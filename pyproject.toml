@@ -31,5 +31,7 @@ pythonpath = ["src"]
 
 [dependency-groups]
 dev = [
+    "py2app>=0.28.10",
+    "pyinstaller>=6.19.0",
     "pytest>=9.0.2",
 ]
