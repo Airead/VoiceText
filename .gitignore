@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+*.egg
+
+# Local configuration files
+*.local
+*.local.*
+.env.local
+.env.*.local
+local.*/
+
+# Environment
+.env
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Logs
+logs/
+
+# py2app
+build/
+dist/
+
+# uv
+uv.lock
