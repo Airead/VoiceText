@@ -5,6 +5,7 @@ A macOS menubar speech-to-text application. Hold a hotkey to record, release to 
 - **Offline-first**: Uses [FunASR](https://github.com/modelscope/FunASR) ONNX models by default — no cloud dependency
 - **Multi-backend**: Supports FunASR (Chinese-optimized) and [MLX-Whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper) (99 languages, Apple Silicon GPU)
 - **AI Enhancement**: Optional LLM-powered text proofreading, formatting, completion, and translation via OpenAI-compatible APIs
+- **Vocabulary Retrieval**: Personal vocabulary index with embedding-based retrieval to improve correction of proper nouns and domain terms
 - **Lightweight**: Runs as a menubar-only app (hidden from Dock)
 
 ## Requirements
@@ -97,6 +98,16 @@ Configure multiple LLM providers and switch between them at runtime from the men
 
 Providers can be added, removed, and verified directly from the menubar UI.
 
+### Vocabulary Retrieval
+
+VoiceText can build a personal vocabulary index from your correction history to improve recognition of proper nouns, technical terms, and domain-specific words. When enabled, relevant vocabulary entries are retrieved via embedding similarity and injected into the LLM prompt as context.
+
+- **Build**: Click **AI Enhance > Build Vocabulary...** to extract terms from `corrections.jsonl` using LLM
+- **Toggle**: Click **AI Enhance > Vocabulary** to enable/disable retrieval during enhancement
+- Uses `fastembed` with a multilingual embedding model for local, offline semantic matching
+
+See [docs/vocabulary-embedding-retrieval.md](docs/vocabulary-embedding-retrieval.md) for detailed design and motivation.
+
 ## Configuration
 
 Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file as a command-line argument to override. Only the fields you want to change are needed; everything else uses defaults.
@@ -137,7 +148,13 @@ Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file 
       }
     },
     "thinking": false,
-    "timeout": 30
+    "timeout": 30,
+    "vocabulary": {
+      "enabled": false,
+      "top_k": 5,
+      "embedding_model": "paraphrase-multilingual-MiniLM-L12-v2",
+      "build_timeout": 600
+    }
   },
   "logging": {
     "level": "INFO"
@@ -170,6 +187,10 @@ Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file 
 | `ai_enhance.default_model` | `"qwen2.5:7b"` | Default LLM model |
 | `ai_enhance.thinking` | `false` | Enable extended thinking for supported models |
 | `ai_enhance.timeout` | `30` | LLM request timeout in seconds |
+| `ai_enhance.vocabulary.enabled` | `false` | Enable vocabulary-based retrieval during enhancement |
+| `ai_enhance.vocabulary.top_k` | `5` | Number of vocabulary entries to retrieve per query |
+| `ai_enhance.vocabulary.embedding_model` | `"paraphrase-multilingual-MiniLM-L12-v2"` | Embedding model for vocabulary index |
+| `ai_enhance.vocabulary.build_timeout` | `600` | Per-batch LLM timeout for vocabulary building (seconds) |
 | `logging.level` | `"INFO"` | Log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 
 ### Environment Variables
@@ -221,9 +242,17 @@ src/voicetext/
 ├── transcriber_mlx.py     # MLX-Whisper backend
 ├── model_registry.py   # Model preset registry and cache management
 ├── enhancer.py         # AI text enhancement (OpenAI-compatible API)
+├── vocabulary.py       # Vocabulary embedding index and retrieval
+├── vocabulary_builder.py # Extract vocabulary from correction logs via LLM
+├── vocab_build_window.py # Vocabulary build progress UI
 ├── punctuation.py      # Punctuation restoration (CT-Transformer)
 └── input.py            # Text injection (clipboard / AppleScript)
 ```
+
+## Documentation
+
+- [AI Enhancement Modes Guide](docs/enhance-modes.md) — how to customize and create enhancement modes
+- [Vocabulary Embedding Retrieval](docs/vocabulary-embedding-retrieval.md) — design and motivation of the vocabulary retrieval system
 
 ## License
 
