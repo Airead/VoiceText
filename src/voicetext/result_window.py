@@ -78,6 +78,7 @@ class ResultPreviewPanel:
         self._build_panel(asr_text, show_enhance)
 
         self._panel.makeKeyAndOrderFront_(None)
+        self._panel.makeFirstResponder_(self._final_text_field)
 
         from AppKit import NSApp
 
