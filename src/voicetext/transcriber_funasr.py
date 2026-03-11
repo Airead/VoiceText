@@ -26,7 +26,7 @@ class FunASRTranscriber(BaseTranscriber):
         self.use_punc = use_punc
         self._asr_model = None
         self._vad_model = None
-        self._punc_model = None
+        self._punc_restorer = None
         self._initialized = False
         self._transcription_count = 0
 
@@ -67,7 +67,7 @@ class FunASRTranscriber(BaseTranscriber):
         if self.use_vad:
             loaders.append(("vad", self._load_vad))
         if self.use_punc:
-            loaders.append(("punc", self._load_punc))
+            loaders.append(("punc", self._load_punc_restorer))
 
         for name, func in loaders:
             t = threading.Thread(target=_load, args=(name, func), daemon=True)
@@ -91,7 +91,9 @@ class FunASRTranscriber(BaseTranscriber):
         """Release all loaded models and free memory."""
         self._asr_model = None
         self._vad_model = None
-        self._punc_model = None
+        if self._punc_restorer:
+            self._punc_restorer.cleanup()
+            self._punc_restorer = None
         self._initialized = False
         self._transcription_count = 0
         gc.collect()
@@ -123,15 +125,8 @@ class FunASRTranscriber(BaseTranscriber):
 
             # Punctuation restoration (optional)
             final_text = raw_text
-            if self.use_punc and self._punc_model and raw_text.strip():
-                try:
-                    punc_result = self._punc_model(raw_text)
-                    if isinstance(punc_result, tuple) and len(punc_result) > 0:
-                        final_text = str(punc_result[0])
-                    else:
-                        final_text = str(punc_result)
-                except Exception as e:
-                    logger.warning("Punctuation restoration failed: %s", e)
+            if self._punc_restorer and raw_text.strip():
+                final_text = self._punc_restorer.restore(raw_text)
 
             self._transcription_count += 1
             if self._transcription_count % 10 == 0:
@@ -239,22 +234,12 @@ class FunASRTranscriber(BaseTranscriber):
             logger.error("Failed to load VAD model: %s", e)
             return False
 
-    def _load_punc(self) -> bool:
+    def _load_punc_restorer(self) -> bool:
         try:
-            from funasr_onnx.punc_bin import CT_Transformer
+            from .punctuation import PunctuationRestorer
 
-            model_dir = self._get_model_dir(MODELS["punc"])
-            use_quantize = os.path.exists(os.path.join(model_dir, "model_quant.onnx"))
-            num_threads = int(os.environ.get("OMP_NUM_THREADS", "8"))
-
-            self._punc_model = CT_Transformer(
-                model_dir,
-                batch_size=1,
-                device_id=-1,
-                quantize=use_quantize,
-                intra_op_num_threads=num_threads,
-            )
-            logger.info("Punctuation model loaded")
+            self._punc_restorer = PunctuationRestorer()
+            self._punc_restorer.initialize()
             return True
         except Exception as e:
             logger.error("Failed to load punctuation model: %s", e)

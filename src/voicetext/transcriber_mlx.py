@@ -23,11 +23,14 @@ class MLXWhisperTranscriber(BaseTranscriber):
         self,
         language: Optional[str] = None,
         model: Optional[str] = None,
+        use_punc: bool = False,
     ) -> None:
         self._model_name = model or DEFAULT_MODEL
         self._language = language
+        self._use_punc = use_punc
         self._initialized = False
         self._mlx_whisper = None
+        self._punc_restorer = None
 
     @property
     def initialized(self) -> bool:
@@ -53,12 +56,22 @@ class MLXWhisperTranscriber(BaseTranscriber):
         # Warm up: run a short silent audio to trigger model download and JIT
         self._warmup()
 
+        # Load punctuation restorer if requested
+        if self._use_punc:
+            from .punctuation import PunctuationRestorer
+
+            self._punc_restorer = PunctuationRestorer()
+            self._punc_restorer.initialize()
+
         elapsed = time.time() - start
         self._initialized = True
         logger.info("mlx-whisper ready in %.1fs", elapsed)
 
     def cleanup(self) -> None:
         """Release mlx-whisper model and free GPU memory."""
+        if self._punc_restorer:
+            self._punc_restorer.cleanup()
+            self._punc_restorer = None
         self._mlx_whisper = None
         self._initialized = False
         gc.collect()
@@ -116,6 +129,10 @@ class MLXWhisperTranscriber(BaseTranscriber):
             )
 
             text = result.get("text", "")
+
+            if self._punc_restorer and text.strip():
+                text = self._punc_restorer.restore(text)
+
             logger.info("Transcription result: %s", text[:100])
             return text
 

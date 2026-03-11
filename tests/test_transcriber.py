@@ -62,7 +62,7 @@ class TestCleanup:
         assert t.initialized is False
         assert t._asr_model is None
         assert t._vad_model is None
-        assert t._punc_model is None
+        assert t._punc_restorer is None
 
     def test_mlx_cleanup(self):
         try:

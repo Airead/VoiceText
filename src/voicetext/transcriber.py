@@ -43,7 +43,7 @@ def create_transcriber(
     Args:
         backend: "funasr" or "mlx-whisper".
         use_vad: Enable voice activity detection (funasr only).
-        use_punc: Enable punctuation restoration (funasr only).
+        use_punc: Enable punctuation restoration.
         language: Language hint (mlx-whisper only, e.g. "zh", "en").
         model: Override default model name/path.
     """
@@ -55,6 +55,6 @@ def create_transcriber(
 
     if backend in ("mlx-whisper", "mlx", "whisper"):
         from .transcriber_mlx import MLXWhisperTranscriber
-        return MLXWhisperTranscriber(language=language, model=model)
+        return MLXWhisperTranscriber(language=language, model=model, use_punc=use_punc)
 
     raise ValueError(f"Unknown ASR backend: {backend!r}. Use 'funasr' or 'mlx-whisper'.")
