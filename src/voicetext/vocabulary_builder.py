@@ -34,10 +34,16 @@ class VocabularyBuilder:
 
         Returns a summary dict with counts.
         """
+        logger.info(
+            "Starting vocabulary build (full_rebuild=%s, corrections=%s)",
+            full_rebuild,
+            self._corrections_path,
+        )
         existing = self._load_existing_vocabulary()
         since = None
         if not full_rebuild and existing:
             since = existing.get("last_processed_timestamp")
+            logger.info("Incremental build since: %s", since)
 
         records = self._read_corrections(since=since)
         if not records:
@@ -45,14 +51,17 @@ class VocabularyBuilder:
             return {"new_records": 0, "new_entries": 0, "total_entries": len(existing.get("entries", []))}
 
         batches = self._batch_records(records, self._batch_size)
+        logger.info("Processing %d records in %d batches", len(records), len(batches))
         all_new_entries: List[Dict[str, Any]] = []
 
-        for batch in batches:
+        for i, batch in enumerate(batches, 1):
             try:
+                logger.info("Extracting batch %d/%d (%d records)...", i, len(batches), len(batch))
                 extracted = await self._extract_batch(batch)
+                logger.info("Batch %d/%d: extracted %d entries", i, len(batches), len(extracted))
                 all_new_entries.extend(extracted)
             except Exception as e:
-                logger.warning("Failed to extract batch: %s", e)
+                logger.warning("Failed to extract batch %d/%d: %s", i, len(batches), e)
 
         existing_entries = existing.get("entries", [])
         merged = self._merge_entries(existing_entries, all_new_entries)

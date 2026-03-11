@@ -627,12 +627,15 @@ Output only the processed text without any explanation."""
             rumps.alert("AI Enhance is not configured.")
             return
 
+        logger.info("Starting vocabulary build...")
+
         def _build():
             import asyncio as _asyncio
 
             from .vocabulary_builder import VocabularyBuilder
 
             ai_cfg = self._config.get("ai_enhance", {})
+            logger.info("VocabularyBuilder initializing...")
             builder = VocabularyBuilder(ai_cfg)
 
             old_title = self.title
