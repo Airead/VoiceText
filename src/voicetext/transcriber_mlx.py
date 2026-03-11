@@ -43,11 +43,10 @@ class MLXWhisperTranscriber(BaseTranscriber):
 
         try:
             import mlx_whisper
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
-                "mlx-whisper is not installed. "
-                "Install it with: uv add mlx-whisper"
-            )
+                f"Failed to import mlx-whisper: {e}"
+            ) from e
 
         self._mlx_whisper = mlx_whisper
 
