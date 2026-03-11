@@ -18,7 +18,7 @@ from CoreFoundation import kCFBooleanTrue
 
 from .config import load_config, save_config
 from .correction_log import CorrectionLogger
-from .enhancer import EnhanceMode, TextEnhancer, create_enhancer
+from .enhancer import MODE_OFF, TextEnhancer, create_enhancer
 from .result_window import ResultPreviewPanel
 from .hotkey import HoldHotkeyListener
 from .input import type_text
@@ -120,30 +120,33 @@ class VoiceTextApp(rumps.App):
         # AI Enhance
         self._enhancer = create_enhancer(self._config)
         ai_cfg = self._config.get("ai_enhance", {})
-        self._enhance_mode = EnhanceMode(ai_cfg.get("mode", "proofread"))
+        self._enhance_mode: str = ai_cfg.get("mode", "proofread")
         if self._enhancer and not ai_cfg.get("enabled", False):
-            self._enhance_mode = EnhanceMode.OFF
+            self._enhance_mode = MODE_OFF
 
         # AI Enhance submenu
         self._enhance_menu = rumps.MenuItem("AI Enhance")
         self._enhance_menu_items: Dict[str, rumps.MenuItem] = {}
-        _mode_labels = {
-            "off": "Off",
-            "proofread": "纠错润色",
-            "format": "格式化",
-            "complete": "智能补全",
-            "enhance": "全面增强",
-            "translate_en": "翻译为英文",
-        }
-        for mode in EnhanceMode:
-            label = _mode_labels.get(mode.value, mode.value)
-            item = rumps.MenuItem(label)
-            item._enhance_mode = mode
-            item.set_callback(self._on_enhance_mode_select)
-            if mode == self._enhance_mode:
-                item.state = 1
-            self._enhance_menu_items[mode.value] = item
-            self._enhance_menu.add(item)
+
+        # Fixed "Off" item
+        off_item = rumps.MenuItem("Off")
+        off_item._enhance_mode = MODE_OFF
+        off_item.set_callback(self._on_enhance_mode_select)
+        if self._enhance_mode == MODE_OFF:
+            off_item.state = 1
+        self._enhance_menu_items[MODE_OFF] = off_item
+        self._enhance_menu.add(off_item)
+
+        # Dynamic mode items from enhancer
+        if self._enhancer:
+            for mode_id, label in self._enhancer.available_modes:
+                item = rumps.MenuItem(label)
+                item._enhance_mode = mode_id
+                item.set_callback(self._on_enhance_mode_select)
+                if mode_id == self._enhance_mode:
+                    item.state = 1
+                self._enhance_menu_items[mode_id] = item
+                self._enhance_menu.add(item)
 
         # Provider submenu
         self._enhance_menu.add(rumps.separator)
@@ -315,7 +318,7 @@ class VoiceTextApp(rumps.App):
                         asr_text=correction_info["asr_text"],
                         enhanced_text=correction_info["enhanced_text"],
                         final_text=correction_info["final_text"],
-                        enhance_mode=self._enhance_mode.value,
+                        enhance_mode=self._enhance_mode,
                     )
                 except Exception as e:
                     logger.error("Failed to log correction: %s", e)
@@ -378,13 +381,13 @@ class VoiceTextApp(rumps.App):
 
         # Update checkmarks
         for m, item in self._enhance_menu_items.items():
-            item.state = 1 if m == mode.value else 0
+            item.state = 1 if m == mode else 0
 
         self._enhance_mode = mode
 
         # Update enhancer state
         if self._enhancer:
-            if mode == EnhanceMode.OFF:
+            if mode == MODE_OFF:
                 self._enhancer._enabled = False
             else:
                 self._enhancer._enabled = True
@@ -392,10 +395,10 @@ class VoiceTextApp(rumps.App):
 
         # Persist to config
         self._config.setdefault("ai_enhance", {})
-        self._config["ai_enhance"]["enabled"] = mode != EnhanceMode.OFF
-        self._config["ai_enhance"]["mode"] = mode.value
+        self._config["ai_enhance"]["enabled"] = mode != MODE_OFF
+        self._config["ai_enhance"]["mode"] = mode
         save_config(self._config, self._config_path)
-        logger.info("AI enhance mode set to: %s", mode.value)
+        logger.info("AI enhance mode set to: %s", mode)
 
     def _on_enhance_provider_select(self, sender) -> None:
         """Handle AI enhance provider menu item click."""

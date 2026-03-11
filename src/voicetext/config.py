@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG_DIR = os.path.join("~", ".config", "VoiceText")
 DEFAULT_CONFIG_PATH = os.path.join(DEFAULT_CONFIG_DIR, "config.json")
+DEFAULT_ENHANCE_MODES_DIR = os.path.join(DEFAULT_CONFIG_DIR, "enhance_modes")
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "hotkey": "fn",

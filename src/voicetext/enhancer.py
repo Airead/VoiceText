@@ -4,58 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
+from .mode_loader import (
+    MODE_OFF,
+    ModeDefinition,
+    ensure_default_modes,
+    get_sorted_modes,
+    load_modes,
+)
+
 logger = logging.getLogger(__name__)
-
-
-class EnhanceMode(Enum):
-    """Available enhancement modes."""
-
-    OFF = "off"
-    PROOFREAD = "proofread"
-    FORMAT = "format"
-    COMPLETE = "complete"
-    ENHANCE = "enhance"
-    TRANSLATE_EN = "translate_en"
-
-
-_MODE_PROMPTS: Dict[EnhanceMode, str] = {
-    EnhanceMode.PROOFREAD: (
-        "你是一个文本纠错润色助手。请修正用户输入中的错别字、语法错误和标点符号问题。"
-        "保持原文的语义和风格不变，只做必要的修正。"
-        "直接输出修正后的文本，不要添加任何解释或说明。"
-    ),
-    EnhanceMode.FORMAT: (
-        "你是一个文本格式化助手。请将用户输入的口语化文本转换为书面语，"
-        "并适当调整结构使其更加清晰易读。"
-        "保持原文的核心语义不变。"
-        "直接输出格式化后的文本，不要添加任何解释或说明。"
-    ),
-    EnhanceMode.COMPLETE: (
-        "你是一个智能文本补全助手。请补全用户输入中不完整的句子，"
-        "使其成为完整、通顺的表达。"
-        "保持原文的语义和风格不变，只补全缺失的部分。"
-        "直接输出补全后的文本，不要添加任何解释或说明。"
-    ),
-    EnhanceMode.ENHANCE: (
-        "你是一个全面的文本增强助手。请对用户输入进行以下处理：\n"
-        "1. 修正错别字和语法错误\n"
-        "2. 修正标点符号\n"
-        "3. 将口语化表达转换为书面语\n"
-        "4. 补全不完整的句子\n"
-        "5. 适当调整结构使其更加清晰\n"
-        "保持原文的核心语义不变。"
-        "直接输出增强后的文本，不要添加任何解释或说明。"
-    ),
-    EnhanceMode.TRANSLATE_EN: (
-        "You are a Chinese-to-English translator. "
-        "Translate the user's Chinese input into natural, fluent English. "
-        "Preserve the original meaning and tone. "
-        "Output only the translated text without any explanation."
-    ),
-}
 
 
 class TextEnhancer:
@@ -63,9 +22,22 @@ class TextEnhancer:
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self._enabled = config.get("enabled", False)
-        self._mode = EnhanceMode(config.get("mode", "proofread"))
         self._timeout = config.get("timeout", 30)
         self._thinking = config.get("thinking", False)
+
+        # Load enhancement modes from external files
+        ensure_default_modes()
+        self._modes: Dict[str, ModeDefinition] = load_modes()
+
+        raw_mode = config.get("mode", "proofread")
+        if raw_mode != MODE_OFF and raw_mode not in self._modes:
+            # Fallback to first available mode
+            first = next(iter(self._modes)) if self._modes else MODE_OFF
+            logger.warning(
+                "Unknown mode '%s', falling back to '%s'", raw_mode, first
+            )
+            raw_mode = first
+        self._mode: str = raw_mode
 
         # Multi-provider support: name -> (AsyncOpenAI client, models list, extra_body)
         self._providers: Dict[str, Tuple[Any, List[str], Dict[str, Any]]] = {}
@@ -110,17 +82,26 @@ class TextEnhancer:
             logger.warning("Failed to initialize AI provider %s: %s", name, e)
 
     @property
-    def mode(self) -> EnhanceMode:
+    def mode(self) -> str:
         return self._mode
 
     @mode.setter
-    def mode(self, value: EnhanceMode) -> None:
+    def mode(self, value: str) -> None:
         self._mode = value
-        logger.info("AI enhance mode changed to: %s", value.value)
+        logger.info("AI enhance mode changed to: %s", value)
 
     @property
     def is_active(self) -> bool:
-        return self._enabled and self._mode != EnhanceMode.OFF
+        return self._enabled and self._mode != MODE_OFF
+
+    @property
+    def available_modes(self) -> List[Tuple[str, str]]:
+        """Return (mode_id, label) pairs sorted by order."""
+        return get_sorted_modes(self._modes)
+
+    def reload_modes(self) -> None:
+        """Reload mode definitions from external files."""
+        self._modes = load_modes()
 
     @property
     def thinking(self) -> bool:
@@ -271,8 +252,8 @@ class TextEnhancer:
             logger.warning("AI enhancer not available, returning original text")
             return text
 
-        prompt = _MODE_PROMPTS.get(self._mode)
-        if not prompt:
+        mode_def = self._modes.get(self._mode)
+        if not mode_def:
             return text
 
         try:
@@ -281,7 +262,7 @@ class TextEnhancer:
             kwargs: Dict[str, Any] = {
                 "model": self._active_model,
                 "messages": [
-                    {"role": "system", "content": prompt},
+                    {"role": "system", "content": mode_def.prompt},
                     {"role": "user", "content": text.strip()},
                 ],
             }

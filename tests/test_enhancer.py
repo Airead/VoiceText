@@ -7,34 +7,28 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from voicetext.enhancer import EnhanceMode, TextEnhancer, create_enhancer
-
-
-# --- EnhanceMode enum tests ---
-
-
-class TestEnhanceMode:
-    def test_all_modes_exist(self):
-        assert EnhanceMode.OFF.value == "off"
-        assert EnhanceMode.PROOFREAD.value == "proofread"
-        assert EnhanceMode.FORMAT.value == "format"
-        assert EnhanceMode.COMPLETE.value == "complete"
-        assert EnhanceMode.ENHANCE.value == "enhance"
-        assert EnhanceMode.TRANSLATE_EN.value == "translate_en"
-
-    def test_mode_count(self):
-        assert len(EnhanceMode) == 6
-
-    def test_from_string(self):
-        assert EnhanceMode("proofread") == EnhanceMode.PROOFREAD
-        assert EnhanceMode("off") == EnhanceMode.OFF
-
-    def test_invalid_mode_raises(self):
-        with pytest.raises(ValueError):
-            EnhanceMode("invalid_mode")
+from voicetext.enhancer import MODE_OFF, TextEnhancer, create_enhancer
+from voicetext.mode_loader import ModeDefinition
 
 
 # --- TextEnhancer tests ---
+
+# Default modes used in tests
+_TEST_MODES = {
+    "proofread": ModeDefinition("proofread", "纠错润色", "proofread prompt", 10),
+    "format": ModeDefinition("format", "格式化", "format prompt", 20),
+    "complete": ModeDefinition("complete", "智能补全", "complete prompt", 30),
+    "enhance": ModeDefinition("enhance", "全面增强", "enhance prompt", 40),
+    "translate_en": ModeDefinition("translate_en", "翻译为英文", "translate prompt", 50),
+}
+
+
+@pytest.fixture(autouse=True)
+def _patch_mode_loading():
+    """Auto-patch mode loading for all enhancer tests."""
+    with patch("voicetext.enhancer.ensure_default_modes"), \
+         patch("voicetext.enhancer.load_modes", return_value=dict(_TEST_MODES)):
+        yield
 
 
 def _make_config(**overrides):
@@ -109,13 +103,28 @@ class TestTextEnhancerMode:
     def test_mode_getter(self):
         with patch("voicetext.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(mode="format"))
-        assert enhancer.mode == EnhanceMode.FORMAT
+        assert enhancer.mode == "format"
 
     def test_mode_setter(self):
         with patch("voicetext.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(mode="proofread"))
-        enhancer.mode = EnhanceMode.ENHANCE
-        assert enhancer.mode == EnhanceMode.ENHANCE
+        enhancer.mode = "enhance"
+        assert enhancer.mode == "enhance"
+
+    def test_unknown_mode_falls_back(self):
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(_make_config(mode="nonexistent"))
+        # Should fall back to first available mode
+        assert enhancer.mode in _TEST_MODES
+
+    def test_available_modes(self):
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(_make_config())
+        modes = enhancer.available_modes
+        assert len(modes) == 5
+        # Should be sorted by order
+        assert modes[0] == ("proofread", "纠错润色")
+        assert modes[-1] == ("translate_en", "翻译为英文")
 
 
 class TestTextEnhancerProviderModel:
