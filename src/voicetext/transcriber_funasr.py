@@ -87,6 +87,16 @@ class FunASRTranscriber(BaseTranscriber):
 
         self._warmup_librosa()
 
+    def cleanup(self) -> None:
+        """Release all loaded models and free memory."""
+        self._asr_model = None
+        self._vad_model = None
+        self._punc_model = None
+        self._initialized = False
+        self._transcription_count = 0
+        gc.collect()
+        logger.info("FunASR models cleaned up")
+
     def transcribe(self, wav_data: bytes) -> str:
         """Transcribe WAV audio bytes to text."""
         if not self._initialized:

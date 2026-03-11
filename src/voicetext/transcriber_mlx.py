@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import logging
 import os
 import tempfile
@@ -56,6 +57,19 @@ class MLXWhisperTranscriber(BaseTranscriber):
         elapsed = time.time() - start
         self._initialized = True
         logger.info("mlx-whisper ready in %.1fs", elapsed)
+
+    def cleanup(self) -> None:
+        """Release mlx-whisper model and free GPU memory."""
+        self._mlx_whisper = None
+        self._initialized = False
+        gc.collect()
+        try:
+            import mlx.core as mx
+
+            mx.metal.clear_cache()
+        except Exception:
+            pass
+        logger.info("mlx-whisper model cleaned up")
 
     def _warmup(self) -> None:
         """Run a tiny transcription to preload the model."""

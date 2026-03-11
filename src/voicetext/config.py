@@ -28,6 +28,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "use_punc": True,
         "language": None,
         "model": None,
+        "preset": None,
     },
     "output": {
         "method": "auto",
@@ -77,6 +78,25 @@ def _ensure_default_config(config_path: str) -> None:
         f.write("\n")
 
     logger.info("Created default config: %s", config_path)
+
+
+def save_config(config: Dict[str, Any], path: Optional[str] = None) -> None:
+    """Save configuration to a JSON file.
+
+    If no path is given, uses ~/.config/VoiceText/config.json.
+    """
+    if not path:
+        path = DEFAULT_CONFIG_PATH
+
+    expanded = os.path.expanduser(path)
+    config_dir = os.path.dirname(expanded)
+    os.makedirs(config_dir, exist_ok=True)
+
+    with open(expanded, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+    logger.info("Config saved to %s", expanded)
 
 
 def load_config(path: Optional[str] = None) -> Dict[str, Any]:

@@ -6,7 +6,7 @@ import tempfile
 
 import pytest
 
-from voicetext.config import DEFAULT_CONFIG, load_config, _merge_dict
+from voicetext.config import DEFAULT_CONFIG, load_config, save_config, _merge_dict
 
 
 class TestMergeDict:
@@ -73,3 +73,36 @@ class TestLoadConfig:
         config = load_config(str(config_file))
         assert config_file.exists()
         assert config == DEFAULT_CONFIG
+
+    def test_default_config_has_preset_field(self):
+        assert "preset" in DEFAULT_CONFIG["asr"]
+        assert DEFAULT_CONFIG["asr"]["preset"] is None
+
+
+class TestSaveConfig:
+    def test_save_and_reload(self, tmp_path):
+        config_file = tmp_path / "config.json"
+        config = dict(DEFAULT_CONFIG)
+        config["asr"] = dict(config["asr"])
+        config["asr"]["preset"] = "mlx-whisper-tiny"
+        save_config(config, str(config_file))
+
+        assert config_file.exists()
+        loaded = load_config(str(config_file))
+        assert loaded["asr"]["preset"] == "mlx-whisper-tiny"
+
+    def test_save_creates_parent_dirs(self, tmp_path):
+        config_file = tmp_path / "sub" / "dir" / "config.json"
+        save_config(DEFAULT_CONFIG, str(config_file))
+        assert config_file.exists()
+
+    def test_save_overwrites_existing(self, tmp_path):
+        config_file = tmp_path / "config.json"
+        save_config(DEFAULT_CONFIG, str(config_file))
+
+        modified = dict(DEFAULT_CONFIG)
+        modified["hotkey"] = "f5"
+        save_config(modified, str(config_file))
+
+        loaded = load_config(str(config_file))
+        assert loaded["hotkey"] == "f5"

@@ -25,6 +25,10 @@ class BaseTranscriber(abc.ABC):
     def transcribe(self, wav_data: bytes) -> str:
         """Transcribe WAV audio bytes to text."""
 
+    @abc.abstractmethod
+    def cleanup(self) -> None:
+        """Release model resources. After this, initialized should return False."""
+
 
 def create_transcriber(
     backend: str = "funasr",

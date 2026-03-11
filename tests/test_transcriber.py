@@ -50,3 +50,29 @@ class TestCreateTranscriber:
     def test_unknown_backend_raises(self):
         with pytest.raises(ValueError, match="Unknown ASR backend"):
             create_transcriber(backend="unknown")
+
+
+class TestCleanup:
+    def test_funasr_cleanup(self):
+        t = FunASRTranscriber(use_vad=False, use_punc=False)
+        # Simulate initialized state
+        t._initialized = True
+        t._asr_model = "fake_model"
+        t.cleanup()
+        assert t.initialized is False
+        assert t._asr_model is None
+        assert t._vad_model is None
+        assert t._punc_model is None
+
+    def test_mlx_cleanup(self):
+        try:
+            from voicetext.transcriber_mlx import MLXWhisperTranscriber
+        except ImportError:
+            pytest.skip("mlx-whisper not installed")
+
+        t = MLXWhisperTranscriber()
+        t._initialized = True
+        t._mlx_whisper = "fake_module"
+        t.cleanup()
+        assert t.initialized is False
+        assert t._mlx_whisper is None
