@@ -4,14 +4,20 @@
 import os
 import sys
 
+from PyInstaller.utils.hooks import collect_all, collect_dynamic_libs
+
 block_cipher = None
+
+# Collect mlx native extensions (.so, .dylib, .metallib) and data files
+mlx_datas, mlx_binaries, mlx_hiddenimports = collect_all('mlx')
+mlx_whisper_datas, mlx_whisper_binaries, mlx_whisper_hiddenimports = collect_all('mlx_whisper')
 
 a = Analysis(
     ['src/voicetext/__main__.py'],
     pathex=['src'],
-    binaries=[],
-    datas=[],
-    hiddenimports=[
+    binaries=mlx_binaries + mlx_whisper_binaries,
+    datas=mlx_datas + mlx_whisper_datas,
+    hiddenimports=mlx_hiddenimports + mlx_whisper_hiddenimports + [
         'voicetext',
         'voicetext.config',
         'voicetext.hotkey',
@@ -19,6 +25,7 @@ a = Analysis(
         'voicetext.transcriber',
         'voicetext.transcriber_funasr',
         'voicetext.transcriber_mlx',
+        'voicetext.model_registry',
         'voicetext.input',
         'rumps',
         'sounddevice',
@@ -37,8 +44,6 @@ a = Analysis(
         'pynput.keyboard._darwin',
         'onnxruntime',
         'sentencepiece',
-        'mlx',
-        'mlx_whisper',
         'tiktoken',
         'huggingface_hub',
         'ApplicationServices',
@@ -70,7 +75,7 @@ exe = EXE(
     upx=False,
     console=False,
     target_arch=None,
-    codesign_identity=None,
+    codesign_identity=os.environ.get('CODESIGN_IDENTITY', 'VoiceText Dev'),
     entitlements_file=None,
 )
 
@@ -89,7 +94,7 @@ app = BUNDLE(
     name='VoiceText.app',
     icon=None,
     bundle_identifier='com.voicetext.app',
-    codesign_identity=os.environ.get('CODESIGN_IDENTITY', '-'),
+    codesign_identity=os.environ.get('CODESIGN_IDENTITY', 'VoiceText Dev'),
     info_plist={
         'CFBundleName': 'VoiceText',
         'CFBundleDisplayName': 'VoiceText',
