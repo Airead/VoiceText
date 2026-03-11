@@ -35,6 +35,16 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "method": "auto",
         "append_newline": False,
     },
+    "ai_enhance": {
+        "enabled": False,
+        "mode": "proofread",
+        "provider": {
+            "base_url": "http://localhost:11434/v1",
+            "api_key": "ollama",
+            "model": "qwen2.5:7b",
+        },
+        "timeout": 30,
+    },
     "logging": {
         "level": "INFO",
     },

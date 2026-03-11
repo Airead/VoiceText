@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import logging.handlers
 import os
@@ -16,6 +17,7 @@ from ApplicationServices import AXIsProcessTrusted, AXIsProcessTrustedWithOption
 from CoreFoundation import kCFBooleanTrue
 
 from .config import load_config, save_config
+from .enhancer import EnhanceMode, TextEnhancer, create_enhancer
 from .hotkey import HoldHotkeyListener
 from .input import type_text
 from .model_registry import (
@@ -110,6 +112,33 @@ class VoiceTextApp(rumps.App):
             self._model_menu_items[preset.id] = item
             self._model_menu.add(item)
 
+        # AI Enhance
+        self._enhancer = create_enhancer(self._config)
+        ai_cfg = self._config.get("ai_enhance", {})
+        self._enhance_mode = EnhanceMode(ai_cfg.get("mode", "proofread"))
+        if self._enhancer and not ai_cfg.get("enabled", False):
+            self._enhance_mode = EnhanceMode.OFF
+
+        # AI Enhance submenu
+        self._enhance_menu = rumps.MenuItem("AI Enhance")
+        self._enhance_menu_items: Dict[str, rumps.MenuItem] = {}
+        _mode_labels = {
+            "off": "Off",
+            "proofread": "纠错润色",
+            "format": "格式化",
+            "complete": "智能补全",
+            "enhance": "全面增强",
+        }
+        for mode in EnhanceMode:
+            label = _mode_labels.get(mode.value, mode.value)
+            item = rumps.MenuItem(label)
+            item._enhance_mode = mode
+            item.set_callback(self._on_enhance_mode_select)
+            if mode == self._enhance_mode:
+                item.state = 1
+            self._enhance_menu_items[mode.value] = item
+            self._enhance_menu.add(item)
+
         self._copy_log_item = rumps.MenuItem(
             "Copy Log Path", callback=self._on_copy_log_path
         )
@@ -119,6 +148,7 @@ class VoiceTextApp(rumps.App):
             self._hotkey_item,
             None,
             self._model_menu,
+            self._enhance_menu,
             self._copy_log_item,
             None,
         ]
@@ -173,6 +203,18 @@ class VoiceTextApp(rumps.App):
             try:
                 text = self._transcriber.transcribe(wav_data)
                 if text and text.strip():
+                    # AI enhancement step
+                    if self._enhancer and self._enhancer.is_active:
+                        self._set_status("Enhancing...")
+                        try:
+                            loop = asyncio.new_event_loop()
+                            text = loop.run_until_complete(
+                                self._enhancer.enhance(text)
+                            )
+                            loop.close()
+                        except Exception as e:
+                            logger.error("AI enhancement failed: %s", e)
+
                     type_text(
                         text.strip(),
                         append_newline=self._append_newline,
@@ -189,6 +231,31 @@ class VoiceTextApp(rumps.App):
                 self._busy = False
 
         threading.Thread(target=_do_transcribe, daemon=True).start()
+
+    def _on_enhance_mode_select(self, sender) -> None:
+        """Handle AI enhance mode menu item click."""
+        mode = sender._enhance_mode
+
+        # Update checkmarks
+        for m, item in self._enhance_menu_items.items():
+            item.state = 1 if m == mode.value else 0
+
+        self._enhance_mode = mode
+
+        # Update enhancer state
+        if self._enhancer:
+            if mode == EnhanceMode.OFF:
+                self._enhancer._enabled = False
+            else:
+                self._enhancer._enabled = True
+                self._enhancer.mode = mode
+
+        # Persist to config
+        self._config.setdefault("ai_enhance", {})
+        self._config["ai_enhance"]["enabled"] = mode != EnhanceMode.OFF
+        self._config["ai_enhance"]["mode"] = mode.value
+        save_config(self._config, self._config_path)
+        logger.info("AI enhance mode set to: %s", mode.value)
 
     def _on_copy_log_path(self, _) -> None:
         """Copy the log file path to clipboard."""
