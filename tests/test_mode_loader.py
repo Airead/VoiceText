@@ -202,3 +202,19 @@ class TestBuiltinModes:
     def test_builtin_modes_have_unique_orders(self):
         orders = [m.order for m in _BUILTIN_MODES.values()]
         assert len(orders) == len(set(orders))
+
+
+class TestAddModeTemplate:
+    """Verify the add-mode template used in the UI is parseable."""
+
+    def test_template_is_parseable(self, tmp_path):
+        from voicetext.app import VoiceTextApp
+
+        template = VoiceTextApp._ADD_MODE_TEMPLATE
+        f = tmp_path / "template.md"
+        f.write_text(template, encoding="utf-8")
+        result = parse_mode_file(str(f))
+        assert result is not None
+        assert result.label == "My New Mode"
+        assert result.order == 60
+        assert "helpful assistant" in result.prompt

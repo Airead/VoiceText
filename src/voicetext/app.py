@@ -148,6 +148,13 @@ class VoiceTextApp(rumps.App):
                 self._enhance_menu_items[mode_id] = item
                 self._enhance_menu.add(item)
 
+        # Add Mode item
+        self._enhance_menu.add(rumps.separator)
+        self._enhance_add_mode_item = rumps.MenuItem(
+            "Add Mode...", callback=self._on_enhance_add_mode
+        )
+        self._enhance_menu.add(self._enhance_add_mode_item)
+
         # Provider submenu
         self._enhance_menu.add(rumps.separator)
         self._enhance_provider_menu = rumps.MenuItem("Provider")
@@ -399,6 +406,135 @@ class VoiceTextApp(rumps.App):
         self._config["ai_enhance"]["mode"] = mode
         save_config(self._config, self._config_path)
         logger.info("AI enhance mode set to: %s", mode)
+
+    _ADD_MODE_TEMPLATE = """\
+---
+label: My New Mode
+order: 60
+---
+You are a helpful assistant. Process the user's input as follows:
+1. Describe what this mode should do
+2. Add more instructions here
+
+Output only the processed text without any explanation."""
+
+    def _on_enhance_add_mode(self, _) -> None:
+        """Show dialog for adding a new enhancement mode."""
+        try:
+            self._do_add_mode()
+        except Exception as e:
+            logger.error("Add mode failed: %s", e, exc_info=True)
+        finally:
+            self._restore_accessory()
+
+    def _do_add_mode(self) -> None:
+        """Internal implementation for adding a new enhancement mode file."""
+        from .mode_loader import DEFAULT_MODES_DIR, parse_mode_file
+
+        resp = self._run_multiline_window(
+            title="Add Enhancement Mode",
+            message=(
+                "Edit the template below, then click Save.\n\n"
+                "  label  – display name in menu\n"
+                "  order  – sort weight (smaller = higher)\n"
+                "  body   – system prompt for the LLM"
+            ),
+            default_text=self._ADD_MODE_TEMPLATE,
+            ok="Save",
+            dimensions=(420, 220),
+        )
+        if resp is None:
+            return
+
+        # Ask for filename (mode ID)
+        name_resp = self._run_window(
+            title="Mode ID",
+            message=(
+                "Enter a short ID for this mode (used as filename).\n"
+                "Only letters, numbers, hyphens, and underscores."
+            ),
+            default_text="my_mode",
+        )
+        if name_resp is None:
+            return
+
+        import re
+        mode_id = name_resp.text.strip()
+        if not mode_id or not re.match(r"^[A-Za-z0-9_-]+$", mode_id):
+            self._activate_for_dialog()
+            rumps.alert(
+                "Invalid ID",
+                "Mode ID must contain only letters, numbers, hyphens, or underscores.",
+            )
+            return
+
+        modes_dir = os.path.expanduser(DEFAULT_MODES_DIR)
+        os.makedirs(modes_dir, exist_ok=True)
+        file_path = os.path.join(modes_dir, f"{mode_id}.md")
+
+        if os.path.exists(file_path):
+            self._activate_for_dialog()
+            rumps.alert(
+                "Already Exists",
+                f"A mode file '{mode_id}.md' already exists.\n"
+                "Edit it directly or choose a different ID.",
+            )
+            return
+
+        # Validate that the content is parseable
+        # Write to a temp location first to validate
+        import tempfile
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", delete=False, encoding="utf-8"
+        ) as tmp:
+            tmp.write(resp.text)
+            tmp_path = tmp.name
+
+        try:
+            mode_def = parse_mode_file(tmp_path)
+        finally:
+            os.unlink(tmp_path)
+
+        if mode_def is None or not mode_def.prompt.strip():
+            self._activate_for_dialog()
+            rumps.alert("Invalid Content", "The mode file has no prompt content.")
+            return
+
+        # Save the file
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(resp.text)
+            if not resp.text.endswith("\n"):
+                f.write("\n")
+        logger.info("Created new mode file: %s", file_path)
+
+        # Reload modes and rebuild menu
+        if self._enhancer:
+            self._enhancer.reload_modes()
+            self._rebuild_enhance_mode_menu()
+
+        self._activate_for_dialog()
+        rumps.alert("Mode Added", f"Enhancement mode '{mode_id}' has been added.")
+
+    def _rebuild_enhance_mode_menu(self) -> None:
+        """Rebuild mode menu items from current enhancer modes."""
+        # Remove old mode items (keep Off)
+        for mode_id, item in list(self._enhance_menu_items.items()):
+            if mode_id != MODE_OFF:
+                self._enhance_menu.pop(item.title)
+                del self._enhance_menu_items[mode_id]
+
+        # Re-add from enhancer, inserting before "Add Mode..."
+        if self._enhancer:
+            for mode_id, label in self._enhancer.available_modes:
+                item = rumps.MenuItem(label)
+                item._enhance_mode = mode_id
+                item.set_callback(self._on_enhance_mode_select)
+                if mode_id == self._enhance_mode:
+                    item.state = 1
+                self._enhance_menu_items[mode_id] = item
+                self._enhance_menu.insert_before(
+                    self._enhance_add_mode_item.title, item
+                )
 
     def _on_enhance_provider_select(self, sender) -> None:
         """Handle AI enhance provider menu item click."""
