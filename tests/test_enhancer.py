@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from voicetext.enhancer import MODE_OFF, TextEnhancer, create_enhancer
+from voicetext.enhancer import MODE_OFF, TextEnhancer, build_disable_thinking_body, create_enhancer
 from voicetext.mode_loader import ModeDefinition
 from voicetext.vocabulary import VocabularyEntry, VocabularyIndex
 
@@ -640,11 +640,19 @@ class TestThinkingAndExtraBody:
         enhancer.thinking = True
         assert enhancer.thinking is True
 
-    def test_build_extra_body_thinking_off(self):
+    def test_build_extra_body_thinking_off_qwen(self):
         with patch("voicetext.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=False))
+            enhancer._active_model = "qwen2.5:7b"
         result = enhancer._build_extra_body({})
         assert result == {"chat_template_kwargs": {"enable_thinking": False}}
+
+    def test_build_extra_body_thinking_off_glm(self):
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(_make_config(thinking=False))
+            enhancer._active_model = "glm-4-flash"
+        result = enhancer._build_extra_body({})
+        assert result == {"thinking": {"type": "disabled"}}
 
     def test_build_extra_body_thinking_on(self):
         with patch("voicetext.enhancer.TextEnhancer._init_providers"):
@@ -655,18 +663,44 @@ class TestThinkingAndExtraBody:
     def test_build_extra_body_provider_overrides(self):
         with patch("voicetext.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=False))
+            enhancer._active_model = "qwen2.5:7b"
         provider_extra = {"chat_template_kwargs": {"enable_thinking": True}}
         result = enhancer._build_extra_body(provider_extra)
         # Provider-level extra_body overrides thinking toggle
         assert result["chat_template_kwargs"]["enable_thinking"] is True
 
+    def test_build_extra_body_provider_overrides_glm(self):
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(_make_config(thinking=False))
+            enhancer._active_model = "glm-4-flash"
+        provider_extra = {"thinking": {"type": "enabled"}}
+        result = enhancer._build_extra_body(provider_extra)
+        assert result["thinking"]["type"] == "enabled"
+
     def test_build_extra_body_merges_provider_fields(self):
         with patch("voicetext.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=False))
+            enhancer._active_model = "qwen2.5:7b"
         provider_extra = {"custom_field": "value"}
         result = enhancer._build_extra_body(provider_extra)
         assert result["chat_template_kwargs"] == {"enable_thinking": False}
         assert result["custom_field"] == "value"
+
+    def test_build_disable_thinking_body_qwen(self):
+        result = build_disable_thinking_body("qwen2.5:7b")
+        assert result == {"chat_template_kwargs": {"enable_thinking": False}}
+
+    def test_build_disable_thinking_body_glm(self):
+        result = build_disable_thinking_body("glm-4-flash")
+        assert result == {"thinking": {"type": "disabled"}}
+
+    def test_build_disable_thinking_body_glm_case_insensitive(self):
+        result = build_disable_thinking_body("GLM-4")
+        assert result == {"thinking": {"type": "disabled"}}
+
+    def test_build_disable_thinking_body_empty(self):
+        result = build_disable_thinking_body("")
+        assert result == {"chat_template_kwargs": {"enable_thinking": False}}
 
     def test_enhance_passes_extra_body_when_thinking_off(self):
         mock_client = _make_mock_client("enhanced")
@@ -682,6 +716,22 @@ class TestThinkingAndExtraBody:
         call_kwargs = mock_client.chat.completions.create.call_args
         assert call_kwargs.kwargs.get("extra_body") == {
             "chat_template_kwargs": {"enable_thinking": False}
+        }
+
+    def test_enhance_passes_extra_body_when_thinking_off_glm(self):
+        mock_client = _make_mock_client("enhanced")
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(_make_config(enabled=True, thinking=False))
+            enhancer._providers = {
+                "zhipu": (mock_client, ["glm-4-flash"], {}),
+            }
+            enhancer._active_provider = "zhipu"
+            enhancer._active_model = "glm-4-flash"
+
+        asyncio.get_event_loop().run_until_complete(enhancer.enhance("hello"))
+        call_kwargs = mock_client.chat.completions.create.call_args
+        assert call_kwargs.kwargs.get("extra_body") == {
+            "thinking": {"type": "disabled"}
         }
 
     def test_enhance_no_extra_body_when_thinking_on(self):

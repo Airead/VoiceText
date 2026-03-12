@@ -18,6 +18,17 @@ from .vocabulary import VocabularyIndex
 logger = logging.getLogger(__name__)
 
 
+def build_disable_thinking_body(model: str) -> Dict[str, Any]:
+    """Build extra_body parameters to disable thinking for a given model.
+
+    - GLM models: {"thinking": {"type": "disabled"}}
+    - Other models (Qwen etc.): {"chat_template_kwargs": {"enable_thinking": False}}
+    """
+    if model and "glm" in model.lower():
+        return {"thinking": {"type": "disabled"}}
+    return {"chat_template_kwargs": {"enable_thinking": False}}
+
+
 class TextEnhancer:
     """Enhance transcribed text using LLM via OpenAI-compatible API."""
 
@@ -263,7 +274,7 @@ class TextEnhancer:
         """
         result: Dict[str, Any] = {}
         if not self._thinking:
-            result["chat_template_kwargs"] = {"enable_thinking": False}
+            result = build_disable_thinking_body(self._active_model)
         if provider_extra_body:
             result.update(provider_extra_body)
         return result
