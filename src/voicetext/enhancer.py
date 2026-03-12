@@ -44,6 +44,8 @@ class TextEnhancer:
 
         # Last system prompt used in enhance()
         self._last_system_prompt: str = ""
+        # Active stream reference for cancellation
+        self._active_stream: Any = None
 
         # Load enhancement modes from external files
         ensure_default_modes()
@@ -544,29 +546,39 @@ class TextEnhancer:
                 client.chat.completions.create(**kwargs),
                 timeout=self._timeout,
             )
+            # Expose stream so callers can close it on cancellation
+            self._active_stream = stream
 
             collected = []
             usage = None
             # Timeout applies between chunks: resets on each received chunk
             aiter = stream.__aiter__()
-            while True:
-                try:
-                    chunk = await asyncio.wait_for(
-                        aiter.__anext__(), timeout=self._timeout
-                    )
-                except StopAsyncIteration:
-                    break
-                if chunk.usage is not None:
-                    usage = {
-                        "prompt_tokens": chunk.usage.prompt_tokens or 0,
-                        "completion_tokens": chunk.usage.completion_tokens or 0,
-                        "total_tokens": chunk.usage.total_tokens or 0,
-                    }
-                if chunk.choices:
-                    delta = chunk.choices[0].delta
-                    if delta and delta.content:
-                        collected.append(delta.content)
-                        yield delta.content, None
+            try:
+                while True:
+                    try:
+                        chunk = await asyncio.wait_for(
+                            aiter.__anext__(), timeout=self._timeout
+                        )
+                    except StopAsyncIteration:
+                        break
+                    if chunk.usage is not None:
+                        usage = {
+                            "prompt_tokens": chunk.usage.prompt_tokens or 0,
+                            "completion_tokens": chunk.usage.completion_tokens or 0,
+                            "total_tokens": chunk.usage.total_tokens or 0,
+                        }
+                    if chunk.choices:
+                        delta = chunk.choices[0].delta
+                        if delta and delta.content:
+                            collected.append(delta.content)
+                            yield delta.content, None
+            finally:
+                self._active_stream = None
+                if hasattr(stream, 'close'):
+                    try:
+                        await stream.close()
+                    except Exception:
+                        pass
 
             full_text = "".join(collected).strip()
             if not full_text:

@@ -125,6 +125,7 @@ class VoiceTextApp(rumps.App):
         self._clipboard_hotkey_listener: Optional[TapHotkeyListener] = None
         self._busy = False
         self._preview_panel = ResultPreviewPanel()
+        self._enhance_cancel_event: threading.Event | None = None
         self._correction_logger = CorrectionLogger()
         self._conversation_history = ConversationHistory()
         self._usage_stats = UsageStats()
@@ -511,6 +512,9 @@ class VoiceTextApp(rumps.App):
 
         def on_cancel() -> None:
             result_holder["confirmed"] = False
+            # Stop any in-flight streaming enhancement
+            if self._enhance_cancel_event is not None:
+                self._enhance_cancel_event.set()
             try:
                 self._usage_stats.record_cancel()
             except Exception as e:
@@ -742,6 +746,9 @@ class VoiceTextApp(rumps.App):
 
         def on_cancel() -> None:
             result_holder["confirmed"] = False
+            # Stop any in-flight streaming enhancement
+            if self._enhance_cancel_event is not None:
+                self._enhance_cancel_event.set()
             result_event.set()
 
         # Build mode list for the segmented control
@@ -834,29 +841,51 @@ class VoiceTextApp(rumps.App):
             logger.info("Clipboard enhance cancelled by user")
 
     def _run_enhance_in_background(
-        self, asr_text: str, request_id: int, result_holder: dict | None = None
+        self, asr_text: str, request_id: int, result_holder: dict | None = None,
     ) -> None:
         """Run AI enhancement in a background thread with streaming."""
+        # Cancel any in-flight enhancement and create a fresh cancel event
+        if self._enhance_cancel_event is not None:
+            self._enhance_cancel_event.set()
+        cancel_event = threading.Event()
+        self._enhance_cancel_event = cancel_event
 
         def _enhance():
             try:
                 loop = asyncio.new_event_loop()
                 collected: list[str] = []
                 usage = None
+                cancelled = False
 
                 async def _stream():
-                    nonlocal usage
-                    async for chunk, chunk_usage in self._enhancer.enhance_stream(asr_text):
-                        if chunk:
-                            collected.append(chunk)
-                            self._preview_panel.append_enhance_text(
-                                chunk, request_id=request_id
-                            )
-                        if chunk_usage is not None:
-                            usage = chunk_usage
+                    nonlocal usage, cancelled
+                    gen = self._enhancer.enhance_stream(asr_text)
+                    try:
+                        async for chunk, chunk_usage in gen:
+                            # Check cancellation between chunks
+                            if cancel_event is not None and cancel_event.is_set():
+                                cancelled = True
+                                return
+                            if chunk:
+                                collected.append(chunk)
+                                self._preview_panel.append_enhance_text(
+                                    chunk, request_id=request_id
+                                )
+                            if chunk_usage is not None:
+                                usage = chunk_usage
+                    finally:
+                        # Explicitly close the async generator so that
+                        # enhance_stream's finally block runs and closes
+                        # the HTTP stream, stopping remote generation.
+                        await gen.aclose()
 
                 loop.run_until_complete(_stream())
+                loop.run_until_complete(loop.shutdown_asyncgens())
                 loop.close()
+
+                if cancelled:
+                    logger.info("AI enhancement cancelled by user")
+                    return
 
                 enhanced = "".join(collected).strip() or asr_text
                 if result_holder is not None:
