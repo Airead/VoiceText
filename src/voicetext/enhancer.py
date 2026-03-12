@@ -13,6 +13,7 @@ from .mode_loader import (
     get_sorted_modes,
     load_modes,
 )
+from .conversation_history import ConversationHistory
 from .vocabulary import VocabularyIndex
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,12 @@ class TextEnhancer:
         self._vocab_index: Optional[VocabularyIndex] = None
         if self._vocab_enabled:
             self._vocab_index = VocabularyIndex(vocab_cfg)
+
+        # Conversation history
+        history_cfg = config.get("conversation_history", {})
+        self._history_enabled = history_cfg.get("enabled", False)
+        self._history_max_entries = history_cfg.get("max_entries", 10)
+        self._conversation_history = ConversationHistory()
 
         # Validate active provider/model
         if self._active_provider not in self._providers and self._providers:
@@ -151,6 +158,19 @@ class TextEnhancer:
     @property
     def vocab_index(self) -> Optional[VocabularyIndex]:
         return self._vocab_index
+
+    @property
+    def history_enabled(self) -> bool:
+        return self._history_enabled
+
+    @history_enabled.setter
+    def history_enabled(self, value: bool) -> None:
+        self._history_enabled = value
+        logger.info("Conversation history changed to: %s", value)
+
+    @property
+    def conversation_history(self) -> ConversationHistory:
+        return self._conversation_history
 
     @property
     def debug_print_prompt(self) -> bool:
@@ -333,6 +353,24 @@ class TextEnhancer:
                         )
                 except Exception as e:
                     logger.warning("Vocabulary retrieval failed: %s", e)
+
+            # Inject conversation history context if enabled
+            if self._history_enabled:
+                try:
+                    entries = self._conversation_history.get_recent(
+                        max_entries=self._history_max_entries
+                    )
+                    if entries:
+                        history_context = self._conversation_history.format_for_prompt(
+                            entries
+                        )
+                        system_content = f"{system_content}\n\n{history_context}"
+                        logger.info(
+                            "Conversation history injected: %d entries",
+                            len(entries),
+                        )
+                except Exception as e:
+                    logger.warning("Conversation history retrieval failed: %s", e)
 
             client, _, provider_extra_body = self._providers[self._active_provider]
             extra_body = self._build_extra_body(provider_extra_body)

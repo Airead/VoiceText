@@ -17,6 +17,7 @@ from ApplicationServices import AXIsProcessTrusted, AXIsProcessTrustedWithOption
 from CoreFoundation import kCFBooleanTrue
 
 from .config import load_config, save_config
+from .conversation_history import ConversationHistory
 from .correction_log import CorrectionLogger
 from .enhancer import MODE_OFF, TextEnhancer, create_enhancer
 from .result_window import ResultPreviewPanel
@@ -80,6 +81,7 @@ class VoiceTextApp(rumps.App):
         self._busy = False
         self._preview_panel = ResultPreviewPanel()
         self._correction_logger = CorrectionLogger()
+        self._conversation_history = ConversationHistory()
 
         # Resolve current preset
         self._current_preset_id = asr_cfg.get("preset")
@@ -197,6 +199,14 @@ class VoiceTextApp(rumps.App):
             "Build Vocabulary...", callback=self._on_vocab_build
         )
         self._enhance_menu.add(self._enhance_vocab_build_item)
+
+        # Conversation history toggle
+        history_enabled = ai_cfg.get("conversation_history", {}).get("enabled", False)
+        self._enhance_history_item = rumps.MenuItem(
+            "Conversation History", callback=self._on_history_toggle
+        )
+        self._enhance_history_item.state = 1 if history_enabled else 0
+        self._enhance_menu.add(self._enhance_history_item)
 
         # Provider configuration items
         self._enhance_menu.add(rumps.separator)
@@ -336,12 +346,14 @@ class VoiceTextApp(rumps.App):
     def _do_transcribe_direct(self, asr_text: str, use_enhance: bool) -> None:
         """Original flow: enhance (if enabled) and type directly."""
         text = asr_text
+        enhanced_text = None
         if use_enhance:
             self._set_status("Enhancing...")
             try:
                 loop = asyncio.new_event_loop()
                 text = loop.run_until_complete(self._enhancer.enhance(text))
                 loop.close()
+                enhanced_text = text
             except Exception as e:
                 logger.error("AI enhancement failed: %s", e)
 
@@ -352,13 +364,24 @@ class VoiceTextApp(rumps.App):
         )
         self._set_status("VT")
 
+        try:
+            self._conversation_history.log(
+                asr_text=asr_text,
+                enhanced_text=enhanced_text,
+                final_text=text.strip(),
+                enhance_mode=self._enhance_mode,
+                preview_enabled=False,
+            )
+        except Exception as e:
+            logger.error("Failed to log conversation: %s", e)
+
     def _do_transcribe_with_preview(self, asr_text: str, use_enhance: bool) -> None:
         """Show preview panel, optionally run AI enhance, wait for user decision."""
         from PyObjCTools import AppHelper
         import time
 
         result_event = threading.Event()
-        result_holder = {"text": None, "confirmed": False}
+        result_holder = {"text": None, "confirmed": False, "enhanced_text": None}
 
         def on_confirm(text: str, correction_info: dict | None = None) -> None:
             result_holder["text"] = text
@@ -401,6 +424,7 @@ class VoiceTextApp(rumps.App):
                         self._enhancer.enhance(asr_text)
                     )
                     loop.close()
+                    result_holder["enhanced_text"] = enhanced
                     self._preview_panel.set_enhance_result(enhanced)
                 except Exception as e:
                     logger.error("AI enhancement failed: %s", e)
@@ -416,12 +440,24 @@ class VoiceTextApp(rumps.App):
         time.sleep(0.1)  # Brief delay for target app to regain focus
 
         if result_holder["confirmed"] and result_holder["text"]:
+            final_text = result_holder["text"].strip()
             type_text(
-                result_holder["text"].strip(),
+                final_text,
                 append_newline=self._append_newline,
                 method=self._output_method,
             )
             self._set_status("VT")
+
+            try:
+                self._conversation_history.log(
+                    asr_text=asr_text,
+                    enhanced_text=result_holder["enhanced_text"],
+                    final_text=final_text,
+                    enhance_mode=self._enhance_mode,
+                    preview_enabled=True,
+                )
+            except Exception as e:
+                logger.error("Failed to log conversation: %s", e)
         else:
             self._set_status("VT")
             logger.info("Preview cancelled by user")
@@ -650,6 +686,22 @@ Output only the processed text without any explanation."""
         self._config["ai_enhance"]["vocabulary"]["enabled"] = new_value
         save_config(self._config, self._config_path)
         logger.info("Vocabulary set to: %s", new_value)
+
+    def _on_history_toggle(self, sender) -> None:
+        """Toggle conversation history context injection."""
+        if not self._enhancer:
+            return
+
+        new_value = not self._enhancer.history_enabled
+        self._enhancer.history_enabled = new_value
+        sender.state = 1 if new_value else 0
+
+        # Persist to config
+        self._config.setdefault("ai_enhance", {})
+        self._config["ai_enhance"].setdefault("conversation_history", {})
+        self._config["ai_enhance"]["conversation_history"]["enabled"] = new_value
+        save_config(self._config, self._config_path)
+        logger.info("Conversation history set to: %s", new_value)
 
     def _on_vocab_build(self, _sender) -> None:
         """Build vocabulary from correction logs in a background thread."""

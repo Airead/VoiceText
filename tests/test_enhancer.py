@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from voicetext.conversation_history import ConversationHistory
 from voicetext.enhancer import MODE_OFF, TextEnhancer, build_disable_thinking_body, create_enhancer
 from voicetext.mode_loader import ModeDefinition
 from voicetext.vocabulary import VocabularyEntry, VocabularyIndex
@@ -978,3 +979,125 @@ class TestDebugFlags:
             info_calls = [c for c in mock_logger.info.call_args_list
                           if "[DEBUG]" in str(c)]
             assert len(info_calls) == 0
+
+
+# --- Conversation history integration tests ---
+
+
+class TestConversationHistoryIntegration:
+    def test_history_disabled_by_default(self):
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(_make_config())
+        assert enhancer.history_enabled is False
+
+    def test_history_enabled_from_config(self):
+        cfg = _make_config(conversation_history={"enabled": True, "max_entries": 5})
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(cfg)
+        assert enhancer.history_enabled is True
+
+    def test_history_toggle(self):
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(_make_config())
+        assert enhancer.history_enabled is False
+        enhancer.history_enabled = True
+        assert enhancer.history_enabled is True
+
+    def test_conversation_history_property(self):
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(_make_config())
+        assert isinstance(enhancer.conversation_history, ConversationHistory)
+
+    def test_enhance_with_history_injects_context(self):
+        mock_client = _make_mock_client("enhanced text")
+        mock_history = MagicMock(spec=ConversationHistory)
+        mock_history.get_recent.return_value = [
+            {"asr_text": "你好", "enhanced_text": "你好。", "final_text": "你好。"},
+        ]
+        mock_history.format_for_prompt.return_value = (
+            "---\n以下是用户近期的对话历史记录\n- 你好\n---"
+        )
+
+        cfg = _make_config(
+            enabled=True,
+            conversation_history={"enabled": True, "max_entries": 10},
+        )
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(cfg)
+            enhancer._providers = {
+                "ollama": (mock_client, ["qwen2.5:7b"], {}),
+            }
+            enhancer._active_provider = "ollama"
+            enhancer._active_model = "qwen2.5:7b"
+            enhancer._conversation_history = mock_history
+
+        asyncio.get_event_loop().run_until_complete(enhancer.enhance("新输入"))
+
+        call_kwargs = mock_client.chat.completions.create.call_args
+        system_msg = call_kwargs.kwargs["messages"][0]["content"]
+        assert "以下是用户近期的对话历史记录" in system_msg
+
+    def test_enhance_without_history_no_injection(self):
+        mock_client = _make_mock_client("enhanced text")
+
+        cfg = _make_config(enabled=True)
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(cfg)
+            enhancer._providers = {
+                "ollama": (mock_client, ["qwen2.5:7b"], {}),
+            }
+            enhancer._active_provider = "ollama"
+            enhancer._active_model = "qwen2.5:7b"
+
+        asyncio.get_event_loop().run_until_complete(enhancer.enhance("hello"))
+
+        call_kwargs = mock_client.chat.completions.create.call_args
+        system_msg = call_kwargs.kwargs["messages"][0]["content"]
+        assert "对话历史记录" not in system_msg
+
+    def test_enhance_history_retrieval_failure_graceful(self):
+        mock_client = _make_mock_client("enhanced text")
+        mock_history = MagicMock(spec=ConversationHistory)
+        mock_history.get_recent.side_effect = RuntimeError("read error")
+
+        cfg = _make_config(
+            enabled=True,
+            conversation_history={"enabled": True, "max_entries": 10},
+        )
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(cfg)
+            enhancer._providers = {
+                "ollama": (mock_client, ["qwen2.5:7b"], {}),
+            }
+            enhancer._active_provider = "ollama"
+            enhancer._active_model = "qwen2.5:7b"
+            enhancer._conversation_history = mock_history
+
+        result = asyncio.get_event_loop().run_until_complete(
+            enhancer.enhance("hello")
+        )
+        assert result == "enhanced text"
+
+    def test_enhance_history_empty_results_no_injection(self):
+        mock_client = _make_mock_client("enhanced text")
+        mock_history = MagicMock(spec=ConversationHistory)
+        mock_history.get_recent.return_value = []
+
+        cfg = _make_config(
+            enabled=True,
+            conversation_history={"enabled": True, "max_entries": 10},
+        )
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(cfg)
+            enhancer._providers = {
+                "ollama": (mock_client, ["qwen2.5:7b"], {}),
+            }
+            enhancer._active_provider = "ollama"
+            enhancer._active_model = "qwen2.5:7b"
+            enhancer._conversation_history = mock_history
+
+        asyncio.get_event_loop().run_until_complete(enhancer.enhance("hello"))
+
+        call_kwargs = mock_client.chat.completions.create.call_args
+        system_msg = call_kwargs.kwargs["messages"][0]["content"]
+        assert "对话历史记录" not in system_msg

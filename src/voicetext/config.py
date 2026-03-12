@@ -57,6 +57,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "embedding_model": "paraphrase-multilingual-MiniLM-L12-v2",
             "build_timeout": 600,
         },
+        "conversation_history": {
+            "enabled": False,
+            "max_entries": 10,
+        },
     },
     "logging": {
         "level": "INFO",
