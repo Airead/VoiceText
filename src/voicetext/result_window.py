@@ -63,6 +63,7 @@ class ResultPreviewPanel:
         self._asr_info: str = ""
         self._asr_wav_data: Optional[bytes] = None
         self._asr_play_button = None
+        self._asr_save_button = None
         self._asr_sound = None
         self._enhance_info: str = ""
         self._enhance_request_id: int = 0
@@ -650,6 +651,8 @@ class ResultPreviewPanel:
 
         # ASR Result label row
         play_btn_width = 62
+        save_btn_width = 50
+        audio_btns_width = play_btn_width + 2 + save_btn_width  # Play + gap + Save
         has_stt_popup = len(self._stt_models) > 0
         label_y = y + self._TEXT_HEIGHT
         x_cursor = self._PADDING
@@ -686,7 +689,7 @@ class ResultPreviewPanel:
             # ASR info label (duration only, model name is in popup)
             remaining = self._PANEL_WIDTH - self._PADDING - x_cursor
             if self._asr_wav_data:
-                remaining -= play_btn_width + 4
+                remaining -= audio_btns_width + 4
             asr_info_label = NSTextField.labelWithString_(self._asr_info)
             asr_info_label.setFrame_(NSMakeRect(x_cursor, label_y, max(remaining, 40), self._LABEL_HEIGHT))
             asr_info_label.setFont_(NSFont.systemFontOfSize_(10))
@@ -697,7 +700,7 @@ class ResultPreviewPanel:
             asr_label_text = "ASR"
             if self._asr_info:
                 asr_label_text = f"ASR ({self._asr_info})"
-            label_width = inner_width - play_btn_width - 4 if self._asr_wav_data else inner_width
+            label_width = inner_width - audio_btns_width - 4 if self._asr_wav_data else inner_width
             asr_label = NSTextField.labelWithString_(asr_label_text)
             asr_label.setFrame_(NSMakeRect(self._PADDING, label_y, label_width, self._LABEL_HEIGHT))
             asr_label.setFont_(NSFont.boldSystemFontOfSize_(12))
@@ -706,11 +709,31 @@ class ResultPreviewPanel:
             self._stt_popup_target = None
             self._asr_info_label = None
 
-        # "Play ▶" button to replay recorded audio
+        # "Play ▶" and "Save ⤓" buttons for recorded audio
         if self._asr_wav_data:
+            save_btn_width = 50
+            btn_right = self._PANEL_WIDTH - self._PADDING
+
+            save_btn = NSButton.alloc().initWithFrame_(
+                NSMakeRect(
+                    btn_right - save_btn_width,
+                    label_y,
+                    save_btn_width,
+                    self._LABEL_HEIGHT,
+                )
+            )
+            save_btn.setTitle_("Save")
+            save_btn.setBezelStyle_(1)
+            save_btn.setBordered_(True)
+            save_btn.setFont_(NSFont.systemFontOfSize_(10))
+            save_btn.setTarget_(self)
+            save_btn.setAction_(b"saveAudioClicked:")
+            content_view.addSubview_(save_btn)
+            self._asr_save_button = save_btn
+
             play_btn = NSButton.alloc().initWithFrame_(
                 NSMakeRect(
-                    self._PANEL_WIDTH - self._PADDING - play_btn_width,
+                    btn_right - save_btn_width - 2 - play_btn_width,
                     label_y,
                     play_btn_width,
                     self._LABEL_HEIGHT,
@@ -726,6 +749,7 @@ class ResultPreviewPanel:
             self._asr_play_button = play_btn
         else:
             self._asr_play_button = None
+            self._asr_save_button = None
 
         # ASR Result text view (read-only)
         asr_scroll, asr_tv = self._make_text_view(
@@ -805,6 +829,34 @@ class ResultPreviewPanel:
         if not self._asr_wav_data:
             return
         self._play_wav(self._asr_wav_data)
+
+    def saveAudioClicked_(self, sender) -> None:
+        """Handle Save ⤓ button click — save recorded WAV audio to file."""
+        if not self._asr_wav_data:
+            return
+        self._save_wav(self._asr_wav_data)
+
+    def _save_wav(self, wav_data: bytes) -> None:
+        """Save WAV audio data to a user-chosen file via NSSavePanel."""
+        from AppKit import NSSavePanel
+        from Foundation import NSURL
+
+        panel = NSSavePanel.savePanel()
+        panel.setTitle_("Save Audio")
+        panel.setNameFieldStringValue_("recording.wav")
+        panel.setAllowedFileTypes_(["wav"])
+
+        result = panel.runModal()
+        if result == 1:  # NSModalResponseOK
+            url = panel.URL()
+            if url:
+                try:
+                    path = url.path()
+                    with open(path, "wb") as f:
+                        f.write(wav_data)
+                    logger.info("Audio saved to: %s", path)
+                except Exception as e:
+                    logger.error("Failed to save audio: %s", e)
 
     def _play_wav(self, wav_data: bytes) -> None:
         """Play WAV audio data using NSSound."""

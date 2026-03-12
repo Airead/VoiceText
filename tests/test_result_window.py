@@ -1010,6 +1010,32 @@ class TestResultPreviewPanelPlayback:
         # Should not raise
         panel._stop_playback()
 
+    def test_save_audio_noop_when_no_wav(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = ResultPreviewPanel()
+        panel._asr_wav_data = None
+
+        # Should not raise
+        panel.saveAudioClicked_(None)
+
+    def test_save_audio_calls_save_wav(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = ResultPreviewPanel()
+        panel._asr_wav_data = b"fake-wav-data"
+        panel._save_wav = MagicMock()
+
+        panel.saveAudioClicked_(None)
+
+        panel._save_wav.assert_called_once_with(b"fake-wav-data")
+
+    def test_save_button_default_none(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = ResultPreviewPanel()
+        assert panel._asr_save_button is None
+
 
 class TestResultPreviewPanelModelPopups:
     """Test STT/LLM model popup infrastructure."""
