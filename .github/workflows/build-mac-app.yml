@@ -43,7 +43,7 @@ jobs:
         run: |
           CERT_FILE="$RUNNER_TEMP/certificate.p12"
           KEYCHAIN_FILE="$RUNNER_TEMP/build.keychain-db"
-          KEYCHAIN_PWD=$(openssl rand -base64 32)
+          KEYCHAIN_PWD="build-keychain-pwd"
 
           echo "$MACOS_CERTIFICATE" | base64 --decode > "$CERT_FILE"
 
@@ -59,8 +59,8 @@ jobs:
 
           security list-keychains -d user -s "$KEYCHAIN_FILE" login.keychain-db
 
-          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_FILE" \
-            | grep -m1 '"' | sed 's/.*"\(.*\)"/\1/')
+          IDENTITY=$(security find-identity -p codesigning "$KEYCHAIN_FILE" \
+            | grep -m1 ')' | awk '{print $2}')
           if [ -z "$IDENTITY" ]; then
             echo "::error::No codesigning identity found in imported certificate"
             exit 1
