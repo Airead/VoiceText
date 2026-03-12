@@ -214,6 +214,25 @@ class TestTextEnhancerProviderModel:
             enhancer._active_provider = "missing"
         assert enhancer.model_names == []
 
+    def test_providers_with_models(self):
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(_make_multi_provider_config())
+            enhancer._providers = {
+                "ollama": (MagicMock(), ["qwen2.5:7b", "llama3:8b"]),
+                "openai": (MagicMock(), ["gpt-4o", "gpt-4o-mini"]),
+            }
+        result = enhancer.providers_with_models
+        assert result == {
+            "ollama": ["qwen2.5:7b", "llama3:8b"],
+            "openai": ["gpt-4o", "gpt-4o-mini"],
+        }
+
+    def test_providers_with_models_empty(self):
+        with patch("voicetext.enhancer.TextEnhancer._init_providers"):
+            enhancer = TextEnhancer(_make_config())
+            enhancer._providers = {}
+        assert enhancer.providers_with_models == {}
+
     def test_default_provider_fallback(self):
         """If default_provider is not in providers, fallback to first available."""
         with patch("voicetext.enhancer.TextEnhancer._init_providers"):

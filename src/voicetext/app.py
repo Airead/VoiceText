@@ -213,28 +213,18 @@ class VoiceTextApp(rumps.App):
         )
         self._enhance_history_item.state = 1 if history_enabled else 0
 
+        # LLM Model top-level submenu
+        self._llm_model_menu = rumps.MenuItem("LLM Model")
+        self._llm_model_menu_items: Dict[Tuple[str, str], rumps.MenuItem] = {}
+        self._llm_add_provider_item = rumps.MenuItem(
+            "Add Provider...", callback=self._on_enhance_add_provider
+        )
+        self._llm_remove_provider_menu = rumps.MenuItem("Remove Provider")
+        self._llm_remove_provider_items: Dict[str, rumps.MenuItem] = {}
+        self._build_llm_model_menu()
+
         # AI Settings submenu (low-frequency AI configuration)
         self._ai_settings_menu = rumps.MenuItem("AI Settings")
-
-        # Provider submenu
-        self._enhance_provider_menu = rumps.MenuItem("Provider")
-        self._enhance_provider_items: Dict[str, rumps.MenuItem] = {}
-        if self._enhancer:
-            for pname in self._enhancer.provider_names:
-                item = rumps.MenuItem(pname)
-                item._provider_name = pname
-                item.set_callback(self._on_enhance_provider_select)
-                if pname == self._enhancer.provider_name:
-                    item.state = 1
-                self._enhance_provider_items[pname] = item
-                self._enhance_provider_menu.add(item)
-        self._ai_settings_menu.add(self._enhance_provider_menu)
-
-        # Model submenu
-        self._enhance_model_menu = rumps.MenuItem("Model")
-        self._enhance_model_items: Dict[str, rumps.MenuItem] = {}
-        self._build_enhance_model_menu()
-        self._ai_settings_menu.add(self._enhance_model_menu)
 
         # Thinking toggle
         self._enhance_thinking_item = rumps.MenuItem(
@@ -257,18 +247,7 @@ class VoiceTextApp(rumps.App):
         self._enhance_auto_build_item.state = 1 if vocab_cfg.get("auto_build", True) else 0
         self._ai_settings_menu.add(self._enhance_auto_build_item)
 
-        # Provider management items
         self._ai_settings_menu.add(rumps.separator)
-        self._enhance_add_provider_item = rumps.MenuItem(
-            "Add Provider...", callback=self._on_enhance_add_provider
-        )
-        self._ai_settings_menu.add(self._enhance_add_provider_item)
-
-        self._enhance_remove_provider_menu = rumps.MenuItem("Remove Provider")
-        self._enhance_remove_provider_items: Dict[str, rumps.MenuItem] = {}
-        self._build_enhance_remove_provider_menu()
-        self._ai_settings_menu.add(self._enhance_remove_provider_menu)
-
         self._enhance_edit_config_item = rumps.MenuItem(
             "Edit Config...", callback=self._on_enhance_edit_config
         )
@@ -333,6 +312,7 @@ class VoiceTextApp(rumps.App):
             self._hotkey_item,
             None,
             self._model_menu,
+            self._llm_model_menu,
             self._enhance_menu,
             None,
             self._preview_item,
@@ -798,45 +778,29 @@ Output only the processed text without any explanation."""
                     self._enhance_add_mode_item.title, item
                 )
 
-    def _on_enhance_provider_select(self, sender) -> None:
-        """Handle AI enhance provider menu item click."""
-        pname = sender._provider_name
-        if not self._enhancer or pname == self._enhancer.provider_name:
+    def _on_llm_model_select(self, sender) -> None:
+        """Handle LLM model menu item click."""
+        pname = sender._llm_provider
+        mname = sender._llm_model
+        if not self._enhancer:
+            return
+        if pname == self._enhancer.provider_name and mname == self._enhancer.model_name:
             return
 
         self._enhancer.provider_name = pname
-
-        # Update provider checkmarks
-        for name, item in self._enhance_provider_items.items():
-            item.state = 1 if name == pname else 0
-
-        # Rebuild model submenu for new provider
-        self._build_enhance_model_menu()
-
-        # Persist to config
-        self._config.setdefault("ai_enhance", {})
-        self._config["ai_enhance"]["default_provider"] = self._enhancer.provider_name
-        self._config["ai_enhance"]["default_model"] = self._enhancer.model_name
-        save_config(self._config, self._config_path)
-        logger.info("AI enhance provider set to: %s", pname)
-
-    def _on_enhance_model_select(self, sender) -> None:
-        """Handle AI enhance model menu item click."""
-        mname = sender._model_name
-        if not self._enhancer or mname == self._enhancer.model_name:
-            return
-
         self._enhancer.model_name = mname
 
-        # Update model checkmarks
-        for name, item in self._enhance_model_items.items():
-            item.state = 1 if name == mname else 0
+        # Update checkmarks
+        current_key = (pname, mname)
+        for key, item in self._llm_model_menu_items.items():
+            item.state = 1 if key == current_key else 0
 
         # Persist to config
         self._config.setdefault("ai_enhance", {})
+        self._config["ai_enhance"]["default_provider"] = pname
         self._config["ai_enhance"]["default_model"] = mname
         save_config(self._config, self._config_path)
-        logger.info("AI enhance model set to: %s", mname)
+        logger.info("LLM model set to: %s / %s", pname, mname)
 
     def _on_enhance_thinking_toggle(self, sender) -> None:
         """Toggle AI thinking mode."""
@@ -1011,58 +975,54 @@ Output only the processed text without any explanation."""
         t = threading.Thread(target=_build, daemon=True)
         t.start()
 
-    def _build_enhance_model_menu(self) -> None:
-        """Build or rebuild the AI enhance model submenu."""
-        # Clear existing items — only call .clear() if the native menu exists
-        if self._enhance_model_menu._menu is not None:
-            self._enhance_model_menu.clear()
-        self._enhance_model_items.clear()
+    def _build_llm_model_menu(self) -> None:
+        """Build or rebuild the LLM Model top-level submenu."""
+        if self._llm_model_menu._menu is not None:
+            self._llm_model_menu.clear()
+        self._llm_model_menu_items.clear()
 
         if not self._enhancer:
             return
 
-        for mname in self._enhancer.model_names:
-            item = rumps.MenuItem(mname)
-            item._model_name = mname
-            item.set_callback(self._on_enhance_model_select)
-            if mname == self._enhancer.model_name:
-                item.state = 1
-            self._enhance_model_items[mname] = item
-            self._enhance_model_menu.add(item)
+        providers = self._enhancer.providers_with_models
+        current_key = (self._enhancer.provider_name, self._enhancer.model_name)
+        first_provider = True
 
-    def _build_enhance_remove_provider_menu(self) -> None:
-        """Build or rebuild the remove-provider submenu."""
-        if self._enhance_remove_provider_menu._menu is not None:
-            self._enhance_remove_provider_menu.clear()
-        self._enhance_remove_provider_items.clear()
+        for pname, models in providers.items():
+            if not first_provider:
+                self._llm_model_menu.add(None)  # separator
+            first_provider = False
 
-        if not self._enhancer:
-            return
+            for mname in models:
+                key = (pname, mname)
+                title = f"{pname} / {mname}"
+                item = rumps.MenuItem(title)
+                item._llm_provider = pname
+                item._llm_model = mname
+                item.set_callback(self._on_llm_model_select)
+                if key == current_key:
+                    item.state = 1
+                self._llm_model_menu_items[key] = item
+                self._llm_model_menu.add(item)
 
-        for pname in self._enhancer.provider_names:
+        # Management items
+        self._llm_model_menu.add(None)  # separator
+        self._llm_model_menu.add(self._llm_add_provider_item)
+
+        # Rebuild remove submenu
+        if self._llm_remove_provider_menu._menu is not None:
+            self._llm_remove_provider_menu.clear()
+        self._llm_remove_provider_items.clear()
+
+        for pname in providers:
             item = rumps.MenuItem(pname)
             item._provider_name = pname
             item.set_callback(self._on_enhance_remove_provider)
-            self._enhance_remove_provider_items[pname] = item
-            self._enhance_remove_provider_menu.add(item)
+            self._llm_remove_provider_items[pname] = item
+            self._llm_remove_provider_menu.add(item)
 
-    def _build_enhance_provider_menu(self) -> None:
-        """Rebuild the provider selection submenu."""
-        if self._enhance_provider_menu._menu is not None:
-            self._enhance_provider_menu.clear()
-        self._enhance_provider_items.clear()
-
-        if not self._enhancer:
-            return
-
-        for pname in self._enhancer.provider_names:
-            item = rumps.MenuItem(pname)
-            item._provider_name = pname
-            item.set_callback(self._on_enhance_provider_select)
-            if pname == self._enhancer.provider_name:
-                item.state = 1
-            self._enhance_provider_items[pname] = item
-            self._enhance_provider_menu.add(item)
+        if providers:
+            self._llm_model_menu.add(self._llm_remove_provider_menu)
 
     # ── Remote ASR provider management ────────────────────────────────
 
@@ -1784,9 +1744,7 @@ extra_body: {"chat_template_kwargs": {"enable_thinking": false}}"""
             save_config(self._config, self._config_path)
             self._remove_provider_draft()
 
-            self._build_enhance_provider_menu()
-            self._build_enhance_model_menu()
-            self._build_enhance_remove_provider_menu()
+            self._build_llm_model_menu()
 
             rumps.notification(
                 "VoiceText", "Provider added", f"{name} ({', '.join(models)})"
@@ -1888,10 +1846,8 @@ extra_body: {"chat_template_kwargs": {"enable_thinking": false}}"""
             self._config["ai_enhance"]["default_model"] = self._enhancer.model_name
             save_config(self._config, self._config_path)
 
-            # Rebuild menus
-            self._build_enhance_provider_menu()
-            self._build_enhance_model_menu()
-            self._build_enhance_remove_provider_menu()
+            # Rebuild LLM model menu
+            self._build_llm_model_menu()
 
             rumps.notification("VoiceText", "Provider removed", pname)
             logger.info("Removed AI provider: %s", pname)

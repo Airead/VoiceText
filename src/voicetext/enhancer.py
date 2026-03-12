@@ -233,6 +233,14 @@ class TextEnhancer:
             return list(self._providers[self._active_provider][1])
         return []
 
+    @property
+    def providers_with_models(self) -> Dict[str, List[str]]:
+        """Return {provider_name: [model_names]} for all providers."""
+        return {
+            pname: list(data[1])
+            for pname, data in self._providers.items()
+        }
+
     async def verify_provider(
         self,
         base_url: str,
