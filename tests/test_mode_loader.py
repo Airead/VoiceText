@@ -158,7 +158,7 @@ class TestEnsureDefaultModes:
         # proofread.md should keep its custom content
         with open(proofread_file, "r", encoding="utf-8") as f:
             assert f.read() == custom_content
-        # Other 4 builtins should have been created
+        # Other builtins should have been created
         md_files = sorted(f for f in os.listdir(modes_dir) if f.endswith(".md"))
         assert len(md_files) == len(_BUILTIN_MODES)
 
@@ -172,7 +172,7 @@ class TestEnsureDefaultModes:
 
         ensure_default_modes(modes_dir)
         md_files = [f for f in os.listdir(modes_dir) if f.endswith(".md")]
-        # custom + 5 builtins
+        # custom + builtins
         assert len(md_files) == len(_BUILTIN_MODES) + 1
         assert "custom.md" in md_files
 
@@ -188,7 +188,7 @@ class TestEnsureDefaultModes:
 
 class TestBuiltinModes:
     def test_builtin_contains_all_modes(self):
-        expected = {"proofread", "format", "complete", "enhance", "translate_en"}
+        expected = {"proofread", "translate_en", "commandline_master"}
         assert set(_BUILTIN_MODES.keys()) == expected
 
     def test_builtin_modes_have_labels(self):

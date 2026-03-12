@@ -380,6 +380,8 @@ class VoiceTextApp(rumps.App):
         from PyObjCTools import AppHelper
         import time
 
+        self._current_preview_asr_text = asr_text
+
         result_event = threading.Event()
         result_holder = {"text": None, "confirmed": False, "enhanced_text": None}
 
@@ -402,7 +404,12 @@ class VoiceTextApp(rumps.App):
             result_holder["confirmed"] = False
             result_event.set()
 
-        # Show panel on main thread
+        # Build mode list for the segmented control
+        available_modes = []
+        if self._enhancer:
+            available_modes = [("off", "Off")] + self._enhancer.available_modes
+
+        # Show panel on main thread, then start enhancement after panel is built
         def _show():
             self._activate_for_dialog()
             self._preview_panel.show(
@@ -410,27 +417,19 @@ class VoiceTextApp(rumps.App):
                 show_enhance=use_enhance,
                 on_confirm=on_confirm,
                 on_cancel=on_cancel,
+                available_modes=available_modes,
+                current_mode=self._enhance_mode,
+                on_mode_change=self._on_preview_mode_change,
             )
+            # Start enhancement after show() so request_id is not reset
+            if use_enhance:
+                self._preview_panel.enhance_request_id += 1
+                self._run_enhance_in_background(
+                    asr_text, self._preview_panel.enhance_request_id, result_holder
+                )
 
         AppHelper.callAfter(_show)
         self._set_status("Preview...")
-
-        # Run AI enhancement in background if enabled
-        if use_enhance:
-            def _enhance():
-                try:
-                    loop = asyncio.new_event_loop()
-                    enhanced = loop.run_until_complete(
-                        self._enhancer.enhance(asr_text)
-                    )
-                    loop.close()
-                    result_holder["enhanced_text"] = enhanced
-                    self._preview_panel.set_enhance_result(enhanced)
-                except Exception as e:
-                    logger.error("AI enhancement failed: %s", e)
-                    self._preview_panel.set_enhance_result(f"(error: {e})")
-
-            threading.Thread(target=_enhance, daemon=True).start()
 
         # Wait for user decision
         result_event.wait()
@@ -461,6 +460,66 @@ class VoiceTextApp(rumps.App):
         else:
             self._set_status("VT")
             logger.info("Preview cancelled by user")
+
+    def _run_enhance_in_background(
+        self, asr_text: str, request_id: int, result_holder: dict | None = None
+    ) -> None:
+        """Run AI enhancement in a background thread."""
+
+        def _enhance():
+            try:
+                loop = asyncio.new_event_loop()
+                enhanced = loop.run_until_complete(
+                    self._enhancer.enhance(asr_text)
+                )
+                loop.close()
+                if result_holder is not None:
+                    result_holder["enhanced_text"] = enhanced
+                self._preview_panel.set_enhance_result(enhanced, request_id=request_id)
+            except Exception as e:
+                logger.error("AI enhancement failed: %s", e)
+                self._preview_panel.set_enhance_result(
+                    f"(error: {e})", request_id=request_id
+                )
+
+        threading.Thread(target=_enhance, daemon=True).start()
+
+    def _on_preview_mode_change(self, mode_id: str) -> None:
+        """Handle mode switch from the preview panel's segmented control."""
+        from PyObjCTools import AppHelper
+
+        # Update enhance mode
+        self._enhance_mode = mode_id
+
+        # Sync menu bar checkmarks
+        for m, item in self._enhance_menu_items.items():
+            item.state = 1 if m == mode_id else 0
+
+        # Update enhancer state
+        if self._enhancer:
+            if mode_id == MODE_OFF:
+                self._enhancer._enabled = False
+            else:
+                self._enhancer._enabled = True
+                self._enhancer.mode = mode_id
+
+        # Persist to config
+        self._config.setdefault("ai_enhance", {})
+        self._config["ai_enhance"]["enabled"] = mode_id != MODE_OFF
+        self._config["ai_enhance"]["mode"] = mode_id
+        save_config(self._config, self._config_path)
+        logger.info("AI enhance mode set to (from preview): %s", mode_id)
+
+        # Update panel UI
+        if mode_id == MODE_OFF:
+            AppHelper.callAfter(self._preview_panel.set_enhance_off)
+        else:
+            AppHelper.callAfter(self._preview_panel.set_enhance_loading)
+            self._preview_panel.enhance_request_id += 1
+            asr_text = getattr(self, "_current_preview_asr_text", "")
+            self._run_enhance_in_background(
+                asr_text, self._preview_panel.enhance_request_id
+            )
 
     def _on_enhance_mode_select(self, sender) -> None:
         """Handle AI enhance mode menu item click."""

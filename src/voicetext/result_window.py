@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -11,13 +11,14 @@ logger = logging.getLogger(__name__)
 class ResultPreviewPanel:
     """Floating NSPanel that shows ASR result, optional AI enhancement, and editable final text.
 
-    Layout (with AI enhance):
+    Layout (with mode switcher):
         ┌──────────────────────────────────┐
         │ ASR Result                        │
         │ ┌──────────────────────────────┐  │
         │ │ (read-only NSTextView)       │  │
         │ └──────────────────────────────┘  │
-        │ AI Enhancement  ⏳ Processing...  │
+        │ [Off|纠错|格式|补全|增强|翻译EN]  │
+        │ AI Enhancement                    │
         │ ┌──────────────────────────────┐  │
         │ │ (read-only NSTextView)       │  │
         │ └──────────────────────────────┘  │
@@ -28,7 +29,8 @@ class ResultPreviewPanel:
         │           [Cancel]  [Confirm ⏎]   │
         └──────────────────────────────────┘
 
-    Without AI enhance, the middle section is hidden.
+    Without available_modes, the segmented control and enhance section are hidden
+    when show_enhance is False (backward compatible).
     """
 
     # Panel dimensions
@@ -39,6 +41,7 @@ class ResultPreviewPanel:
     _BUTTON_HEIGHT = 32
     _PADDING = 12
     _BUTTON_WIDTH = 90
+    _SEGMENT_HEIGHT = 28
 
     def __init__(self) -> None:
         self._panel = None
@@ -47,12 +50,19 @@ class ResultPreviewPanel:
         self._enhance_scroll = None
         self._enhance_text_view = None
         self._final_text_field = None
+        self._mode_segment = None
+        self._segment_target = None
         self._on_confirm: Optional[Callable[[str, Optional[dict]], None]] = None
         self._on_cancel: Optional[Callable[[], None]] = None
+        self._on_mode_change: Optional[Callable[[str], None]] = None
         self._user_edited = False
         self._show_enhance = False
         self._asr_text = ""
+        self._available_modes: List[Tuple[str, str]] = []
+        self._current_mode: str = "off"
+        self._enhance_request_id: int = 0
         self._delegate = None
+        self._event_monitor = None
 
     def show(
         self,
@@ -60,6 +70,9 @@ class ResultPreviewPanel:
         show_enhance: bool,
         on_confirm: Callable[[str, Optional[dict]], None],
         on_cancel: Callable[[], None],
+        available_modes: Optional[List[Tuple[str, str]]] = None,
+        current_mode: Optional[str] = None,
+        on_mode_change: Optional[Callable[[str], None]] = None,
     ) -> None:
         """Show the preview panel with ASR text.
 
@@ -68,12 +81,19 @@ class ResultPreviewPanel:
             show_enhance: Whether to show the AI enhancement section.
             on_confirm: Callback with final text when user confirms.
             on_cancel: Callback when user cancels.
+            available_modes: List of (mode_id, label) pairs for mode switcher.
+            current_mode: Currently selected mode_id.
+            on_mode_change: Callback when user switches mode in the segmented control.
         """
         self._on_confirm = on_confirm
         self._on_cancel = on_cancel
+        self._on_mode_change = on_mode_change
         self._user_edited = False
         self._show_enhance = show_enhance
         self._asr_text = asr_text
+        self._available_modes = available_modes or []
+        self._current_mode = current_mode or "off"
+        self._enhance_request_id = 0
 
         self._build_panel(asr_text, show_enhance)
 
@@ -85,14 +105,17 @@ class ResultPreviewPanel:
             end = editor.string().length() if editor.string() else 0
             editor.setSelectedRange_((end, 0))
 
+        self._install_event_monitor()
+
         from AppKit import NSApp
 
         NSApp.activateIgnoringOtherApps_(True)
 
-    def set_enhance_result(self, text: str) -> None:
+    def set_enhance_result(self, text: str, request_id: int = 0) -> None:
         """Update the AI enhancement result.
 
         If the user has not manually edited the final text, update it too.
+        Stale results (mismatched request_id) are discarded.
         """
         if self._enhance_text_view is None:
             return
@@ -101,6 +124,9 @@ class ResultPreviewPanel:
 
         def _update():
             if self._enhance_text_view is None:
+                return
+            # Discard stale results
+            if request_id != 0 and request_id != self._enhance_request_id:
                 return
             self._enhance_text_view.setString_(text)
             # Update label to remove spinner
@@ -111,6 +137,44 @@ class ResultPreviewPanel:
                 self._final_text_field.setStringValue_(text)
 
         AppHelper.callAfter(_update)
+
+    def set_enhance_loading(self) -> None:
+        """Show loading state in the enhancement section."""
+        from PyObjCTools import AppHelper
+
+        def _update():
+            if self._enhance_label is not None:
+                self._enhance_label.setStringValue_("AI Enhancement  \u23f3 Processing...")
+            if self._enhance_text_view is not None:
+                self._enhance_text_view.setString_("")
+            self._user_edited = False
+            self._show_enhance = True
+
+        AppHelper.callAfter(_update)
+
+    def set_enhance_off(self) -> None:
+        """Show off state: clear enhancement and restore ASR text to final field."""
+        from PyObjCTools import AppHelper
+
+        def _update():
+            if self._enhance_label is not None:
+                self._enhance_label.setStringValue_("AI Enhancement (Off)")
+            if self._enhance_text_view is not None:
+                self._enhance_text_view.setString_("")
+            if not self._user_edited and self._final_text_field is not None:
+                self._final_text_field.setStringValue_(self._asr_text)
+            self._show_enhance = False
+
+        AppHelper.callAfter(_update)
+
+    @property
+    def enhance_request_id(self) -> int:
+        """Return the current enhance request id."""
+        return self._enhance_request_id
+
+    @enhance_request_id.setter
+    def enhance_request_id(self, value: int) -> None:
+        self._enhance_request_id = value
 
     @property
     def is_visible(self) -> bool:
@@ -127,9 +191,62 @@ class ResultPreviewPanel:
 
     def close(self) -> None:
         """Close the panel."""
+        self._remove_event_monitor()
         if self._panel is not None:
             self._panel.orderOut_(None)
             self._panel = None
+
+    def _handle_key_event(self, event):
+        """Handle key events for ⌘1~⌘9 mode switching."""
+        if self._panel is None or not self._panel.isKeyWindow():
+            return event
+
+        from AppKit import NSCommandKeyMask, NSDeviceIndependentModifierFlagsMask
+
+        modifier_flags = event.modifierFlags() & NSDeviceIndependentModifierFlagsMask
+        if modifier_flags != NSCommandKeyMask:
+            return event
+
+        chars = event.charactersIgnoringModifiers()
+        if not chars or len(chars) != 1:
+            return event
+
+        char = chars[0] if isinstance(chars, str) else str(chars)
+        if char < "1" or char > "9":
+            return event
+
+        index = int(char) - 1
+        if index >= len(self._available_modes):
+            return event
+
+        self._switch_to_mode(index)
+        return None  # Consume the event
+
+    def _switch_to_mode(self, index: int) -> None:
+        """Switch to the mode at the given index, updating segment and triggering callback."""
+        if self._mode_segment is not None:
+            self._mode_segment.setSelectedSegment_(index)
+        self._on_segment_changed(index)
+
+    def _install_event_monitor(self) -> None:
+        """Install a local event monitor for keyboard shortcuts."""
+        self._remove_event_monitor()
+        if not self._available_modes:
+            return
+
+        from AppKit import NSEvent, NSKeyDownMask
+
+        self._event_monitor = NSEvent.addLocalMonitorForEventsMatchingMask_handler_(
+            NSKeyDownMask, self._handle_key_event
+        )
+
+    def _remove_event_monitor(self) -> None:
+        """Remove the local event monitor if installed."""
+        if self._event_monitor is not None:
+            from AppKit import NSEvent
+
+            NSEvent.removeMonitor_(self._event_monitor)
+            self._event_monitor = None
 
     def _build_panel(self, asr_text: str, show_enhance: bool) -> None:
         """Build the NSPanel and all subviews."""
@@ -144,20 +261,27 @@ class ResultPreviewPanel:
             NSLineBreakByWordWrapping,
             NSPanel,
             NSScrollView,
+            NSSegmentedControl,
             NSTextField,
             NSTextView,
             NSTitledWindowMask,
         )
         from Foundation import NSMakeRect
 
+        has_modes = len(self._available_modes) > 0
+        # Always show enhance section when mode switcher is available
+        show_enhance_section = show_enhance or has_modes
+
         # Calculate total height
         content_height = self._PADDING  # bottom padding
         content_height += self._BUTTON_HEIGHT + self._PADDING  # buttons
         content_height += self._EDIT_HEIGHT + self._PADDING  # final edit
         content_height += self._LABEL_HEIGHT  # final label
-        if show_enhance:
+        if show_enhance_section:
             content_height += self._TEXT_HEIGHT + self._PADDING  # enhance text
             content_height += self._LABEL_HEIGHT  # enhance label
+        if has_modes:
+            content_height += self._SEGMENT_HEIGHT + self._PADDING  # segmented control
         content_height += self._TEXT_HEIGHT + self._PADDING  # asr text
         content_height += self._LABEL_HEIGHT  # asr label
         content_height += self._PADDING  # top padding
@@ -205,7 +329,7 @@ class ResultPreviewPanel:
                 self._BUTTON_HEIGHT,
             )
         )
-        confirm_btn.setTitle_("Confirm ⏎")
+        confirm_btn.setTitle_("Confirm \u23ce")
         confirm_btn.setBezelStyle_(1)
         confirm_btn.setKeyEquivalent_("\r")  # Enter
         confirm_btn.setTarget_(self)
@@ -243,9 +367,15 @@ class ResultPreviewPanel:
 
         y += self._EDIT_HEIGHT + self._LABEL_HEIGHT + self._PADDING
 
-        # AI Enhancement section (optional)
-        if show_enhance:
-            enhance_label = NSTextField.labelWithString_("AI Enhancement  ⏳ Processing...")
+        # AI Enhancement section
+        if show_enhance_section:
+            # Determine initial label text
+            if not show_enhance:
+                enhance_label_text = "AI Enhancement (Off)"
+            else:
+                enhance_label_text = "AI Enhancement  \u23f3 Processing..."
+
+            enhance_label = NSTextField.labelWithString_(enhance_label_text)
             enhance_label.setFrame_(NSMakeRect(self._PADDING, y + self._TEXT_HEIGHT, inner_width, self._LABEL_HEIGHT))
             enhance_label.setFont_(NSFont.boldSystemFontOfSize_(12))
             content_view.addSubview_(enhance_label)
@@ -264,6 +394,33 @@ class ResultPreviewPanel:
             self._enhance_label = None
             self._enhance_text_view = None
             self._enhance_scroll = None
+
+        # Mode segmented control
+        if has_modes:
+            segment = NSSegmentedControl.alloc().initWithFrame_(
+                NSMakeRect(self._PADDING, y, inner_width, self._SEGMENT_HEIGHT)
+            )
+            segment.setSegmentCount_(len(self._available_modes))
+            selected_index = 0
+            for i, (mode_id, label) in enumerate(self._available_modes):
+                segment.setLabel_forSegment_(label, i)
+                if mode_id == self._current_mode:
+                    selected_index = i
+            segment.setSelectedSegment_(selected_index)
+
+            # Create action target for segment changes
+            self._segment_target = _SegmentActionTarget.alloc().init()
+            self._segment_target._panel_ref = self
+            segment.setTarget_(self._segment_target)
+            segment.setAction_(b"segmentChanged:")
+
+            content_view.addSubview_(segment)
+            self._mode_segment = segment
+
+            y += self._SEGMENT_HEIGHT + self._PADDING
+        else:
+            self._mode_segment = None
+            self._segment_target = None
 
         # ASR Result label
         asr_label = NSTextField.labelWithString_("ASR Result")
@@ -314,6 +471,15 @@ class ResultPreviewPanel:
         """Called when user edits the final text field."""
         self._user_edited = True
 
+    def _on_segment_changed(self, selected_index: int) -> None:
+        """Handle segmented control selection change."""
+        if not self._available_modes or selected_index >= len(self._available_modes):
+            return
+        mode_id = self._available_modes[selected_index][0]
+        self._current_mode = mode_id
+        if self._on_mode_change is not None:
+            self._on_mode_change(mode_id)
+
     def confirmClicked_(self, sender) -> None:
         """Handle confirm button click."""
         if self._final_text_field is not None and self._on_confirm is not None:
@@ -352,4 +518,22 @@ def _create_text_field_delegate_class():
     return TextFieldEditDelegate
 
 
+def _create_segment_action_target_class():
+    """Create an NSObject subclass to handle NSSegmentedControl actions."""
+    from Foundation import NSObject
+
+    class SegmentActionTarget(NSObject):
+        """Action target for NSSegmentedControl."""
+
+        _panel_ref = None
+
+        def segmentChanged_(self, sender):
+            if self._panel_ref is not None:
+                selected = sender.selectedSegment()
+                self._panel_ref._on_segment_changed(selected)
+
+    return SegmentActionTarget
+
+
 _TextFieldEditDelegate = _create_text_field_delegate_class()
+_SegmentActionTarget = _create_segment_action_target_class()

@@ -14,8 +14,15 @@ def mock_appkit(monkeypatch):
     """Provide mock AppKit and Foundation modules for headless testing."""
     mock_nsobj = MagicMock()
 
+    mock_appkit_mod = MagicMock()
+    # Set real integer values for keyboard event constants
+    mock_appkit_mod.NSCommandKeyMask = 1 << 20
+    mock_appkit_mod.NSShiftKeyMask = 1 << 17
+    mock_appkit_mod.NSDeviceIndependentModifierFlagsMask = 0xFFFF0000
+    mock_appkit_mod.NSKeyDownMask = 1 << 10
+
     modules = {
-        "AppKit": MagicMock(),
+        "AppKit": mock_appkit_mod,
         "Foundation": MagicMock(),
         "objc": MagicMock(),
         "PyObjCTools": MagicMock(),
@@ -448,3 +455,290 @@ class TestResultPreviewPanelThreading:
 
         assert event.wait(timeout=1)
         assert cancelled == [True]
+
+
+class TestResultPreviewPanelModeSwitch:
+    """Test mode switcher (NSSegmentedControl) in preview panel."""
+
+    def test_show_stores_available_modes(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = _setup_panel_with_final_field(ResultPreviewPanel())
+        modes = [("off", "Off"), ("proofread", "Proofread"), ("format", "Format")]
+
+        panel.show(
+            asr_text="text",
+            show_enhance=True,
+            on_confirm=MagicMock(),
+            on_cancel=MagicMock(),
+            available_modes=modes,
+            current_mode="proofread",
+        )
+
+        assert panel._available_modes == modes
+        assert panel._current_mode == "proofread"
+
+    def test_mode_change_callback_invoked(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = _setup_panel_with_final_field(ResultPreviewPanel())
+        modes = [("off", "Off"), ("proofread", "Proofread"), ("format", "Format")]
+        changed_modes = []
+
+        panel.show(
+            asr_text="text",
+            show_enhance=True,
+            on_confirm=MagicMock(),
+            on_cancel=MagicMock(),
+            available_modes=modes,
+            current_mode="off",
+            on_mode_change=lambda m: changed_modes.append(m),
+        )
+
+        # Simulate selecting segment index 2 ("format")
+        panel._on_segment_changed(2)
+
+        assert changed_modes == ["format"]
+        assert panel._current_mode == "format"
+
+    def test_set_enhance_loading_resets_user_edited(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = ResultPreviewPanel()
+        panel._user_edited = True
+        panel._enhance_label = MagicMock()
+        panel._enhance_text_view = MagicMock()
+
+        with patch("PyObjCTools.AppHelper") as mock_helper:
+            mock_helper.callAfter.side_effect = lambda fn: fn()
+            panel.set_enhance_loading()
+
+        assert panel._user_edited is False
+
+    def test_set_enhance_loading_shows_spinner_label(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = ResultPreviewPanel()
+        panel._enhance_label = MagicMock()
+        panel._enhance_text_view = MagicMock()
+
+        with patch("PyObjCTools.AppHelper") as mock_helper:
+            mock_helper.callAfter.side_effect = lambda fn: fn()
+            panel.set_enhance_loading()
+
+        panel._enhance_label.setStringValue_.assert_called_with(
+            "AI Enhancement  \u23f3 Processing..."
+        )
+        panel._enhance_text_view.setString_.assert_called_with("")
+
+    def test_set_enhance_off_clears_and_restores_asr(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = ResultPreviewPanel()
+        panel._asr_text = "original asr"
+        panel._user_edited = False
+        panel._enhance_label = MagicMock()
+        panel._enhance_text_view = MagicMock()
+        panel._final_text_field = MagicMock()
+
+        with patch("PyObjCTools.AppHelper") as mock_helper:
+            mock_helper.callAfter.side_effect = lambda fn: fn()
+            panel.set_enhance_off()
+
+        panel._enhance_label.setStringValue_.assert_called_with(
+            "AI Enhancement (Off)"
+        )
+        panel._enhance_text_view.setString_.assert_called_with("")
+        panel._final_text_field.setStringValue_.assert_called_with("original asr")
+        assert panel._show_enhance is False
+
+    def test_set_enhance_result_ignores_stale_request_id(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = ResultPreviewPanel()
+        panel._enhance_request_id = 3
+        panel._enhance_text_view = MagicMock()
+        panel._enhance_label = MagicMock()
+        panel._final_text_field = MagicMock()
+
+        with patch("PyObjCTools.AppHelper") as mock_helper:
+            mock_helper.callAfter.side_effect = lambda fn: fn()
+            # Send result with stale request_id=1
+            panel.set_enhance_result("stale result", request_id=1)
+
+        # Should not update anything because request_id is stale
+        panel._enhance_text_view.setString_.assert_not_called()
+
+    def test_set_enhance_result_accepts_current_request_id(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = ResultPreviewPanel()
+        panel._enhance_request_id = 3
+        panel._user_edited = False
+        panel._enhance_text_view = MagicMock()
+        panel._enhance_label = MagicMock()
+        panel._final_text_field = MagicMock()
+
+        with patch("PyObjCTools.AppHelper") as mock_helper:
+            mock_helper.callAfter.side_effect = lambda fn: fn()
+            panel.set_enhance_result("current result", request_id=3)
+
+        panel._enhance_text_view.setString_.assert_called_with("current result")
+        panel._final_text_field.setStringValue_.assert_called_with("current result")
+
+    def test_backward_compat_show_without_modes(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = _setup_panel_with_final_field(ResultPreviewPanel())
+
+        # Call show() without the new parameters — should work as before
+        panel.show(
+            asr_text="text",
+            show_enhance=False,
+            on_confirm=MagicMock(),
+            on_cancel=MagicMock(),
+        )
+
+        assert panel._available_modes == []
+        assert panel._current_mode == "off"
+        assert panel._on_mode_change is None
+        assert panel._mode_segment is None
+
+
+def _make_key_event(char, command=True, shift=False):
+    """Create a mock NSEvent for keyboard shortcut testing."""
+    event = MagicMock()
+    event.charactersIgnoringModifiers.return_value = char
+
+    # Build modifier flags: NSCommandKeyMask = 1 << 20, NSShiftKeyMask = 1 << 17
+    # NSDeviceIndependentModifierFlagsMask = 0xFFFF0000
+    flags = 0
+    if command:
+        flags |= 1 << 20  # NSCommandKeyMask
+    if shift:
+        flags |= 1 << 17  # NSShiftKeyMask
+    event.modifierFlags.return_value = flags
+    return event
+
+
+def _make_panel_with_modes(modes=None, current_mode="off"):
+    """Create a ResultPreviewPanel set up with modes for keyboard shortcut testing."""
+    from voicetext.result_window import ResultPreviewPanel
+
+    if modes is None:
+        modes = [
+            ("off", "Off"),
+            ("proofread", "Proofread"),
+            ("format", "Format"),
+            ("complete", "Complete"),
+            ("enhance", "Enhance"),
+            ("translate_en", "Translate EN"),
+        ]
+
+    panel = _setup_panel_with_final_field(ResultPreviewPanel())
+    panel._mode_segment = MagicMock()
+    changed_modes = []
+
+    panel.show(
+        asr_text="text",
+        show_enhance=True,
+        on_confirm=MagicMock(),
+        on_cancel=MagicMock(),
+        available_modes=modes,
+        current_mode=current_mode,
+        on_mode_change=lambda m: changed_modes.append(m),
+    )
+
+    return panel, changed_modes
+
+
+class TestResultPreviewPanelKeyboardShortcuts:
+    """Test ⌘1~⌘N keyboard shortcuts for mode switching."""
+
+    def test_cmd_number_switches_mode(self):
+        """⌘2 should switch to index 1 (proofread), update segment and trigger callback."""
+        panel, changed_modes = _make_panel_with_modes()
+        panel._panel.isKeyWindow.return_value = True
+
+        event = _make_key_event("2", command=True)
+        result = panel._handle_key_event(event)
+
+        assert result is None  # Event consumed
+        panel._mode_segment.setSelectedSegment_.assert_called_with(1)
+        assert changed_modes == ["proofread"]
+
+    def test_cmd_number_out_of_range_ignored(self):
+        """⌘9 with only 6 modes should pass through."""
+        panel, changed_modes = _make_panel_with_modes()
+        panel._panel.isKeyWindow.return_value = True
+
+        event = _make_key_event("9", command=True)
+        result = panel._handle_key_event(event)
+
+        assert result is event  # Event not consumed
+        panel._mode_segment.setSelectedSegment_.assert_not_called()
+        assert changed_modes == []
+
+    def test_plain_number_key_passthrough(self):
+        """Number key without Command modifier should pass through."""
+        panel, changed_modes = _make_panel_with_modes()
+        panel._panel.isKeyWindow.return_value = True
+
+        event = _make_key_event("2", command=False)
+        result = panel._handle_key_event(event)
+
+        assert result is event
+        panel._mode_segment.setSelectedSegment_.assert_not_called()
+        assert changed_modes == []
+
+    def test_event_monitor_installed_on_show(self):
+        """show() with available_modes should install event monitor."""
+        panel, _ = _make_panel_with_modes()
+
+        assert panel._event_monitor is not None
+
+    def test_event_monitor_removed_on_close(self):
+        """close() should remove event monitor."""
+        panel, _ = _make_panel_with_modes()
+        assert panel._event_monitor is not None
+
+        panel.close()
+
+        assert panel._event_monitor is None
+
+    def test_event_ignored_when_panel_not_key_window(self):
+        """When panel is not key window, events should pass through."""
+        panel, changed_modes = _make_panel_with_modes()
+        panel._panel.isKeyWindow.return_value = False
+
+        event = _make_key_event("1", command=True)
+        result = panel._handle_key_event(event)
+
+        assert result is event
+        assert changed_modes == []
+
+    def test_no_monitor_when_no_modes(self):
+        """Without available_modes, no event monitor should be installed."""
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = _setup_panel_with_final_field(ResultPreviewPanel())
+
+        panel.show(
+            asr_text="text",
+            show_enhance=False,
+            on_confirm=MagicMock(),
+            on_cancel=MagicMock(),
+        )
+
+        assert panel._event_monitor is None
+
+    def test_cmd_shift_number_passthrough(self):
+        """⌘+Shift+number should not be intercepted."""
+        panel, changed_modes = _make_panel_with_modes()
+        panel._panel.isKeyWindow.return_value = True
+
+        event = _make_key_event("2", command=True, shift=True)
+        result = panel._handle_key_event(event)
+
+        assert result is event
+        assert changed_modes == []
