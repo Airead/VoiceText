@@ -215,6 +215,60 @@ class _PynputListener:
                 logger.error("on_release callback error: %s", e)
 
 
+def _convert_hotkey_to_pynput(hotkey_str: str) -> str:
+    """Convert user hotkey format to pynput GlobalHotKeys format.
+
+    Examples:
+        "ctrl+shift+v" -> "<ctrl>+<shift>+v"
+        "cmd+c" -> "<cmd>+c"
+    """
+    parts = hotkey_str.strip().lower().split("+")
+    converted = []
+    modifiers = {"ctrl", "shift", "alt", "option", "cmd", "command"}
+    for part in parts:
+        part = part.strip()
+        if part in modifiers:
+            if part == "option":
+                part = "alt"
+            elif part == "command":
+                part = "cmd"
+            converted.append(f"<{part}>")
+        else:
+            converted.append(part)
+    return "+".join(converted)
+
+
+class TapHotkeyListener:
+    """Listen for a hotkey combination (single tap, not hold).
+
+    Uses pynput's GlobalHotKeys to listen for key combinations like
+    "ctrl+shift+v" and fire the callback once per activation.
+    """
+
+    def __init__(self, hotkey_str: str, on_activate: Callable[[], None]) -> None:
+        self._hotkey_str = hotkey_str
+        self._on_activate = on_activate
+        self._listener: Optional[keyboard.GlobalHotKeys] = None
+        self._pynput_hotkey = _convert_hotkey_to_pynput(hotkey_str)
+
+    def start(self) -> None:
+        self._listener = keyboard.GlobalHotKeys({
+            self._pynput_hotkey: self._on_activate,
+        })
+        self._listener.daemon = True
+        self._listener.start()
+        logger.info(
+            "TapHotkeyListener started: %s -> %s",
+            self._hotkey_str, self._pynput_hotkey,
+        )
+
+    def stop(self) -> None:
+        if self._listener:
+            self._listener.stop()
+            self._listener = None
+            logger.info("TapHotkeyListener stopped")
+
+
 class HoldHotkeyListener:
     """Listen for a hotkey: call on_press when pressed, on_release when released.
 

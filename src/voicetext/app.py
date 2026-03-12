@@ -23,8 +23,8 @@ from .correction_log import CorrectionLogger
 from .usage_stats import UsageStats
 from .enhancer import MODE_OFF, TextEnhancer, create_enhancer
 from .result_window import ResultPreviewPanel
-from .hotkey import HoldHotkeyListener
-from .input import type_text
+from .hotkey import HoldHotkeyListener, TapHotkeyListener
+from .input import get_clipboard_text, set_clipboard_text, type_text
 from .model_registry import (
     PRESET_BY_ID,
     PRESETS,
@@ -116,6 +116,7 @@ class VoiceTextApp(rumps.App):
         self._append_newline = self._config["output"]["append_newline"]
         self._preview_enabled = self._config["output"].get("preview", True)
         self._hotkey_listener: Optional[HoldHotkeyListener] = None
+        self._clipboard_hotkey_listener: Optional[TapHotkeyListener] = None
         self._busy = False
         self._preview_panel = ResultPreviewPanel()
         self._correction_logger = CorrectionLogger()
@@ -258,6 +259,10 @@ class VoiceTextApp(rumps.App):
         )
         self._preview_item.state = 1 if self._preview_enabled else 0
 
+        self._clipboard_enhance_item = rumps.MenuItem(
+            "Enhance Clipboard", callback=self._on_clipboard_enhance
+        )
+
         # Debug submenu
         self._debug_menu = rumps.MenuItem("Debug")
 
@@ -315,6 +320,7 @@ class VoiceTextApp(rumps.App):
             self._llm_model_menu,
             self._enhance_menu,
             None,
+            self._clipboard_enhance_item,
             self._preview_item,
             self._enhance_vocab_item,
             self._enhance_history_item,
@@ -632,6 +638,140 @@ class VoiceTextApp(rumps.App):
         else:
             self._set_status("VT")
             logger.info("Preview cancelled by user")
+
+    def _on_clipboard_enhance(self, _sender=None) -> None:
+        """Handle Enhance Clipboard menu item or hotkey activation."""
+        if self._busy:
+            logger.info("Clipboard enhance ignored: busy")
+            return
+
+        clipboard_text = get_clipboard_text()
+        if not clipboard_text or not clipboard_text.strip():
+            rumps.notification("VoiceText", "Clipboard Empty", "No text found in clipboard.")
+            return
+
+        clipboard_text = clipboard_text.strip()
+        self._busy = True
+        self._set_status("Enhancing...")
+
+        def _do():
+            try:
+                self._do_clipboard_with_preview(clipboard_text)
+            except Exception as e:
+                logger.error("Clipboard enhance failed: %s", e)
+                self._set_status("Error")
+            finally:
+                self._busy = False
+
+        threading.Thread(target=_do, daemon=True).start()
+
+    def _do_clipboard_with_preview(self, clipboard_text: str) -> None:
+        """Show preview panel for clipboard text enhancement."""
+        from PyObjCTools import AppHelper
+        import time
+
+        self._current_preview_asr_text = clipboard_text
+
+        result_event = threading.Event()
+        result_holder = {"text": None, "confirmed": False, "enhanced_text": None}
+
+        def on_confirm(text: str, correction_info: dict | None = None) -> None:
+            result_holder["text"] = text
+            result_holder["confirmed"] = True
+            result_event.set()
+
+        def on_cancel() -> None:
+            result_holder["confirmed"] = False
+            result_event.set()
+
+        # Build mode list for the segmented control
+        available_modes = []
+        if self._enhancer:
+            available_modes = [("off", "Off")] + self._enhancer.available_modes
+
+        # Build LLM model list for popup
+        llm_models: List[str] = []
+        llm_model_keys: list = []
+        llm_current_index = 0
+
+        if self._enhancer:
+            providers_with = self._enhancer.providers_with_models
+            current_llm = (self._enhancer.provider_name, self._enhancer.model_name)
+            for pname, models in providers_with.items():
+                for mname in models:
+                    key = (pname, mname)
+                    llm_models.append(f"{pname} / {mname}")
+                    llm_model_keys.append(key)
+                    if key == current_llm:
+                        llm_current_index = len(llm_models) - 1
+
+        self._preview_llm_keys = llm_model_keys
+
+        # Build enhance info string
+        enhance_info = ""
+        if self._enhancer:
+            parts = []
+            if self._enhancer.provider_name:
+                parts.append(self._enhancer.provider_name)
+            if self._enhancer.model_name:
+                parts.append(self._enhancer.model_name)
+            enhance_info = " / ".join(parts)
+
+        use_enhance = bool(self._enhancer and self._enhancer.is_active)
+
+        def _show():
+            self._activate_for_dialog()
+            self._preview_panel.show(
+                asr_text=clipboard_text,
+                show_enhance=use_enhance,
+                on_confirm=on_confirm,
+                on_cancel=on_cancel,
+                available_modes=available_modes,
+                current_mode=self._enhance_mode,
+                on_mode_change=self._on_preview_mode_change,
+                asr_info="",
+                asr_wav_data=None,
+                enhance_info=enhance_info,
+                stt_models=None,
+                stt_current_index=0,
+                on_stt_model_change=None,
+                llm_models=llm_models if llm_models else None,
+                llm_current_index=llm_current_index,
+                on_llm_model_change=self._on_preview_llm_change if llm_models else None,
+                source="clipboard",
+            )
+            if use_enhance:
+                self._preview_panel.enhance_request_id += 1
+                self._run_enhance_in_background(
+                    clipboard_text, self._preview_panel.enhance_request_id, result_holder
+                )
+
+        AppHelper.callAfter(_show)
+        self._set_status("Preview...")
+
+        result_event.wait()
+
+        AppHelper.callAfter(self._restore_accessory)
+        time.sleep(0.1)
+
+        clip_cfg = self._config.get("clipboard_enhance", {})
+        output_mode = clip_cfg.get("output", "clipboard")
+
+        if result_holder["confirmed"] and result_holder["text"]:
+            final_text = result_holder["text"].strip()
+            if output_mode == "type_text":
+                type_text(
+                    final_text,
+                    append_newline=self._append_newline,
+                    method=self._output_method,
+                )
+            else:
+                set_clipboard_text(final_text)
+                rumps.notification("VoiceText", "Clipboard Updated", final_text[:80])
+            self._set_status("VT")
+        else:
+            self._set_status("VT")
+            logger.info("Clipboard enhance cancelled by user")
 
     def _run_enhance_in_background(
         self, asr_text: str, request_id: int, result_holder: dict | None = None
@@ -2527,6 +2667,8 @@ extra_body: {"chat_template_kwargs": {"enable_thinking": false}}"""
     def _on_quit_click(self, _) -> None:
         if self._hotkey_listener:
             self._hotkey_listener.stop()
+        if self._clipboard_hotkey_listener:
+            self._clipboard_hotkey_listener.stop()
         rumps.quit_application()
 
     @staticmethod
@@ -2566,6 +2708,15 @@ extra_body: {"chat_template_kwargs": {"enable_thinking": false}}"""
             on_release=self._on_hotkey_release,
         )
         self._hotkey_listener.start()
+
+        # Start clipboard enhance hotkey listener if configured
+        clip_hotkey = self._config.get("clipboard_enhance", {}).get("hotkey", "")
+        if clip_hotkey:
+            self._clipboard_hotkey_listener = TapHotkeyListener(
+                hotkey_str=clip_hotkey,
+                on_activate=self._on_clipboard_enhance,
+            )
+            self._clipboard_hotkey_listener.start()
 
         super().run(**kwargs)
 

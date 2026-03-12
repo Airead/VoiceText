@@ -12,6 +12,16 @@ from AppKit import NSPasteboard, NSPasteboardTypeString, NSString
 logger = logging.getLogger(__name__)
 
 
+def get_clipboard_text() -> str | None:
+    """Read the current plain-text content from the system clipboard."""
+    return _get_pasteboard_string()
+
+
+def set_clipboard_text(text: str) -> None:
+    """Write text to the system clipboard (visible in clipboard history)."""
+    _set_pasteboard_string(text)
+
+
 def type_text(text: str, append_newline: bool = False, method: str = "auto") -> None:
     """Type text into the currently focused text field on macOS.
 

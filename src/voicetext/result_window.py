@@ -84,6 +84,7 @@ class ResultPreviewPanel:
         self._llm_models: List[str] = []
         self._stt_current_index: int = 0
         self._llm_current_index: int = 0
+        self._source: str = "voice"
 
     def show(
         self,
@@ -103,6 +104,7 @@ class ResultPreviewPanel:
         llm_models: Optional[List[str]] = None,
         llm_current_index: int = 0,
         on_llm_model_change: Optional[Callable[[int], None]] = None,
+        source: str = "voice",
     ) -> None:
         """Show the preview panel with ASR text.
 
@@ -123,6 +125,7 @@ class ResultPreviewPanel:
             llm_models: Display name list for LLM model popup.
             llm_current_index: Currently selected LLM model index.
             on_llm_model_change: Callback when user changes LLM model popup.
+            source: Source of text - "voice" (default) or "clipboard".
         """
         self._on_confirm = on_confirm
         self._on_cancel = on_cancel
@@ -132,6 +135,7 @@ class ResultPreviewPanel:
         self._user_edited = False
         self._show_enhance = show_enhance
         self._asr_text = asr_text
+        self._source = source
         self._available_modes = available_modes or []
         self._current_mode = current_mode or "off"
         self._asr_info = asr_info
@@ -449,7 +453,8 @@ class ResultPreviewPanel:
             NSBackingStoreBuffered,
             False,
         )
-        panel.setTitle_("Preview")
+        panel_title = "Enhance Clipboard" if self._source == "clipboard" else "Preview"
+        panel.setTitle_(panel_title)
         panel.setLevel_(NSStatusWindowLevel)
         panel.setFloatingPanel_(True)
         panel.setHidesOnDeactivate_(False)
@@ -657,9 +662,11 @@ class ResultPreviewPanel:
         label_y = y + self._TEXT_HEIGHT
         x_cursor = self._PADDING
 
-        if has_stt_popup:
+        asr_section_title = "Clipboard Text" if self._source == "clipboard" else "ASR"
+
+        if has_stt_popup and self._source != "clipboard":
             # "ASR" fixed label
-            asr_fixed = NSTextField.labelWithString_("ASR")
+            asr_fixed = NSTextField.labelWithString_(asr_section_title)
             asr_fixed.setFrame_(NSMakeRect(x_cursor, label_y, 30, self._LABEL_HEIGHT))
             asr_fixed.setFont_(NSFont.boldSystemFontOfSize_(12))
             content_view.addSubview_(asr_fixed)
@@ -696,10 +703,10 @@ class ResultPreviewPanel:
             content_view.addSubview_(asr_info_label)
             self._asr_info_label = asr_info_label
         else:
-            # Original layout: ASR (model info  duration)
-            asr_label_text = "ASR"
-            if self._asr_info:
-                asr_label_text = f"ASR ({self._asr_info})"
+            # Original layout: ASR (model info  duration) or Clipboard Text
+            asr_label_text = asr_section_title
+            if self._asr_info and self._source != "clipboard":
+                asr_label_text = f"{asr_section_title} ({self._asr_info})"
             label_width = inner_width - audio_btns_width - 4 if self._asr_wav_data else inner_width
             asr_label = NSTextField.labelWithString_(asr_label_text)
             asr_label.setFrame_(NSMakeRect(self._PADDING, label_y, label_width, self._LABEL_HEIGHT))

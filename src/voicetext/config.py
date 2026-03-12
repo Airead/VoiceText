@@ -67,6 +67,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "max_entries": 10,
         },
     },
+    "clipboard_enhance": {
+        "hotkey": "",
+        "output": "clipboard",
+    },
     "logging": {
         "level": "INFO",
     },

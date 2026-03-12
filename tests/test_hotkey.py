@@ -6,9 +6,11 @@ from unittest.mock import MagicMock, patch
 from voicetext.hotkey import (
     _parse_key,
     _is_fn_key,
+    _convert_hotkey_to_pynput,
     _QuartzFnListener,
     _PynputListener,
     HoldHotkeyListener,
+    TapHotkeyListener,
 )
 
 
@@ -89,3 +91,36 @@ class TestHoldHotkeyListener:
         from pynput import keyboard
         listener._impl._handle_press(keyboard.Key.f3)
         on_press.assert_not_called()
+
+
+class TestConvertHotkeyToPynput:
+    def test_simple_combo(self):
+        assert _convert_hotkey_to_pynput("ctrl+shift+v") == "<ctrl>+<shift>+v"
+
+    def test_cmd(self):
+        assert _convert_hotkey_to_pynput("cmd+c") == "<cmd>+c"
+
+    def test_option_maps_to_alt(self):
+        assert _convert_hotkey_to_pynput("option+shift+e") == "<alt>+<shift>+e"
+
+    def test_command_maps_to_cmd(self):
+        assert _convert_hotkey_to_pynput("command+v") == "<cmd>+v"
+
+    def test_strips_spaces(self):
+        assert _convert_hotkey_to_pynput(" ctrl + shift + v ") == "<ctrl>+<shift>+v"
+
+    def test_case_insensitive(self):
+        assert _convert_hotkey_to_pynput("Ctrl+Shift+V") == "<ctrl>+<shift>+v"
+
+
+class TestTapHotkeyListener:
+    def test_creation(self):
+        cb = MagicMock()
+        listener = TapHotkeyListener("ctrl+shift+v", cb)
+        assert listener._pynput_hotkey == "<ctrl>+<shift>+v"
+        assert listener._on_activate is cb
+
+    def test_stop_when_not_started(self):
+        listener = TapHotkeyListener("ctrl+v", MagicMock())
+        listener.stop()
+        assert listener._listener is None
