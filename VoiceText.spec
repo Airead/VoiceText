@@ -103,7 +103,7 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='VoiceText.app',
-    icon=None,
+    icon=os.path.join(_spec_dir, 'resources', 'icon.icns'),
     bundle_identifier='com.voicetext.app',
     codesign_identity=os.environ.get('CODESIGN_IDENTITY', 'VoiceText Dev'),
     info_plist={
