@@ -54,13 +54,77 @@ class TestResultPreviewPanelCallbacks:
         panel.show(
             asr_text="raw asr",
             show_enhance=False,
-            on_confirm=lambda t, info=None: confirmed_text.append(t),
+            on_confirm=lambda t, info=None, clipboard=False: confirmed_text.append(t),
             on_cancel=MagicMock(),
         )
 
         panel.confirmClicked_(None)
 
         assert confirmed_text == ["final text"]
+
+    def test_confirm_with_cmd_held_passes_clipboard_flag(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = _setup_panel_with_final_field(ResultPreviewPanel())
+        panel._final_text_field.stringValue.return_value = "clipboard text"
+        results = []
+
+        panel.show(
+            asr_text="raw asr",
+            show_enhance=False,
+            on_confirm=lambda t, info=None, clipboard=False: results.append(
+                (t, clipboard)
+            ),
+            on_cancel=MagicMock(),
+        )
+
+        # Simulate Command key held
+        panel._cmd_held = True
+        panel.confirmClicked_(None)
+
+        assert results == [("clipboard text", True)]
+
+    def test_confirm_without_cmd_passes_false(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = _setup_panel_with_final_field(ResultPreviewPanel())
+        panel._final_text_field.stringValue.return_value = "normal text"
+        results = []
+
+        panel.show(
+            asr_text="raw asr",
+            show_enhance=False,
+            on_confirm=lambda t, info=None, clipboard=False: results.append(
+                (t, clipboard)
+            ),
+            on_cancel=MagicMock(),
+        )
+
+        panel.confirmClicked_(None)
+
+        assert results == [("normal text", False)]
+
+    def test_flags_changed_updates_button_title(self):
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = _setup_panel_with_final_field(ResultPreviewPanel())
+        panel._confirm_btn = MagicMock()
+        panel._panel.isKeyWindow.return_value = True
+
+        # Simulate Command key press
+        event = MagicMock()
+        event.modifierFlags.return_value = 1 << 20  # NSCommandKeyMask
+        panel._handle_flags_changed(event)
+
+        panel._confirm_btn.setTitle_.assert_called_with("Copy \u2318\u23ce")
+        assert panel._cmd_held is True
+
+        # Simulate Command key release
+        event.modifierFlags.return_value = 0
+        panel._handle_flags_changed(event)
+
+        panel._confirm_btn.setTitle_.assert_called_with("Confirm \u23ce")
+        assert panel._cmd_held is False
 
     def test_cancel_triggers_callback(self):
         from voicetext.result_window import ResultPreviewPanel
@@ -135,7 +199,7 @@ class TestResultPreviewPanelCorrectionInfo:
         panel.show(
             asr_text="raw asr",
             show_enhance=True,
-            on_confirm=lambda text, info: results.append((text, info)),
+            on_confirm=lambda text, info, clipboard=False: results.append((text, info)),
             on_cancel=MagicMock(),
         )
 
@@ -163,7 +227,7 @@ class TestResultPreviewPanelCorrectionInfo:
         panel.show(
             asr_text="raw asr",
             show_enhance=True,
-            on_confirm=lambda text, info: results.append((text, info)),
+            on_confirm=lambda text, info, clipboard=False: results.append((text, info)),
             on_cancel=MagicMock(),
         )
 
@@ -183,7 +247,7 @@ class TestResultPreviewPanelCorrectionInfo:
         panel.show(
             asr_text="raw asr",
             show_enhance=False,
-            on_confirm=lambda text, info: results.append((text, info)),
+            on_confirm=lambda text, info, clipboard=False: results.append((text, info)),
             on_cancel=MagicMock(),
         )
 
@@ -306,7 +370,7 @@ class TestResultPreviewPanelKeyHandling:
         panel.show(
             asr_text="asr",
             show_enhance=False,
-            on_confirm=lambda t, info=None: confirmed.append(t),
+            on_confirm=lambda t, info=None, clipboard=False: confirmed.append(t),
             on_cancel=MagicMock(),
         )
 
@@ -450,7 +514,7 @@ class TestResultPreviewPanelThreading:
         event = threading.Event()
         result_holder = {"text": None}
 
-        def on_confirm(text, correction_info=None):
+        def on_confirm(text, correction_info=None, clipboard=False):
             result_holder["text"] = text
             event.set()
 
@@ -484,7 +548,7 @@ class TestResultPreviewPanelThreading:
         panel.show(
             asr_text="asr",
             show_enhance=False,
-            on_confirm=lambda t, info=None: event.set(),
+            on_confirm=lambda t, info=None, clipboard=False: event.set(),
             on_cancel=on_cancel,
         )
 
@@ -781,8 +845,8 @@ class TestResultPreviewPanelKeyboardShortcuts:
         assert result is event
         assert changed_modes == []
 
-    def test_no_monitor_when_no_modes(self):
-        """Without available_modes, no event monitor should be installed."""
+    def test_monitor_installed_even_without_modes(self):
+        """Event monitor should be installed even without modes (for ⌘Enter)."""
         from voicetext.result_window import ResultPreviewPanel
 
         panel = _setup_panel_with_final_field(ResultPreviewPanel())
@@ -794,7 +858,29 @@ class TestResultPreviewPanelKeyboardShortcuts:
             on_cancel=MagicMock(),
         )
 
-        assert panel._event_monitor is None
+        assert panel._event_monitor is not None
+
+    def test_cmd_enter_triggers_clipboard_confirm(self):
+        """⌘Enter should trigger confirmClicked_ with _cmd_held=True."""
+        from voicetext.result_window import ResultPreviewPanel
+
+        panel = _setup_panel_with_final_field(ResultPreviewPanel())
+        panel._panel.isKeyWindow.return_value = True
+        panel._final_text_field.stringValue.return_value = "test"
+        results = []
+
+        panel.show(
+            asr_text="test",
+            show_enhance=False,
+            on_confirm=lambda t, info=None, clipboard=False: results.append(clipboard),
+            on_cancel=MagicMock(),
+        )
+
+        event = _make_key_event("\r", command=True)
+        result = panel._handle_key_event(event)
+
+        assert result is None  # Event consumed
+        assert results == [True]
 
     def test_cmd_shift_number_passthrough(self):
         """⌘+Shift+number should not be intercepted."""
@@ -1367,7 +1453,7 @@ class TestPanelCloseDelegate:
         panel.show(
             asr_text="hello",
             show_enhance=False,
-            on_confirm=lambda t, c: None,
+            on_confirm=lambda t, c, clipboard=False: None,
             on_cancel=lambda: cancelled.append(True),
         )
 
@@ -1384,7 +1470,7 @@ class TestPanelCloseDelegate:
         panel.show(
             asr_text="hello",
             show_enhance=False,
-            on_confirm=lambda t, c: None,
+            on_confirm=lambda t, c, clipboard=False: None,
             on_cancel=lambda: cancel_count.append(1),
         )
 
@@ -1402,7 +1488,7 @@ class TestPanelCloseDelegate:
         panel.show(
             asr_text="hello",
             show_enhance=False,
-            on_confirm=lambda t, c: None,
+            on_confirm=lambda t, c, clipboard=False: None,
             on_cancel=lambda: cancel_count.append(1),
         )
 

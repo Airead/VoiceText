@@ -33,10 +33,15 @@ def copy_selection_to_clipboard() -> bool:
 
     Uses CGEvent directly so that only the Command modifier is set,
     regardless of which physical modifier keys the user is still holding.
+    Checks for a text selection via Accessibility API first to avoid
+    triggering a system beep when nothing is selected.
 
     Returns True if the clipboard content changed (selection was copied),
     False otherwise.
     """
+    if not _has_text_selection():
+        return False
+
     old = get_clipboard_text()
 
     # Brief pause so the system finishes processing the trigger hotkey
@@ -73,6 +78,45 @@ def _send_cmd_c() -> None:
     event_up = Quartz.CGEventCreateKeyboardEvent(None, _C_KEYCODE, False)
     Quartz.CGEventSetFlags(event_up, Quartz.kCGEventFlagMaskCommand)
     Quartz.CGEventPost(Quartz.kCGAnnotatedSessionEventTap, event_up)
+
+
+def _has_text_selection() -> bool:
+    """Check if the frontmost application has a non-empty text selection.
+
+    Uses the macOS Accessibility API (AXUIElement) to query AXSelectedText
+    on the focused UI element. Returns False if there is no selection,
+    accessibility is unavailable, or the focused element has no text.
+    """
+    try:
+        from ApplicationServices import (
+            AXUIElementCreateSystemWide,
+            AXUIElementCopyAttributeValue,
+        )
+        from CoreFoundation import CFRelease
+
+        system = AXUIElementCreateSystemWide()
+        err, focused_app = AXUIElementCopyAttributeValue(
+            system, "AXFocusedApplication", None
+        )
+        if err != 0 or focused_app is None:
+            return False
+
+        err, focused_elem = AXUIElementCopyAttributeValue(
+            focused_app, "AXFocusedUIElement", None
+        )
+        if err != 0 or focused_elem is None:
+            return False
+
+        err, selected_text = AXUIElementCopyAttributeValue(
+            focused_elem, "AXSelectedText", None
+        )
+        if err != 0 or selected_text is None:
+            return False
+
+        return len(str(selected_text)) > 0
+    except Exception as exc:
+        logger.debug("Accessibility selection check failed: %s", exc)
+        return False
 
 
 def type_text(text: str, append_newline: bool = False, method: str = "auto") -> None:

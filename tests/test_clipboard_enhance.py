@@ -95,10 +95,11 @@ class TestClipboardPublicFunctions:
 class TestCopySelectionToClipboard:
     """Test copy_selection_to_clipboard() function."""
 
+    @patch("voicetext.input._has_text_selection", return_value=True)
     @patch("voicetext.input.time.sleep")
     @patch("voicetext.input._send_cmd_c")
     @patch("voicetext.input.get_clipboard_text")
-    def test_selection_copied_successfully(self, mock_get, mock_send, mock_sleep):
+    def test_selection_copied_successfully(self, mock_get, mock_send, mock_sleep, _):
         from voicetext.input import copy_selection_to_clipboard
 
         # Clipboard changes after Cmd+C
@@ -113,23 +114,33 @@ class TestCopySelectionToClipboard:
         mock_sleep.assert_any_call(0.05)
         mock_sleep.assert_any_call(0.15)
 
+    @patch("voicetext.input._has_text_selection", return_value=False)
+    def test_no_selection_skips_cmd_c(self, _):
+        from voicetext.input import copy_selection_to_clipboard
+
+        result = copy_selection_to_clipboard()
+
+        assert result is False
+
+    @patch("voicetext.input._has_text_selection", return_value=True)
     @patch("voicetext.input.time.sleep")
     @patch("voicetext.input._send_cmd_c")
     @patch("voicetext.input.get_clipboard_text")
-    def test_no_selection_clipboard_unchanged(self, mock_get, mock_send, mock_sleep):
+    def test_clipboard_unchanged_returns_false(self, mock_get, mock_send, mock_sleep, _):
         from voicetext.input import copy_selection_to_clipboard
 
-        # Clipboard stays the same (nothing selected)
+        # Clipboard stays the same (nothing selected per clipboard check)
         mock_get.side_effect = ["same text", "same text"]
 
         result = copy_selection_to_clipboard()
 
         assert result is False
 
+    @patch("voicetext.input._has_text_selection", return_value=True)
     @patch("voicetext.input.time.sleep")
     @patch("voicetext.input._send_cmd_c")
     @patch("voicetext.input.get_clipboard_text")
-    def test_send_cmd_c_failure_returns_false(self, mock_get, mock_send, mock_sleep):
+    def test_send_cmd_c_failure_returns_false(self, mock_get, mock_send, mock_sleep, _):
         from voicetext.input import copy_selection_to_clipboard
 
         mock_get.return_value = "old text"

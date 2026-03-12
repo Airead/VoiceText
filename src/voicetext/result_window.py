@@ -93,6 +93,9 @@ class ResultPreviewPanel:
         self._on_thinking_toggle: Optional[Callable[[bool], None]] = None
         self._thinking_text: str = ""
         self._thinking_button = None
+        self._confirm_btn = None
+        self._flags_monitor = None
+        self._cmd_held = False
 
     def show(
         self,
@@ -179,6 +182,7 @@ class ResultPreviewPanel:
             editor.setSelectedRange_((end, 0))
 
         self._install_event_monitor()
+        self._install_flags_monitor()
 
         from AppKit import NSApp
 
@@ -530,6 +534,8 @@ class ResultPreviewPanel:
         """Close the panel."""
         self._stop_playback()
         self._remove_event_monitor()
+        self._remove_flags_monitor()
+        self._cmd_held = False
         if self._panel is not None:
             # Clear delegate before closing to prevent windowWillClose: re-entry
             self._panel.setDelegate_(None)
@@ -541,30 +547,37 @@ class ResultPreviewPanel:
         self._on_cancel = None
 
     def _handle_key_event(self, event):
-        """Handle key events for ⌘1~⌘9 mode switching."""
+        """Handle key events for ⌘Enter (copy to clipboard) and ⌘1~⌘9 mode switching."""
         if self._panel is None or not self._panel.isKeyWindow():
             return event
 
         from AppKit import NSCommandKeyMask, NSDeviceIndependentModifierFlagsMask
 
         modifier_flags = event.modifierFlags() & NSDeviceIndependentModifierFlagsMask
-        if modifier_flags != NSCommandKeyMask:
+        if not (modifier_flags & NSCommandKeyMask):
             return event
 
         chars = event.charactersIgnoringModifiers()
-        if not chars or len(chars) != 1:
+        if not chars:
             return event
 
         char = chars[0] if isinstance(chars, str) else str(chars)
-        if char < "1" or char > "9":
-            return event
 
-        index = int(char) - 1
-        if index >= len(self._available_modes):
-            return event
+        # ⌘Enter — confirm and copy to clipboard
+        if char == "\r":
+            self._cmd_held = True
+            self.confirmClicked_(None)
+            return None  # Consume the event
 
-        self._switch_to_mode(index)
-        return None  # Consume the event
+        # ⌘1~⌘9 — mode switching (only when exact ⌘, no other modifiers)
+        if modifier_flags == NSCommandKeyMask and len(chars) == 1:
+            if "1" <= char <= "9":
+                index = int(char) - 1
+                if index < len(self._available_modes):
+                    self._switch_to_mode(index)
+                    return None
+
+        return event
 
     def _switch_to_mode(self, index: int) -> None:
         """Switch to the mode at the given index, updating segment and triggering callback."""
@@ -573,10 +586,8 @@ class ResultPreviewPanel:
         self._on_segment_changed(index)
 
     def _install_event_monitor(self) -> None:
-        """Install a local event monitor for keyboard shortcuts."""
+        """Install a local event monitor for keyboard shortcuts (⌘Enter, ⌘1~⌘9)."""
         self._remove_event_monitor()
-        if not self._available_modes:
-            return
 
         from AppKit import NSEvent, NSKeyDownMask
 
@@ -591,6 +602,44 @@ class ResultPreviewPanel:
 
             NSEvent.removeMonitor_(self._event_monitor)
             self._event_monitor = None
+
+    def _install_flags_monitor(self) -> None:
+        """Install a monitor for modifier key changes (Command key detection)."""
+        self._remove_flags_monitor()
+
+        from AppKit import NSEvent, NSFlagsChangedMask
+
+        self._flags_monitor = NSEvent.addLocalMonitorForEventsMatchingMask_handler_(
+            NSFlagsChangedMask, self._handle_flags_changed
+        )
+
+    def _remove_flags_monitor(self) -> None:
+        """Remove the flags-changed monitor if installed."""
+        if self._flags_monitor is not None:
+            from AppKit import NSEvent
+
+            NSEvent.removeMonitor_(self._flags_monitor)
+            self._flags_monitor = None
+
+    def _handle_flags_changed(self, event):
+        """Update Confirm button appearance based on Command key state."""
+        if self._panel is None or not self._panel.isKeyWindow():
+            return event
+
+        from AppKit import NSCommandKeyMask, NSDeviceIndependentModifierFlagsMask
+
+        modifier_flags = event.modifierFlags() & NSDeviceIndependentModifierFlagsMask
+        cmd_pressed = bool(modifier_flags & NSCommandKeyMask)
+
+        if cmd_pressed != self._cmd_held:
+            self._cmd_held = cmd_pressed
+            if self._confirm_btn is not None:
+                if cmd_pressed:
+                    self._confirm_btn.setTitle_("Copy \u2318\u23ce")
+                else:
+                    self._confirm_btn.setTitle_("Confirm \u23ce")
+
+        return event
 
     def _build_panel(self, asr_text: str, show_enhance: bool) -> None:
         """Build the NSPanel and all subviews."""
@@ -688,6 +737,7 @@ class ResultPreviewPanel:
         confirm_btn.setTarget_(self)
         confirm_btn.setAction_(b"confirmClicked:")
         content_view.addSubview_(confirm_btn)
+        self._confirm_btn = confirm_btn
 
         y += self._BUTTON_HEIGHT + self._PADDING
 
@@ -1086,9 +1136,10 @@ class ResultPreviewPanel:
             self._on_mode_change(mode_id)
 
     def confirmClicked_(self, sender) -> None:
-        """Handle confirm button click."""
+        """Handle confirm button click. If Command is held, copy to clipboard."""
         if self._final_text_field is not None and self._on_confirm is not None:
             text = self._final_text_field.stringValue()
+            copy_to_clipboard = self._cmd_held
             correction_info = None
             if self._user_edited and self._show_enhance and self._enhance_text_view is not None:
                 enhanced = self._enhance_text_view.string()
@@ -1099,7 +1150,7 @@ class ResultPreviewPanel:
                 }
             callback = self._on_confirm
             self.close()
-            callback(text, correction_info)
+            callback(text, correction_info, copy_to_clipboard)
 
     def cancelClicked_(self, sender) -> None:
         """Handle cancel button click."""

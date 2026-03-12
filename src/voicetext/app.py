@@ -504,9 +504,14 @@ class VoiceTextApp(rumps.App):
         result_event = threading.Event()
         result_holder = {"text": None, "confirmed": False, "enhanced_text": None}
 
-        def on_confirm(text: str, correction_info: dict | None = None) -> None:
+        def on_confirm(
+            text: str,
+            correction_info: dict | None = None,
+            copy_to_clipboard: bool = False,
+        ) -> None:
             result_holder["text"] = text
             result_holder["confirmed"] = True
+            result_holder["copy_to_clipboard"] = copy_to_clipboard
             if correction_info is not None:
                 try:
                     self._correction_logger.log(
@@ -721,11 +726,15 @@ class VoiceTextApp(rumps.App):
 
         if result_holder["confirmed"] and result_holder["text"]:
             final_text = result_holder["text"].strip()
-            type_text(
-                final_text,
-                append_newline=self._append_newline,
-                method=self._output_method,
-            )
+            if result_holder.get("copy_to_clipboard"):
+                set_clipboard_text(final_text)
+                logger.info("Text copied to clipboard (%d chars)", len(final_text))
+            else:
+                type_text(
+                    final_text,
+                    append_newline=self._append_newline,
+                    method=self._output_method,
+                )
             self._set_status("VT")
 
             try:
@@ -823,9 +832,14 @@ class VoiceTextApp(rumps.App):
         result_event = threading.Event()
         result_holder = {"text": None, "confirmed": False, "enhanced_text": None}
 
-        def on_confirm(text: str, correction_info: dict | None = None) -> None:
+        def on_confirm(
+            text: str,
+            correction_info: dict | None = None,
+            copy_to_clipboard: bool = False,
+        ) -> None:
             result_holder["text"] = text
             result_holder["confirmed"] = True
+            result_holder["copy_to_clipboard"] = copy_to_clipboard
             result_event.set()
 
         def on_cancel() -> None:
@@ -912,7 +926,10 @@ class VoiceTextApp(rumps.App):
 
         if result_holder["confirmed"] and result_holder["text"]:
             final_text = result_holder["text"].strip()
-            if output_mode == "type_text":
+            if result_holder.get("copy_to_clipboard"):
+                set_clipboard_text(final_text)
+                logger.info("Text copied to clipboard (%d chars)", len(final_text))
+            elif output_mode == "type_text":
                 type_text(
                     final_text,
                     append_newline=self._append_newline,
@@ -920,7 +937,7 @@ class VoiceTextApp(rumps.App):
                 )
             else:
                 set_clipboard_text(final_text)
-                rumps.notification("VoiceText", "Clipboard Updated", final_text[:80])
+                logger.info("Clipboard updated (%d chars)", len(final_text))
             self._set_status("VT")
         else:
             self._set_status("VT")
