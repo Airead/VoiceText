@@ -62,6 +62,7 @@ class ResultPreviewPanel:
         self._current_mode: str = "off"
         self._enhance_request_id: int = 0
         self._delegate = None
+        self._event_monitor = None
 
     def show(
         self,
@@ -103,6 +104,8 @@ class ResultPreviewPanel:
         if editor:
             end = editor.string().length() if editor.string() else 0
             editor.setSelectedRange_((end, 0))
+
+        self._install_event_monitor()
 
         from AppKit import NSApp
 
@@ -188,9 +191,62 @@ class ResultPreviewPanel:
 
     def close(self) -> None:
         """Close the panel."""
+        self._remove_event_monitor()
         if self._panel is not None:
             self._panel.orderOut_(None)
             self._panel = None
+
+    def _handle_key_event(self, event):
+        """Handle key events for ⌘1~⌘9 mode switching."""
+        if self._panel is None or not self._panel.isKeyWindow():
+            return event
+
+        from AppKit import NSCommandKeyMask, NSDeviceIndependentModifierFlagsMask
+
+        modifier_flags = event.modifierFlags() & NSDeviceIndependentModifierFlagsMask
+        if modifier_flags != NSCommandKeyMask:
+            return event
+
+        chars = event.charactersIgnoringModifiers()
+        if not chars or len(chars) != 1:
+            return event
+
+        char = chars[0] if isinstance(chars, str) else str(chars)
+        if char < "1" or char > "9":
+            return event
+
+        index = int(char) - 1
+        if index >= len(self._available_modes):
+            return event
+
+        self._switch_to_mode(index)
+        return None  # Consume the event
+
+    def _switch_to_mode(self, index: int) -> None:
+        """Switch to the mode at the given index, updating segment and triggering callback."""
+        if self._mode_segment is not None:
+            self._mode_segment.setSelectedSegment_(index)
+        self._on_segment_changed(index)
+
+    def _install_event_monitor(self) -> None:
+        """Install a local event monitor for keyboard shortcuts."""
+        self._remove_event_monitor()
+        if not self._available_modes:
+            return
+
+        from AppKit import NSEvent, NSKeyDownMask
+
+        self._event_monitor = NSEvent.addLocalMonitorForEventsMatchingMask_handler_(
+            NSKeyDownMask, self._handle_key_event
+        )
+
+    def _remove_event_monitor(self) -> None:
+        """Remove the local event monitor if installed."""
+        if self._event_monitor is not None:
+            from AppKit import NSEvent
+
+            NSEvent.removeMonitor_(self._event_monitor)
+            self._event_monitor = None
 
     def _build_panel(self, asr_text: str, show_enhance: bool) -> None:
         """Build the NSPanel and all subviews."""
