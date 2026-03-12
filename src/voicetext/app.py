@@ -1718,8 +1718,10 @@ models:
             resp = self._run_multiline_window(
                 title="Add ASR Provider",
                 message=(
-                    "Fill in the provider config below, then click Verify.\n"
-                    "Models: one per line under 'models:'."
+                    "name       — unique provider name\n"
+                    "base_url   — OpenAI-compatible ASR endpoint\n"
+                    "api_key    — authentication key\n"
+                    "models     — one model per line (indented)"
                 ),
                 default_text=template,
                 ok="Verify",
@@ -2094,7 +2096,8 @@ models:
                 padding = 12
                 btn_h = 32
                 btn_w = 90
-                label_h = 20
+                line_count = max(message.count("\n") + 1, 1)
+                label_h = 16 * line_count
                 width, height = dimensions
                 panel_w = width + 2 * padding
                 panel_h = padding + btn_h + padding + height + padding + label_h + padding
@@ -2231,8 +2234,7 @@ base_url: https://api.openai.com/v1
 api_key: sk-xxx
 models:
   gpt-4o
-  gpt-4o-mini
-extra_body: {"chat_template_kwargs": {"enable_thinking": false}}"""
+  gpt-4o-mini"""
 
     _PROVIDER_DRAFT_FILENAME = ".provider_draft"
 
@@ -2289,8 +2291,11 @@ extra_body: {"chat_template_kwargs": {"enable_thinking": false}}"""
             resp = self._run_multiline_window(
                 title="Add AI Provider",
                 message=(
-                    "Fill in the provider config below, then click Verify.\n"
-                    "Models: one per line under 'models:'."
+                    "name       — unique provider name\n"
+                    "base_url   — OpenAI-compatible API endpoint\n"
+                    "api_key    — authentication key\n"
+                    "models     — one model per line (indented)\n"
+                    "extra_body — optional, extra JSON for request body"
                 ),
                 default_text=template,
                 ok="Verify",
