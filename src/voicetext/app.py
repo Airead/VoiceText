@@ -396,13 +396,17 @@ class VoiceTextApp(rumps.App):
         if cached is not None:
             return cached
         try:
-            from AppKit import NSImage
+            from AppKit import NSImage, NSImageSymbolConfiguration
             if not hasattr(NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):
                 return None
             img = NSImage.imageWithSystemSymbolName_accessibilityDescription_(
                 name, description or name
             )
             if img is not None:
+                config = NSImageSymbolConfiguration.configurationWithPointSize_weight_(
+                    17.0, 0  # 0 = NSFontWeightRegular
+                )
+                img = img.imageWithSymbolConfiguration_(config)
                 img.setTemplate_(True)
                 _sf_symbol_cache[name] = img
             return img
