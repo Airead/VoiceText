@@ -37,22 +37,22 @@ class TestLoadConfig:
     def test_default_config_creates_file(self, tmp_path):
         config_file = tmp_path / "config.json"
         config = load_config(str(config_file))
-        assert config["hotkey"] == "fn"
+        assert config["hotkeys"] == {"fn": True}
         assert config["audio"]["sample_rate"] == 16000
         # File should be created
         assert config_file.exists()
         written = json.loads(config_file.read_text())
-        assert written["hotkey"] == "fn"
+        assert written["hotkeys"] == {"fn": True}
         assert written["asr"]["backend"] == "funasr"
 
     def test_default_config_creates_parent_dirs(self, tmp_path):
         config_file = tmp_path / "sub" / "dir" / "config.json"
         config = load_config(str(config_file))
         assert config_file.exists()
-        assert config["hotkey"] == "fn"
+        assert config["hotkeys"] == {"fn": True}
 
     def test_load_from_file(self):
-        overrides = {"hotkey": "f5", "audio": {"sample_rate": 44100}}
+        overrides = {"hotkeys": {"f5": True}, "audio": {"sample_rate": 44100}}
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".json", delete=False
         ) as f:
@@ -61,10 +61,30 @@ class TestLoadConfig:
 
         try:
             config = load_config(tmp_path)
-            assert config["hotkey"] == "f5"
+            assert config["hotkeys"]["f5"] is True
             assert config["audio"]["sample_rate"] == 44100
             # Defaults should be preserved for unset keys
             assert config["audio"]["block_ms"] == 20
+        finally:
+            os.unlink(tmp_path)
+
+    def test_migrate_legacy_hotkey(self):
+        """Old 'hotkey' string auto-migrates to 'hotkeys' dict."""
+        overrides = {"hotkey": "f5"}
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as f:
+            json.dump(overrides, f)
+            tmp_path = f.name
+
+        try:
+            config = load_config(tmp_path)
+            assert "hotkey" not in config
+            assert config["hotkeys"] == {"f5": True}
+            # File should be updated on disk
+            written = json.loads(open(tmp_path).read())
+            assert "hotkey" not in written
+            assert written["hotkeys"] == {"f5": True}
         finally:
             os.unlink(tmp_path)
 
@@ -101,8 +121,8 @@ class TestSaveConfig:
         save_config(DEFAULT_CONFIG, str(config_file))
 
         modified = dict(DEFAULT_CONFIG)
-        modified["hotkey"] = "f5"
+        modified["hotkeys"] = {"f5": True}
         save_config(modified, str(config_file))
 
         loaded = load_config(str(config_file))
-        assert loaded["hotkey"] == "f5"
+        assert loaded["hotkeys"]["f5"] is True

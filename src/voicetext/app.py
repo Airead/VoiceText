@@ -23,7 +23,7 @@ from .correction_log import CorrectionLogger
 from .usage_stats import UsageStats
 from .enhancer import MODE_OFF, TextEnhancer, create_enhancer
 from .result_window import ResultPreviewPanel
-from .hotkey import HoldHotkeyListener, TapHotkeyListener
+from .hotkey import MultiHotkeyListener, _is_fn_key
 from .input import (
     copy_selection_to_clipboard,
     get_clipboard_text,
@@ -121,8 +121,7 @@ class VoiceTextApp(rumps.App):
         self._output_method = self._config["output"]["method"]
         self._append_newline = self._config["output"]["append_newline"]
         self._preview_enabled = self._config["output"].get("preview", True)
-        self._hotkey_listener: Optional[HoldHotkeyListener] = None
-        self._clipboard_hotkey_listener: Optional[TapHotkeyListener] = None
+        self._hotkey_listener: Optional[MultiHotkeyListener] = None
         self._busy = False
         self._preview_panel = ResultPreviewPanel()
         self._enhance_cancel_event: threading.Event | None = None
@@ -143,9 +142,13 @@ class VoiceTextApp(rumps.App):
         # Menu items
         self._status_item = rumps.MenuItem("Ready")
         self._status_item.set_callback(None)
-        hotkey_name = self._config["hotkey"]
-        self._hotkey_item = rumps.MenuItem(f"Hotkey: {hotkey_name}")
-        self._hotkey_item.set_callback(None)
+        # Hotkey submenu
+        self._hotkey_menu = rumps.MenuItem("Hotkey")
+        self._hotkey_menu_items: Dict[str, rumps.MenuItem] = {}
+        self._hotkey_record_item = rumps.MenuItem(
+            "Record Hotkey...", callback=self._on_record_hotkey
+        )
+        self._build_hotkey_menu()
 
         # STT Model submenu
         self._model_menu = rumps.MenuItem("STT Model")
@@ -324,7 +327,7 @@ class VoiceTextApp(rumps.App):
 
         self.menu = [
             self._status_item,
-            self._hotkey_item,
+            self._hotkey_menu,
             None,
             self._model_menu,
             self._llm_model_menu,
@@ -431,6 +434,163 @@ class VoiceTextApp(rumps.App):
                     self._busy = False
 
             threading.Thread(target=_do_transcribe, daemon=True).start()
+
+    # ------------------------------------------------------------------
+    # Hotkey management
+    # ------------------------------------------------------------------
+
+    def _build_hotkey_menu(self) -> None:
+        """(Re)build the Hotkey submenu from config."""
+        # Clear rumps-level items
+        for key in list(self._hotkey_menu.keys()):
+            del self._hotkey_menu[key]
+        self._hotkey_menu_items.clear()
+        # Clear NSMenu-level items (separators are not tracked by rumps)
+        ns_submenu = self._hotkey_menu._menuitem.submenu()
+        if ns_submenu:
+            ns_submenu.removeAllItems()
+
+        hotkeys: Dict[str, bool] = self._config.get("hotkeys", {"fn": True})
+        for key_name, enabled in hotkeys.items():
+            item = rumps.MenuItem(key_name, callback=self._on_hotkey_item_click)
+            item.state = 1 if enabled else 0
+            item._hotkey_name = key_name
+            self._hotkey_menu_items[key_name] = item
+            self._hotkey_menu.add(item)
+
+        self._hotkey_menu.add(rumps.separator)
+        self._hotkey_menu.add(self._hotkey_record_item)
+
+    def _start_hotkey_listeners(self) -> None:
+        hotkeys: Dict[str, bool] = self._config.get("hotkeys", {"fn": True})
+        active_keys = [k for k, v in hotkeys.items() if v]
+        if active_keys:
+            self._hotkey_listener = MultiHotkeyListener(
+                key_names=active_keys,
+                on_press=self._on_hotkey_press,
+                on_release=self._on_hotkey_release,
+            )
+            self._hotkey_listener.start()
+
+    def _on_hotkey_item_click(self, sender) -> None:
+        """Handle click on a hotkey menu item — show enable/disable/delete alert."""
+        from AppKit import NSAlert, NSStatusWindowLevel
+        from PyObjCTools import AppHelper
+
+        key_name = sender._hotkey_name
+        enabled = bool(sender.state)
+        is_fn = _is_fn_key(key_name)
+
+        self._activate_for_dialog()
+        alert = NSAlert.alloc().init()
+        alert.setMessageText_(f"Hotkey: {key_name}")
+        state_text = "enabled" if enabled else "disabled"
+        toggle_text = "Disable" if enabled else "Enable"
+        alert.setInformativeText_(f'"{key_name}" is currently {state_text}.')
+        alert.addButtonWithTitle_("Cancel")
+        alert.addButtonWithTitle_(toggle_text)
+        if not is_fn:
+            alert.addButtonWithTitle_("Delete")
+
+        alert.setAlertStyle_(0)
+        alert.window().setLevel_(NSStatusWindowLevel)
+        result = alert.runModal()
+        self._restore_accessory()
+
+        # 1000=first(Cancel), 1001=second(Disable/Enable), 1002=third(Delete)
+        # Defer all state changes to avoid modifying menu/listeners during
+        # the NSMenu callback (AppKit crashes if the clicked item is removed
+        # or Quartz event taps are stopped mid-callback).
+        if result == 1001:
+            new_state = not enabled
+            def _toggle():
+                try:
+                    self._config["hotkeys"][key_name] = new_state
+                    sender.state = 1 if new_state else 0
+                    save_config(self._config, self._config_path)
+                    if self._hotkey_listener:
+                        if new_state:
+                            self._hotkey_listener.enable_key(key_name)
+                        else:
+                            self._hotkey_listener.disable_key(key_name)
+                except Exception:
+                    logger.exception("Failed to toggle hotkey %s", key_name)
+            AppHelper.callAfter(_toggle)
+        elif result == 1002 and not is_fn:
+            def _delete():
+                try:
+                    del self._config["hotkeys"][key_name]
+                    save_config(self._config, self._config_path)
+                    if self._hotkey_listener:
+                        self._hotkey_listener.disable_key(key_name)
+                    self._build_hotkey_menu()
+                except Exception:
+                    logger.exception("Failed to delete hotkey %s", key_name)
+            AppHelper.callAfter(_delete)
+
+    def _on_record_hotkey(self, _) -> None:
+        """Show 'press any key' alert and record a hotkey."""
+        from AppKit import NSAlert, NSStatusWindowLevel
+        from PyObjCTools import AppHelper
+
+        if not self._hotkey_listener:
+            return
+
+        self._activate_for_dialog()
+        alert = NSAlert.alloc().init()
+        alert.setMessageText_("Record Hotkey")
+        alert.setInformativeText_("Press any key to register it as a hotkey...")
+        alert.addButtonWithTitle_("Cancel")
+        alert.setAlertStyle_(0)
+        alert.window().setLevel_(NSStatusWindowLevel)
+
+        recorded_key = None
+
+        def on_recorded(key_name):
+            nonlocal recorded_key
+            recorded_key = key_name
+            def _close():
+                from AppKit import NSApp
+                NSApp.abortModal()
+            AppHelper.callAfter(_close)
+
+        def on_timeout():
+            def _close():
+                from AppKit import NSApp
+                NSApp.abortModal()
+            AppHelper.callAfter(_close)
+
+        def on_unrecognized(debug_info):
+            def _update():
+                alert.setInformativeText_(
+                    f"Unsupported key: {debug_info}\n"
+                    "Add it to _SPECIAL_KEYS in hotkey.py, then retry."
+                )
+            AppHelper.callAfter(_update)
+
+        self._hotkey_listener.record_next_key(
+            on_recorded=on_recorded,
+            on_timeout=on_timeout,
+            timeout=10.0,
+            on_unrecognized=on_unrecognized,
+        )
+        result = alert.runModal()
+        self._hotkey_listener.cancel_record()
+        self._restore_accessory()
+
+        if recorded_key:
+            def _apply():
+                try:
+                    hotkeys = self._config.setdefault("hotkeys", {})
+                    hotkeys[recorded_key] = True
+                    save_config(self._config, self._config_path)
+                    if self._hotkey_listener:
+                        self._hotkey_listener.enable_key(recorded_key)
+                    self._build_hotkey_menu()
+                    logger.info("Recorded new hotkey: %s", recorded_key)
+                except Exception:
+                    logger.exception("Failed to apply recorded hotkey %s", recorded_key)
+            AppHelper.callAfter(_apply)
 
     def _do_transcribe_direct(self, asr_text: str, use_enhance: bool) -> None:
         """Original flow: enhance (if enabled) and type directly."""
@@ -2979,7 +3139,9 @@ models:
         vocabulary = _on if self._enhance_vocab_item.state else _off
         history = _on if self._enhance_history_item.state else _off
         output = self._output_method
-        hotkey = self._config["hotkey"]
+        hotkeys_dict = self._config.get("hotkeys", {"fn": True})
+        active = [k for k, v in hotkeys_dict.items() if v]
+        hotkey = ", ".join(active) if active else "none"
         log_level = self._config["logging"]["level"]
         from .config import DEFAULT_CONFIG_PATH
         config_path = os.path.expanduser(self._config_path or DEFAULT_CONFIG_PATH)
@@ -3252,14 +3414,8 @@ models:
 
         threading.Thread(target=_init_models, daemon=True).start()
 
-        # Start hotkey listener
-        hotkey_name = self._config["hotkey"]
-        self._hotkey_listener = HoldHotkeyListener(
-            key_name=hotkey_name,
-            on_press=self._on_hotkey_press,
-            on_release=self._on_hotkey_release,
-        )
-        self._hotkey_listener.start()
+        # Start hotkey listeners
+        self._start_hotkey_listeners()
 
         # Start clipboard enhance hotkey listener if configured
         clip_hotkey = self._config.get("clipboard_enhance", {}).get("hotkey", "")
