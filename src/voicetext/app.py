@@ -421,14 +421,43 @@ class VoiceTextApp(rumps.App):
         if use_enhance:
             self._set_status("Enhancing...")
             try:
-                loop = asyncio.new_event_loop()
-                text, _usage = loop.run_until_complete(self._enhancer.enhance(text))
-                loop.close()
-                enhanced_text = text
-                try:
-                    self._usage_stats.record_token_usage(_usage)
-                except Exception as e:
-                    logger.error("Failed to record token usage: %s", e)
+                current_mode_def = self._enhancer.get_mode_definition(self._enhance_mode)
+                chain_steps: list[str] = []
+                if current_mode_def and current_mode_def.steps:
+                    for step_id in current_mode_def.steps:
+                        step_def = self._enhancer.get_mode_definition(step_id)
+                        if step_def:
+                            chain_steps.append(step_id)
+                        else:
+                            logger.warning("Chain step '%s' not found, skipping", step_id)
+
+                if chain_steps:
+                    # Chain mode: run each step sequentially
+                    original_mode = self._enhancer.mode
+                    try:
+                        loop = asyncio.new_event_loop()
+                        for step_id in chain_steps:
+                            self._enhancer.mode = step_id
+                            text, _usage = loop.run_until_complete(
+                                self._enhancer.enhance(text)
+                            )
+                            try:
+                                self._usage_stats.record_token_usage(_usage)
+                            except Exception as e:
+                                logger.error("Failed to record token usage: %s", e)
+                        loop.close()
+                        enhanced_text = text
+                    finally:
+                        self._enhancer.mode = original_mode
+                else:
+                    loop = asyncio.new_event_loop()
+                    text, _usage = loop.run_until_complete(self._enhancer.enhance(text))
+                    loop.close()
+                    enhanced_text = text
+                    try:
+                        self._usage_stats.record_token_usage(_usage)
+                    except Exception as e:
+                        logger.error("Failed to record token usage: %s", e)
             except Exception as e:
                 logger.error("AI enhancement failed: %s", e)
 
@@ -908,6 +937,17 @@ class VoiceTextApp(rumps.App):
                     method=self._output_method,
                 )
             self._set_status("VT")
+
+            try:
+                self._conversation_history.log(
+                    asr_text=clipboard_text,
+                    enhanced_text=result_holder.get("enhanced_text"),
+                    final_text=final_text,
+                    enhance_mode=self._enhance_mode,
+                    preview_enabled=True,
+                )
+            except Exception as e:
+                logger.error("Failed to log conversation: %s", e)
         else:
             self._set_status("VT")
             logger.info("Clipboard enhance cancelled by user")
@@ -922,29 +962,159 @@ class VoiceTextApp(rumps.App):
         cancel_event = threading.Event()
         self._enhance_cancel_event = cancel_event
 
+        # Resolve chain steps
+        current_mode_def = self._enhancer.get_mode_definition(self._enhance_mode)
+        chain_steps: list[str] = []
+        if current_mode_def and current_mode_def.steps:
+            for step_id in current_mode_def.steps:
+                step_def = self._enhancer.get_mode_definition(step_id)
+                if step_def:
+                    chain_steps.append(step_id)
+                else:
+                    logger.warning("Chain step '%s' not found, skipping", step_id)
+
         def _enhance():
             try:
-                loop = asyncio.new_event_loop()
-                collected: list[str] = []
-                usage = None
-                cancelled = False
+                if chain_steps:
+                    self._run_chain_enhance(
+                        asr_text, request_id, result_holder, cancel_event,
+                        chain_steps, current_mode_def.mode_id,
+                    )
+                else:
+                    self._run_single_enhance(
+                        asr_text, request_id, result_holder, cancel_event,
+                    )
+            except Exception as e:
+                logger.error("AI enhancement failed: %s", e)
+                self._preview_panel.set_enhance_result(
+                    f"(error: {e})", request_id=request_id
+                )
 
-                async def _stream():
-                    nonlocal usage, cancelled
-                    gen = self._enhancer.enhance_stream(asr_text)
+        threading.Thread(target=_enhance, daemon=True).start()
+
+    def _run_single_enhance(
+        self, asr_text: str, request_id: int,
+        result_holder: dict | None, cancel_event: threading.Event,
+    ) -> None:
+        """Run a single-step streaming enhancement."""
+        loop = asyncio.new_event_loop()
+        collected: list[str] = []
+        usage = None
+        cancelled = False
+
+        async def _stream():
+            nonlocal usage, cancelled
+            gen = self._enhancer.enhance_stream(asr_text)
+            completion_tokens = 0
+            thinking_tokens = 0
+            had_thinking = False
+            first_chunk = True
+            try:
+                async for chunk, chunk_usage, is_thinking in gen:
+                    if first_chunk:
+                        first_chunk = False
+                        self._preview_panel.update_system_prompt(
+                            self._enhancer.last_system_prompt
+                        )
+                    if cancel_event is not None and cancel_event.is_set():
+                        cancelled = True
+                        return
+                    if is_thinking and chunk:
+                        had_thinking = True
+                        thinking_tokens += 1
+                        self._preview_panel.append_thinking_text(
+                            chunk, request_id=request_id,
+                            thinking_tokens=thinking_tokens,
+                        )
+                    elif chunk:
+                        if had_thinking:
+                            had_thinking = False
+                            self._preview_panel.clear_enhance_text(
+                                request_id=request_id,
+                            )
+                        collected.append(chunk)
+                        completion_tokens += 1
+                        self._preview_panel.append_enhance_text(
+                            chunk, request_id=request_id,
+                            completion_tokens=completion_tokens,
+                        )
+                    if chunk_usage is not None:
+                        usage = chunk_usage
+            finally:
+                await gen.aclose()
+
+        loop.run_until_complete(_stream())
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.close()
+
+        if cancelled:
+            logger.info("AI enhancement cancelled by user")
+            return
+
+        enhanced = "".join(collected).strip() or asr_text
+        if result_holder is not None:
+            result_holder["enhanced_text"] = enhanced
+        try:
+            self._usage_stats.record_token_usage(usage)
+        except Exception as e:
+            logger.error("Failed to record token usage: %s", e)
+        system_prompt = self._enhancer.last_system_prompt
+        self._preview_panel.set_enhance_complete(
+            request_id=request_id, usage=usage,
+            system_prompt=system_prompt,
+        )
+
+    def _run_chain_enhance(
+        self, asr_text: str, request_id: int,
+        result_holder: dict | None, cancel_event: threading.Event,
+        chain_steps: list[str], original_mode_id: str,
+    ) -> None:
+        """Run a multi-step chain enhancement with streaming."""
+        loop = asyncio.new_event_loop()
+        total_steps = len(chain_steps)
+        input_text = asr_text
+        total_usage: dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        cancelled = False
+
+        try:
+            for step_idx, step_id in enumerate(chain_steps, 1):
+                if cancel_event is not None and cancel_event.is_set():
+                    cancelled = True
+                    break
+
+                step_def = self._enhancer.get_mode_definition(step_id)
+                step_label = step_def.label if step_def else step_id
+
+                # Show step info in the label
+                self._preview_panel.set_enhance_step_info(step_idx, total_steps, step_label)
+
+                # Append separator before non-first steps
+                if step_idx > 1:
+                    separator = f"\n\n--- {step_label} ---\n\n"
+                    self._preview_panel.append_enhance_text(
+                        separator, request_id=request_id, completion_tokens=0,
+                    )
+
+                # Set enhancer mode to this step
+                self._enhancer.mode = step_id
+
+                collected: list[str] = []
+                step_usage = None
+
+                async def _stream_step(text_input: str) -> None:
+                    nonlocal step_usage, cancelled
+                    gen = self._enhancer.enhance_stream(text_input)
                     completion_tokens = 0
                     thinking_tokens = 0
                     had_thinking = False
                     first_chunk = True
                     try:
                         async for chunk, chunk_usage, is_thinking in gen:
-                            # Update system prompt as soon as streaming starts
                             if first_chunk:
                                 first_chunk = False
                                 self._preview_panel.update_system_prompt(
                                     self._enhancer.last_system_prompt
                                 )
-                            # Check cancellation between chunks
                             if cancel_event is not None and cancel_event.is_set():
                                 cancelled = True
                                 return
@@ -956,12 +1126,9 @@ class VoiceTextApp(rumps.App):
                                     thinking_tokens=thinking_tokens,
                                 )
                             elif chunk:
-                                # Clear thinking content when first real content arrives
                                 if had_thinking:
                                     had_thinking = False
-                                    self._preview_panel.clear_enhance_text(
-                                        request_id=request_id,
-                                    )
+                                    # For chain mode, don't clear previous steps' content
                                 collected.append(chunk)
                                 completion_tokens += 1
                                 self._preview_panel.append_enhance_text(
@@ -969,40 +1136,51 @@ class VoiceTextApp(rumps.App):
                                     completion_tokens=completion_tokens,
                                 )
                             if chunk_usage is not None:
-                                usage = chunk_usage
+                                step_usage = chunk_usage
                     finally:
-                        # Explicitly close the async generator so that
-                        # enhance_stream's finally block runs and closes
-                        # the HTTP stream, stopping remote generation.
                         await gen.aclose()
 
-                loop.run_until_complete(_stream())
-                loop.run_until_complete(loop.shutdown_asyncgens())
-                loop.close()
+                loop.run_until_complete(_stream_step(input_text))
 
                 if cancelled:
-                    logger.info("AI enhancement cancelled by user")
-                    return
+                    break
 
-                enhanced = "".join(collected).strip() or asr_text
-                if result_holder is not None:
-                    result_holder["enhanced_text"] = enhanced
+                # This step's output becomes next step's input
+                step_result = "".join(collected).strip()
+                if step_result:
+                    input_text = step_result
+
+                # Accumulate token usage
+                if step_usage:
+                    total_usage["prompt_tokens"] += step_usage.get("prompt_tokens", 0)
+                    total_usage["completion_tokens"] += step_usage.get("completion_tokens", 0)
+                    total_usage["total_tokens"] += step_usage.get("total_tokens", 0)
                 try:
-                    self._usage_stats.record_token_usage(usage)
+                    self._usage_stats.record_token_usage(step_usage)
                 except Exception as e:
                     logger.error("Failed to record token usage: %s", e)
-                system_prompt = self._enhancer.last_system_prompt
-                self._preview_panel.set_enhance_complete(
-                    request_id=request_id, usage=usage,
-                    system_prompt=system_prompt,
-                )
-            except Exception as e:
-                logger.error("AI enhancement failed: %s", e)
-                self._preview_panel.set_enhance_result(
-                    f"(error: {e})", request_id=request_id
-                )
 
-        threading.Thread(target=_enhance, daemon=True).start()
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            loop.close()
+
+            if cancelled:
+                logger.info("AI enhancement chain cancelled by user")
+                return
+
+            # Final result is the last step's output
+            enhanced = input_text.strip() or asr_text
+            if result_holder is not None:
+                result_holder["enhanced_text"] = enhanced
+            system_prompt = self._enhancer.last_system_prompt
+            self._preview_panel.set_enhance_complete(
+                request_id=request_id,
+                usage=total_usage if total_usage["total_tokens"] > 0 else None,
+                system_prompt=system_prompt,
+                final_text=enhanced,
+            )
+        finally:
+            # Restore enhancer mode to the original chain mode id
+            self._enhancer.mode = original_mode_id
 
     def _on_preview_mode_change(self, mode_id: str) -> None:
         """Handle mode switch from the preview panel's segmented control."""

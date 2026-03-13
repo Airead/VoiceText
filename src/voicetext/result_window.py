@@ -366,9 +366,15 @@ class ResultPreviewPanel:
 
     def set_enhance_complete(
         self, request_id: int = 0, usage: dict | None = None,
-        system_prompt: str = "",
+        system_prompt: str = "", final_text: str | None = None,
     ) -> None:
-        """Mark streaming enhancement as complete, updating label with token info."""
+        """Mark streaming enhancement as complete, updating label with token info.
+
+        Args:
+            final_text: If provided, use this as the final result text instead of
+                the full enhance text view content. Useful for chain modes where
+                only the last step's output should appear in Final Result.
+        """
         if self._enhance_text_view is None:
             return
 
@@ -398,7 +404,7 @@ class ResultPreviewPanel:
                 self._thinking_button.setAlphaValue_(1.0 if has_thinking else 0.3)
             # Final sync of final text field
             if not self._user_edited and self._final_text_field is not None:
-                text = self._enhance_text_view.string()
+                text = final_text if final_text is not None else self._enhance_text_view.string()
                 self._final_text_field.setStringValue_(text)
 
         AppHelper.callAfter(_update)
@@ -418,6 +424,17 @@ class ResultPreviewPanel:
             if self._thinking_button is not None:
                 self._thinking_button.setEnabled_(False)
                 self._thinking_button.setAlphaValue_(0.3)
+
+        AppHelper.callAfter(_update)
+
+    def set_enhance_step_info(self, step: int, total: int, label: str) -> None:
+        """Update enhance label to show chain step progress, e.g. 'Step 1/2: 纠错润色'."""
+        from PyObjCTools import AppHelper
+
+        def _update():
+            if self._enhance_label is not None:
+                suffix = f"\u23f3 Step {step}/{total}: {label}"
+                self._enhance_label.setStringValue_(self._enhance_label_text(suffix))
 
         AppHelper.callAfter(_update)
 

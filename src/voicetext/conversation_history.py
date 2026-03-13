@@ -55,8 +55,17 @@ class ConversationHistory:
         except Exception:
             return 0
 
+    # Skip history entries whose final_text exceeds this length (e.g. clipboard
+    # enhance with large input).  Long texts bloat the system prompt and add
+    # little value as correction context.
+    _MAX_TEXT_LENGTH_FOR_CONTEXT = 500
+
     def get_recent(self, n: Optional[int] = None, max_entries: int = 10) -> List[Dict[str, Any]]:
         """Read the most recent N preview_enabled=true records.
+
+        Records whose ``final_text`` exceeds ``_MAX_TEXT_LENGTH_FOR_CONTEXT``
+        characters are skipped so that large clipboard-enhance entries do not
+        bloat the LLM context.
 
         Args:
             n: Number of records to return. Defaults to max_entries.
@@ -88,6 +97,9 @@ class ConversationHistory:
             except json.JSONDecodeError:
                 continue
             if record.get("preview_enabled") is True:
+                final = record.get("final_text", "")
+                if len(final) > self._MAX_TEXT_LENGTH_FOR_CONTEXT:
+                    continue
                 results.append(record)
                 if len(results) >= count:
                     break
@@ -115,8 +127,8 @@ class ConversationHistory:
             "",
         ]
         for entry in entries:
-            asr = entry.get("asr_text", "")
-            final = entry.get("final_text", "")
+            asr = entry.get("asr_text", "").replace("\n", "\u23ce")
+            final = entry.get("final_text", "").replace("\n", "\u23ce")
             if asr == final:
                 lines.append(f"- {final}")
             else:

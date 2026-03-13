@@ -82,6 +82,48 @@ class TestParseModeFile:
         assert "Line 1." in result.prompt
         assert "Line 3." in result.prompt
 
+    def test_parse_with_steps(self, tmp_path):
+        f = tmp_path / "chain.md"
+        f.write_text(
+            "---\nlabel: Chain Mode\norder: 25\nsteps: proofread, translate_en\n---\n",
+            encoding="utf-8",
+        )
+        result = parse_mode_file(str(f))
+        assert result is not None
+        assert result.steps == ["proofread", "translate_en"]
+        assert result.label == "Chain Mode"
+        assert result.order == 25
+
+    def test_parse_without_steps_has_empty_list(self, tmp_path):
+        f = tmp_path / "nosteps.md"
+        f.write_text(
+            "---\nlabel: Normal\norder: 10\n---\nSome prompt.\n",
+            encoding="utf-8",
+        )
+        result = parse_mode_file(str(f))
+        assert result is not None
+        assert result.steps == []
+
+    def test_parse_steps_single_item(self, tmp_path):
+        f = tmp_path / "single_step.md"
+        f.write_text(
+            "---\nlabel: Single Step\nsteps: proofread\n---\n",
+            encoding="utf-8",
+        )
+        result = parse_mode_file(str(f))
+        assert result is not None
+        assert result.steps == ["proofread"]
+
+    def test_parse_steps_with_extra_spaces(self, tmp_path):
+        f = tmp_path / "spaced.md"
+        f.write_text(
+            "---\nlabel: Spaced\nsteps:  proofread , translate_en , commandline_master \n---\n",
+            encoding="utf-8",
+        )
+        result = parse_mode_file(str(f))
+        assert result is not None
+        assert result.steps == ["proofread", "translate_en", "commandline_master"]
+
 
 class TestLoadModes:
     def test_load_from_directory(self, tmp_path):
@@ -188,7 +230,7 @@ class TestEnsureDefaultModes:
 
 class TestBuiltinModes:
     def test_builtin_contains_all_modes(self):
-        expected = {"proofread", "translate_en", "commandline_master"}
+        expected = {"proofread", "translate_en", "translate_en_plus", "commandline_master"}
         assert set(_BUILTIN_MODES.keys()) == expected
 
     def test_builtin_modes_have_labels(self):
@@ -197,11 +239,22 @@ class TestBuiltinModes:
 
     def test_builtin_modes_have_prompts(self):
         for mode_id, mode_def in _BUILTIN_MODES.items():
-            assert mode_def.prompt, f"Mode {mode_id} missing prompt"
+            # Chain modes have empty prompts
+            if mode_def.steps:
+                assert mode_def.prompt == "", f"Chain mode {mode_id} should have empty prompt"
+            else:
+                assert mode_def.prompt, f"Mode {mode_id} missing prompt"
 
     def test_builtin_modes_have_unique_orders(self):
         orders = [m.order for m in _BUILTIN_MODES.values()]
         assert len(orders) == len(set(orders))
+
+    def test_translate_en_plus_chain_mode(self):
+        mode = _BUILTIN_MODES["translate_en_plus"]
+        assert mode.label == "润色+翻译EN"
+        assert mode.steps == ["proofread", "translate_en"]
+        assert mode.order == 25
+        assert mode.prompt == ""
 
 
 class TestAddModeTemplate:

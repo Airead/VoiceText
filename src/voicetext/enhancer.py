@@ -182,6 +182,10 @@ class TextEnhancer:
         """Return (mode_id, label) pairs sorted by order."""
         return get_sorted_modes(self._modes)
 
+    def get_mode_definition(self, mode_id: str) -> Optional["ModeDefinition"]:
+        """Return the ModeDefinition for a given mode_id, or None."""
+        return self._modes.get(mode_id)
+
     def reload_modes(self) -> None:
         """Reload mode definitions from external files."""
         self._modes = load_modes()

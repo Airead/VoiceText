@@ -156,6 +156,39 @@ class TestConversationHistoryGetRecent:
         assert results[0]["asr_text"] == "first"
         assert results[2]["asr_text"] == "third"
 
+    def test_skips_long_final_text(self, history):
+        """Records with final_text exceeding the max length should be excluded."""
+        history.log("short", "Short", "Short", "proofread", True)
+        history.log("long", "Long", "x" * 501, "proofread", True)
+        history.log("short2", "Short2", "Short2", "proofread", True)
+
+        results = history.get_recent(max_entries=10)
+        assert len(results) == 2
+        assert results[0]["asr_text"] == "short"
+        assert results[1]["asr_text"] == "short2"
+
+    def test_long_text_at_boundary(self, history):
+        """Text exactly at the limit should be included, one over should be excluded."""
+        history.log("exact", "Exact", "x" * 500, "proofread", True)
+        history.log("over", "Over", "x" * 501, "proofread", True)
+
+        results = history.get_recent(max_entries=10)
+        assert len(results) == 1
+        assert results[0]["asr_text"] == "exact"
+
+    def test_skips_long_text_still_fills_n(self, history):
+        """Skipped long entries should not count toward the N limit."""
+        history.log("a", "A", "A", "proofread", True)
+        history.log("long1", "L1", "x" * 600, "proofread", True)
+        history.log("b", "B", "B", "proofread", True)
+        history.log("long2", "L2", "x" * 700, "proofread", True)
+        history.log("c", "C", "C", "proofread", True)
+
+        results = history.get_recent(n=3)
+        assert len(results) == 3
+        texts = [r["asr_text"] for r in results]
+        assert texts == ["a", "b", "c"]
+
 
 class TestConversationHistoryFormatForPrompt:
     def test_format_same_asr_and_final(self, history):
@@ -185,6 +218,21 @@ class TestConversationHistoryFormatForPrompt:
         result = history.format_for_prompt(entries)
         assert "- same" in result
         assert "平平 → 萍萍" in result
+
+    def test_format_replaces_newlines_with_return_symbol(self, history):
+        entries = [
+            {"asr_text": "line1\nline2", "final_text": "line1\nline2"},
+        ]
+        result = history.format_for_prompt(entries)
+        assert "\n" not in result.split("\n")[-2]  # the entry line itself
+        assert "line1\u23celine2" in result
+
+    def test_format_newlines_in_both_asr_and_final(self, history):
+        entries = [
+            {"asr_text": "a\nb", "final_text": "a\nc"},
+        ]
+        result = history.format_for_prompt(entries)
+        assert "a\u23ceb → a\u23cec" in result
 
 
 class TestConversationHistoryCount:

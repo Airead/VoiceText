@@ -23,6 +23,11 @@ class ModeDefinition:
     label: str
     prompt: str
     order: int = 50
+    steps: List[str] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.steps is None:
+            self.steps = []
 
 
 _BUILTIN_MODES: Dict[str, ModeDefinition] = {
@@ -57,6 +62,13 @@ _BUILTIN_MODES: Dict[str, ModeDefinition] = {
             "4. Output only the translated text without any explanation"
         ),
         order=20,
+    ),
+    "translate_en_plus": ModeDefinition(
+        mode_id="translate_en_plus",
+        label="润色+翻译EN",
+        prompt="",
+        order=25,
+        steps=["proofread", "translate_en"],
     ),
     "commandline_master": ModeDefinition(
         mode_id="commandline_master",
@@ -100,6 +112,7 @@ def parse_mode_file(file_path: str) -> Optional[ModeDefinition]:
     basename = os.path.splitext(os.path.basename(file_path))[0]
     label = basename
     order = 50
+    steps: List[str] = []
     prompt = content.strip()
 
     # Try to parse front matter delimited by ---
@@ -118,10 +131,15 @@ def parse_mode_file(file_path: str) -> Optional[ModeDefinition]:
         if order_match:
             order = int(order_match.group(1))
 
+        # Extract steps (comma-separated mode_id list)
+        steps_match = re.search(r"^steps:\s*(.+)$", front_matter, re.MULTILINE)
+        if steps_match:
+            steps = [s.strip() for s in steps_match.group(1).split(",") if s.strip()]
+
         if body:
             prompt = body
 
-    return ModeDefinition(mode_id=basename, label=label, prompt=prompt, order=order)
+    return ModeDefinition(mode_id=basename, label=label, prompt=prompt, order=order, steps=steps)
 
 
 def load_modes(modes_dir: Optional[str] = None) -> Dict[str, ModeDefinition]:
@@ -167,13 +185,17 @@ def ensure_default_modes(modes_dir: Optional[str] = None) -> str:
         file_path = os.path.join(expanded, f"{mode_id}.md")
         if os.path.exists(file_path):
             continue
-        content = (
-            f"---\n"
-            f"label: {mode_def.label}\n"
-            f"order: {mode_def.order}\n"
-            f"---\n"
-            f"{mode_def.prompt}\n"
-        )
+        lines = [
+            "---",
+            f"label: {mode_def.label}",
+            f"order: {mode_def.order}",
+        ]
+        if mode_def.steps:
+            lines.append(f"steps: {', '.join(mode_def.steps)}")
+        lines.append("---")
+        lines.append(mode_def.prompt)
+        lines.append("")
+        content = "\n".join(lines)
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
         logger.info("Created default mode file: %s", file_path)
