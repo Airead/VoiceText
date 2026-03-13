@@ -1,17 +1,21 @@
-"""Minimal test to debug rumps.Window in menu callbacks."""
+"""Minimal test to debug statusbar window/alert in menu callbacks."""
 
-import rumps
-from AppKit import NSApp, NSApplication
+from AppKit import NSAlert, NSApp, NSApplication
+from voicetext.statusbar import (
+    InputWindow,
+    StatusBarApp,
+    StatusMenuItem,
+)
 
 
-class TestApp(rumps.App):
+class TestApp(StatusBarApp):
     def __init__(self):
         super().__init__("Test", title="T")
 
         self.menu = [
-            rumps.MenuItem("Alert (no fix)", callback=self._on_alert_raw),
-            rumps.MenuItem("Alert (with policy)", callback=self._on_alert_fix),
-            rumps.MenuItem("Window (with policy)", callback=self._on_window_fix),
+            StatusMenuItem("Alert (no fix)", callback=self._on_alert_raw),
+            StatusMenuItem("Alert (with policy)", callback=self._on_alert_fix),
+            StatusMenuItem("Window (with policy)", callback=self._on_window_fix),
         ]
 
     def _activate_for_dialog(self):
@@ -25,20 +29,26 @@ class TestApp(rumps.App):
 
     def _on_alert_raw(self, _):
         print("[raw] callback fired", flush=True)
-        result = rumps.alert("Test", "No fix applied")
+        alert = NSAlert.alloc().init()
+        alert.setMessageText_("Test")
+        alert.setInformativeText_("No fix applied")
+        result = alert.runModal()
         print(f"[raw] result: {result}", flush=True)
 
     def _on_alert_fix(self, _):
         print("[fix] callback fired", flush=True)
         self._activate_for_dialog()
-        result = rumps.alert("Test", "With activation policy fix")
+        alert = NSAlert.alloc().init()
+        alert.setMessageText_("Test")
+        alert.setInformativeText_("With activation policy fix")
+        result = alert.runModal()
         self._restore_accessory()
         print(f"[fix] result: {result}", flush=True)
 
     def _on_window_fix(self, _):
         print("[window] callback fired", flush=True)
         self._activate_for_dialog()
-        w = rumps.Window("Test Window", "Enter text:", "hello", ok="OK", cancel="Cancel")
+        w = InputWindow("Enter text:", "Test Window", "hello", ok="OK", cancel="Cancel")
         resp = w.run()
         self._restore_accessory()
         print(f"[window] clicked={resp.clicked}, text={resp.text}", flush=True)

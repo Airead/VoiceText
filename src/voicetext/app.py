@@ -13,7 +13,6 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import rumps
 from ApplicationServices import AXIsProcessTrusted, AXIsProcessTrustedWithOptions
 from CoreFoundation import kCFBooleanTrue
 
@@ -48,6 +47,13 @@ from .model_registry import (
 from .recorder import Recorder
 from .recording_indicator import RecordingIndicatorPanel
 from .sound_manager import SoundManager
+from .statusbar import (
+    InputWindow,
+    StatusBarApp,
+    StatusMenuItem,
+    quit_application,
+    send_notification,
+)
 from .streaming_overlay import StreamingOverlayPanel
 from .transcriber import create_transcriber
 
@@ -93,7 +99,7 @@ _STATUS_ICONS: Dict[str, str] = {
 _sf_symbol_cache: Dict[str, Any] = {}
 
 
-class VoiceTextApp(rumps.App):
+class VoiceTextApp(StatusBarApp):
     """Menubar app: hold hotkey to record, release to transcribe and type."""
 
     def __init__(self, config_path: Optional[str] = None) -> None:
@@ -197,25 +203,25 @@ class VoiceTextApp(rumps.App):
                 )
 
         # Menu items
-        self._status_item = rumps.MenuItem("Ready")
+        self._status_item = StatusMenuItem("Ready")
         self._status_item.set_callback(None)
         # Hotkey submenu
-        self._hotkey_menu = rumps.MenuItem("Hotkey")
-        self._hotkey_menu_items: Dict[str, rumps.MenuItem] = {}
-        self._hotkey_record_item = rumps.MenuItem(
+        self._hotkey_menu = StatusMenuItem("Hotkey")
+        self._hotkey_menu_items: Dict[str, StatusMenuItem] = {}
+        self._hotkey_record_item = StatusMenuItem(
             "Record Hotkey...", callback=self._on_record_hotkey
         )
         self._build_hotkey_menu()
 
         # STT Model submenu
-        self._model_menu = rumps.MenuItem("STT Model")
-        self._model_menu_items: Dict[str, rumps.MenuItem] = {}
-        self._remote_asr_menu_items: Dict[Tuple[str, str], rumps.MenuItem] = {}
-        self._asr_add_provider_item = rumps.MenuItem(
+        self._model_menu = StatusMenuItem("STT Model")
+        self._model_menu_items: Dict[str, StatusMenuItem] = {}
+        self._remote_asr_menu_items: Dict[Tuple[str, str], StatusMenuItem] = {}
+        self._asr_add_provider_item = StatusMenuItem(
             "Add ASR Provider...", callback=self._on_asr_add_provider
         )
-        self._asr_remove_provider_menu = rumps.MenuItem("Remove ASR Provider")
-        self._asr_remove_provider_items: Dict[str, rumps.MenuItem] = {}
+        self._asr_remove_provider_menu = StatusMenuItem("Remove ASR Provider")
+        self._asr_remove_provider_items: Dict[str, StatusMenuItem] = {}
         self._build_model_menu()
 
         # AI Enhance
@@ -238,11 +244,11 @@ class VoiceTextApp(rumps.App):
             self._auto_vocab_builder.set_enhancer(self._enhancer)
 
         # AI Enhance submenu (mode selection only)
-        self._enhance_menu = rumps.MenuItem("AI Enhance")
-        self._enhance_menu_items: Dict[str, rumps.MenuItem] = {}
+        self._enhance_menu = StatusMenuItem("AI Enhance")
+        self._enhance_menu_items: Dict[str, StatusMenuItem] = {}
 
         # Fixed "Off" item
-        off_item = rumps.MenuItem("Off")
+        off_item = StatusMenuItem("Off")
         off_item._enhance_mode = MODE_OFF
         off_item.set_callback(self._on_enhance_mode_select)
         if self._enhance_mode == MODE_OFF:
@@ -253,7 +259,7 @@ class VoiceTextApp(rumps.App):
         # Dynamic mode items from enhancer
         if self._enhancer:
             for mode_id, label in self._enhancer.available_modes:
-                item = rumps.MenuItem(label)
+                item = StatusMenuItem(label)
                 item._enhance_mode = mode_id
                 item.set_callback(self._on_enhance_mode_select)
                 if mode_id == self._enhance_mode:
@@ -262,45 +268,45 @@ class VoiceTextApp(rumps.App):
                 self._enhance_menu.add(item)
 
         # Add Mode item
-        self._enhance_menu.add(rumps.separator)
-        self._enhance_add_mode_item = rumps.MenuItem(
+        self._enhance_menu.add(None)
+        self._enhance_add_mode_item = StatusMenuItem(
             "Add Mode...", callback=self._on_enhance_add_mode
         )
         self._enhance_menu.add(self._enhance_add_mode_item)
 
         # Top-level toggle items (promoted from AI Enhance)
         vocab_enabled = ai_cfg.get("vocabulary", {}).get("enabled", False)
-        self._enhance_vocab_item = rumps.MenuItem(
+        self._enhance_vocab_item = StatusMenuItem(
             "Vocabulary", callback=self._on_vocab_toggle
         )
         self._enhance_vocab_item.state = 1 if vocab_enabled else 0
         self._update_vocab_title()
 
         history_enabled = ai_cfg.get("conversation_history", {}).get("enabled", False)
-        self._enhance_history_item = rumps.MenuItem(
+        self._enhance_history_item = StatusMenuItem(
             "Conversation History", callback=self._on_history_toggle
         )
         self._enhance_history_item.state = 1 if history_enabled else 0
 
-        self._browse_history_item = rumps.MenuItem(
+        self._browse_history_item = StatusMenuItem(
             "Browse History...", callback=self._on_browse_history
         )
 
         # LLM Model top-level submenu
-        self._llm_model_menu = rumps.MenuItem("LLM Model")
-        self._llm_model_menu_items: Dict[Tuple[str, str], rumps.MenuItem] = {}
-        self._llm_add_provider_item = rumps.MenuItem(
+        self._llm_model_menu = StatusMenuItem("LLM Model")
+        self._llm_model_menu_items: Dict[Tuple[str, str], StatusMenuItem] = {}
+        self._llm_add_provider_item = StatusMenuItem(
             "Add Provider...", callback=self._on_enhance_add_provider
         )
-        self._llm_remove_provider_menu = rumps.MenuItem("Remove Provider")
-        self._llm_remove_provider_items: Dict[str, rumps.MenuItem] = {}
+        self._llm_remove_provider_menu = StatusMenuItem("Remove Provider")
+        self._llm_remove_provider_items: Dict[str, StatusMenuItem] = {}
         self._build_llm_model_menu()
 
         # AI Settings submenu (low-frequency AI configuration)
-        self._ai_settings_menu = rumps.MenuItem("AI Settings")
+        self._ai_settings_menu = StatusMenuItem("AI Settings")
 
         # Thinking toggle
-        self._enhance_thinking_item = rumps.MenuItem(
+        self._enhance_thinking_item = StatusMenuItem(
             "Thinking", callback=self._on_enhance_thinking_toggle
         )
         if self._enhancer and self._enhancer.thinking:
@@ -308,71 +314,71 @@ class VoiceTextApp(rumps.App):
         self._ai_settings_menu.add(self._enhance_thinking_item)
 
         # Build vocabulary action
-        self._ai_settings_menu.add(rumps.separator)
-        self._enhance_vocab_build_item = rumps.MenuItem(
+        self._ai_settings_menu.add(None)
+        self._enhance_vocab_build_item = StatusMenuItem(
             "Build Vocabulary...", callback=self._on_vocab_build
         )
         self._ai_settings_menu.add(self._enhance_vocab_build_item)
 
-        self._enhance_auto_build_item = rumps.MenuItem(
+        self._enhance_auto_build_item = StatusMenuItem(
             "Auto Build Vocabulary", callback=self._on_auto_build_toggle
         )
         self._enhance_auto_build_item.state = 1 if vocab_cfg.get("auto_build", True) else 0
         self._ai_settings_menu.add(self._enhance_auto_build_item)
 
-        self._ai_settings_menu.add(rumps.separator)
-        self._enhance_edit_config_item = rumps.MenuItem(
+        self._ai_settings_menu.add(None)
+        self._enhance_edit_config_item = StatusMenuItem(
             "Edit Config...", callback=self._on_enhance_edit_config
         )
         self._ai_settings_menu.add(self._enhance_edit_config_item)
 
-        self._preview_item = rumps.MenuItem(
+        self._preview_item = StatusMenuItem(
             "Preview", callback=self._on_preview_toggle
         )
         self._preview_item.state = 1 if self._preview_enabled else 0
 
-        self._clipboard_enhance_item = rumps.MenuItem(
+        self._clipboard_enhance_item = StatusMenuItem(
             "Enhance Clipboard", callback=self._on_clipboard_enhance
         )
 
         # Feedback toggle items
-        self._sound_feedback_item = rumps.MenuItem(
+        self._sound_feedback_item = StatusMenuItem(
             "Sound Feedback", callback=self._on_sound_feedback_toggle
         )
         self._sound_feedback_item.state = 1 if self._sound_manager.enabled else 0
 
-        self._visual_indicator_item = rumps.MenuItem(
+        self._visual_indicator_item = StatusMenuItem(
             "Visual Indicator", callback=self._on_visual_indicator_toggle
         )
         self._visual_indicator_item.state = 1 if self._recording_indicator.enabled else 0
 
         # View Logs top-level item (replaces Debug submenu)
-        self._view_logs_item = rumps.MenuItem(
+        self._view_logs_item = StatusMenuItem(
             "View Logs...", callback=self._on_view_logs
         )
 
         # Show Config / Reload Config items
-        self._show_config_item = rumps.MenuItem(
+        self._show_config_item = StatusMenuItem(
             "Show Config...", callback=self._on_show_config
         )
-        self._reload_config_item = rumps.MenuItem(
+        self._reload_config_item = StatusMenuItem(
             "Reload Config", callback=self._on_reload_config
         )
 
         # Usage Stats item
-        self._usage_stats_item = rumps.MenuItem(
+        self._usage_stats_item = StatusMenuItem(
             "Usage Stats", callback=self._on_show_usage_stats
         )
 
         # About item
-        self._about_item = rumps.MenuItem("About VoiceText", callback=self._on_about)
+        self._about_item = StatusMenuItem("About VoiceText", callback=self._on_about)
 
         # History browser (lazy-created)
         self._history_browser: Optional[HistoryBrowserPanel] = None
 
         # Settings panel
         self._settings_panel = SettingsPanel()
-        self._settings_item = rumps.MenuItem(
+        self._settings_item = StatusMenuItem(
             "Settings...", callback=self._on_open_settings
         )
 
@@ -455,10 +461,7 @@ class VoiceTextApp(rumps.App):
         nsimage = self._sf_symbol_image(symbol_name, text)
         if nsimage is not None:
             self._icon_nsimage = nsimage
-            try:
-                self._nsapp.setStatusBarIcon()
-            except AttributeError:
-                pass
+            self._update_status_bar_icon()
             self.title = bar_title  # clear text when icon is set
         else:
             self.title = text  # fallback to text-only if SF Symbols unavailable
@@ -626,13 +629,13 @@ class VoiceTextApp(rumps.App):
 
         hotkeys: Dict[str, bool] = self._config.get("hotkeys", {"fn": True})
         for key_name, enabled in hotkeys.items():
-            item = rumps.MenuItem(key_name, callback=self._on_hotkey_item_click)
+            item = StatusMenuItem(key_name, callback=self._on_hotkey_item_click)
             item.state = 1 if enabled else 0
             item._hotkey_name = key_name
             self._hotkey_menu_items[key_name] = item
             self._hotkey_menu.add(item)
 
-        self._hotkey_menu.add(rumps.separator)
+        self._hotkey_menu.add(None)
         self._hotkey_menu.add(self._hotkey_record_item)
 
     def _start_hotkey_listeners(self) -> None:
@@ -2264,7 +2267,7 @@ Output only the processed text without any explanation."""
         # Re-add from enhancer, inserting before "Add Mode..."
         if self._enhancer:
             for mode_id, label in self._enhancer.available_modes:
-                item = rumps.MenuItem(label)
+                item = StatusMenuItem(label)
                 item._enhance_mode = mode_id
                 item.set_callback(self._on_enhance_mode_select)
                 if mode_id == self._enhance_mode:
@@ -2488,14 +2491,14 @@ Output only the processed text without any explanation."""
                 )
                 progress_panel.update_status(f"{status}: {msg}")
                 try:
-                    rumps.notification("VoiceText", f"Vocabulary {status}", msg)
+                    send_notification("VoiceText", f"Vocabulary {status}", msg)
                 except Exception:
                     logger.debug("Notification center unavailable, skipping notification")
             except Exception as e:
                 logger.error("Vocabulary build failed: %s", e)
                 progress_panel.update_status(f"Failed: {e}")
                 try:
-                    rumps.notification(
+                    send_notification(
                         "VoiceText", "Vocabulary Build Failed", str(e)
                     )
                 except Exception:
@@ -2528,7 +2531,7 @@ Output only the processed text without any explanation."""
             for mname in models:
                 key = (pname, mname)
                 title = f"{pname} / {mname}"
-                item = rumps.MenuItem(title)
+                item = StatusMenuItem(title)
                 item._llm_provider = pname
                 item._llm_model = mname
                 item.set_callback(self._on_llm_model_select)
@@ -2547,7 +2550,7 @@ Output only the processed text without any explanation."""
         self._llm_remove_provider_items.clear()
 
         for pname in providers:
-            item = rumps.MenuItem(pname)
+            item = StatusMenuItem(pname)
             item._provider_name = pname
             item.set_callback(self._on_enhance_remove_provider)
             self._llm_remove_provider_items[pname] = item
@@ -2578,7 +2581,7 @@ Output only the processed text without any explanation."""
                 title = preset.display_name
             else:
                 title = f"{preset.display_name} (N/A)"
-            item = rumps.MenuItem(title)
+            item = StatusMenuItem(title)
             item._preset_id = preset.id
             if backend_ok:
                 item.set_callback(self._on_model_select)
@@ -2598,7 +2601,7 @@ Output only the processed text without any explanation."""
             self._model_menu.add(None)  # separator
             for rm in remote_models:
                 key = (rm.provider, rm.model)
-                item = rumps.MenuItem(rm.display_name)
+                item = StatusMenuItem(rm.display_name)
                 item._remote_asr = rm
                 item.set_callback(self._on_remote_asr_select)
                 if key == self._current_remote_asr:
@@ -2615,7 +2618,7 @@ Output only the processed text without any explanation."""
             self._asr_remove_provider_menu.clear()
         self._asr_remove_provider_items.clear()
         for pname in providers:
-            item = rumps.MenuItem(pname)
+            item = StatusMenuItem(pname)
             item._provider_name = pname
             item.set_callback(self._on_asr_remove_provider)
             self._asr_remove_provider_items[pname] = item
@@ -2633,7 +2636,7 @@ Output only the processed text without any explanation."""
             return
 
         if self._busy:
-            rumps.notification(
+            send_notification(
                 "VoiceText",
                 "Cannot switch model",
                 "Please wait for current operation to finish.",
@@ -2672,7 +2675,7 @@ Output only the processed text without any explanation."""
                 self._set_status("VT")
                 logger.info("Switched to remote ASR: %s", rm.display_name)
                 try:
-                    rumps.notification(
+                    send_notification(
                         "VoiceText",
                         "Model switched",
                         f"Now using: {rm.display_name}",
@@ -2684,7 +2687,7 @@ Output only the processed text without any explanation."""
                 logger.error("Remote ASR switch failed: %s", e)
                 self._set_status("Error")
                 try:
-                    rumps.notification(
+                    send_notification(
                         "VoiceText",
                         "Model switch failed",
                         str(e)[:100],
@@ -2850,7 +2853,7 @@ models:
 
             self._build_model_menu()
 
-            rumps.notification(
+            send_notification(
                 "VoiceText", "ASR Provider added", f"{name} ({', '.join(models)})"
             )
             logger.info("Added ASR provider: %s", name)
@@ -2951,7 +2954,7 @@ models:
             self._build_model_menu()
             self._update_model_checkmarks()
 
-            rumps.notification("VoiceText", "ASR Provider removed", pname)
+            send_notification("VoiceText", "ASR Provider removed", pname)
             logger.info("Removed ASR provider: %s", pname)
         except Exception as e:
             logger.error("Remove ASR provider failed: %s", e, exc_info=True)
@@ -3074,7 +3077,7 @@ models:
     def _run_window(title: str, message: str, default_text: str = "",
                     ok: str = "OK", cancel: str = "Cancel",
                     dimensions: tuple = (320, 22), secure: bool = False):
-        """Run a rumps.Window with proper app activation.
+        """Run an InputWindow with proper app activation.
 
         Safe to call from any thread — dispatches to main thread if needed.
         Returns Response or None on cancel.
@@ -3088,13 +3091,13 @@ models:
             from AppKit import NSStatusWindowLevel
 
             VoiceTextApp._activate_for_dialog()
-            w = rumps.Window(
+            w = InputWindow(
                 title=title, message=message, default_text=default_text,
                 ok=ok, cancel=cancel, dimensions=dimensions, secure=secure,
             )
-            w._alert.window().setLevel_(NSStatusWindowLevel)
-            w._alert.window().setFloatingPanel_(True)
-            w._alert.window().setHidesOnDeactivate_(False)
+            w.alert.window().setLevel_(NSStatusWindowLevel)
+            w.alert.window().setFloatingPanel_(True)
+            w.alert.window().setHidesOnDeactivate_(False)
             resp = w.run()
             result_holder["resp"] = resp if resp.clicked == 1 else None
             done_event.set()
@@ -3443,7 +3446,7 @@ models:
 
             self._build_llm_model_menu()
 
-            rumps.notification(
+            send_notification(
                 "VoiceText", "Provider added", f"{name} ({', '.join(models)})"
             )
             logger.info("Added AI provider: %s", name)
@@ -3546,7 +3549,7 @@ models:
             # Rebuild LLM model menu
             self._build_llm_model_menu()
 
-            rumps.notification("VoiceText", "Provider removed", pname)
+            send_notification("VoiceText", "Provider removed", pname)
             logger.info("Removed AI provider: %s", pname)
         except Exception as e:
             logger.error("Remove provider failed: %s", e, exc_info=True)
@@ -3631,7 +3634,7 @@ models:
 
         # Reject if busy (transcribing or switching)
         if self._busy:
-            rumps.notification(
+            send_notification(
                 "VoiceText",
                 "Cannot switch model",
                 "Please wait for current operation to finish.",
@@ -3706,7 +3709,7 @@ models:
                 self._set_status("VT")
                 logger.info("Switched to model: %s", preset.display_name)
                 try:
-                    rumps.notification(
+                    send_notification(
                         "VoiceText",
                         "Model switched",
                         f"Now using: {preset.display_name}",
@@ -3722,7 +3725,7 @@ models:
                 logger.error("Model switch failed: %s", e)
                 self._set_status("Error")
                 try:
-                    rumps.notification(
+                    send_notification(
                         "VoiceText",
                         "Model switch failed",
                         str(e)[:100],
@@ -3911,7 +3914,7 @@ models:
             new_config = load_config(self._config_path)
         except Exception as e:
             logger.error("Failed to reload config: %s", e)
-            rumps.notification("VoiceText", "Reload Failed", str(e))
+            send_notification("VoiceText", "Reload Failed", str(e))
             return
 
         self._config = new_config
@@ -4000,7 +4003,7 @@ models:
                 self._clipboard_hotkey_listener.start()
 
         logger.info("Configuration reloaded successfully")
-        rumps.notification("VoiceText", "Config Reloaded", "Configuration has been reloaded.")
+        send_notification("VoiceText", "Config Reloaded", "Configuration has been reloaded.")
 
     def _on_browse_history(self, _=None) -> None:
         """Open the conversation history browser panel."""
@@ -4361,7 +4364,7 @@ models:
                 self._set_status("VT")
                 logger.info("Switched to model: %s (from settings)", preset.display_name)
                 try:
-                    rumps.notification("VoiceText", "Model switched",
+                    send_notification("VoiceText", "Model switched",
                                       f"Now using: {preset.display_name}")
                 except Exception:
                     logger.debug("Notification unavailable, skipping")
@@ -4571,7 +4574,7 @@ models:
             self._clipboard_hotkey_listener.stop()
         if self._settings_panel.is_visible:
             self._settings_panel.close()
-        rumps.quit_application()
+        quit_application()
 
     @staticmethod
     def _ensure_accessibility() -> bool:
@@ -4674,7 +4677,7 @@ def main() -> None:
     """Entry point."""
     import signal
 
-    signal.signal(signal.SIGINT, lambda *_: rumps.quit_application())
+    signal.signal(signal.SIGINT, lambda *_: quit_application())
 
     config_path = sys.argv[1] if len(sys.argv) > 1 else None
     app = VoiceTextApp(config_path=config_path)  # None uses default path

@@ -7,7 +7,7 @@ import logging
 import threading
 from typing import Any, Callable, Dict, Optional
 
-import rumps
+from .statusbar import send_notification
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,7 @@ class AutoVocabBuilder:
 
             if new_entries > 0:
                 try:
-                    rumps.notification(
+                    send_notification(
                         "VoiceText",
                         "Vocabulary Auto-Built",
                         f"{new_entries} new entries ({total_entries} total)",

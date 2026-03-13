@@ -116,8 +116,8 @@ class TestBuildingFlag:
 
 
 class TestBuildExecution:
-    @patch("voicetext.auto_vocab_builder.rumps")
-    def test_build_success_with_new_entries(self, mock_rumps, config):
+    @patch("voicetext.auto_vocab_builder.send_notification")
+    def test_build_success_with_new_entries(self, mock_notify, config):
         """Test that a successful build reloads index and sends notification."""
         async def fake_build(**kwargs):
             return {"new_entries": 5, "total_entries": 20}
@@ -139,11 +139,11 @@ class TestBuildExecution:
             builder._build()
 
         mock_enhancer.vocab_index.reload.assert_called_once()
-        mock_rumps.notification.assert_called_once()
+        mock_notify.assert_called_once()
         assert builder._building is False
 
-    @patch("voicetext.auto_vocab_builder.rumps")
-    def test_build_success_no_new_entries(self, mock_rumps, config):
+    @patch("voicetext.auto_vocab_builder.send_notification")
+    def test_build_success_no_new_entries(self, mock_notify, config):
         """Test that no notification is sent when there are no new entries."""
         async def fake_build(**kwargs):
             return {"new_entries": 0, "total_entries": 10}
@@ -160,7 +160,7 @@ class TestBuildExecution:
         ):
             builder._build()
 
-        mock_rumps.notification.assert_not_called()
+        mock_notify.assert_not_called()
         assert builder._building is False
 
     def test_build_failure_clears_building_flag(self, config):
@@ -186,8 +186,8 @@ class TestSetEnhancer:
 
 
 class TestOnBuildDoneCallback:
-    @patch("voicetext.auto_vocab_builder.rumps")
-    def test_on_build_done_called(self, mock_rumps, config):
+    @patch("voicetext.auto_vocab_builder.send_notification")
+    def test_on_build_done_called(self, mock_notify, config):
         """Test that on_build_done callback is invoked after successful build."""
         async def fake_build(**kwargs):
             return {"new_entries": 3, "total_entries": 15}

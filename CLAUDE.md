@@ -2,7 +2,7 @@
 
 ## UI Dialogs
 
-This is a macOS statusbar (accessory) app. Standard `rumps.alert()` / `rumps.notification()` dialogs will not appear on screen because the app has no foreground presence.
+This is a macOS statusbar (accessory) app built with pure PyObjC (via `statusbar.py`). Standard modal dialogs will not appear on screen because the app has no foreground presence.
 
 When you need to show a user-facing dialog (error, warning, confirmation), use `self._topmost_alert()` instead. It activates the app, sets `NSStatusWindowLevel`, and runs a modal `NSAlert` so the dialog is always visible. Call `self._restore_accessory()` afterward to return to statusbar-only mode.
 
@@ -11,11 +11,11 @@ self._topmost_alert(title="...", message="...")
 self._restore_accessory()
 ```
 
-`rumps.notification()` will crash with `Info.plist` / `CFBundleIdentifier` errors when running directly from the terminal (`uv run`) without app bundling. This is expected during development — wrap calls in try/except and log the error instead of crashing. In a packaged app `rumps.notification()` works normally, so it is fine to use for non-critical user feedback.
+`send_notification()` (from `statusbar.py`) may fail with `Info.plist` / `CFBundleIdentifier` errors when running directly from the terminal (`uv run`) without app bundling. This is expected during development — the function catches exceptions internally and logs them. In a packaged app notifications work normally.
 
 ## Showing NSPanel / NSWindow from Menu Callbacks
 
-When showing an NSPanel from a rumps menu callback (e.g. clicking "Settings..."), the window must be created and displayed **synchronously within the callback**. Do NOT use `AppHelper.callAfter()` to defer the `show()` call.
+When showing an NSPanel from a menu callback (e.g. clicking "Settings..."), the window must be created and displayed **synchronously within the callback**. Do NOT use `AppHelper.callAfter()` to defer the `show()` call.
 
 **Why:** In a statusbar app (`NSApplicationActivationPolicyAccessory`), clicking a menu item briefly activates the app for menu tracking. When the menu callback returns, the app falls back to accessory mode. If `show()` is deferred via `callAfter`, it runs after the app has deactivated — the window is created but never appears on screen.
 
