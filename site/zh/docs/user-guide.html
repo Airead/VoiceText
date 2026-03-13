@@ -428,7 +428,7 @@ steps: proofread, translate_en
         <li>以 &ldquo;Output only the processed text without any explanation&rdquo; 结尾</li>
         <li><code>order</code> 值留出间隔（10、20、30&hellip;），方便日后在中间插入新模式</li>
       </ul>
-      <p>更多现成模板请参阅 <a href="https://github.com/Airead/VoiceText/blob/main/docs/enhance-mode-examples.md" target="_blank" rel="noopener">增强模式示例</a>，涵盖邮件、会议纪要、翻译、开发工具等场景。</p>
+      <p>更多现成模板请参阅 <a href="https://github.com/Airead/VoiceText/blob/main/docs/enhance-mode-examples-zh.md" target="_blank" rel="noopener">增强模式示例</a>，涵盖邮件、会议纪要、翻译、开发工具等场景。</p>
     </section>
 
     <!-- Level 9 -->
@@ -459,7 +459,7 @@ models:
 
       <h3>在预览面板中切换</h3>
       <p>你也可以直接在预览面板的下拉菜单中切换 LLM 和 STT 模型，方便对同一段音频比较不同模型的结果。</p>
-      <p>详细示例请参阅 <a href="https://github.com/Airead/VoiceText/blob/main/docs/provider-model-guide.md" target="_blank" rel="noopener">供应商与模型配置指南</a>，涵盖 Ollama、OpenAI、DeepSeek、Groq、OpenRouter、通义千问等。</p>
+      <p>详细示例请参阅 <a href="https://github.com/Airead/VoiceText/blob/main/docs/provider-model-guide-zh.md" target="_blank" rel="noopener">供应商与模型配置指南</a>，涵盖 Ollama、OpenAI、DeepSeek、Groq、OpenRouter、通义千问等。</p>
     </section>
 
     <!-- Level 10 -->
@@ -499,7 +499,7 @@ models:
 
       <h3>浏览历史</h3>
       <p>菜单栏 &rarr; <strong>浏览历史...</strong> 打开可搜索、可筛选的历史转录视图。你可以按模式、模型以及是否有纠正进行过滤。</p>
-      <p>技术细节请参阅 <a href="https://github.com/Airead/VoiceText/blob/main/docs/vocabulary-embedding-retrieval.md" target="_blank" rel="noopener">词汇嵌入检索</a> 和 <a href="https://github.com/Airead/VoiceText/blob/main/docs/conversation-history-enhancement.md" target="_blank" rel="noopener">对话历史增强</a>。</p>
+      <p>技术细节请参阅 <a href="https://github.com/Airead/VoiceText/blob/main/docs/vocabulary-embedding-retrieval-zh.md" target="_blank" rel="noopener">词汇嵌入检索</a> 和 <a href="https://github.com/Airead/VoiceText/blob/main/docs/conversation-history-enhancement-zh.md" target="_blank" rel="noopener">对话历史增强</a>。</p>
     </section>
 
     <!-- Level 11 -->
@@ -565,7 +565,7 @@ models:
       <h3>配置文件</h3>
       <p>位置：<code>~/.config/VoiceText/config.json</code></p>
       <p>你只需包含想要修改的字段 &mdash; 其余全部使用默认值。编辑后，点击设置工具栏中的 <strong>重新加载配置</strong> 即可应用，无需重启。</p>
-      <p>完整选项请参阅 <a href="https://github.com/Airead/VoiceText/blob/main/docs/configuration.md" target="_blank" rel="noopener">配置参考</a>。</p>
+      <p>完整选项请参阅 <a href="https://github.com/Airead/VoiceText/blob/main/docs/configuration-zh.md" target="_blank" rel="noopener">配置参考</a>。</p>
 
       <h3>日志</h3>
       <p>日志保存在 <code>~/Library/Logs/VoiceText/voicetext.log</code>（5 MB 轮转，3 个备份）。</p>
@@ -642,20 +642,20 @@ models:
         <li><strong>构建链式模式</strong> &mdash; 校对 &rarr; 翻译，或总结 &rarr; 格式化</li>
         <li><strong>积累词汇表</strong> &mdash; 纠正越多，越智能</li>
         <li><strong>尝试不同模型</strong> &mdash; 比较 Groq 的速度、本地 Ollama 的隐私性、OpenAI 的准确度</li>
-        <li><strong>浏览 <a href="https://github.com/Airead/VoiceText/blob/main/docs/enhance-mode-examples.md" target="_blank" rel="noopener">增强模式示例</a></strong> 获取灵感</li>
+        <li><strong>浏览 <a href="https://github.com/Airead/VoiceText/blob/main/docs/enhance-mode-examples-zh.md" target="_blank" rel="noopener">增强模式示例</a></strong> 获取灵感</li>
       </ul>
       <p>各功能的技术细节请参阅 <a href="https://github.com/Airead/VoiceText/blob/main/README.md#documentation" target="_blank" rel="noopener">文档索引</a>。</p>
     </section>
 
     <!-- Navigation cards -->
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 48px;">
-      <a href="enhance-modes.html" class="doc-nav-card" style="margin-top: 0;">
-        <h3>AI 增强模式 &rarr;</h3>
-        <p>内置模式、链式流水线、自定义创建和现成模板库。</p>
-      </a>
       <a href="prompt-optimization.html" class="doc-nav-card" style="margin-top: 0;">
-        <h3>提示词优化工作流 &rarr;</h3>
+        <h3>&larr; 提示词优化工作流</h3>
         <p>使用诊断工具系统性地提升 AI 增强质量。</p>
+      </a>
+      <a href="error-correction.html" class="doc-nav-card" style="margin-top: 0;">
+        <h3>纠错机制 &rarr;</h3>
+        <p>五层纠错机制协同工作，修复语音识别错误。</p>
       </a>
     </div>
 
