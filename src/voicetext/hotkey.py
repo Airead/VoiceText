@@ -168,12 +168,27 @@ class _QuartzFnListener:
     def start(self) -> None:
         import Quartz
 
+        # Eagerly resolve Quartz symbols on the main thread to avoid
+        # thread-safety issues with PyObjC lazy imports.
+        _CGEventMaskBit = Quartz.CGEventMaskBit
+        _kCGEventFlagsChanged = Quartz.kCGEventFlagsChanged
+        _CGEventTapCreate = Quartz.CGEventTapCreate
+        _kCGSessionEventTap = Quartz.kCGSessionEventTap
+        _kCGHeadInsertEventTap = Quartz.kCGHeadInsertEventTap
+        _kCGEventTapOptionListenOnly = Quartz.kCGEventTapOptionListenOnly
+        _CFMachPortCreateRunLoopSource = Quartz.CFMachPortCreateRunLoopSource
+        _CFRunLoopGetCurrent = Quartz.CFRunLoopGetCurrent
+        _CFRunLoopAddSource = Quartz.CFRunLoopAddSource
+        _kCFRunLoopDefaultMode = Quartz.kCFRunLoopDefaultMode
+        _CGEventTapEnable = Quartz.CGEventTapEnable
+        _CFRunLoopRun = Quartz.CFRunLoopRun
+
         def _run():
-            mask = Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)
-            self._tap = Quartz.CGEventTapCreate(
-                Quartz.kCGSessionEventTap,
-                Quartz.kCGHeadInsertEventTap,
-                Quartz.kCGEventTapOptionListenOnly,
+            mask = _CGEventMaskBit(_kCGEventFlagsChanged)
+            self._tap = _CGEventTapCreate(
+                _kCGSessionEventTap,
+                _kCGHeadInsertEventTap,
+                _kCGEventTapOptionListenOnly,
                 mask,
                 self._callback,
                 None,
@@ -186,14 +201,14 @@ class _QuartzFnListener:
                 return
             logger.debug("Quartz event tap created successfully: %s", self._tap)
 
-            source = Quartz.CFMachPortCreateRunLoopSource(None, self._tap, 0)
-            self._loop = Quartz.CFRunLoopGetCurrent()
-            Quartz.CFRunLoopAddSource(
-                self._loop, source, Quartz.kCFRunLoopDefaultMode
+            source = _CFMachPortCreateRunLoopSource(None, self._tap, 0)
+            self._loop = _CFRunLoopGetCurrent()
+            _CFRunLoopAddSource(
+                self._loop, source, _kCFRunLoopDefaultMode
             )
-            Quartz.CGEventTapEnable(self._tap, True)
+            _CGEventTapEnable(self._tap, True)
             logger.info("Quartz fn key listener started")
-            Quartz.CFRunLoopRun()
+            _CFRunLoopRun()
 
         self._thread = threading.Thread(target=_run, daemon=True)
         self._thread.start()
@@ -341,12 +356,27 @@ class TapHotkeyListener:
     def start(self) -> None:
         import Quartz
 
+        # Eagerly resolve Quartz symbols on the main thread to avoid
+        # thread-safety issues with PyObjC lazy imports.
+        _CGEventMaskBit = Quartz.CGEventMaskBit
+        _kCGEventKeyDown = Quartz.kCGEventKeyDown
+        _CGEventTapCreate = Quartz.CGEventTapCreate
+        _kCGSessionEventTap = Quartz.kCGSessionEventTap
+        _kCGHeadInsertEventTap = Quartz.kCGHeadInsertEventTap
+        _kCGEventTapOptionDefault = Quartz.kCGEventTapOptionDefault
+        _CFMachPortCreateRunLoopSource = Quartz.CFMachPortCreateRunLoopSource
+        _CFRunLoopGetCurrent = Quartz.CFRunLoopGetCurrent
+        _CFRunLoopAddSource = Quartz.CFRunLoopAddSource
+        _kCFRunLoopDefaultMode = Quartz.kCFRunLoopDefaultMode
+        _CGEventTapEnable = Quartz.CGEventTapEnable
+        _CFRunLoopRun = Quartz.CFRunLoopRun
+
         def _run():
-            mask = Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown)
-            self._tap = Quartz.CGEventTapCreate(
-                Quartz.kCGSessionEventTap,
-                Quartz.kCGHeadInsertEventTap,
-                Quartz.kCGEventTapOptionDefault,
+            mask = _CGEventMaskBit(_kCGEventKeyDown)
+            self._tap = _CGEventTapCreate(
+                _kCGSessionEventTap,
+                _kCGHeadInsertEventTap,
+                _kCGEventTapOptionDefault,
                 mask,
                 self._callback,
                 None,
@@ -358,14 +388,14 @@ class TapHotkeyListener:
                 )
                 return
 
-            source = Quartz.CFMachPortCreateRunLoopSource(None, self._tap, 0)
-            self._loop = Quartz.CFRunLoopGetCurrent()
-            Quartz.CFRunLoopAddSource(
-                self._loop, source, Quartz.kCFRunLoopDefaultMode
+            source = _CFMachPortCreateRunLoopSource(None, self._tap, 0)
+            self._loop = _CFRunLoopGetCurrent()
+            _CFRunLoopAddSource(
+                self._loop, source, _kCFRunLoopDefaultMode
             )
-            Quartz.CGEventTapEnable(self._tap, True)
+            _CGEventTapEnable(self._tap, True)
             logger.info("TapHotkeyListener started: %s", self._hotkey_str)
-            Quartz.CFRunLoopRun()
+            _CFRunLoopRun()
 
         self._thread = threading.Thread(target=_run, daemon=True)
         self._thread.start()
