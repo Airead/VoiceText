@@ -108,10 +108,11 @@ class RecordingIndicatorView:
         level = self._level
         for i in range(_NUM_BARS):
             # Each bar has a slightly different phase for visual variety
-            phase = i * 0.4
-            wave = (math.sin(elapsed * 4.0 + phase) + 1.0) / 2.0
-            # Mix between base animation and actual audio level
-            bar_factor = level * 0.7 + wave * 0.3 * max(0.2, level)
+            phase = i * 0.6
+            wave = (math.sin(elapsed * 5.0 + phase) + 1.0) / 2.0
+            # Base idle animation + level-driven height
+            idle = wave * 0.15
+            bar_factor = idle + level * (0.85 + wave * 0.15)
             bar_height = max(_BAR_MIN_HEIGHT, bar_factor * _BAR_MAX_HEIGHT)
 
             bar_x = bars_start_x + i * (_BAR_WIDTH + _BAR_GAP)
@@ -138,6 +139,10 @@ try:
 
         def isOpaque(self):
             return False
+
+        def refresh_(self, timer):
+            """Called by NSTimer to trigger a redraw."""
+            self.setNeedsDisplay_(True)
 
 except Exception:
     _IndicatorNSView = None
@@ -190,12 +195,14 @@ class RecordingIndicatorPanel:
                 2,  # NSBackingStoreBuffered
                 False,
             )
-            panel.setLevel_(NSStatusWindowLevel)
+            panel.setLevel_(NSStatusWindowLevel + 1)
             panel.setOpaque_(False)
             panel.setBackgroundColor_(NSColor.clearColor())
             panel.setIgnoresMouseEvents_(True)
             panel.setHasShadow_(True)
-            panel.setCollectionBehavior_(1 << 4)  # NSWindowCollectionBehaviorCanJoinAllSpaces
+            panel.setHidesOnDeactivate_(False)
+            # canJoinAllSpaces (1<<4) + stationary (1<<4 is same, use just canJoinAllSpaces)
+            panel.setCollectionBehavior_(1 << 4)
 
             # Position at top center of main screen
             screen = NSScreen.mainScreen()
@@ -216,14 +223,14 @@ class RecordingIndicatorPanel:
             self._timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
                 _REFRESH_INTERVAL,
                 content_view,
-                b"setNeedsDisplay",
+                b"refresh:",
                 None,
                 True,
             )
 
             logger.debug("Recording indicator shown")
-        except Exception as e:
-            logger.warning("Failed to show recording indicator: %s", e)
+        except Exception:
+            logger.error("Failed to show recording indicator", exc_info=True)
 
     def hide(self) -> None:
         """Hide and clean up the indicator panel."""

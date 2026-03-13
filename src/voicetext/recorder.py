@@ -51,8 +51,12 @@ class Recorder:
 
     @property
     def current_level(self) -> float:
-        """Return current audio level normalized to 0.0-1.0."""
-        return min(1.0, self._current_rms / 5000.0)
+        """Return current audio level normalized to 0.0-1.0.
+
+        Uses 2000 as reference so normal speech (~1000-3000 RMS) maps
+        to roughly 0.5-1.0.
+        """
+        return min(1.0, self._current_rms / 800.0)
 
     def start(self) -> None:
         """Start recording."""

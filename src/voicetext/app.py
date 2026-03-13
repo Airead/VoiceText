@@ -141,6 +141,7 @@ class VoiceTextApp(rumps.App):
         self._recording_indicator = RecordingIndicatorPanel()
         self._recording_indicator.enabled = fb_cfg.get("visual_indicator", True)
         self._level_poll_stop: threading.Event | None = None
+        self._recording_started = threading.Event()
 
         # Resolve current preset (None if using remote)
         self._current_preset_id: Optional[str] = None
@@ -429,21 +430,28 @@ class VoiceTextApp(rumps.App):
         if self._sound_manager.enabled:
             self._usage_stats.record_sound_feedback()
 
+        self._recording_started.clear()
+
         def _delayed_start():
             import time
             time.sleep(0.35)
             if not self._busy:
                 self._recorder.start()
                 self._start_recording_indicator()
+            self._recording_started.set()
 
         if self._sound_manager.enabled:
             threading.Thread(target=_delayed_start, daemon=True).start()
         else:
             self._recorder.start()
             self._start_recording_indicator()
+            self._recording_started.set()
 
     def _on_hotkey_release(self) -> None:
         """Called when hotkey is released - stop recording and transcribe."""
+        # Wait for delayed start to finish (if sound feedback caused a delay)
+        if not self._recording_started.wait(timeout=1.0):
+            return
         if not self._recorder.is_recording:
             return
         logger.info("Hotkey released, stopping recording")

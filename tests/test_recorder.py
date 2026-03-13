@@ -90,10 +90,10 @@ class TestRecorder:
         r.start()
 
         # Simulate a callback with known RMS
-        # Frame of all 1000s → RMS = 1000 → level = 1000/5000 = 0.2
-        frame_data = np.full(320, 1000, dtype=np.int16).tobytes()
+        # Frame of all 500s → RMS = 500 → level = 500/800 = 0.625
+        frame_data = np.full(320, 500, dtype=np.int16).tobytes()
         r._callback(frame_data, 320, None, None)
-        assert abs(r.current_level - 0.2) < 0.01
+        assert abs(r.current_level - 0.625) < 0.01
 
     @patch("voicetext.recorder.sd.RawInputStream")
     def test_current_level_capped_at_one(self, mock_stream_cls):
