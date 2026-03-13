@@ -272,9 +272,9 @@ models:
         </thead>
         <tbody>
           <tr><td><strong>Off</strong></td><td>No enhancement (raw transcription)</td></tr>
-          <tr><td><strong>&#32416;&#38169;&#28070;&#33394;</strong> (Proofread)</td><td>Fix typos, grammar, punctuation</td></tr>
-          <tr><td><strong>&#32763;&#35793;&#20026;&#33521;&#25991;</strong> (Translate EN)</td><td>Translate to English</td></tr>
-          <tr><td><strong>&#21629;&#20196;&#34892;&#22823;&#31070;</strong> (Commandline)</td><td>Convert speech to shell commands</td></tr>
+          <tr><td><strong>Proofread</strong></td><td>Fix typos, grammar, punctuation</td></tr>
+          <tr><td><strong>Translate to English</strong></td><td>Translate to English</td></tr>
+          <tr><td><strong>Commandline Master</strong></td><td>Convert speech to shell commands</td></tr>
         </tbody>
       </table>
 
@@ -285,7 +285,7 @@ models:
         <li>The result now goes through the LLM before appearing.</li>
       </ol>
       <blockquote>
-        <strong>Tip:</strong> Start with "&#32416;&#38169;&#28070;&#33394;" (Proofread) &mdash; it's the most universally useful mode.
+        <strong>Tip:</strong> Start with "Proofread" &mdash; it's the most universally useful mode.
       </blockquote>
     </section>
 
@@ -415,7 +415,7 @@ Output only the email text without any explanation.</pre>
       <h3>Create a Chain Mode</h3>
       <p>Chain modes run multiple steps sequentially:</p>
       <pre class="code-block">---
-label: &#28070;&#33394;+&#32763;&#35793;EN
+label: Proofread+Translate EN
 order: 25
 steps: proofread, translate_en
 ---
@@ -468,7 +468,7 @@ models:
       <p><strong>Goal:</strong> Teach VoiceText your personal terms and maintain topic context across turns.</p>
 
       <h3>Vocabulary Retrieval</h3>
-      <p><strong>Problem:</strong> ASR often misrecognizes proper nouns, technical terms, and names (e.g., "&#33805;&#33805;" &rarr; "&#24179;&#24179;").</p>
+      <p><strong>Problem:</strong> ASR often misrecognizes proper nouns, technical terms, and names (e.g., "Ciriel" &rarr; "cereal").</p>
       <p><strong>Solution:</strong> VoiceText builds a personal vocabulary from your correction history and uses it to improve future results.</p>
 
       <h3>How to Build Vocabulary</h3>

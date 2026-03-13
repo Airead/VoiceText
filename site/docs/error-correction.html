@@ -101,7 +101,7 @@
       <ul>
         <li><strong>Proper nouns</strong> &mdash; People's names, product names, and brand names that the model has never seen</li>
         <li><strong>Technical terms</strong> &mdash; Domain-specific jargon like "Kubernetes", "OAuth", or "hemoglobin A1C"</li>
-        <li><strong>Homophones</strong> &mdash; Chinese is particularly prone to this: "&#33805;&#33805;" (a name) vs "&#24179;&#24179;" (flat), "&#36825;&#37324;" vs "&#36825;&#20799;"</li>
+        <li><strong>Homophones</strong> &mdash; "Ciriel" (a name) heard as "cereal", "their" vs "there" vs "they're", "affect" vs "effect"</li>
         <li><strong>Punctuation and formatting</strong> &mdash; ASR engines output raw text with little or no punctuation</li>
         <li><strong>Context loss</strong> &mdash; Each transcription is independent &mdash; the engine doesn't know what you said 30 seconds ago</li>
       </ul>
@@ -189,18 +189,18 @@
         <div class="ex-label">How it helps</div>
         <div class="ex-row">
           <span class="ex-tag">ASR output:</span>
-          <span class="ex-text">&#25226;&#36825;&#20010;&#26381;&#21153;&#37096;&#32626;&#21040;&#37239;&#20271;&#19978;</span>
+          <span class="ex-text">deploy the service to cooper netties</span>
         </div>
         <div class="ex-row">
           <span class="ex-tag">Vocab match:</span>
-          <span class="ex-text" style="font-size: 0.88rem;">Kubernetes (&#23481;&#22120;&#32534;&#25490;) &mdash; variants: &#37239;&#20271;, &#24211;&#20271;&#23612;&#29305;&#26031;</span>
+          <span class="ex-text" style="font-size: 0.88rem;">Kubernetes (container orchestration) &mdash; variants: cooper netties, kuber nettis</span>
         </div>
         <div class="ex-row">
           <span class="ex-tag ex-arrow">&darr;</span>
         </div>
         <div class="ex-row">
           <span class="ex-tag">Enhanced:</span>
-          <span class="ex-correct">&#25226;&#36825;&#20010;&#26381;&#21153;&#37096;&#32626;&#21040; Kubernetes &#19978;&#12290;</span>
+          <span class="ex-correct">Deploy the service to Kubernetes.</span>
         </div>
       </div>
 
@@ -223,17 +223,17 @@
 
       <div class="example-box">
         <div class="ex-label">Injected context (token-efficient format)</div>
-<pre class="code-block" style="font-size: 0.85rem; margin: 0;">- &#23558;&#26159;&#21542;&#24320;&#21551;&#23545;&#35805;&#21382;&#21490;&#27880;&#20837;&#30340;&#21151;&#33021;&#65292;&#20570;&#19968;&#20010;&#24320;&#20851;&#25918;&#22312;&#33756;&#21333;&#26639;&#37324;&#12290;
-- &#29616;&#22312;&#27979;&#35797;&#19968;&#19979;&#21382;&#21490;&#19978;&#19979;&#25991;&#27880;&#20837;&#30340;&#21151;&#33021;&#12290;
-- &#26524;&#26524;&#20170;&#22825;&#22312;&#20844;&#22253;&#37324;&#36935;&#21040;&#20102;&#24179;&#24179;&#12290; &rarr; &#26524;&#26524;&#20170;&#22825;&#22312;&#20844;&#22253;&#37324;&#36935;&#21040;&#20102;&#33805;&#33805;&#12290;
-- &#24179;&#24179;&#23545;&#26524;&#26524;&#35828;&#25105;&#20170;&#22825;&#21507;&#20102;&#38754;&#26465;&#12290; &rarr; &#33805;&#33805;&#23545;&#26524;&#26524;&#35828;&#25105;&#20170;&#22825;&#21507;&#20102;&#38754;&#26465;&#12290;</pre>
+<pre class="code-block" style="font-size: 0.85rem; margin: 0;">- Add a toggle for the conversation history injection feature in the menu bar.
+- Now test the history context injection feature.
+- I met cereal at the park today. &rarr; I met Ciriel at the park today.
+- cereal told me she had noodles today. &rarr; Ciriel told me she had noodles today.</pre>
       </div>
 
-      <p>The arrow notation shows correction patterns. When the LLM sees that "&#24179;&#24179;" was corrected to "&#33805;&#33805;" in a previous turn, it can make the same correction automatically in subsequent inputs &mdash; <strong>without you ever adding it to a dictionary</strong>.</p>
+      <p>The arrow notation shows correction patterns. When the LLM sees that "cereal" was corrected to "Ciriel" in a previous turn, it can make the same correction automatically in subsequent inputs &mdash; <strong>without you ever adding it to a dictionary</strong>.</p>
 
       <h3>Three Problems This Solves</h3>
       <ul>
-        <li><strong>Consistent entity resolution</strong> &mdash; Once you confirm "&#33805;&#33805;", subsequent mentions are corrected automatically.</li>
+        <li><strong>Consistent entity resolution</strong> &mdash; Once you confirm "Ciriel", subsequent mentions are corrected automatically.</li>
         <li><strong>Topic-aware enhancement</strong> &mdash; The LLM understands the current conversation topic and makes contextually appropriate decisions.</li>
         <li><strong>Style adaptation</strong> &mdash; The LLM observes your writing patterns and matches your tone and formatting preferences.</li>
       </ul>
@@ -249,7 +249,7 @@
         <li><strong>Switch modes</strong> on the fly with keyboard shortcuts (<code>&#8984;1</code>&ndash;<code>&#8984;9</code>) and re-enhance instantly</li>
         <li><strong>Inspect thinking</strong> &mdash; see the LLM's reasoning process (if the model supports it)</li>
       </ul>
-      <p>This is more than a convenience feature. Every edit you make in the Preview panel becomes a <strong>training signal</strong> for the system. When you correct "&#24179;&#24179;" to "&#33805;&#33805;", that correction is recorded with a <code>user_corrected: true</code> flag, feeding back into Layers 2 and 3.</p>
+      <p>This is more than a convenience feature. Every edit you make in the Preview panel becomes a <strong>training signal</strong> for the system. When you correct "cereal" to "Ciriel", that correction is recorded with a <code>user_corrected: true</code> flag, feeding back into Layers 2 and 3.</p>
 
       <blockquote>The Preview panel also serves as a <strong>prompt tuning workbench</strong>. You can test different prompts, compare models, and systematically improve enhancement quality. See <a href="prompt-optimization.html">Prompt Optimization Workflow</a> for the full process.</blockquote>
     </section>
@@ -276,7 +276,7 @@
       </div>
 
       <ol>
-        <li><strong>You correct</strong> an error in the Preview panel (e.g., "&#24179;&#24179;" &rarr; "&#33805;&#33805;")</li>
+        <li><strong>You correct</strong> an error in the Preview panel (e.g., "cereal" &rarr; "Ciriel")</li>
         <li><strong>VoiceText records</strong> the ASR text, AI output, and your final confirmed text</li>
         <li><strong>Conversation history</strong> uses this immediately &mdash; the next input already benefits from your correction</li>
         <li><strong>Vocabulary builder</strong> periodically extracts new terms from your correction history and rebuilds the embedding index</li>
@@ -294,28 +294,28 @@
       <p>Let's trace a real scenario through all five layers:</p>
 
       <div class="example-box">
-        <div class="ex-label">Scenario: Talking about a colleague "&#33805;&#33805;" and a project using Kubernetes</div>
+        <div class="ex-label">Scenario: Talking about a colleague "Ciriel" and a project using Kubernetes</div>
       </div>
 
       <div class="layer-card">
         <h4><span class="layer-num">1</span>ASR Output</h4>
-        <p>You say: "&#33805;&#33805;&#35828;&#25226;&#37027;&#20010;&#26381;&#21153;&#37096;&#32626;&#21040;&#37239;&#20271;&#19978;&#23601;&#21487;&#20197;&#20102;"</p>
-        <p>ASR produces: <code>&#24179;&#24179;&#35828;&#25226;&#37027;&#20010;&#26381;&#21153;&#37096;&#32626;&#21040;&#37239;&#20271;&#19978;&#23601;&#21487;&#20197;&#20102;</code></p>
-        <p style="font-size: 0.88rem;"><strong>Errors:</strong> "&#33805;&#33805;" &rarr; "&#24179;&#24179;", "Kubernetes" &rarr; "&#37239;&#20271;"</p>
+        <p>You say: "Ciriel said just deploy the service to Kubernetes and we're good"</p>
+        <p>ASR produces: <code>cereal said just deploy the service to cooper netties and were good</code></p>
+        <p style="font-size: 0.88rem;"><strong>Errors:</strong> "Ciriel" &rarr; "cereal", "Kubernetes" &rarr; "cooper netties", "we're" &rarr; "were"</p>
       </div>
 
       <div class="layer-connector">&darr;</div>
 
       <div class="layer-card">
         <h4><span class="layer-num">2</span>Vocabulary Retrieval Kicks In</h4>
-        <p>The embedding index finds <strong>Kubernetes</strong> (variants: &#37239;&#20271;, &#24211;&#20271;&#23612;&#29305;&#26031;) is semantically close to the input. This term is injected into the LLM prompt.</p>
+        <p>The embedding index finds <strong>Kubernetes</strong> (variants: cooper netties, kuber nettis) is semantically close to the input. This term is injected into the LLM prompt.</p>
       </div>
 
       <div class="layer-connector">&darr;</div>
 
       <div class="layer-card">
         <h4><span class="layer-num">3</span>Conversation History Provides Context</h4>
-        <p>Your recent history shows: <code>&#24179;&#24179;&#23545;&#26524;&#26524;&#35828;... &rarr; &#33805;&#33805;&#23545;&#26524;&#26524;&#35828;...</code>. The LLM now knows "&#24179;&#24179;" should be "&#33805;&#33805;".</p>
+        <p>Your recent history shows: <code>cereal told me she had noodles today. &rarr; Ciriel told me she had noodles today.</code> The LLM now knows "cereal" should be "Ciriel".</p>
       </div>
 
       <div class="layer-connector">&darr;</div>
@@ -323,8 +323,8 @@
       <div class="layer-card">
         <h4><span class="layer-num">1+2+3</span>AI Enhancement Result</h4>
         <p>The LLM, armed with vocabulary context and conversation history, produces:</p>
-        <p><span class="ex-correct">&#33805;&#33805;&#35828;&#25226;&#37027;&#20010;&#26381;&#21153;&#37096;&#32626;&#21040; Kubernetes &#19978;&#23601;&#21487;&#20197;&#20102;&#12290;</span></p>
-        <p style="font-size: 0.88rem;">Both errors corrected. Punctuation added.</p>
+        <p><span class="ex-correct">Ciriel said just deploy the service to Kubernetes and we're good.</span></p>
+        <p style="font-size: 0.88rem;">All errors corrected. Punctuation added.</p>
       </div>
 
       <div class="layer-connector">&darr;</div>
@@ -338,7 +338,7 @@
 
       <div class="layer-card">
         <h4><span class="layer-num">5</span>Self-Improving: Recorded for the Future</h4>
-        <p>This session is logged. Next time you mention "&#33805;&#33805;" or "Kubernetes", the system will be even more confident in making the right correction.</p>
+        <p>This session is logged. Next time you mention "Ciriel" or "Kubernetes", the system will be even more confident in making the right correction.</p>
       </div>
     </section>
 

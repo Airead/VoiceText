@@ -81,10 +81,10 @@
 <pre class="code-block">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
 &#9474;  ASR   [FunASR &#9662;]  10.6s    &#9744; Punc   Play &#9654;  Save  &#9474;  &larr; Raw speech recognition
 &#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;    &#9474;
-&#9474;  &#9474; &#26681;&#25454;&#30446;&#21069;&#31243;&#24207;&#30340;preview&#30028;&#38754;&#20320;&#33021;&#24819;&#21040;&#29992;&#25143;...       &#9474;    &#9474;
+&#9474;  &#9474; based on the current preview you can think of...    &#9474;    &#9474;
 &#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;    &#9474;
 &#9474;                                                     &#9474;
-&#9474;  [ Off ] [&#32416;&#38169;&#28070;&#33394;] [&#32763;&#35793;&#20026;&#33521;&#25991;] [&#28070;&#33394;+&#32763;&#35793;EN] [...]  &#9474;  &larr; Mode switcher (&amp;#8984;1&ndash;&amp;#8984;9)
+&#9474;  [ Off ] [Proofread] [Translate EN] [Proof+Trans] [...]  &#9474;  &larr; Mode switcher (&amp;#8984;1&ndash;&amp;#8984;9)
 &#9474;                                                     &#9474;
 &#9474;  AI  [provider/model &#9662;]  Tokens: 897 (&uarr;878 &darr;19)    &#9474;
 &#9474;                                &#9744; thinking  &#129504; Prompt&#9474;  &larr; Enhancement controls
@@ -254,24 +254,24 @@
       <h2>Practical Examples</h2>
 
       <h3>Example 1: AI Adds Explanation After Translation</h3>
-      <p><strong>Problem:</strong> The "&#32763;&#35793;&#20026;&#33521;&#25991;" mode outputs "Translation: ..." with a prefix.</p>
+      <p><strong>Problem:</strong> The "Translate to English" mode outputs "Translation: ..." with a prefix.</p>
       <p><strong>Diagnosis:</strong> Click Prompt &rarr; the prompt says "translate to English" but doesn't explicitly forbid commentary.</p>
       <p><strong>Fix:</strong> Add to the prompt:</p>
 <pre class="code-block">Output only the translated text.
 Do not add any prefix, label, or explanation.</pre>
 
       <h3>Example 2: AI Corrects a Name Incorrectly</h3>
-      <p><strong>Problem:</strong> You say "&#25214;&#33805;&#33805;&#30830;&#35748;&#19968;&#19979;" but AI changes it to "&#25214;&#24179;&#24179;&#30830;&#35748;&#19968;&#19979;".</p>
-      <p><strong>Diagnosis:</strong> Enable thinking &rarr; the AI treats "&#33805;&#33805;" as an ASR error for "&#24179;&#24179;" because it lacks context.</p>
+      <p><strong>Problem:</strong> You say "check with Ciriel about this" but AI changes it to "check with cereal about this".</p>
+      <p><strong>Diagnosis:</strong> Enable thinking &rarr; the AI treats "Ciriel" as an ASR error for "cereal" because it lacks context.</p>
       <p><strong>Fix options:</strong></p>
       <ul>
-        <li>Edit Final Result to "&#33805;&#33805;" &rarr; the correction is logged and builds vocabulary over time</li>
-        <li>Enable Conversation History (Settings &rarr; AI) so the AI sees prior confirmed uses of "&#33805;&#33805;"</li>
+        <li>Edit Final Result to "Ciriel" &rarr; the correction is logged and builds vocabulary over time</li>
+        <li>Enable Conversation History (Settings &rarr; AI) so the AI sees prior confirmed uses of "Ciriel"</li>
         <li>Manually build vocabulary after accumulating corrections</li>
       </ul>
 
       <h3>Example 3: Mode Works on One Model But Not Another</h3>
-      <p><strong>Problem:</strong> "&#21629;&#20196;&#34892;&#22823;&#31070;" produces clean shell commands on GPT-4 but adds markdown fences on a local model.</p>
+      <p><strong>Problem:</strong> "Commandline Master" produces clean shell commands on GPT-4 but adds markdown fences on a local model.</p>
       <p><strong>Diagnosis:</strong> Switch models via dropdown, compare outputs. Click Prompt to check.</p>
       <p><strong>Fix:</strong> Make the prompt more explicit:</p>
 <pre class="code-block">Output only the raw command.
