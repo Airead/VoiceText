@@ -15,7 +15,7 @@ DEFAULT_CONFIG_PATH = os.path.join(DEFAULT_CONFIG_DIR, "config.json")
 DEFAULT_ENHANCE_MODES_DIR = os.path.join(DEFAULT_CONFIG_DIR, "enhance_modes")
 
 DEFAULT_CONFIG: Dict[str, Any] = {
-    "hotkey": "fn",
+    "hotkeys": {"fn": True},
     "audio": {
         "sample_rate": 16000,
         "block_ms": 20,
@@ -153,4 +153,14 @@ def load_config(path: Optional[str] = None) -> Dict[str, Any]:
     with open(expanded, "r", encoding="utf-8") as f:
         overrides = json.load(f)
 
-    return _merge_dict(DEFAULT_CONFIG, overrides)
+    config = _merge_dict(DEFAULT_CONFIG, overrides)
+
+    # Migrate legacy "hotkey" (string) → "hotkeys" (dict)
+    if "hotkey" in config:
+        old = config.pop("hotkey")
+        if isinstance(old, str) and "hotkeys" not in overrides:
+            config["hotkeys"] = {old: True}
+            save_config(config, path)
+            logger.info("Migrated hotkey %r → hotkeys dict", old)
+
+    return config

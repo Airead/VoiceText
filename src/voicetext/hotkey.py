@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Callable, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from pynput import keyboard
 
@@ -90,7 +90,12 @@ _SPECIAL_KEYS = {
     "alt": keyboard.Key.alt,
     "option": keyboard.Key.alt,
     "shift": keyboard.Key.shift,
+    "alt_r": keyboard.Key.alt_r,
+    "cmd_r": keyboard.Key.cmd_r,
+    "ctrl_r": keyboard.Key.ctrl_r,
 }
+
+_REVERSE_SPECIAL_KEYS = {v: k for k, v in _SPECIAL_KEYS.items() if k != "option"}
 
 
 def _parse_key(name: str):
@@ -105,6 +110,46 @@ def _parse_key(name: str):
 
 def _is_fn_key(name: str) -> bool:
     return name.strip().lower() == "fn"
+
+
+def _normalize_key(key):
+    """Normalize a pynput key for comparison."""
+    if isinstance(key, keyboard.Key):
+        return key
+    if isinstance(key, keyboard.KeyCode):
+        if key.vk is not None:
+            return key.vk
+        if key.char is not None:
+            return keyboard.KeyCode.from_char(key.char.lower())
+    return key
+
+
+def _key_to_name(key) -> Optional[str]:
+    """Convert a pynput key object to its string name."""
+    if isinstance(key, keyboard.Key):
+        return _REVERSE_SPECIAL_KEYS.get(key)
+    if isinstance(key, keyboard.KeyCode):
+        if key.char is not None:
+            return key.char.lower()
+        if key.vk is not None:
+            for name, sk in _SPECIAL_KEYS.items():
+                if isinstance(sk, keyboard.KeyCode) and sk.vk == key.vk:
+                    return name
+    return None
+
+
+def _key_debug_info(key) -> str:
+    """Format a pynput key object for debugging (shown when key is unrecognized)."""
+    if isinstance(key, keyboard.Key):
+        return f"keyboard.Key.{key.name} (vk={key.value.vk})"
+    if isinstance(key, keyboard.KeyCode):
+        parts = []
+        if key.char is not None:
+            parts.append(f"char={key.char!r}")
+        if key.vk is not None:
+            parts.append(f"vk={key.vk}")
+        return f"keyboard.KeyCode({', '.join(parts)})"
+    return repr(key)
 
 
 class _QuartzFnListener:
@@ -232,7 +277,7 @@ class _PynputListener:
         on_press: Callable[[], None],
         on_release: Callable[[], None],
     ) -> None:
-        self._target_key = _parse_key(key_name)
+        self._target_key = _normalize_key(_parse_key(key_name))
         self._on_press = on_press
         self._on_release = on_release
         self._listener: Optional[keyboard.Listener] = None
@@ -253,20 +298,8 @@ class _PynputListener:
             self._listener = None
             logger.info("Pynput hotkey listener stopped")
 
-    def _normalize(self, key):
-        if isinstance(key, keyboard.Key):
-            return key
-        if isinstance(key, keyboard.KeyCode):
-            if key.vk is not None:
-                return key.vk
-            if key.char is not None:
-                return keyboard.KeyCode.from_char(key.char.lower())
-        return key
-
     def _matches(self, key) -> bool:
-        normalized = self._normalize(key)
-        target = self._normalize(self._target_key)
-        return normalized == target
+        return _normalize_key(key) == self._target_key
 
     def _handle_press(self, key) -> None:
         if self._matches(key) and not self._held:
@@ -433,3 +466,220 @@ class HoldHotkeyListener:
 
     def stop(self) -> None:
         self._impl.stop()
+
+
+class MultiHotkeyListener:
+    """Listen for multiple hotkeys using a single pynput listener + Quartz for fn.
+
+    macOS only allows one pynput keyboard.Listener reliably, so this class
+    merges all non-fn keys into one shared listener.
+    """
+
+    def __init__(
+        self,
+        key_names: List[str],
+        on_press: Callable[[], None],
+        on_release: Callable[[], None],
+    ) -> None:
+        self._on_press = on_press
+        self._on_release = on_release
+        self._fn_enabled = False
+        self._quartz: Optional[_QuartzFnListener] = None
+        self._pynput_listener: Optional[keyboard.Listener] = None
+        self._target_keys: Dict[Any, str] = {}  # normalized_key → name
+        self._held: set = set()  # set of currently held key names
+        # Recording mode state
+        self._record_done = threading.Event()
+        self._record_cb: Optional[Callable[[str], None]] = None
+        self._record_unrecognized_cb: Optional[Callable[[str], None]] = None
+        self._record_timeout_cb: Optional[Callable[[], None]] = None
+        self._record_timer: Optional[threading.Timer] = None
+
+        for name in key_names:
+            if _is_fn_key(name):
+                self._fn_enabled = True
+            else:
+                parsed = _parse_key(name)
+                self._target_keys[_normalize_key(parsed)] = name
+
+    def start(self) -> None:
+        if self._fn_enabled:
+            self._quartz = _QuartzFnListener(
+                on_press=self._on_fn_press,
+                on_release=self._on_fn_release,
+            )
+            self._quartz.start()
+        # Always start pynput listener — needed for recording mode even with no target keys
+        self._pynput_listener = keyboard.Listener(
+            on_press=self._handle_press,
+            on_release=self._handle_release,
+        )
+        self._pynput_listener.daemon = True
+        self._pynput_listener.start()
+        logger.info(
+            "Pynput multi-hotkey listener started, keys=%s",
+            list(self._target_keys.values()),
+        )
+
+    def stop(self) -> None:
+        self.cancel_record()
+        if self._quartz:
+            self._quartz.stop()
+            self._quartz = None
+        if self._pynput_listener:
+            self._pynput_listener.stop()
+            self._pynput_listener = None
+            logger.info("Pynput multi-hotkey listener stopped")
+        self._held.clear()
+
+    # ------------------------------------------------------------------
+    # Recording mode — capture the next key press (any key)
+    # ------------------------------------------------------------------
+
+    def record_next_key(
+        self,
+        on_recorded: Callable[[str], None],
+        on_timeout: Callable[[], None],
+        timeout: float = 10.0,
+        on_unrecognized: Optional[Callable[[str], None]] = None,
+    ) -> None:
+        """Enter recording mode: the next key press calls *on_recorded* instead of on_press."""
+        self._record_done.clear()
+        self._record_cb = on_recorded
+        self._record_unrecognized_cb = on_unrecognized
+        self._record_timeout_cb = on_timeout
+        self._record_timer = threading.Timer(timeout, self._on_record_timeout)
+        self._record_timer.daemon = True
+        self._record_timer.start()
+        logger.info("Recording mode started (timeout=%.1fs)", timeout)
+
+    def cancel_record(self) -> None:
+        """Cancel recording mode if active."""
+        self._record_done.set()
+        self._record_cb = None
+        self._record_unrecognized_cb = None
+        self._record_timeout_cb = None
+        if self._record_timer:
+            self._record_timer.cancel()
+            self._record_timer = None
+
+    def _on_record_timeout(self) -> None:
+        if self._record_done.is_set():
+            return
+        self._record_done.set()
+        cb = self._record_timeout_cb
+        self._record_cb = None
+        self._record_unrecognized_cb = None
+        self._record_timeout_cb = None
+        self._record_timer = None
+        if cb:
+            cb()
+        logger.info("Recording mode timed out")
+
+    def _try_record(self, key_name: str) -> bool:
+        """If in recording mode, deliver the key and return True."""
+        if self._record_done.is_set():
+            return False
+        self._record_done.set()
+        cb = self._record_cb
+        self._record_cb = None
+        self._record_unrecognized_cb = None
+        self._record_timeout_cb = None
+        if self._record_timer:
+            self._record_timer.cancel()
+            self._record_timer = None
+        if cb is None:
+            return False
+        logger.info("Recorded key: %s", key_name)
+        cb(key_name)
+        return True
+
+    # ------------------------------------------------------------------
+
+    def enable_key(self, key_name: str) -> None:
+        """Enable a key dynamically (add to monitored set, start listener if needed)."""
+        if _is_fn_key(key_name):
+            self._fn_enabled = True
+            if not self._quartz:
+                self._quartz = _QuartzFnListener(
+                    on_press=self._on_fn_press,
+                    on_release=self._on_fn_release,
+                )
+                self._quartz.start()
+            logger.info("Hotkey fn enabled")
+        else:
+            parsed = _parse_key(key_name)
+            self._target_keys[_normalize_key(parsed)] = key_name
+            if not self._pynput_listener:
+                self._pynput_listener = keyboard.Listener(
+                    on_press=self._handle_press,
+                    on_release=self._handle_release,
+                )
+                self._pynput_listener.daemon = True
+                self._pynput_listener.start()
+            logger.info("Hotkey %s enabled", key_name)
+
+    def disable_key(self, key_name: str) -> None:
+        """Disable a key dynamically (remove from monitored set)."""
+        if _is_fn_key(key_name):
+            self._fn_enabled = False
+            self._held.discard("fn")
+            logger.info("Hotkey fn disabled")
+        else:
+            parsed = _parse_key(key_name)
+            name = self._target_keys.pop(_normalize_key(parsed), None)
+            if name:
+                self._held.discard(name)
+            logger.info("Hotkey %s disabled", key_name)
+
+    def _match(self, key) -> Optional[str]:
+        return self._target_keys.get(_normalize_key(key))
+
+    def _handle_press(self, key) -> None:
+        if self._record_cb is not None:
+            name = _key_to_name(key)
+            if name:
+                self._try_record(name)
+            elif self._record_unrecognized_cb is not None:
+                debug = _key_debug_info(key)
+                logger.warning("Unrecognized key during recording: %s", debug)
+                try:
+                    self._record_unrecognized_cb(debug)
+                except Exception as e:
+                    logger.error("on_unrecognized callback error: %s", e)
+            return
+        name = self._match(key)
+        if name and name not in self._held:
+            self._held.add(name)
+            try:
+                self._on_press()
+            except Exception as e:
+                logger.error("on_press callback error: %s", e)
+
+    def _handle_release(self, key) -> None:
+        name = self._match(key)
+        if name and name in self._held:
+            self._held.discard(name)
+            try:
+                self._on_release()
+            except Exception as e:
+                logger.error("on_release callback error: %s", e)
+
+    def _on_fn_press(self) -> None:
+        if self._record_cb is not None:
+            self._try_record("fn")
+            return
+        if self._fn_enabled and "fn" not in self._held:
+            self._held.add("fn")
+            try:
+                self._on_press()
+            except Exception as e:
+                logger.error("on_press callback error: %s", e)
+
+    def _on_fn_release(self) -> None:
+        if "fn" in self._held:
+            self._held.discard("fn")
+            try:
+                self._on_release()
+            except Exception as e:
+                logger.error("on_release callback error: %s", e)

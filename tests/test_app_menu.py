@@ -19,7 +19,7 @@ def _make_mock_app():
     app._preview_enabled = True
     app._output_method = "clipboard"
     app._config = {
-        "hotkey": "right_cmd",
+        "hotkeys": {"right_cmd": True, "fn": True},
         "logging": {"level": "INFO"},
     }
     app._config_path = "/tmp/test_config.yaml"
