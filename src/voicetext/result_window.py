@@ -8,6 +8,45 @@ from typing import Callable, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
+def _ensure_edit_menu() -> None:
+    """Ensure NSApp has a main menu with a standard Edit submenu.
+
+    Statusbar-only apps (NSApplicationActivationPolicyAccessory) have no menu
+    bar, so ⌘A/⌘C/⌘V/⌘X key equivalents are never dispatched.  Adding a
+    hidden Edit menu to the main menu restores the standard responder-chain
+    routing for these shortcuts.
+    """
+    from AppKit import NSApp, NSMenu, NSMenuItem
+
+    main_menu = NSApp.mainMenu()
+    if main_menu is None:
+        main_menu = NSMenu.alloc().init()
+        NSApp.setMainMenu_(main_menu)
+
+    # Check if Edit menu already exists
+    if main_menu.itemWithTitle_("Edit") is not None:
+        return
+
+    edit_menu = NSMenu.alloc().initWithTitle_("Edit")
+    for title, action, key in [
+        ("Undo", "undo:", "z"),
+        ("Redo", "redo:", "Z"),
+        ("Cut", "cut:", "x"),
+        ("Copy", "copy:", "c"),
+        ("Paste", "paste:", "v"),
+        ("Select All", "selectAll:", "a"),
+    ]:
+        item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            title, action, key
+        )
+        edit_menu.addItem_(item)
+
+    edit_item = NSMenuItem.alloc().init()
+    edit_item.setTitle_("Edit")
+    edit_item.setSubmenu_(edit_menu)
+    main_menu.addItem_(edit_item)
+
+
 class ResultPreviewPanel:
     """Floating NSPanel that shows ASR result, optional AI enhancement, and editable final text.
 
@@ -758,6 +797,8 @@ class ResultPreviewPanel:
         panel.setFloatingPanel_(True)
         panel.setHidesOnDeactivate_(False)
         panel.center()
+
+        _ensure_edit_menu()
 
         # Set delegate to handle close button (X) as cancel
         self._close_delegate = _PanelCloseDelegate.alloc().init()
