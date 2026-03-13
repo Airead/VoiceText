@@ -1329,6 +1329,7 @@ class VoiceTextApp(rumps.App):
                         return
                     if is_thinking == "retry" and chunk:
                         # Retry status — show as gray italic, update label as retry
+                        had_thinking = True
                         self._preview_panel.append_thinking_text(
                             chunk, request_id=request_id,
                             thinking_tokens=0,
@@ -1444,6 +1445,7 @@ class VoiceTextApp(rumps.App):
                                 cancelled = True
                                 return
                             if is_thinking == "retry" and chunk:
+                                had_thinking = True
                                 self._preview_panel.append_thinking_text(
                                     chunk, request_id=request_id,
                                     thinking_tokens=0,
