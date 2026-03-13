@@ -274,6 +274,7 @@ src/voicetext/
 - [Provider & Model Setup Guide](docs/provider-model-guide.md) — step-by-step setup for ASR and LLM providers
 - [AI Enhancement Modes Guide](docs/enhance-modes.md) — how to customize and create enhancement modes
 - [Enhancement Mode Examples](docs/enhance-mode-examples.md) — ready-to-use mode templates for inspiration
+- [Prompt Optimization Workflow](docs/prompt-optimization-workflow.md) — how to use the Preview panel to systematically improve prompts
 - [Vocabulary Embedding Retrieval](docs/vocabulary-embedding-retrieval.md) — design and motivation of the vocabulary retrieval system
 - [Conversation History Enhancement](docs/conversation-history-enhancement.md) — how conversation history improves AI enhancement accuracy
 
