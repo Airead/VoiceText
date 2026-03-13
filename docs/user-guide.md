@@ -93,7 +93,7 @@ The menubar icon changes to reflect the current status:
 | 💬 (text.bubble) | Transcribing... | Processing speech to text |
 | ✨ (sparkles) | Enhancing... | AI enhancement in progress |
 | 👁 (eye) | Preview... | Preview panel is open |
-| ⬇ (arrow.down) + DL X% | Downloading... | Model download in progress |
+| ⬇ (arrow.down.circle) + DL X% | Downloading... | Model download in progress |
 | ⚙ (cpu) | Loading... | Loading model into memory |
 | ⚠ (triangle) | Error | Something went wrong |
 
@@ -367,7 +367,7 @@ Chain modes run multiple steps sequentially:
 
 ```markdown
 ---
-label: Translate EN+ (Proofread → Translate)
+label: 润色+翻译EN
 order: 25
 steps: proofread, translate_en
 ---

@@ -168,6 +168,7 @@ Optional post-processing of transcribed text using any OpenAI-compatible API (cl
 | Off | No enhancement |
 | Proofread (纠错润色) | Fix typos, grammar, and punctuation |
 | Translate to English (翻译为英文) | Translate Chinese text to English |
+| Translate EN+ (润色+翻译EN) | Chain mode: proofread then translate to English |
 | Commandline Master (命令行大神) | Convert natural language to shell commands |
 
 Additional modes can be added via Markdown files or the Settings panel (AI tab → **Add Mode...**) — see [docs/enhance-modes.md](docs/enhance-modes.md).

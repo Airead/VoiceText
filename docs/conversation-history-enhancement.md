@@ -31,7 +31,10 @@ Every voice input session is recorded to `~/.config/VoiceText/conversation_histo
     "enhanced_text": "果果今天在公园里遇到了平平。",
     "final_text": "果果今天在公园里遇到了萍萍。",
     "enhance_mode": "proofread",
-    "preview_enabled": true
+    "preview_enabled": true,
+    "stt_model": "funasr-paraformer",
+    "llm_model": "qwen2.5:7b",
+    "user_corrected": true
 }
 ```
 
@@ -52,8 +55,8 @@ When conversation history is enabled, the enhancement prompt is augmented with r
 
 ```
 ---
-以下是用户近期的对话历史，用于了解表达习惯和话题上下文。
-每条均为一行，若语音识别与最终确认不同则用→分隔（识别→确认），相同则无→。
+以下是用户近期的对话记录，用于学习纠错偏好和话题上下文。
+若 ASR 识别与最终确认不同则用→分隔（识别→确认），相同则表示无需纠错：
 
 - 将是否开启对话历史注入的功能，做一个开关放在菜单栏里。
 - 现在测试一下历史上下文注入的功能。

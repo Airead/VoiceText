@@ -120,7 +120,7 @@ Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `ai_enhance.enabled` | `false` | Enable AI text enhancement |
-| `ai_enhance.mode` | `"proofread"` | Enhancement mode: `off`, `proofread`, `translate_en`, `commandline_master`, or custom mode IDs |
+| `ai_enhance.mode` | `"proofread"` | Enhancement mode: `off`, `proofread`, `translate_en`, `translate_en_plus`, `commandline_master`, or custom mode IDs |
 | `ai_enhance.default_provider` | `"ollama"` | Default LLM provider name |
 | `ai_enhance.default_model` | `"qwen2.5:7b"` | Default LLM model |
 | `ai_enhance.thinking` | `false` | Enable extended thinking for supported models |

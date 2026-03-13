@@ -90,13 +90,14 @@ EOF
 
 ## Built-in Modes
 
-These 3 modes are created automatically on first launch:
+These 4 modes are created automatically on first launch:
 
-| File                   | Label      | Order | Description                              |
-|------------------------|------------|-------|------------------------------------------|
-| `proofread.md`         | 纠错润色   | 10    | Fix typos, grammar, and punctuation      |
-| `translate_en.md`      | 翻译为英文 | 20    | Translate Chinese to English             |
-| `commandline_master.md`| 命令行大神 | 30    | Convert natural language to shell commands|
+| File                   | Label      | Order | Type  | Description                              |
+|------------------------|------------|-------|-------|------------------------------------------|
+| `proofread.md`         | 纠错润色   | 10    | Single | Fix typos, grammar, and punctuation      |
+| `translate_en.md`      | 翻译为英文 | 20    | Single | Translate Chinese to English             |
+| `translate_en_plus.md` | 润色+翻译EN | 25   | Chain (proofread → translate_en) | Proofread first, then translate to English |
+| `commandline_master.md`| 命令行大神 | 30    | Single | Convert natural language to shell commands|
 
 ## Add a New Mode
 

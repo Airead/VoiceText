@@ -73,11 +73,12 @@ After editing, restart VoiceText for changes to take effect.
 | Preset ID | Backend | Model | Size |
 |-----------|---------|-------|------|
 | `funasr-paraformer` | funasr | Paraformer-large (Chinese) | ~400 MB |
-| `mlx-whisper-tiny` | mlx-whisper | `mlx-community/whisper-tiny` | ~75 MB |
-| `mlx-whisper-base` | mlx-whisper | `mlx-community/whisper-base` | ~140 MB |
-| `mlx-whisper-small` | mlx-whisper | `mlx-community/whisper-small` | ~460 MB |
+| `apple-speech-ondevice` | apple-speech | Apple Speech (On-Device) | Built-in |
+| `apple-speech-server` | apple-speech | Apple Speech (Server) | Built-in |
 | `mlx-whisper-medium` | mlx-whisper | `mlx-community/whisper-medium` | ~1.5 GB |
 | `mlx-whisper-large-v3-turbo` | mlx-whisper | `mlx-community/whisper-large-v3-turbo` | ~1.6 GB |
+
+> **Note:** MLX-Whisper tiny/base/small models are not available as presets but can be used by setting `asr.model` directly (e.g., `"model": "mlx-community/whisper-small"`).
 
 ---
 
