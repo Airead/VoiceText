@@ -258,6 +258,7 @@ src/voicetext/
 
 ## Documentation
 
+- **[User Guide](docs/user-guide.md) — progressive guide from first launch to advanced usage (start here!)**
 - [Configuration](docs/configuration.md) — full default config, all options, and environment variables
 - [Provider & Model Setup Guide](docs/provider-model-guide.md) — step-by-step setup for ASR and LLM providers
 - [AI Enhancement Modes Guide](docs/enhance-modes.md) — how to customize and create enhancement modes
