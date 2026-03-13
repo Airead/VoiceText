@@ -721,7 +721,7 @@ class VoiceTextApp(rumps.App):
             self._set_status("VT")
             logger.info("Preview cancelled by user")
 
-    _CLIPBOARD_MAX_CHARS = 300
+    _CLIPBOARD_MAX_CHARS = 2000
 
     def _on_clipboard_enhance(self, _sender=None) -> None:
         """Handle Enhance Clipboard menu item or hotkey activation.
