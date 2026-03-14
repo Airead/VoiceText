@@ -24,6 +24,60 @@ _SCREEN_MARGIN = 20
 # ESC key code
 _ESC_KEY_CODE = 53
 
+# Appearance change notification name
+_APPEARANCE_NOTIFICATION = "AppleInterfaceThemeChangedNotification"
+
+
+def _is_dark_mode() -> bool:
+    """Detect whether the system is currently in dark mode."""
+    try:
+        from AppKit import NSApp
+        name = str(NSApp.effectiveAppearance().name())
+        return "Dark" in name
+    except Exception:
+        return False
+
+
+# Lazy-initialized custom NSView for drawRect_-based background
+_OverlayBgView = None
+
+
+def _get_overlay_bg_view_class():
+    global _OverlayBgView
+    if _OverlayBgView is None:
+        from AppKit import NSBezierPath, NSColor, NSView
+        import objc
+
+        class StreamingOverlayBgView(NSView):
+            _dark = objc.ivar.bool()
+
+            def initWithFrame_(self, frame):
+                self = objc.super(StreamingOverlayBgView, self).initWithFrame_(frame)
+                if self is not None:
+                    self._dark = _is_dark_mode()
+                return self
+
+            def isOpaque(self):
+                return False
+
+            def drawRect_(self, rect):
+                if self._dark:
+                    c = NSColor.colorWithSRGBRed_green_blue_alpha_(0.15, 0.15, 0.15, 0.85)
+                else:
+                    c = NSColor.colorWithSRGBRed_green_blue_alpha_(0.95, 0.95, 0.95, 0.85)
+                c.setFill()
+                path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+                    rect, _CORNER_RADIUS, _CORNER_RADIUS,
+                )
+                path.fill()
+
+            def updateDarkMode(self):
+                self._dark = _is_dark_mode()
+                self.setNeedsDisplay_(True)
+
+        _OverlayBgView = StreamingOverlayBgView
+    return _OverlayBgView
+
 
 class StreamingOverlayPanel:
     """Non-interactive floating overlay that displays streaming AI enhancement.
@@ -35,74 +89,101 @@ class StreamingOverlayPanel:
     def __init__(self) -> None:
         self._panel: object = None
         self._asr_label: object = None
+        self._asr_title: object = None
         self._status_label: object = None
         self._text_view: object = None
         self._scroll_view: object = None
+        self._content_view: object = None
+        self._separator: object = None
         self._esc_monitor: object = None
+        self._appearance_observer: object = None
         self._cancel_event: Optional[threading.Event] = None
         self._loading_timer: object = None
         self._loading_seconds: int = 0
         self._llm_info: str = ""
 
     @staticmethod
-    def _dynamic_bg_color():
-        """Create a dynamic background color matching RecordingIndicatorPanel."""
+    def _bg_color(dark: bool):
         from AppKit import NSColor
-
-        def _provider(appearance):
-            name = appearance.bestMatchFromAppearancesWithNames_(
-                ["NSAppearanceNameAqua", "NSAppearanceNameDarkAqua"]
-            )
-            if name and "Dark" in str(name):
-                return NSColor.colorWithSRGBRed_green_blue_alpha_(0.9, 0.9, 0.9, 0.85)
-            return NSColor.colorWithSRGBRed_green_blue_alpha_(0.1, 0.1, 0.1, 0.85)
-
-        return NSColor.colorWithName_dynamicProvider_(None, _provider)
+        if dark:
+            return NSColor.colorWithSRGBRed_green_blue_alpha_(0.15, 0.15, 0.15, 0.85)
+        return NSColor.colorWithSRGBRed_green_blue_alpha_(0.95, 0.95, 0.95, 0.85)
 
     @staticmethod
-    def _dynamic_text_color():
-        """Create a dynamic text color that contrasts with the background."""
+    def _text_color(dark: bool):
         from AppKit import NSColor
-
-        def _provider(appearance):
-            name = appearance.bestMatchFromAppearancesWithNames_(
-                ["NSAppearanceNameAqua", "NSAppearanceNameDarkAqua"]
-            )
-            if name and "Dark" in str(name):
-                return NSColor.colorWithSRGBRed_green_blue_alpha_(0.1, 0.1, 0.1, 1.0)
+        if dark:
             return NSColor.colorWithSRGBRed_green_blue_alpha_(0.95, 0.95, 0.95, 1.0)
-
-        return NSColor.colorWithName_dynamicProvider_(None, _provider)
+        return NSColor.colorWithSRGBRed_green_blue_alpha_(0.1, 0.1, 0.1, 1.0)
 
     @staticmethod
-    def _dynamic_secondary_text_color():
-        """Create a dynamic secondary text color for ASR text."""
+    def _secondary_text_color(dark: bool):
         from AppKit import NSColor
-
-        def _provider(appearance):
-            name = appearance.bestMatchFromAppearancesWithNames_(
-                ["NSAppearanceNameAqua", "NSAppearanceNameDarkAqua"]
-            )
-            if name and "Dark" in str(name):
-                return NSColor.colorWithSRGBRed_green_blue_alpha_(0.3, 0.3, 0.3, 1.0)
+        if dark:
             return NSColor.colorWithSRGBRed_green_blue_alpha_(0.7, 0.7, 0.7, 1.0)
-
-        return NSColor.colorWithName_dynamicProvider_(None, _provider)
+        return NSColor.colorWithSRGBRed_green_blue_alpha_(0.3, 0.3, 0.3, 1.0)
 
     @staticmethod
-    def _dynamic_separator_color():
-        """Create a dynamic separator color."""
+    def _separator_color(dark: bool):
         from AppKit import NSColor
-
-        def _provider(appearance):
-            name = appearance.bestMatchFromAppearancesWithNames_(
-                ["NSAppearanceNameAqua", "NSAppearanceNameDarkAqua"]
-            )
-            if name and "Dark" in str(name):
-                return NSColor.colorWithSRGBRed_green_blue_alpha_(0.3, 0.3, 0.3, 0.5)
+        if dark:
             return NSColor.colorWithSRGBRed_green_blue_alpha_(0.7, 0.7, 0.7, 0.5)
+        return NSColor.colorWithSRGBRed_green_blue_alpha_(0.3, 0.3, 0.3, 0.5)
 
-        return NSColor.colorWithName_dynamicProvider_(None, _provider)
+    def _apply_colors(self) -> None:
+        """Detect current appearance and apply all colors to UI elements."""
+        dark = _is_dark_mode()
+
+        if self._content_view is not None:
+            self._content_view.updateDarkMode()
+
+        if self._separator is not None:
+            layer = self._separator.layer()
+            if layer:
+                layer.setBackgroundColor_(self._separator_color(dark).CGColor())
+
+        secondary = self._secondary_text_color(dark)
+        if self._asr_title is not None:
+            self._asr_title.setTextColor_(secondary)
+        if self._asr_label is not None:
+            self._asr_label.setTextColor_(secondary)
+
+        text_c = self._text_color(dark)
+        if self._status_label is not None:
+            self._status_label.setTextColor_(text_c)
+        if self._text_view is not None:
+            self._text_view.setTextColor_(text_c)
+
+    def _on_appearance_changed_(self, notification) -> None:
+        """Handle system appearance change notification."""
+        try:
+            from PyObjCTools import AppHelper
+            AppHelper.callAfter(self._apply_colors)
+        except Exception:
+            logger.error("Failed to handle appearance change", exc_info=True)
+
+    def _register_appearance_observer(self) -> None:
+        """Register observer for system appearance changes."""
+        try:
+            from Foundation import NSDistributedNotificationCenter
+            center = NSDistributedNotificationCenter.defaultCenter()
+            center.addObserver_selector_name_object_(
+                self, b"_on_appearance_changed:", _APPEARANCE_NOTIFICATION, None,
+            )
+            self._appearance_observer = center
+        except Exception:
+            logger.error("Failed to register appearance observer", exc_info=True)
+
+    def _remove_appearance_observer(self) -> None:
+        """Remove the appearance change observer."""
+        if self._appearance_observer is not None:
+            try:
+                self._appearance_observer.removeObserver_name_object_(
+                    self, _APPEARANCE_NOTIFICATION, None,
+                )
+            except Exception:
+                logger.error("Failed to remove appearance observer", exc_info=True)
+            self._appearance_observer = None
 
     def show(
         self,
@@ -134,6 +215,8 @@ class StreamingOverlayPanel:
             self._loading_seconds = 0
             self._llm_info = llm_info
 
+            dark = _is_dark_mode()
+
             # Create borderless panel
             panel = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 NSMakeRect(0, 0, _PANEL_WIDTH, _PANEL_HEIGHT),
@@ -149,17 +232,12 @@ class StreamingOverlayPanel:
             panel.setHidesOnDeactivate_(False)
             panel.setCollectionBehavior_(1 << 4)  # canJoinAllSpaces
 
-            # Build content view with rounded background
-            content = NSView.alloc().initWithFrame_(
+            # Build content view with drawRect_-based rounded background
+            BgViewCls = _get_overlay_bg_view_class()
+            content = BgViewCls.alloc().initWithFrame_(
                 NSMakeRect(0, 0, _PANEL_WIDTH, _PANEL_HEIGHT)
             )
-            content.setWantsLayer_(True)
-            content.layer().setCornerRadius_(_CORNER_RADIUS)
-            content.layer().setMasksToBounds_(True)
-
-            # Background layer color
-            bg_color = self._dynamic_bg_color()
-            content.layer().setBackgroundColor_(bg_color.CGColor())
+            self._content_view = content
 
             inner_width = _PANEL_WIDTH - 2 * _PADDING
 
@@ -172,14 +250,15 @@ class StreamingOverlayPanel:
             asr_title = NSTextField.labelWithString_(asr_title_text)
             asr_title.setFrame_(NSMakeRect(_PADDING, y, inner_width, _LABEL_HEIGHT))
             asr_title.setFont_(NSFont.boldSystemFontOfSize_(11.0))
-            asr_title.setTextColor_(self._dynamic_secondary_text_color())
+            asr_title.setTextColor_(self._secondary_text_color(dark))
             content.addSubview_(asr_title)
+            self._asr_title = asr_title
 
             y -= _ASR_TEXT_HEIGHT
             asr_label = NSTextField.wrappingLabelWithString_(asr_text or "")
             asr_label.setFrame_(NSMakeRect(_PADDING, y, inner_width, _ASR_TEXT_HEIGHT))
             asr_label.setFont_(NSFont.systemFontOfSize_(12.0))
-            asr_label.setTextColor_(self._dynamic_secondary_text_color())
+            asr_label.setTextColor_(self._secondary_text_color(dark))
             asr_label.setMaximumNumberOfLines_(2)
             content.addSubview_(asr_label)
             self._asr_label = asr_label
@@ -191,9 +270,10 @@ class StreamingOverlayPanel:
             )
             separator.setWantsLayer_(True)
             separator.layer().setBackgroundColor_(
-                self._dynamic_separator_color().CGColor()
+                self._separator_color(dark).CGColor()
             )
             content.addSubview_(separator)
+            self._separator = separator
 
             # --- Bottom section: Enhancement streaming ---
             y -= _STATUS_LABEL_HEIGHT + 4
@@ -202,7 +282,7 @@ class StreamingOverlayPanel:
                 NSMakeRect(_PADDING, y, inner_width, _STATUS_LABEL_HEIGHT)
             )
             status_label.setFont_(NSFont.boldSystemFontOfSize_(11.0))
-            status_label.setTextColor_(self._dynamic_text_color())
+            status_label.setTextColor_(self._text_color(dark))
             content.addSubview_(status_label)
             self._status_label = status_label
 
@@ -224,7 +304,7 @@ class StreamingOverlayPanel:
             tv.setHorizontallyResizable_(False)
             tv.textContainer().setWidthTracksTextView_(True)
             tv.setFont_(NSFont.systemFontOfSize_(13.0))
-            tv.setTextColor_(self._dynamic_text_color())
+            tv.setTextColor_(self._text_color(dark))
             tv.setEditable_(False)
             tv.setSelectable_(False)
             tv.setDrawsBackground_(False)
@@ -269,6 +349,9 @@ class StreamingOverlayPanel:
 
             # Register global ESC key monitor
             self._register_esc_monitor()
+
+            # Register appearance change observer
+            self._register_appearance_observer()
 
             # Start loading timer
             self._start_loading_timer()
@@ -371,7 +454,7 @@ class StreamingOverlayPanel:
             from Foundation import NSAttributedString, NSDictionary
 
             attrs = NSDictionary.dictionaryWithObjects_forKeys_(
-                [self._dynamic_text_color(), NSFont.systemFontOfSize_(13.0)],
+                [self._text_color(_is_dark_mode()), NSFont.systemFontOfSize_(13.0)],
                 ["NSColor", "NSFont"],
             )
             attr_str = (
@@ -404,7 +487,7 @@ class StreamingOverlayPanel:
             italic_font = fm.convertFont_toHaveTrait_(font, 0x01)  # NSItalicFontMask
 
             attrs = NSDictionary.dictionaryWithObjects_forKeys_(
-                [self._dynamic_secondary_text_color(), italic_font],
+                [self._secondary_text_color(_is_dark_mode()), italic_font],
                 ["NSColor", "NSFont"],
             )
             attr_str = (
@@ -469,16 +552,20 @@ class StreamingOverlayPanel:
         def _close():
             self._stop_loading_timer()
             self._remove_esc_monitor()
+            self._remove_appearance_observer()
             self._cancel_event = None
 
             if self._panel is not None:
                 self._panel.orderOut_(None)
                 self._panel = None
 
+            self._asr_title = None
             self._asr_label = None
             self._status_label = None
             self._text_view = None
             self._scroll_view = None
+            self._content_view = None
+            self._separator = None
             logger.debug("Streaming overlay closed")
 
         AppHelper.callAfter(_close)
