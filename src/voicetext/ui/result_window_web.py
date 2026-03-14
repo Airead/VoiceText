@@ -43,17 +43,24 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
 body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Mono", Menlo, monospace;
     background: var(--bg); color: var(--text);
-    padding: 16px; overflow-y: auto;
+    padding: 12px; overflow: hidden;
     -webkit-user-select: none; user-select: none;
     font-size: 13px;
+    display: flex; flex-direction: column;
 }
-.section { margin-bottom: 12px; }
+.section { margin-bottom: 8px; flex-shrink: 0; }
+.section.expand {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+}
 .section-header {
     display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 6px; min-height: 24px; gap: 6px;
+    margin-bottom: 4px; min-height: 22px; gap: 6px;
+    flex-shrink: 0;
 }
 .section-header .left { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
 .section-header .right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
@@ -65,27 +72,29 @@ body {
     overflow: hidden; text-overflow: ellipsis;
 }
 .text-area {
-    width: 100%; min-height: 70px; max-height: 160px;
+    width: 100%; min-height: 36px;
     background: var(--text-bg); border: 1px solid var(--border);
-    border-radius: 6px; padding: 8px 10px;
+    border-radius: 6px; padding: 6px 10px;
     font-family: "SF Mono", Menlo, monospace; font-size: 12px;
-    color: var(--text); line-height: 1.5;
+    color: var(--text); line-height: 1.4;
     overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;
     -webkit-user-select: text; user-select: text;
 }
+.section.expand .text-area { flex: 1; min-height: 0; }
 .text-area.enhance-bg { background: var(--enhance-bg); }
 .text-area .thinking {
     color: var(--secondary); font-style: italic;
 }
 .final-area {
-    width: 100%; min-height: 80px; max-height: 200px;
+    width: 100%; min-height: 36px;
     background: var(--text-bg); border: 2px solid var(--accent);
-    border-radius: 6px; padding: 8px 10px;
+    border-radius: 6px; padding: 6px 10px;
     font-family: "SF Mono", Menlo, monospace; font-size: 12px;
-    color: var(--text); line-height: 1.5;
-    resize: vertical; outline: none;
+    color: var(--text); line-height: 1.4;
+    resize: none; outline: none;
     -webkit-user-select: text; user-select: text;
 }
+.section.expand .final-area { flex: 1; min-height: 0; }
 .final-area:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
 
 /* Buttons */
@@ -127,10 +136,11 @@ select {
 /* Segmented control */
 .segment-bar {
     display: flex; gap: 0; background: var(--segment-bg);
-    border-radius: 7px; padding: 2px; margin-bottom: 12px;
+    border-radius: 7px; padding: 2px; margin-bottom: 8px;
+    flex-shrink: 0;
 }
 .segment-btn {
-    flex: 1; padding: 5px 4px; border: none; background: transparent;
+    flex: 1; padding: 4px 4px; border: none; background: transparent;
     color: var(--text); font-size: 12px; font-family: inherit;
     cursor: pointer; border-radius: 5px; text-align: center;
     transition: background 0.15s, box-shadow 0.15s;
@@ -146,8 +156,9 @@ select {
 /* Button bar */
 .button-bar {
     display: flex; justify-content: flex-end; gap: 8px;
-    margin-top: 14px; padding-top: 10px;
+    margin-top: 8px; padding-top: 8px;
     border-top: 1px solid var(--border);
+    flex-shrink: 0;
 }
 .button-bar .left-group { margin-right: auto; }
 .bar-btn {
@@ -175,7 +186,7 @@ select {
 <body>
 
 <!-- ASR Section -->
-<div class="section" id="asr-section">
+<div class="section expand" id="asr-section">
     <div class="section-header">
         <div class="left">
             <span class="section-title" id="asr-title">ASR</span>
@@ -198,7 +209,7 @@ select {
 <div class="segment-bar hidden" id="mode-segment"></div>
 
 <!-- Enhance Section -->
-<div class="section hidden" id="enhance-section">
+<div class="section expand hidden" id="enhance-section">
     <div class="section-header">
         <div class="left">
             <span class="section-title">AI</span>
@@ -215,7 +226,7 @@ select {
 </div>
 
 <!-- Final Result Section -->
-<div class="section">
+<div class="section expand">
     <div class="section-header">
         <div class="left">
             <span class="section-title" style="color: var(--accent);">Final Result (editable)</span>
@@ -648,7 +659,7 @@ class ResultPreviewPanel:
     """
 
     _PANEL_WIDTH = 640
-    _PANEL_HEIGHT = 520
+    _PANEL_HEIGHT = 396  # Golden ratio: 640 / 1.618
 
     def __init__(self) -> None:
         self._panel = None
@@ -1212,9 +1223,9 @@ class ResultPreviewPanel:
         show_enhance_section = self._show_enhance or has_modes
         height = self._PANEL_HEIGHT
         if not show_enhance_section:
-            height -= 120  # Less height without enhance section
+            height -= 60  # Less height without enhance section
         if not has_modes:
-            height -= 40  # Less height without mode segment
+            height -= 20  # Less height without mode segment
 
         NSApp.setActivationPolicy_(0)  # Regular (foreground)
 
