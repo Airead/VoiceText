@@ -168,7 +168,8 @@ class TestStreamingIntegration:
         mock_app._transcriber.supports_streaming = True
         # Use a descriptive string so if it leaks to terminal output (via un-mocked
         # type_text or logging), we can immediately identify which test caused it.
-        mock_app._transcriber.stop_streaming.return_value = "[mock from test_recording_controller.py::test_streaming_release_calls_stop_streaming]"
+        _mock_text = "[mock from test_recording_controller.py::test_streaming_release_calls_stop_streaming]"
+        mock_app._transcriber.stop_streaming.return_value = _mock_text
         mock_app._sound_manager.enabled = False
 
         # Press to start streaming
