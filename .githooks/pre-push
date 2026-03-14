@@ -12,7 +12,7 @@ uv run ruff check
 
 echo ""
 echo "--- Tests (pytest) ---"
-uv run pytest tests/ -v --cov=voicetext
+uv run pytest tests/ -q --tb=short
 
 echo ""
 echo "==> All checks passed. Pushing..."
