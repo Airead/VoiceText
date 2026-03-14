@@ -198,6 +198,36 @@ class TestSkipPunc:
         assert t.skip_punc is True
 
 
+class TestStreamingInterface:
+    """Tests for the optional streaming interface on BaseTranscriber."""
+
+    def test_supports_streaming_default_false(self):
+        t = FunASRTranscriber(use_vad=False, use_punc=False)
+        assert t.supports_streaming is False
+
+    def test_start_streaming_raises(self):
+        t = FunASRTranscriber(use_vad=False, use_punc=False)
+        with pytest.raises(NotImplementedError):
+            t.start_streaming(lambda text, is_final: None)
+
+    def test_feed_audio_raises(self):
+        import numpy as np
+
+        t = FunASRTranscriber(use_vad=False, use_punc=False)
+        with pytest.raises(NotImplementedError):
+            t.feed_audio(np.zeros(160, dtype=np.int16))
+
+    def test_stop_streaming_raises(self):
+        t = FunASRTranscriber(use_vad=False, use_punc=False)
+        with pytest.raises(NotImplementedError):
+            t.stop_streaming()
+
+    def test_cancel_streaming_raises(self):
+        t = FunASRTranscriber(use_vad=False, use_punc=False)
+        with pytest.raises(NotImplementedError):
+            t.cancel_streaming()
+
+
 class TestCleanup:
     def test_funasr_cleanup(self):
         t = FunASRTranscriber(use_vad=False, use_punc=False)

@@ -1721,6 +1721,25 @@ wheels = [
 ]
 
 [[package]]
+name = "pyobjc-framework-avfoundation"
+version = "12.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyobjc-core" },
+    { name = "pyobjc-framework-cocoa" },
+    { name = "pyobjc-framework-coreaudio" },
+    { name = "pyobjc-framework-coremedia" },
+    { name = "pyobjc-framework-quartz" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cd/42/c026ab308edc2ed5582d8b4b93da6b15d1b6557c0086914a4aabedd1f032/pyobjc_framework_avfoundation-12.1.tar.gz", hash = "sha256:eda0bb60be380f9ba2344600c4231dd58a3efafa99fdc65d3673ecfbb83f6fcb", size = 310047, upload-time = "2025-11-14T10:09:40.069Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b3/d4/ade88067deff45858b457648dd82c9363977eb1915efd257232cd06bdac1/pyobjc_framework_avfoundation-12.1-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:f8ac7f7e0884ac8f12009cdb9d4fefc2f269294ab2ccfd84520a560859b69cec", size = 83413, upload-time = "2025-11-14T09:37:53.759Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/3a/fa699d748d6351fa0aeca656ea2f9eacc36e31203dfa56bc13c8a3d26d7d/pyobjc_framework_avfoundation-12.1-cp313-cp313t-macosx_10_13_universal2.whl", hash = "sha256:51aba2c6816badfb1fb5a2de1b68b33a23f065bf9e3b99d46ede0c8c774ac7a4", size = 83860, upload-time = "2025-11-14T09:38:00.051Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/65/a79cf3b8935a78329ac1107056b91868a581096a90ab6ddff5fd28db4947/pyobjc_framework_avfoundation-12.1-cp314-cp314-macosx_10_15_universal2.whl", hash = "sha256:9a3ffd1ae90bd72dbcf2875aa9254369e805b904140362a7338ebf1af54201a6", size = 83629, upload-time = "2025-11-14T09:38:06.697Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/03/4125204a17cd7b4de1fdfc38b280a47d0d8f8691a4ee306ebb41b58ff030/pyobjc_framework_avfoundation-12.1-cp314-cp314t-macosx_10_15_universal2.whl", hash = "sha256:394c99876b9a38db4851ddf8146db363556895c12e9c711ccd3c3f907ac8e273", size = 83962, upload-time = "2025-11-14T09:38:13.153Z" },
+]
+
+[[package]]
 name = "pyobjc-framework-cocoa"
 version = "12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1733,6 +1752,38 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/23/3b/b9f61be7b9f9b4e0a6db18b3c35c4c4d589f2d04e963e2174d38c6555a92/pyobjc_framework_cocoa-12.1-cp313-cp313t-macosx_10_13_universal2.whl", hash = "sha256:914b74328c22d8ca261d78c23ef2befc29776e0b85555973927b338c5734ca44", size = 388843, upload-time = "2025-11-14T09:42:05.719Z" },
     { url = "https://files.pythonhosted.org/packages/59/bb/f777cc9e775fc7dae77b569254570fe46eb842516b3e4fe383ab49eab598/pyobjc_framework_cocoa-12.1-cp314-cp314-macosx_10_15_universal2.whl", hash = "sha256:03342a60fc0015bcdf9b93ac0b4f457d3938e9ef761b28df9564c91a14f0129a", size = 384932, upload-time = "2025-11-14T09:42:29.771Z" },
     { url = "https://files.pythonhosted.org/packages/58/27/b457b7b37089cad692c8aada90119162dfb4c4a16f513b79a8b2b022b33b/pyobjc_framework_cocoa-12.1-cp314-cp314t-macosx_10_15_universal2.whl", hash = "sha256:6ba1dc1bfa4da42d04e93d2363491275fb2e2be5c20790e561c8a9e09b8cf2cc", size = 388970, upload-time = "2025-11-14T09:42:53.964Z" },
+]
+
+[[package]]
+name = "pyobjc-framework-coreaudio"
+version = "12.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyobjc-core" },
+    { name = "pyobjc-framework-cocoa" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/84/d1/0b884c5564ab952ff5daa949128c64815300556019c1bba0cf2ca752a1a0/pyobjc_framework_coreaudio-12.1.tar.gz", hash = "sha256:a9e72925fcc1795430496ce0bffd4ddaa92c22460a10308a7283ade830089fe1", size = 75077, upload-time = "2025-11-14T10:13:22.345Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3d/ce/45808618fefc760e2948c363e0a3402ff77690c8934609cd07b19bc5b15f/pyobjc_framework_coreaudio-12.1-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:3d8ef424850c8ae2146f963afaec6c4f5bf0c2e412871e68fb6ecfb209b8376f", size = 36935, upload-time = "2025-11-14T09:43:39.414Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/f6/0d74d9464bfb4f39451abf745174ec0c4d5c5ebf1c2fcb7556263ae3f75a/pyobjc_framework_coreaudio-12.1-cp313-cp313t-macosx_10_13_universal2.whl", hash = "sha256:6552624df39dbc68ff9328f244ba56f59234ecbde8455db1e617a71bc4f3dd3a", size = 38390, upload-time = "2025-11-14T09:43:43.194Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/f2/c5ca32d01c9d892bf189cfe9b17deaf996db3b4013f8a8ba9b0d22730d70/pyobjc_framework_coreaudio-12.1-cp314-cp314-macosx_10_15_universal2.whl", hash = "sha256:78ea67483a5deb21625c189328152008d278fe1da4304da9fcc1babd12627038", size = 37012, upload-time = "2025-11-14T09:43:46.54Z" },
+    { url = "https://files.pythonhosted.org/packages/00/be/c3d660cef1ef874f42057a74931a7a05f581f6a647f5209bef96b372db86/pyobjc_framework_coreaudio-12.1-cp314-cp314t-macosx_10_15_universal2.whl", hash = "sha256:8d81b0d0296ab4571a4ff302e5cdb52386e486eb8749e99b95b9141438558ca2", size = 38485, upload-time = "2025-11-14T09:43:49.883Z" },
+]
+
+[[package]]
+name = "pyobjc-framework-coremedia"
+version = "12.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyobjc-core" },
+    { name = "pyobjc-framework-cocoa" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/da/7d/5ad600ff7aedfef8ba8f51b11d9aaacdf247b870bd14045d6e6f232e3df9/pyobjc_framework_coremedia-12.1.tar.gz", hash = "sha256:166c66a9c01e7a70103f3ca44c571431d124b9070612ef63a1511a4e6d9d84a7", size = 89566, upload-time = "2025-11-14T10:13:49.788Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a5/ea/aee26a475b4af8ed4152d3c50b1b8955241b8e95ae789aa9ee296953bc6a/pyobjc_framework_coremedia-12.1-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:98e885b7a092083fceaef0a7fc406a01ba7bcd3318fb927e59e055931c99cac8", size = 29414, upload-time = "2025-11-14T09:45:01.336Z" },
+    { url = "https://files.pythonhosted.org/packages/db/9d/5ff10ee0ff539e125c96b8cff005457558766f942919814c968c3367cc32/pyobjc_framework_coremedia-12.1-cp313-cp313t-macosx_10_13_universal2.whl", hash = "sha256:d2b84149c1b3e65ec9050a3e5b617e6c0b4cdad2ab622c2d8c5747a20f013e16", size = 29477, upload-time = "2025-11-14T09:45:04.218Z" },
+    { url = "https://files.pythonhosted.org/packages/08/e2/b890658face1290c8b6b6b53a1159c822bece248f883e42302548bef38da/pyobjc_framework_coremedia-12.1-cp314-cp314-macosx_10_15_universal2.whl", hash = "sha256:737ec6e0b63414f42f7188030c85975d6d2124fbf6b15b52c99b6cc20250af4d", size = 29447, upload-time = "2025-11-14T09:45:07.17Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/9e/16981d0ee04b182481ce1e497b5e0326bad6d698fe0265bb7db72b1b26b5/pyobjc_framework_coremedia-12.1-cp314-cp314t-macosx_10_15_universal2.whl", hash = "sha256:6a9419e0d143df16a1562520a13a389417386e2a53031530af6da60c34058ced", size = 29500, upload-time = "2025-11-14T09:45:10.506Z" },
 ]
 
 [[package]]
@@ -2270,6 +2321,45 @@ wheels = [
 ]
 
 [[package]]
+name = "sherpa-onnx"
+version = "1.12.29"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/fd/d3/f708e40632c4230b45917c8757faf82786fcae3107f3e51a1ea92ff51344/sherpa_onnx-1.12.29.tar.gz", hash = "sha256:6f7dac085a1eecf18bb9a0771d8be15ea1fa66dd5e039e54073e252bf0dbaabf", size = 787286, upload-time = "2026-03-12T03:21:08.751Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2d/0e/30caeb4b65d94c84faabdbb2893d67a678a360552ef58cdd1f3636b8b2bc/sherpa_onnx-1.12.29-cp313-cp313-linux_armv7l.whl", hash = "sha256:4b4b350f37d0c6b9d18ff348a34ec863438ca1afd1e4ffc00e064edcca14975c", size = 11154547, upload-time = "2026-03-12T04:31:15.994Z" },
+    { url = "https://files.pythonhosted.org/packages/84/1a/c011c29089773c0e080207ade9cd7bc4ed6fa2eb3439538afec0b4eb3249/sherpa_onnx-1.12.29-cp313-cp313-macosx_10_15_universal2.whl", hash = "sha256:8674f18dbca3fe471aaf50741cd7b80a9b1202f330830abadbbe2c7c3eba9c29", size = 4290871, upload-time = "2026-03-12T02:50:52.412Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/2d/897c4bb98f3d5a450a41305db99ddd43104aa2654adc73f1f7eb7ad0541f/sherpa_onnx-1.12.29-cp313-cp313-macosx_10_15_x86_64.whl", hash = "sha256:5c8b87f73fa4bc64822a1c833e573e33d05d2b34c17bed7f8f412d17411faedb", size = 2280319, upload-time = "2026-03-12T03:46:28.338Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/a1/9f4cbdf0ee523a5d89d330fdf85affc813e5dc26ec6b11b2758c1102177a/sherpa_onnx-1.12.29-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:e469588e47252f9d85013417bcb8e81e9ab132950fa0153d1bb81693c48ce544", size = 2044727, upload-time = "2026-03-12T03:20:16.244Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/3f/1de559af6bfad6275a22f47229cc747b94253a6cd66770a933afec6b9208/sherpa_onnx-1.12.29-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:b7a29567b64d198b9ae54e30a3422fbb9fe8208c6f221b82331620fe3b1ccc08", size = 4088143, upload-time = "2026-03-12T03:02:38.933Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/88/264ef2571458e4fca387726e6b79c8b1f6612d590472a39822a8ee179d41/sherpa_onnx-1.12.29-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:c838c630a4bea6ce0a650914b5e18906c607c8ed448b9a79b2775bdb8b930629", size = 4302588, upload-time = "2026-03-12T02:53:48.514Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/7d/7d9d38a6bb28600e29316d3bb0df00f71f862e2e34e09640628a78d201bd/sherpa_onnx-1.12.29-cp313-cp313-win32.whl", hash = "sha256:429d9d4919792d9249caadc3454ad43b424159b50909eab5fb066941da111fa5", size = 1734345, upload-time = "2026-03-12T03:16:08.976Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/e7/79e67ef72ed5d4bad2ecad2842c1d42d5088d8cf15a8c7f461778a92142a/sherpa_onnx-1.12.29-cp313-cp313-win_amd64.whl", hash = "sha256:b34d5c5a76e97e9a511d9d2a855c6400dbc6364464ea0badf67107578f3b00b3", size = 2045048, upload-time = "2026-03-12T03:55:44.513Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/d9/6fb1db03622cf380bdbdf792e72be44bc54257bfcc777e0e14f94461f26a/sherpa_onnx-1.12.29-cp314-cp314-linux_armv7l.whl", hash = "sha256:50bace59bc1a1a9e3dda979e40e9f13f887abe56e082e7f968a08c5644b31be8", size = 11153218, upload-time = "2026-03-12T04:33:38.976Z" },
+    { url = "https://files.pythonhosted.org/packages/50/c6/39ed0a0a336d1f8abec10c4f21b64b2beb4fbbb07cbcc7a7172254851845/sherpa_onnx-1.12.29-cp314-cp314-macosx_10_15_universal2.whl", hash = "sha256:26bbf1a6c3a7f6adaec475c03d506dae9b26c929d07474b59880cb1d1fbf832c", size = 4294736, upload-time = "2026-03-12T03:06:44.852Z" },
+    { url = "https://files.pythonhosted.org/packages/54/7b/3471bb6057c4ed3e1fedbde43e2b9f85c3b5211815710f5b89cbfb1b7257/sherpa_onnx-1.12.29-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:3c9fad61a289742ec6f2521c7fbb3b0249d14daae20d8d833ad62a2d9e1d9e8a", size = 2281090, upload-time = "2026-03-12T03:44:16.106Z" },
+    { url = "https://files.pythonhosted.org/packages/41/e3/e0978fe0d6039bae694d846a4dc45b3d6ff1f0ad74b921b97929f69b488c/sherpa_onnx-1.12.29-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:9f6ef139d1636fb5d4e3296ba5160be7dcac52a877cf009ce0fd21a0de049e14", size = 2046326, upload-time = "2026-03-12T03:22:19.72Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/f9/5b8fba6f8f48d5d3e6fe8f7086275ec249e6ba592cc5d884b7d99ea29356/sherpa_onnx-1.12.29-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:e44a60539cb655418c3b0bb0655ca3a4ebf7d47854cdf89698db403035e2fcf6", size = 4091759, upload-time = "2026-03-12T03:12:37.192Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/4e/d8c84800b0c9a6a494b7d8ced2b308d6551aac289b45edab660452b4ae4e/sherpa_onnx-1.12.29-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:ccba7b66a79f5df21cfad707394550ae2bace0adc49d1733b4d0ea6a5f1fe29e", size = 4303803, upload-time = "2026-03-12T03:23:20.375Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/8c/8cb0436e5ca549371a660f3e417647255aa53c7fc389130b4a23f6f833d7/sherpa_onnx-1.12.29-cp314-cp314-win32.whl", hash = "sha256:e901b75cd46853a82b32231d7ea0c12d4a095ecc0b7f854e52aeaed7df3932da", size = 1769803, upload-time = "2026-03-12T03:48:59.897Z" },
+    { url = "https://files.pythonhosted.org/packages/46/4c/59bb487328ce09f7574e519ae02ff746e1e1b493914806721b274d7edeb6/sherpa_onnx-1.12.29-cp314-cp314-win_amd64.whl", hash = "sha256:041f1466af9a6a6488278d5d21e0fe14f985d149f4143a9e67fcc5b5a8cfe3e9", size = 2109403, upload-time = "2026-03-12T03:53:49.916Z" },
+]
+
+[[package]]
+name = "sherpa-onnx-core"
+version = "1.12.29"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d3/9b/c4130bd7c77b557efe49030c2da5e73e46af35ddcaa3e7bc73f52d118e48/sherpa_onnx_core-1.12.29-py3-none-macosx_10_15_universal2.whl", hash = "sha256:f7a815050fb90fa3cfd3b65496c3dfaddc51534cf8e48b8218471589b57f09d5", size = 46167279, upload-time = "2026-03-12T02:43:32.539Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/f6/916c2a2c4bab2725a02463e8ee83d8751c45739a149d5e8039841acb69e4/sherpa_onnx_core-1.12.29-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:f0df82564cf3ba97ac793a81e545c5956a94af5f71905a5989dc808913b59353", size = 24864988, upload-time = "2026-03-12T02:59:50.018Z" },
+    { url = "https://files.pythonhosted.org/packages/19/fd/a366971f26c3b91b2eda7a799ecff0572b7ec42f469b973ad585c20e931e/sherpa_onnx_core-1.12.29-py3-none-macosx_11_0_arm64.whl", hash = "sha256:2f4b7ca512b0b2cccabe7573e775dd70789e6eeecd67ca20b85a486180924622", size = 21319959, upload-time = "2026-03-12T02:41:48.973Z" },
+    { url = "https://files.pythonhosted.org/packages/99/87/43a916c070d9e4ac7a7a35d239617d16ccbe7f815ff41e78c48ff34e89f8/sherpa_onnx_core-1.12.29-py3-none-manylinux2014_aarch64.whl", hash = "sha256:5df7844cebf3c97d2a36310e3b1b95d13699282aa7b1de02cc8bec328677ee99", size = 12267916, upload-time = "2026-03-12T02:42:32.109Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/d4/9add1c164692c23aad67211f4e40a6847e81cebab0f221f6887e549b6523/sherpa_onnx_core-1.12.29-py3-none-manylinux2014_x86_64.whl", hash = "sha256:a9b57db5495062f4558d9feea75106d6749176d2e585d2027c543e6df6be76b8", size = 9673010, upload-time = "2026-03-12T02:42:46.124Z" },
+    { url = "https://files.pythonhosted.org/packages/02/fe/0438123e76e948694f273b35be430b6ea9aa8ab935bf57a67ea04fa24c5a/sherpa_onnx_core-1.12.29-py3-none-manylinux_2_35_armv7l.whl", hash = "sha256:caca89ed528e6dda50344af1ca1dc35c1270eaf054fd4068aa7cfdf021a937f8", size = 9211369, upload-time = "2026-03-12T04:31:03.456Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/5c/c5578357c2b4668d1b72acf99a202280cd39ed94c06c7a1a3f127e11d4ea/sherpa_onnx_core-1.12.29-py3-none-win32.whl", hash = "sha256:4606182e197881ebc545cc25e3414867b8160fa44949bf1c7d0916760718a48c", size = 13036895, upload-time = "2026-03-12T02:49:51.46Z" },
+    { url = "https://files.pythonhosted.org/packages/32/88/af93e447fc6cee14c14f4d3592677dd8ed3cfc509a42fd0ebcf6b9b972f1/sherpa_onnx_core-1.12.29-py3-none-win_amd64.whl", hash = "sha256:8c88c883efcdcf6d7876e0e2359cb6bdb08220d29c289786855fad590832ce21", size = 14855267, upload-time = "2026-03-12T03:28:37.338Z" },
+]
+
+[[package]]
 name = "six"
 version = "1.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2650,9 +2740,12 @@ dependencies = [
     { name = "numpy" },
     { name = "openai-agents" },
     { name = "pynput" },
+    { name = "pyobjc-framework-avfoundation" },
     { name = "pyobjc-framework-cocoa" },
     { name = "pyobjc-framework-speech" },
     { name = "pyobjc-framework-webkit" },
+    { name = "sherpa-onnx" },
+    { name = "sherpa-onnx-core" },
     { name = "sounddevice" },
     { name = "soundfile" },
 ]
@@ -2677,9 +2770,12 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "openai-agents", specifier = ">=0.11.0" },
     { name = "pynput", specifier = ">=1.8.0" },
+    { name = "pyobjc-framework-avfoundation", specifier = ">=10.0" },
     { name = "pyobjc-framework-cocoa", specifier = ">=10.0" },
     { name = "pyobjc-framework-speech", specifier = ">=10.0" },
     { name = "pyobjc-framework-webkit", specifier = ">=12.1" },
+    { name = "sherpa-onnx", specifier = ">=1.12.29" },
+    { name = "sherpa-onnx-core", specifier = ">=1.12.29" },
     { name = "sounddevice", specifier = ">=0.5.0" },
     { name = "soundfile", specifier = ">=0.13.0" },
 ]

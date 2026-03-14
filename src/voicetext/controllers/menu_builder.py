@@ -187,6 +187,23 @@ class MenuBuilder:
                     app._enhance_add_mode_item.title, item
                 )
 
+    def on_help_click(self, sender) -> None:
+        """Open the help documentation URL in the default browser."""
+        import locale
+        import webbrowser
+
+        base_url = "https://github.com/Airead/VoiceText"
+        current_locale = locale.getdefaultlocale()[0] or ""
+        if current_locale.startswith("zh"):
+            url = f"{base_url}/blob/main/README.zh.md"
+        else:
+            url = f"{base_url}/blob/main/README.md"
+
+        try:
+            webbrowser.open(url)
+        except Exception as e:
+            logger.error("Failed to open help URL: %s", e)
+
     def update_model_checkmarks(self) -> None:
         """Sync menu item checkmarks with current model state (thread-safe)."""
         import Foundation

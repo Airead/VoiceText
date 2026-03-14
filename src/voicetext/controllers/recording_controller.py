@@ -21,6 +21,8 @@ class RecordingController:
 
     def __init__(self, app: VoiceTextApp) -> None:
         self._app = app
+        self._streaming_active = False
+        self._live_overlay = None
 
     def on_hotkey_press(self) -> None:
         """Called when hotkey is pressed down - start recording."""
@@ -40,6 +42,7 @@ class RecordingController:
             time.sleep(0.35)
             if not app._busy:
                 app._recorder.start()
+                self._start_streaming_if_supported()
                 self.start_recording_indicator()
             app._recording_started.set()
 
@@ -47,6 +50,7 @@ class RecordingController:
             threading.Thread(target=_delayed_start, daemon=True).start()
         else:
             app._recorder.start()
+            self._start_streaming_if_supported()
             self.start_recording_indicator()
             app._recording_started.set()
 
@@ -59,7 +63,43 @@ class RecordingController:
         if not app._recorder.is_recording:
             return
         logger.info("Hotkey released, stopping recording")
+
+        streaming_active = self._streaming_active
+
+        # Disconnect audio chunk callback before stopping recorder
+        app._recorder.clear_on_audio_chunk()
+
         wav_data = app._recorder.stop()
+
+        if streaming_active:
+            # Streaming path: get final text from the streaming session
+            self._streaming_active = False
+            self.stop_recording_indicator()
+
+            app._busy = True
+
+            def _do_streaming_stop():
+                try:
+                    text = app._transcriber.stop_streaming()
+                    self._hide_live_overlay()
+                    if text and text.strip():
+                        asr_text = text.strip()
+                        use_enhance = bool(app._enhancer and app._enhancer.is_active)
+                        self.do_transcribe_direct(asr_text, use_enhance)
+                    else:
+                        app._set_status("(empty)")
+                        logger.warning("Streaming transcription returned empty text")
+                except Exception as e:
+                    logger.error("Streaming stop failed: %s", e)
+                    self._hide_live_overlay()
+                    app._set_status("Error")
+                finally:
+                    app._busy = False
+
+            threading.Thread(target=_do_streaming_stop, daemon=True).start()
+            return
+
+        # Non-streaming (batch) path
         if not wav_data:
             self.stop_recording_indicator()
             app._set_status("VT")
@@ -112,6 +152,55 @@ class RecordingController:
                     app._busy = False
 
             threading.Thread(target=_do_transcribe, daemon=True).start()
+
+    def _start_streaming_if_supported(self) -> None:
+        """If transcriber supports streaming, start a streaming session."""
+        app = self._app
+        if not app._transcriber.supports_streaming:
+            return
+
+        try:
+            from PyObjCTools import AppHelper
+
+            def _on_partial(text: str, is_final: bool) -> None:
+                AppHelper.callAfter(self._update_live_overlay, text)
+
+            app._transcriber.start_streaming(_on_partial)
+            app._recorder.set_on_audio_chunk(app._transcriber.feed_audio)
+            self._streaming_active = True
+
+            # Show live overlay on main thread
+            AppHelper.callAfter(self._show_live_overlay)
+            logger.info("Streaming transcription started")
+        except Exception as e:
+            logger.warning("Failed to start streaming, will use batch mode: %s", e)
+            self._streaming_active = False
+
+    def _show_live_overlay(self) -> None:
+        """Show the live transcription overlay (must be called on main thread)."""
+        app = self._app
+        if hasattr(app, "_live_overlay") and app._live_overlay is not None:
+            self._live_overlay = app._live_overlay
+        else:
+            from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+            self._live_overlay = LiveTranscriptionOverlay()
+        self._live_overlay.show()
+
+    def _update_live_overlay(self, text: str) -> None:
+        """Update the live transcription overlay text (main thread)."""
+        if self._live_overlay is not None:
+            self._live_overlay.update_text(text)
+
+    def _hide_live_overlay(self) -> None:
+        """Hide and close the live transcription overlay."""
+        from PyObjCTools import AppHelper
+
+        def _close():
+            if self._live_overlay is not None:
+                self._live_overlay.close()
+                self._live_overlay = None
+
+        AppHelper.callAfter(_close)
 
     def start_recording_indicator(self) -> None:
         """Show visual indicator and start polling audio level."""

@@ -18,7 +18,14 @@ dependencies = [
     "fastembed>=0.7.0",
     "pyobjc-framework-Speech>=10.0",
     "pyobjc-framework-webkit>=12.1",
+    "pyobjc-framework-AVFoundation>=10.0",
+    "sherpa-onnx>=1.12.29",
+    "sherpa-onnx-core>=1.12.29",
 ]
+# NOTE: sherpa-onnx declares sherpa-onnx-core as a dependency, but uv's resolver
+# does not always pick it up from the sdist metadata. Listing it explicitly
+# ensures libonnxruntime is present at runtime.
+#
 # NOTE: funasr-onnx declares numpy<=1.26.4 while fastembed declares numpy>=2.1.0,
 # but fastembed works fine at runtime with numpy 1.26.4. The override below
 # forces the resolver to accept numpy 1.26.4 for both.

@@ -7,6 +7,7 @@ from voicetext.transcription.model_registry import (
     PRESET_BY_ID,
     PRESETS,
     get_model_cache_dir,
+    get_model_size,
     is_backend_available,
     is_model_cached,
     resolve_preset_from_config,
@@ -30,7 +31,7 @@ class TestPresets:
         for preset in PRESETS:
             assert preset.id
             assert preset.display_name
-            assert preset.backend in ("funasr", "mlx-whisper", "apple-speech")
+            assert preset.backend in ("funasr", "mlx-whisper", "apple-speech", "sherpa-onnx")
 
     def test_funasr_preset_exists(self):
         assert "funasr-paraformer" in PRESET_BY_ID
@@ -52,6 +53,20 @@ class TestPresets:
         assert p.model == "on-device"
         p2 = PRESET_BY_ID["apple-speech-server"]
         assert p2.model == "server"
+
+
+    def test_sherpa_presets_exist(self):
+        assert "sherpa-zipformer-zh" in PRESET_BY_ID
+        assert "sherpa-paraformer-zh" in PRESET_BY_ID
+        p = PRESET_BY_ID["sherpa-zipformer-zh"]
+        assert p.backend == "sherpa-onnx"
+        assert p.model == "zipformer-zh"
+
+    def test_sherpa_presets_have_model(self):
+        for preset in PRESETS:
+            if preset.backend == "sherpa-onnx":
+                assert preset.model is not None
+                assert preset.language is not None
 
 
 class TestResolvePresetFromConfig:
@@ -91,6 +106,14 @@ class TestResolvePresetFromConfig:
         result = resolve_preset_from_config("apple-speech", "server")
         assert result == "apple-speech-server"
 
+    def test_resolve_sherpa_zipformer(self):
+        result = resolve_preset_from_config("sherpa-onnx", "zipformer-zh")
+        assert result == "sherpa-zipformer-zh"
+
+    def test_resolve_sherpa_paraformer(self):
+        result = resolve_preset_from_config("sherpa-onnx", "paraformer-zh")
+        assert result == "sherpa-paraformer-zh"
+
 
 class TestGetModelCacheDir:
     def test_funasr_cache_dir(self):
@@ -111,6 +134,39 @@ class TestGetModelCacheDir:
         preset = PRESET_BY_ID["mlx-whisper-medium"]
         cache_dir = get_model_cache_dir(preset)
         assert "models--mlx-community--whisper-medium" in str(cache_dir)
+
+
+    def test_sherpa_cache_dir(self):
+        preset = PRESET_BY_ID["sherpa-zipformer-zh"]
+        cache_dir = get_model_cache_dir(preset)
+        assert isinstance(cache_dir, Path)
+        assert "sherpa-onnx-models" in str(cache_dir)
+
+
+class TestGetModelSize:
+    def test_apple_speech_returns_none(self):
+        # Apple Speech is "always cached" but has no actual files
+        preset = PRESET_BY_ID["apple-speech-ondevice"]
+        # is_model_cached returns True but there's no real directory
+        # get_model_size should handle gracefully
+        size = get_model_size(preset)
+        # Apple returns True for is_model_cached, but cache dir won't exist
+        # Result depends on whether the dir exists
+        assert size is None or isinstance(size, int)
+
+    def test_uncached_model_returns_none(self):
+        from voicetext.transcription.model_registry import ModelPreset
+
+        # Use a backend that falls through to the default voicetext cache path
+        fake_preset = ModelPreset(
+            id="nonexistent-model-xyz",
+            display_name="Fake",
+            backend="nonexistent",
+            model=None,
+            language=None,
+        )
+        size = get_model_size(fake_preset)
+        assert size is None
 
 
 class TestIsBackendAvailable:

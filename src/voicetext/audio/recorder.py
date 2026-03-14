@@ -49,6 +49,7 @@ class Recorder:
         self._recording = False
         self._total_bytes = 0
         self._current_rms: float = 0.0
+        self._on_audio_chunk: Optional[callable] = None
 
     @property
     def is_recording(self) -> bool:
@@ -159,6 +160,14 @@ class Recorder:
         sf.write(buf, audio, self.sample_rate, format="WAV", subtype="PCM_16")
         return buf.getvalue()
 
+    def set_on_audio_chunk(self, cb: callable) -> None:
+        """Set a callback invoked with each audio chunk (np.ndarray int16)."""
+        self._on_audio_chunk = cb
+
+    def clear_on_audio_chunk(self) -> None:
+        """Remove the audio chunk callback."""
+        self._on_audio_chunk = None
+
     def _callback(self, in_data, frames, time_info, status):
         if status:
             logger.warning("Audio stream status: %s", status)
@@ -172,10 +181,18 @@ class Recorder:
 
         self._current_rms = float(np.sqrt(np.mean(frame.astype(np.float64) ** 2)))
         self._total_bytes += frame_bytes
+        copied = frame.copy()
         try:
-            self._queue.put_nowait(frame.copy())
+            self._queue.put_nowait(copied)
         except queue.Full:
             logger.warning("Audio queue full, dropping frame")
+
+        cb = self._on_audio_chunk
+        if cb is not None:
+            try:
+                cb(copied)
+            except Exception:
+                logger.debug("Audio chunk callback error", exc_info=True)
 
     def _flush(self) -> None:
         while not self._queue.empty():

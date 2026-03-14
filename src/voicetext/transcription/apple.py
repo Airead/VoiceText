@@ -6,6 +6,9 @@ import logging
 import tempfile
 import threading
 import time
+from typing import Callable, Optional
+
+import numpy as np
 
 from .base import BaseTranscriber
 
@@ -25,6 +28,7 @@ _LANG_TO_LOCALE = {
 }
 
 RECOGNITION_TIMEOUT = 30  # seconds
+STREAMING_FINAL_TIMEOUT = 10  # seconds
 
 
 def _resolve_locale(language: str) -> str:
@@ -186,8 +190,136 @@ class AppleSpeechTranscriber(BaseTranscriber):
             except OSError:
                 pass
 
+    # ── Streaming interface ───────────────────────────────────────────
+
+    @property
+    def supports_streaming(self) -> bool:
+        return True
+
+    def start_streaming(self, on_partial: Callable[[str, bool], None]) -> None:
+        """Begin a streaming recognition session using SFSpeechAudioBufferRecognitionRequest."""
+        if not self._initialized:
+            self.initialize()
+
+        import Speech
+        from AVFoundation import AVAudioFormat
+
+        self._stream_on_partial = on_partial
+        self._stream_final_text: Optional[str] = None
+        self._stream_done = threading.Event()
+        self._stream_cancelled = False
+
+        request = Speech.SFSpeechAudioBufferRecognitionRequest.alloc().init()
+        if self._on_device:
+            request.setRequiresOnDeviceRecognition_(True)
+        request.setShouldReportPartialResults_(True)
+
+        self._stream_request = request
+
+        # Audio format: mono int16 at self sample rate
+        audio_format = AVAudioFormat.alloc().initWithCommonFormat_sampleRate_channels_interleaved_(
+            1,  # AVAudioPCMFormatInt16
+            float(16000),
+            1,
+            False,
+        )
+        self._stream_audio_format = audio_format
+
+        def _handler(result, error):
+            if self._stream_cancelled:
+                return
+            if error is not None:
+                logger.warning("Streaming recognition error: %s", error)
+            if result is not None:
+                text = result.bestTranscription().formattedString()
+                is_final = result.isFinal()
+                try:
+                    on_partial(text, is_final)
+                except Exception:
+                    logger.debug("on_partial callback error", exc_info=True)
+                if is_final:
+                    self._stream_final_text = text
+                    self._stream_done.set()
+            elif error is not None:
+                self._stream_done.set()
+
+        self._stream_task = self._recognizer.recognitionTaskWithRequest_resultHandler_(
+            request, _handler
+        )
+
+        # Start a RunLoop thread to drive callbacks
+        self._stream_runloop_stop = threading.Event()
+
+        def _run_loop():
+            from CoreFoundation import CFRunLoopRunInMode, kCFRunLoopDefaultMode
+
+            while not self._stream_runloop_stop.is_set():
+                CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, False)
+
+        self._stream_runloop_thread = threading.Thread(target=_run_loop, daemon=True)
+        self._stream_runloop_thread.start()
+
+        logger.info("Streaming recognition started")
+
+    def feed_audio(self, samples: np.ndarray) -> None:
+        """Feed int16 audio samples to the streaming request."""
+        if not hasattr(self, "_stream_request") or self._stream_request is None:
+            return
+
+        from AVFoundation import AVAudioPCMBuffer
+
+        n_samples = len(samples)
+        buffer = AVAudioPCMBuffer.alloc().initWithPCMFormat_frameCapacity_(
+            self._stream_audio_format, n_samples
+        )
+        buffer.setFrameLength_(n_samples)
+
+        # Copy int16 data into the buffer
+        int16_channel = buffer.int16ChannelData()
+        if int16_channel is not None:
+            ptr = int16_channel[0]
+            for i in range(n_samples):
+                ptr[i] = int(samples[i])
+
+        self._stream_request.appendAudioPCMBuffer_(buffer)
+
+    def stop_streaming(self) -> str:
+        """End audio input and return the final transcription."""
+        if not hasattr(self, "_stream_request") or self._stream_request is None:
+            return ""
+
+        self._stream_request.endAudio()
+        self._stream_done.wait(timeout=STREAMING_FINAL_TIMEOUT)
+
+        # Cleanup
+        self._stream_runloop_stop.set()
+        text = self._stream_final_text or ""
+        self._cleanup_stream()
+
+        logger.info("Streaming recognition stopped, result: %s", text[:100] if text else "(empty)")
+        return text
+
+    def cancel_streaming(self) -> None:
+        """Cancel the streaming session."""
+        self._stream_cancelled = True
+        if hasattr(self, "_stream_task") and self._stream_task is not None:
+            self._stream_task.cancel()
+        self._cleanup_stream()
+        logger.info("Streaming recognition cancelled")
+
+    def _cleanup_stream(self) -> None:
+        """Clean up streaming session resources."""
+        if hasattr(self, "_stream_runloop_stop"):
+            self._stream_runloop_stop.set()
+        self._stream_request = None
+        self._stream_task = None
+        self._stream_audio_format = None
+        self._stream_on_partial = None
+
     def cleanup(self) -> None:
         """Release the recognizer."""
+        if hasattr(self, "_stream_request") and self._stream_request is not None:
+            self.cancel_streaming()
         self._recognizer = None
         self._initialized = False
         logger.info("Apple Speech recognizer cleaned up")

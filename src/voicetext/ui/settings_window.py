@@ -271,6 +271,9 @@ class SettingsPanel:
         self._build_ai_tab(ai_tab, state, inner_w)
         tab_view.addTabViewItem_(ai_tab)
 
+        # Set tab delegate for scroll-to-top on tab switch
+        tab_view.setDelegate_(self)
+
         content.addSubview_(tab_view)
         self._tab_view = tab_view
         self._panel = panel
@@ -448,12 +451,21 @@ class SettingsPanel:
         self._stt_buttons.clear()
         self._stt_remote_buttons.clear()
 
+        stt_model_sizes = state.get("stt_model_sizes", {})
+
         for preset_id, display_name, available in sorted(stt_presets, key=lambda x: x[1]):
             y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
             is_selected = (
                 current_remote_asr is None and preset_id == current_preset
             )
-            title = display_name if available else f"{display_name} (N/A)"
+            # Append model size if available
+            size_bytes = stt_model_sizes.get(preset_id)
+            if size_bytes is not None:
+                size_str = self._format_size(size_bytes)
+                title_base = display_name if available else f"{display_name} (N/A)"
+                title = f"{title_base}  [{size_str}]"
+            else:
+                title = display_name if available else f"{display_name} (N/A)"
             btn = self._make_radio(
                 title, pad + 12, y, content_w - 24,
                 is_selected, small_font, doc_view,
@@ -760,6 +772,13 @@ class SettingsPanel:
     # ── Helper methods ───────────────────────────────────────────────
 
     @staticmethod
+    def _format_size(size_bytes: int) -> str:
+        """Format byte size as human-readable string (MB or GB)."""
+        if size_bytes >= 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 ** 3):.1f} GB"
+        return f"{size_bytes / (1024 ** 2):.0f} MB"
+
+    @staticmethod
     def _import_ns_color():
         from AppKit import NSColor
         return NSColor
@@ -844,6 +863,22 @@ class SettingsPanel:
                 logger.exception("Settings callback %s failed", name)
         else:
             logger.warning("No callback registered for: %s", name)
+
+    # ── Tab view delegate ──────────────────────────────────────────────
+
+    def tabView_didSelectTabViewItem_(self, tab_view, tab_item):
+        """Scroll to top when switching tabs."""
+        try:
+            view = tab_item.view()
+            if view is not None and hasattr(view, "documentView"):
+                doc_view = view.documentView()
+                if doc_view is not None:
+                    from Foundation import NSMakePoint
+
+                    total_h = doc_view.frame().size.height
+                    doc_view.scrollPoint_(NSMakePoint(0, total_h))
+        except Exception:
+            logger.debug("Tab scroll reset failed", exc_info=True)
 
     # ── Radio group helpers ──────────────────────────────────────────
 

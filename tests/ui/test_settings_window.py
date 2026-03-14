@@ -366,6 +366,60 @@ class TestHintHelpers:
         parent.addSubview_.assert_called_once()
 
 
+class TestModelSizeDisplay:
+    """Tests for model size display in STT tab."""
+
+    def test_format_size_mb(self):
+        from voicetext.ui.settings_window import SettingsPanel
+
+        panel = SettingsPanel()
+        assert panel._format_size(50 * 1024 * 1024) == "50 MB"
+        assert panel._format_size(512 * 1024 * 1024) == "512 MB"
+
+    def test_format_size_gb(self):
+        from voicetext.ui.settings_window import SettingsPanel
+
+        panel = SettingsPanel()
+        assert panel._format_size(2 * 1024 * 1024 * 1024) == "2.0 GB"
+        assert panel._format_size(int(1.5 * 1024 * 1024 * 1024)) == "1.5 GB"
+
+    def test_stt_tab_shows_sizes(self):
+        from voicetext.ui.settings_window import SettingsPanel
+
+        panel = SettingsPanel()
+        state = _make_state()
+        state["stt_model_sizes"] = {
+            "funasr-paraformer": 200 * 1024 * 1024,  # 200 MB
+        }
+        callbacks = _make_callbacks()
+        panel.show(state, callbacks)
+
+        # Panel should build without errors
+        assert panel._panel is not None
+
+
+class TestTabScrollReset:
+    """Tests for tab change scroll-to-top behavior."""
+
+    def test_tab_delegate_method_exists(self):
+        from voicetext.ui.settings_window import SettingsPanel
+
+        panel = SettingsPanel()
+        assert hasattr(panel, "tabView_didSelectTabViewItem_")
+
+    def test_tab_delegate_does_not_raise(self):
+        from voicetext.ui.settings_window import SettingsPanel
+
+        panel = SettingsPanel()
+        state = _make_state()
+        callbacks = _make_callbacks()
+        panel.show(state, callbacks)
+
+        # Simulate tab switch - should not raise
+        mock_tab_item = MagicMock()
+        panel.tabView_didSelectTabViewItem_(panel._tab_view, mock_tab_item)
+
+
 class TestSettingsCallbackErrorHandling:
     """Tests for error handling in callbacks."""
 
