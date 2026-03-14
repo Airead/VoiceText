@@ -110,8 +110,8 @@
 <p>一组即用型增强模式模板。将任意示例复制到 <code>~/.config/VoiceText/enhance_modes/</code> 目录下，保存为 <code>.md</code> 文件，然后重启应用即可使用。</p>
 <p>关于文件格式和模式工作原理，请参阅 <a href="enhance-modes.md">enhance-modes.md</a>。</p>
 <hr />
-<h2 id="_1">写作与沟通</h2>
-<h3 id="_2">正式邮件</h3>
+<h2 id="_1"><a href="#_1" class="heading-anchor">写作与沟通</a></h2>
+<h3 id="_2"><a href="#_2" class="heading-anchor">正式邮件</a></h3>
 <p>将口述想法转化为精致的邮件正文。</p>
 <pre><code class="language-markdown">---
 label: 正式邮件
@@ -127,7 +127,7 @@ Rules:
 4. If the user mentions a recipient name, use it in the greeting
 5. Output only the email text without any explanation
 </code></pre>
-<h3 id="_3">会议纪要</h3>
+<h3 id="_3"><a href="#_3" class="heading-anchor">会议纪要</a></h3>
 <p>将意识流式的口述内容整理为结构化的笔记。</p>
 <pre><code class="language-markdown">---
 label: 会议纪要
@@ -142,7 +142,7 @@ order: 101
 4. 去除口语填充词和重复内容
 5. 直接输出整理后的纪要，不要添加说明
 </code></pre>
-<h3 id="_4">礼貌润色</h3>
+<h3 id="_4"><a href="#_4" class="heading-anchor">礼貌润色</a></h3>
 <p>将直白或生硬的表达改写得更加委婉得体。</p>
 <pre><code class="language-markdown">---
 label: 礼貌润色
@@ -157,7 +157,7 @@ order: 102
 4. 不要改变核心内容和立场
 5. 直接输出润色后的文本，不要添加说明
 </code></pre>
-<h3 id="_5">社交媒体文案</h3>
+<h3 id="_5"><a href="#_5" class="heading-anchor">社交媒体文案</a></h3>
 <p>将口述内容浓缩为简短、有吸引力的帖子。</p>
 <pre><code class="language-markdown">---
 label: 社交媒体
@@ -173,8 +173,8 @@ order: 103
 5. 直接输出文案，不要添加说明
 </code></pre>
 <hr />
-<h2 id="_6">摘要与提取</h2>
-<h3 id="_7">摘要</h3>
+<h2 id="_6"><a href="#_6" class="heading-anchor">摘要与提取</a></h2>
+<h3 id="_7"><a href="#_7" class="heading-anchor">摘要</a></h3>
 <p>将较长的口述内容浓缩为关键要点。</p>
 <pre><code class="language-markdown">---
 label: 摘要
@@ -188,7 +188,7 @@ order: 110
 3. 去除冗余和重复内容
 4. 直接输出摘要，不要添加说明
 </code></pre>
-<h3 id="_8">提取待办事项</h3>
+<h3 id="_8"><a href="#_8" class="heading-anchor">提取待办事项</a></h3>
 <p>从口述内容中提取任务和待办事项。</p>
 <pre><code class="language-markdown">---
 label: 提取待办
@@ -204,8 +204,8 @@ order: 111
 5. 只输出待办列表，不要添加其他内容
 </code></pre>
 <hr />
-<h2 id="_9">翻译</h2>
-<h3 id="_10">翻译为日文</h3>
+<h2 id="_9"><a href="#_9" class="heading-anchor">翻译</a></h2>
+<h3 id="_10"><a href="#_10" class="heading-anchor">翻译为日文</a></h3>
 <pre><code class="language-markdown">---
 label: 翻译为日文
 order: 120
@@ -219,7 +219,7 @@ Rules:
 3. Keep proper nouns in their standard Japanese form (katakana for foreign words)
 4. Output only the translated text without any explanation
 </code></pre>
-<h3 id="_11">翻译为韩文</h3>
+<h3 id="_11"><a href="#_11" class="heading-anchor">翻译为韩文</a></h3>
 <pre><code class="language-markdown">---
 label: 翻译为韩文
 order: 121
@@ -233,7 +233,7 @@ Rules:
 3. Keep proper nouns in their standard Korean form
 4. Output only the translated text without any explanation
 </code></pre>
-<h3 id="_12">中英双语输出</h3>
+<h3 id="_12"><a href="#_12" class="heading-anchor">中英双语输出</a></h3>
 <p>同时输出修正后的原文和英文翻译。</p>
 <pre><code class="language-markdown">---
 label: 中英双语
@@ -249,8 +249,8 @@ order: 122
 5. 不要添加任何标签或说明
 </code></pre>
 <hr />
-<h2 id="_13">开发者工具</h2>
-<h3 id="sql">SQL 查询</h3>
+<h2 id="_13"><a href="#_13" class="heading-anchor">开发者工具</a></h2>
+<h3 id="sql"><a href="#sql" class="heading-anchor">SQL 查询</a></h3>
 <p>将自然语言转换为 SQL 语句，类似于命令行大师模式，但面向数据库场景。</p>
 <pre><code class="language-markdown">---
 label: SQL 查询
@@ -271,7 +271,7 @@ order: 130
 - &quot;统计每个部门的人数&quot; → SELECT department, COUNT(*) FROM employees GROUP BY department;
 - &quot;找出最近7天注册的用户&quot; → SELECT * FROM users WHERE created_at &gt;= NOW() - INTERVAL 7 DAY;
 </code></pre>
-<h3 id="git-commit">Git Commit 消息</h3>
+<h3 id="git-commit"><a href="#git-commit" class="heading-anchor">Git Commit 消息</a></h3>
 <p>根据口述的变更描述生成 commit 消息。</p>
 <pre><code class="language-markdown">---
 label: Git Commit
@@ -291,7 +291,7 @@ Examples:
 - &quot;修了一个用户登录时密码验证的bug&quot; → fix: validate password correctly during login
 - &quot;给订单模块加了导出 CSV 的功能&quot; → feat(order): add CSV export support
 </code></pre>
-<h3 id="_14">代码注释</h3>
+<h3 id="_14"><a href="#_14" class="heading-anchor">代码注释</a></h3>
 <p>将口述的代码解释转换为代码注释。</p>
 <pre><code class="language-markdown">---
 label: 代码注释
@@ -308,8 +308,8 @@ Rules:
 5. Output only the comments without any explanation
 </code></pre>
 <hr />
-<h2 id="_15">特定领域</h2>
-<h3 id="_16">医疗记录</h3>
+<h2 id="_15"><a href="#_15" class="heading-anchor">特定领域</a></h2>
+<h3 id="_16"><a href="#_16" class="heading-anchor">医疗记录</a></h3>
 <p>将口述的临床观察整理为结构化的医疗记录。</p>
 <pre><code class="language-markdown">---
 label: 医疗记录
@@ -326,7 +326,7 @@ order: 140
 
 注意：此模式仅辅助文字整理，不提供医疗建议。
 </code></pre>
-<h3 id="_17">法律条款</h3>
+<h3 id="_17"><a href="#_17" class="heading-anchor">法律条款</a></h3>
 <p>将口述的意图改写为正式的法律语言。</p>
 <pre><code class="language-markdown">---
 label: 法律条款
@@ -344,8 +344,8 @@ order: 141
 注意：此模式仅辅助文字起草，不构成法律意见。
 </code></pre>
 <hr />
-<h2 id="_18">创意</h2>
-<h3 id="emoji">Emoji 加持</h3>
+<h2 id="_18"><a href="#_18" class="heading-anchor">创意</a></h2>
+<h3 id="emoji"><a href="#emoji" class="heading-anchor">Emoji 加持</a></h3>
 <p>为文本添加富有表现力的 emoji。</p>
 <pre><code class="language-markdown">---
 label: Emoji 加持
@@ -360,7 +360,7 @@ order: 150
 4. emoji 要符合语境和情感
 5. 直接输出加了 emoji 的文本
 </code></pre>
-<h3 id="_19">诗意改写</h3>
+<h3 id="_19"><a href="#_19" class="heading-anchor">诗意改写</a></h3>
 <p>将口述的想法转化为诗意的文字形式。</p>
 <pre><code class="language-markdown">---
 label: 诗意改写
@@ -376,7 +376,7 @@ order: 151
 5. 直接输出改写后的文本
 </code></pre>
 <hr />
-<h2 id="_20">创建自定义模式的技巧</h2>
+<h2 id="_20"><a href="#_20" class="heading-anchor">创建自定义模式的技巧</a></h2>
 <ol>
 <li>
 <p><strong>明确具体</strong> -- 准确告诉 LLM 应该做什么以及不应该做什么。模糊的提示会产生不一致的结果。</p>

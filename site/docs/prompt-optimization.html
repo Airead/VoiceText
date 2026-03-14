@@ -100,13 +100,13 @@
     </div>
 
 <p>A practical guide for advanced users who want to systematically improve AI enhancement quality using the Preview panel's built-in tools.</p>
-<h2 id="prerequisites">Prerequisites</h2>
+<h2 id="prerequisites"><a href="#prerequisites" class="heading-anchor">Prerequisites</a></h2>
 <ul>
 <li>Preview mode enabled (Settings → General → Preview)</li>
 <li>At least one LLM provider configured (Settings → LLM)</li>
 <li>An enhancement mode selected (Settings → AI)</li>
 </ul>
-<h2 id="the-preview-panel-at-a-glance">The Preview Panel at a Glance</h2>
+<h2 id="the-preview-panel-at-a-glance"><a href="#the-preview-panel-at-a-glance" class="heading-anchor">The Preview Panel at a Glance</a></h2>
 <pre><code>┌─────────────────────────────────────────────────────┐
 │  ASR   [FunASR ▾]  10.6s    ☐ Punc   Play ▶  Save  │  ← Raw speech recognition
 │  ┌─────────────────────────────────────────────┐    │
@@ -129,8 +129,8 @@
 │  [History]                      [Cancel]  [Copy ⌘↵] │
 └─────────────────────────────────────────────────────┘
 </code></pre>
-<h2 id="core-tools-for-prompt-optimization">Core Tools for Prompt Optimization</h2>
-<h3 id="1-play-verify-what-you-actually-said">1. Play ▶ — Verify What You Actually Said</h3>
+<h2 id="core-tools-for-prompt-optimization"><a href="#core-tools-for-prompt-optimization" class="heading-anchor">Core Tools for Prompt Optimization</a></h2>
+<h3 id="1-play-verify-what-you-actually-said"><a href="#1-play-verify-what-you-actually-said" class="heading-anchor">1. Play ▶ — Verify What You Actually Said</a></h3>
 <p>Before blaming ASR or AI, play back the recording. This tells you which layer the problem is in:</p>
 <div class="table-wrapper"><table>
 <thead>
@@ -158,7 +158,7 @@
 </tr>
 </tbody>
 </table></div>
-<h3 id="2-prompt-button-see-the-actual-system-prompt">2. Prompt Button — See the Actual System Prompt</h3>
+<h3 id="2-prompt-button-see-the-actual-system-prompt"><a href="#2-prompt-button-see-the-actual-system-prompt" class="heading-anchor">2. Prompt Button — See the Actual System Prompt</a></h3>
 <p>Click <strong>Prompt ⓘ</strong> after enhancement completes to see the exact system prompt sent to the LLM. This is the single most important tool for optimization — you cannot improve what you cannot see.</p>
 <p>What to look for:</p>
 <ul>
@@ -167,7 +167,7 @@
 <li>Does it have an output-only rule to prevent commentary?</li>
 <li>Are there edge cases the prompt doesn't cover?</li>
 </ul>
-<h3 id="3-mode-switcher-19-compare-modes-instantly">3. Mode Switcher (⌘1–⌘9) — Compare Modes Instantly</h3>
+<h3 id="3-mode-switcher-19-compare-modes-instantly"><a href="#3-mode-switcher-19-compare-modes-instantly" class="heading-anchor">3. Mode Switcher (⌘1–⌘9) — Compare Modes Instantly</a></h3>
 <p>Press <code>⌘1</code> through <code>⌘9</code> to switch modes without re-recording. Results are cached — switching back shows the previous result instantly (marked <code>[cached]</code>).</p>
 <p>Use this to:</p>
 <ul>
@@ -175,9 +175,9 @@
 <li>A/B test a new mode against existing ones</li>
 <li>Find which mode handles specific content types best</li>
 </ul>
-<h3 id="4-llm-model-dropdown-compare-models">4. LLM Model Dropdown — Compare Models</h3>
+<h3 id="4-llm-model-dropdown-compare-models"><a href="#4-llm-model-dropdown-compare-models" class="heading-anchor">4. LLM Model Dropdown — Compare Models</a></h3>
 <p>Switch models from the AI dropdown to see how the same prompt performs across different LLMs. Each (mode, model, thinking) combination is cached independently.</p>
-<h3 id="5-thinking-mode-observe-ai-reasoning">5. Thinking Mode — Observe AI Reasoning</h3>
+<h3 id="5-thinking-mode-observe-ai-reasoning"><a href="#5-thinking-mode-observe-ai-reasoning" class="heading-anchor">5. Thinking Mode — Observe AI Reasoning</a></h3>
 <p>Enable the thinking checkbox, then click the <strong>🧠</strong> (brain) button after enhancement to read the AI's reasoning process. This reveals:</p>
 <ul>
 <li>Why the AI made specific word choices</li>
@@ -185,10 +185,10 @@
 <li>Whether the AI understood your intent correctly</li>
 </ul>
 <p>This is invaluable for diagnosing prompt issues — if the AI's reasoning is wrong, the prompt needs clarification.</p>
-<h3 id="6-final-result-correct-and-train">6. Final Result — Correct and Train</h3>
+<h3 id="6-final-result-correct-and-train"><a href="#6-final-result-correct-and-train" class="heading-anchor">6. Final Result — Correct and Train</a></h3>
 <p>Edit the Final Result to fix any remaining issues before confirming. Each edit is recorded with a <code>user_corrected</code> flag, which feeds into the vocabulary system over time.</p>
-<h2 id="step-by-step-optimization-workflow">Step-by-Step Optimization Workflow</h2>
-<h3 id="phase-1-identify-the-problem">Phase 1: Identify the Problem</h3>
+<h2 id="step-by-step-optimization-workflow"><a href="#step-by-step-optimization-workflow" class="heading-anchor">Step-by-Step Optimization Workflow</a></h2>
+<h3 id="phase-1-identify-the-problem"><a href="#phase-1-identify-the-problem" class="heading-anchor">Phase 1: Identify the Problem</a></h3>
 <ol>
 <li><strong>Record</strong> a representative sentence.</li>
 <li><strong>Play ▶</strong> the recording to confirm you said what you meant.</li>
@@ -196,7 +196,7 @@
 <li><strong>Read the AI result</strong> — did the enhancement improve or damage the text?</li>
 <li><strong>Click Prompt</strong> — read the system prompt that produced this result.</li>
 </ol>
-<h3 id="phase-2-diagnose">Phase 2: Diagnose</h3>
+<h3 id="phase-2-diagnose"><a href="#phase-2-diagnose" class="heading-anchor">Phase 2: Diagnose</a></h3>
 <p>Use the controls to narrow down the issue:</p>
 <div class="table-wrapper"><table>
 <thead>
@@ -234,7 +234,7 @@
 </tr>
 </tbody>
 </table></div>
-<h3 id="phase-3-edit-the-mode">Phase 3: Edit the Mode</h3>
+<h3 id="phase-3-edit-the-mode"><a href="#phase-3-edit-the-mode" class="heading-anchor">Phase 3: Edit the Mode</a></h3>
 <ol>
 <li>Open <code>~/.config/VoiceText/enhance_modes/&lt;mode_id&gt;.md</code> in a text editor.
    Or use Settings → AI → select mode → edit.</li>
@@ -242,35 +242,35 @@
 <li>Restart the app (or reload config) to load the updated prompt.</li>
 <li>Re-record the same sentence and compare results.</li>
 </ol>
-<h3 id="phase-4-validate">Phase 4: Validate</h3>
+<h3 id="phase-4-validate"><a href="#phase-4-validate" class="heading-anchor">Phase 4: Validate</a></h3>
 <ol>
 <li><strong>⌘1–⌘9</strong> to switch between the updated mode and other modes — is the updated one better?</li>
 <li><strong>Switch LLM models</strong> — does the improvement hold across models?</li>
 <li><strong>Test edge cases</strong> — try short input, long input, mixed languages, noisy speech.</li>
 <li><strong>Enable thinking</strong> — does the AI's reasoning now match your intent?</li>
 </ol>
-<h3 id="phase-5-refine-over-time">Phase 5: Refine Over Time</h3>
+<h3 id="phase-5-refine-over-time"><a href="#phase-5-refine-over-time" class="heading-anchor">Phase 5: Refine Over Time</a></h3>
 <ul>
 <li><strong>Correct Final Results</strong> consistently — the vocabulary system learns from your edits.</li>
 <li><strong>Review History</strong> (click History button) — look for patterns in what the AI gets wrong.</li>
 <li><strong>Build vocabulary</strong> (Settings → AI → Build Vocabulary) — domain terms accumulate automatically.</li>
 </ul>
-<h2 id="practical-examples">Practical Examples</h2>
-<h3 id="example-1-ai-adds-explanation-after-translation">Example 1: AI Adds Explanation After Translation</h3>
+<h2 id="practical-examples"><a href="#practical-examples" class="heading-anchor">Practical Examples</a></h2>
+<h3 id="example-1-ai-adds-explanation-after-translation"><a href="#example-1-ai-adds-explanation-after-translation" class="heading-anchor">Example 1: AI Adds Explanation After Translation</a></h3>
 <p><strong>Problem:</strong> The "翻译为英文" mode outputs "Translation: ..." with a prefix.</p>
 <p><strong>Diagnosis:</strong> Click Prompt → the prompt says "translate to English" but doesn't explicitly forbid commentary.</p>
 <p><strong>Fix:</strong> Add to the prompt:</p>
 <pre><code>Output only the translated text.
 Do not add any prefix, label, or explanation.
 </code></pre>
-<h3 id="example-2-ai-corrects-a-name-incorrectly">Example 2: AI Corrects a Name Incorrectly</h3>
+<h3 id="example-2-ai-corrects-a-name-incorrectly"><a href="#example-2-ai-corrects-a-name-incorrectly" class="heading-anchor">Example 2: AI Corrects a Name Incorrectly</a></h3>
 <p><strong>Problem:</strong> You say "找萍萍确认一下" but AI changes it to "找平平确认一下".</p>
 <p><strong>Diagnosis:</strong> Enable thinking → the AI treats "萍萍" as an ASR error for "平平" because it lacks context.</p>
 <p><strong>Fix options:</strong>
 - Edit Final Result to "萍萍" → the correction is logged and builds vocabulary over time
 - Enable Conversation History (Settings → AI) so the AI sees prior confirmed uses of "萍萍"
 - Manually build vocabulary after accumulating corrections</p>
-<h3 id="example-3-mode-works-on-one-model-but-not-another">Example 3: Mode Works on One Model But Not Another</h3>
+<h3 id="example-3-mode-works-on-one-model-but-not-another"><a href="#example-3-mode-works-on-one-model-but-not-another" class="heading-anchor">Example 3: Mode Works on One Model But Not Another</a></h3>
 <p><strong>Problem:</strong> "命令行大神" produces clean shell commands on GPT-4 but adds markdown fences on a local model.</p>
 <p><strong>Diagnosis:</strong> Switch models via dropdown, compare outputs. Click Prompt to check.</p>
 <p><strong>Fix:</strong> Make the prompt more explicit:</p>
@@ -278,7 +278,7 @@ Do not add any prefix, label, or explanation.
 Do not wrap in markdown code blocks or backticks.
 Do not add any explanation.
 </code></pre>
-<h2 id="quick-reference">Quick Reference</h2>
+<h2 id="quick-reference"><a href="#quick-reference" class="heading-anchor">Quick Reference</a></h2>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -329,7 +329,7 @@ Do not add any explanation.
 </tr>
 </tbody>
 </table></div>
-<h2 id="tips">Tips</h2>
+<h2 id="tips"><a href="#tips" class="heading-anchor">Tips</a></h2>
 <ul>
 <li><strong>One change at a time.</strong> When editing a prompt, change one thing, then test. Multiple changes make it hard to know what helped.</li>
 <li><strong>Save good test cases.</strong> Use <strong>Save</strong> to export recordings that expose prompt issues. Replay them after editing the prompt to verify the fix.</li>

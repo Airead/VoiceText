@@ -110,8 +110,8 @@
 <p>A collection of ready-to-use enhancement mode templates. Copy any example into <code>~/.config/VoiceText/enhance_modes/</code> as a <code>.md</code> file and restart the app.</p>
 <p>For the file format and how modes work, see <a href="enhance-modes.md">enhance-modes.md</a>.</p>
 <hr />
-<h2 id="writing-communication">Writing &amp; Communication</h2>
-<h3 id="formal-email">Formal Email</h3>
+<h2 id="writing-communication"><a href="#writing-communication" class="heading-anchor">Writing &amp; Communication</a></h2>
+<h3 id="formal-email"><a href="#formal-email" class="heading-anchor">Formal Email</a></h3>
 <p>Turn spoken thoughts into a polished email body.</p>
 <pre><code class="language-markdown">---
 label: 正式邮件
@@ -127,7 +127,7 @@ Rules:
 4. If the user mentions a recipient name, use it in the greeting
 5. Output only the email text without any explanation
 </code></pre>
-<h3 id="meeting-notes">Meeting Notes</h3>
+<h3 id="meeting-notes"><a href="#meeting-notes" class="heading-anchor">Meeting Notes</a></h3>
 <p>Structure stream-of-consciousness speech into organized notes.</p>
 <pre><code class="language-markdown">---
 label: 会议纪要
@@ -142,7 +142,7 @@ order: 101
 4. 去除口语填充词和重复内容
 5. 直接输出整理后的纪要，不要添加说明
 </code></pre>
-<h3 id="polite-rewrite">Polite Rewrite</h3>
+<h3 id="polite-rewrite"><a href="#polite-rewrite" class="heading-anchor">Polite Rewrite</a></h3>
 <p>Make direct or blunt speech more diplomatic.</p>
 <pre><code class="language-markdown">---
 label: 礼貌润色
@@ -157,7 +157,7 @@ order: 102
 4. 不要改变核心内容和立场
 5. 直接输出润色后的文本，不要添加说明
 </code></pre>
-<h3 id="social-media-post">Social Media Post</h3>
+<h3 id="social-media-post"><a href="#social-media-post" class="heading-anchor">Social Media Post</a></h3>
 <p>Condense spoken content into a short, engaging post.</p>
 <pre><code class="language-markdown">---
 label: 社交媒体
@@ -173,8 +173,8 @@ order: 103
 5. 直接输出文案，不要添加说明
 </code></pre>
 <hr />
-<h2 id="summarization-extraction">Summarization &amp; Extraction</h2>
-<h3 id="summarize">Summarize</h3>
+<h2 id="summarization-extraction"><a href="#summarization-extraction" class="heading-anchor">Summarization &amp; Extraction</a></h2>
+<h3 id="summarize"><a href="#summarize" class="heading-anchor">Summarize</a></h3>
 <p>Condense long speech into key points.</p>
 <pre><code class="language-markdown">---
 label: 摘要
@@ -188,7 +188,7 @@ order: 110
 3. 去除冗余和重复内容
 4. 直接输出摘要，不要添加说明
 </code></pre>
-<h3 id="extract-action-items">Extract Action Items</h3>
+<h3 id="extract-action-items"><a href="#extract-action-items" class="heading-anchor">Extract Action Items</a></h3>
 <p>Pull out tasks and to-dos from spoken content.</p>
 <pre><code class="language-markdown">---
 label: 提取待办
@@ -204,8 +204,8 @@ order: 111
 5. 只输出待办列表，不要添加其他内容
 </code></pre>
 <hr />
-<h2 id="translation">Translation</h2>
-<h3 id="translate-to-japanese">Translate to Japanese</h3>
+<h2 id="translation"><a href="#translation" class="heading-anchor">Translation</a></h2>
+<h3 id="translate-to-japanese"><a href="#translate-to-japanese" class="heading-anchor">Translate to Japanese</a></h3>
 <pre><code class="language-markdown">---
 label: 翻译为日文
 order: 120
@@ -219,7 +219,7 @@ Rules:
 3. Keep proper nouns in their standard Japanese form (katakana for foreign words)
 4. Output only the translated text without any explanation
 </code></pre>
-<h3 id="translate-to-korean">Translate to Korean</h3>
+<h3 id="translate-to-korean"><a href="#translate-to-korean" class="heading-anchor">Translate to Korean</a></h3>
 <pre><code class="language-markdown">---
 label: 翻译为韩文
 order: 121
@@ -233,7 +233,7 @@ Rules:
 3. Keep proper nouns in their standard Korean form
 4. Output only the translated text without any explanation
 </code></pre>
-<h3 id="bilingual-output">Bilingual Output</h3>
+<h3 id="bilingual-output"><a href="#bilingual-output" class="heading-anchor">Bilingual Output</a></h3>
 <p>Output both original (corrected) and English translation.</p>
 <pre><code class="language-markdown">---
 label: 中英双语
@@ -249,8 +249,8 @@ order: 122
 5. 不要添加任何标签或说明
 </code></pre>
 <hr />
-<h2 id="developer-tools">Developer Tools</h2>
-<h3 id="sql-query">SQL Query</h3>
+<h2 id="developer-tools"><a href="#developer-tools" class="heading-anchor">Developer Tools</a></h2>
+<h3 id="sql-query"><a href="#sql-query" class="heading-anchor">SQL Query</a></h3>
 <p>Convert natural language to SQL, similar to Commandline Master but for databases.</p>
 <pre><code class="language-markdown">---
 label: SQL 查询
@@ -271,7 +271,7 @@ order: 130
 - &quot;统计每个部门的人数&quot; → SELECT department, COUNT(*) FROM employees GROUP BY department;
 - &quot;找出最近7天注册的用户&quot; → SELECT * FROM users WHERE created_at &gt;= NOW() - INTERVAL 7 DAY;
 </code></pre>
-<h3 id="git-commit-message">Git Commit Message</h3>
+<h3 id="git-commit-message"><a href="#git-commit-message" class="heading-anchor">Git Commit Message</a></h3>
 <p>Generate a commit message from a spoken description of changes.</p>
 <pre><code class="language-markdown">---
 label: Git Commit
@@ -291,7 +291,7 @@ Examples:
 - &quot;修了一个用户登录时密码验证的bug&quot; → fix: validate password correctly during login
 - &quot;给订单模块加了导出 CSV 的功能&quot; → feat(order): add CSV export support
 </code></pre>
-<h3 id="code-comment">Code Comment</h3>
+<h3 id="code-comment"><a href="#code-comment" class="heading-anchor">Code Comment</a></h3>
 <p>Convert spoken explanation into code comments.</p>
 <pre><code class="language-markdown">---
 label: 代码注释
@@ -308,8 +308,8 @@ Rules:
 5. Output only the comments without any explanation
 </code></pre>
 <hr />
-<h2 id="domain-specific">Domain-Specific</h2>
-<h3 id="medical-notes">Medical Notes</h3>
+<h2 id="domain-specific"><a href="#domain-specific" class="heading-anchor">Domain-Specific</a></h2>
+<h3 id="medical-notes"><a href="#medical-notes" class="heading-anchor">Medical Notes</a></h3>
 <p>Structure spoken clinical observations into formatted notes.</p>
 <pre><code class="language-markdown">---
 label: 医疗记录
@@ -326,7 +326,7 @@ order: 140
 
 注意：此模式仅辅助文字整理，不提供医疗建议。
 </code></pre>
-<h3 id="legal-clause">Legal Clause</h3>
+<h3 id="legal-clause"><a href="#legal-clause" class="heading-anchor">Legal Clause</a></h3>
 <p>Rewrite spoken intent into formal legal language.</p>
 <pre><code class="language-markdown">---
 label: 法律条款
@@ -344,8 +344,8 @@ order: 141
 注意：此模式仅辅助文字起草，不构成法律意见。
 </code></pre>
 <hr />
-<h2 id="creative">Creative</h2>
-<h3 id="emoji-enhance">Emoji Enhance</h3>
+<h2 id="creative"><a href="#creative" class="heading-anchor">Creative</a></h2>
+<h3 id="emoji-enhance"><a href="#emoji-enhance" class="heading-anchor">Emoji Enhance</a></h3>
 <p>Add expressive emojis to the text.</p>
 <pre><code class="language-markdown">---
 label: Emoji 加持
@@ -360,7 +360,7 @@ order: 150
 4. emoji 要符合语境和情感
 5. 直接输出加了 emoji 的文本
 </code></pre>
-<h3 id="haiku-poetry">Haiku / Poetry</h3>
+<h3 id="haiku-poetry"><a href="#haiku-poetry" class="heading-anchor">Haiku / Poetry</a></h3>
 <p>Transform spoken thoughts into poetic form.</p>
 <pre><code class="language-markdown">---
 label: 诗意改写
@@ -376,7 +376,7 @@ order: 151
 5. 直接输出改写后的文本
 </code></pre>
 <hr />
-<h2 id="tips-for-creating-your-own-modes">Tips for Creating Your Own Modes</h2>
+<h2 id="tips-for-creating-your-own-modes"><a href="#tips-for-creating-your-own-modes" class="heading-anchor">Tips for Creating Your Own Modes</a></h2>
 <ol>
 <li>
 <p><strong>Be specific</strong> — Tell the LLM exactly what to do and what NOT to do. Vague prompts produce inconsistent results.</p>

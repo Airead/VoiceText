@@ -102,7 +102,7 @@
     </div>
 
 <p>本指南说明如何在 VoiceText 中配置 ASR（语音识别）模型和 AI 增强服务商。涵盖 GUI（设置面板）和配置文件两种方式。</p>
-<h2 id="asr">ASR 模型选择</h2>
+<h2 id="asr"><a href="#asr" class="heading-anchor">ASR 模型选择</a></h2>
 <p>VoiceText 支持四种 ASR 后端：</p>
 <div class="table-wrapper"><table>
 <thead>
@@ -140,10 +140,10 @@
 </tr>
 </tbody>
 </table></div>
-<h3 id="gui-asr">通过 GUI 配置 ASR</h3>
+<h3 id="gui-asr"><a href="#gui-asr" class="heading-anchor">通过 GUI 配置 ASR</a></h3>
 <p>打开 <strong>Settings...</strong> → <strong>STT</strong> 标签页。所有可用的本地和远程 ASR 模型以单选按钮形式列出。选择其中一个即可切换——当前激活的模型会高亮显示。</p>
 <p>如果所选的 MLX-Whisper 模型尚未下载，VoiceText 会在首次使用时自动下载（菜单栏图标显示 <code>DL X%</code> 下载进度）。已配置服务商的远程 ASR 模型也会显示在此标签页中。</p>
-<h3 id="asr_1">通过配置文件配置 ASR</h3>
+<h3 id="asr_1"><a href="#asr_1" class="heading-anchor">通过配置文件配置 ASR</a></h3>
 <p>编辑 <code>~/.config/VoiceText/config.json</code>：</p>
 <pre><code class="language-json">{
   &quot;asr&quot;: {
@@ -187,7 +187,7 @@
 </tbody>
 </table></div>
 <p>编辑后需重启 VoiceText 使更改生效。</p>
-<h3 id="asr_2">可用 ASR 模型</h3>
+<h3 id="asr_2"><a href="#asr_2" class="heading-anchor">可用 ASR 模型</a></h3>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -234,9 +234,9 @@
 <p><strong>注意：</strong> MLX-Whisper 的 tiny/base/small 模型没有预设，但可以通过直接设置 <code>asr.model</code> 来使用（例如 <code>"model": "mlx-community/whisper-small"</code>）。</p>
 </blockquote>
 <hr />
-<h2 id="asr_3">远程 ASR 服务商</h2>
+<h2 id="asr_3"><a href="#asr_3" class="heading-anchor">远程 ASR 服务商</a></h2>
 <p>除本地 ASR 后端外，VoiceText 还支持通过 OpenAI 兼容的音频转录 API（例如 Groq、OpenAI）进行远程 ASR。远程服务商的配置与 LLM 服务商分开管理。</p>
-<h3 id="gui-asr_1">通过 GUI 配置远程 ASR</h3>
+<h3 id="gui-asr_1"><a href="#gui-asr_1" class="heading-anchor">通过 GUI 配置远程 ASR</a></h3>
 <ol>
 <li>
 <p>打开 <strong>Settings...</strong> → <strong>STT</strong> 标签页 → <strong>Add Provider...</strong></p>
@@ -258,7 +258,7 @@
 <p>验证通过后，点击 <strong>Save</strong>。新模型将出现在 <strong>STT</strong> 标签页中。</p>
 </li>
 </ol>
-<h3 id="asr_4">通过配置文件配置远程 ASR</h3>
+<h3 id="asr_4"><a href="#asr_4" class="heading-anchor">通过配置文件配置远程 ASR</a></h3>
 <p>编辑 <code>~/.config/VoiceText/config.json</code>，在 <code>asr</code> 下添加条目：</p>
 <pre><code class="language-json">{
   &quot;asr&quot;: {
@@ -275,7 +275,7 @@
 }
 </code></pre>
 <p>设置 <code>default_provider</code> 和 <code>default_model</code> 后，VoiceText 启动时将使用远程 ASR 模型。将两者都设为 <code>null</code> 可切换回本地后端。</p>
-<h3 id="asr_5">远程 ASR 示例</h3>
+<h3 id="asr_5"><a href="#asr_5" class="heading-anchor">远程 ASR 示例</a></h3>
 <p><strong>Groq</strong></p>
 <pre><code class="language-json">&quot;groq&quot;: {
   &quot;base_url&quot;: &quot;https://api.groq.com/openai/v1&quot;,
@@ -291,9 +291,9 @@
 }
 </code></pre>
 <hr />
-<h2 id="ai-llm">AI (LLM) 服务商配置</h2>
+<h2 id="ai-llm"><a href="#ai-llm" class="heading-anchor">AI (LLM) 服务商配置</a></h2>
 <p>AI 增强功能使用 OpenAI 兼容的 LLM 服务商。您可以配置多个服务商，并随时在它们之间切换。</p>
-<h3 id="gui">通过 GUI 配置服务商</h3>
+<h3 id="gui"><a href="#gui" class="heading-anchor">通过 GUI 配置服务商</a></h3>
 <ol>
 <li>
 <p>打开 <strong>Settings...</strong> → <strong>LLM</strong> 标签页 → <strong>Add Provider...</strong></p>
@@ -325,7 +325,7 @@
 <p>验证通过后，点击 <strong>Save</strong> 添加服务商。</p>
 </li>
 </ol>
-<h3 id="_1">通过配置文件配置服务商</h3>
+<h3 id="_1"><a href="#_1" class="heading-anchor">通过配置文件配置服务商</a></h3>
 <p>编辑 <code>~/.config/VoiceText/config.json</code>，在 <code>ai_enhance.providers</code> 下添加条目：</p>
 <pre><code class="language-json">{
   &quot;ai_enhance&quot;: {
@@ -374,7 +374,7 @@
 </tbody>
 </table></div>
 <p>编辑后需重启 VoiceText 使更改生效。</p>
-<h3 id="_2">服务商示例</h3>
+<h3 id="_2"><a href="#_2" class="heading-anchor">服务商示例</a></h3>
 <p><strong>Ollama（本地）</strong></p>
 <pre><code class="language-json">&quot;ollama&quot;: {
   &quot;base_url&quot;: &quot;http://localhost:11434/v1&quot;,
@@ -415,14 +415,14 @@
 <p><strong>关于 <code>extra_body</code> 的说明：</strong> 部分服务商需要额外参数。例如，Qwen 模型需要 <code>enable_thinking</code> 来控制思考模式。此字段会与标准 OpenAI 字段一起直接传递在请求体中。</p>
 </blockquote>
 <hr />
-<h2 id="_3">切换服务商与模型</h2>
-<h3 id="gui_1">通过 GUI 切换</h3>
+<h2 id="_3"><a href="#_3" class="heading-anchor">切换服务商与模型</a></h2>
+<h3 id="gui_1"><a href="#gui_1" class="heading-anchor">通过 GUI 切换</a></h3>
 <p><strong>切换 LLM 服务商/模型：</strong> 打开 <strong>Settings...</strong> → <strong>LLM</strong> 标签页 → 从可用模型列表中选择。</p>
 <p>所有已配置服务商的模型以单选按钮形式显示，当前激活的模型会高亮。</p>
 <p><strong>切换 STT 模型：</strong> 打开 <strong>Settings...</strong> → <strong>STT</strong> 标签页 → 选择一个（本地或远程）。</p>
 <p><strong>切换思考模式：</strong> 打开 <strong>Settings...</strong> → <strong>AI</strong> 标签页 → <strong>Thinking</strong> 复选框。</p>
 <p>您也可以直接在<strong>预览面板</strong>的下拉菜单中切换 STT 和 LLM 模型，无需打开设置面板。</p>
-<h3 id="_4">通过配置文件切换</h3>
+<h3 id="_4"><a href="#_4" class="heading-anchor">通过配置文件切换</a></h3>
 <p>更新 <code>config.json</code> 中的 <code>default_provider</code> 和 <code>default_model</code>：</p>
 <pre><code class="language-json">{
   &quot;ai_enhance&quot;: {
@@ -436,18 +436,18 @@
 <p><strong>重要：</strong> <code>default_model</code> 必须是所选服务商 <code>models</code> 数组中列出的模型之一。</p>
 </blockquote>
 <hr />
-<h2 id="_5">移除服务商</h2>
-<h3 id="llm">LLM 服务商</h3>
+<h2 id="_5"><a href="#_5" class="heading-anchor">移除服务商</a></h2>
+<h3 id="llm"><a href="#llm" class="heading-anchor">LLM 服务商</a></h3>
 <p><strong>通过 GUI：</strong> 打开 <strong>Settings...</strong> → <strong>LLM</strong> 标签页 → <strong>Remove...</strong> → 选择要移除的服务商 → 在对话框中确认。</p>
 <p><strong>通过配置文件：</strong> 从 <code>config.json</code> 的 <code>ai_enhance.providers</code> 中删除该服务商条目。如果它是当前激活的服务商，需将 <code>default_provider</code> 和 <code>default_model</code> 更新为其他可用服务商。</p>
-<h3 id="asr_6">ASR 服务商</h3>
+<h3 id="asr_6"><a href="#asr_6" class="heading-anchor">ASR 服务商</a></h3>
 <p><strong>通过 GUI：</strong> 打开 <strong>Settings...</strong> → <strong>STT</strong> 标签页 → <strong>Remove...</strong> → 选择要移除的服务商 → 在对话框中确认。</p>
 <p><strong>通过配置文件：</strong> 从 <code>config.json</code> 的 <code>asr.providers</code> 中删除该服务商条目。如果它是当前激活的服务商，需将 <code>asr.default_provider</code> 和 <code>asr.default_model</code> 设为 <code>null</code>。</p>
 <blockquote>
 <p>无法移除当前激活的服务商。请先切换到其他服务商/模型。</p>
 </blockquote>
 <hr />
-<h2 id="_6">快速开始示例</h2>
+<h2 id="_6"><a href="#_6" class="heading-anchor">快速开始示例</a></h2>
 <p>使用 OpenAI 增强的最简配置：</p>
 <pre><code class="language-json">{
   &quot;ai_enhance&quot;: {

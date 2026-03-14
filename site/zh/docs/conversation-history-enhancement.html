@@ -84,14 +84,14 @@
 
     </div>
 
-<h2 id="_1">背景</h2>
+<h2 id="_1"><a href="#_1" class="heading-anchor">背景</a></h2>
 <p>VoiceText 对每次语音输入会话进行独立处理——AI 增强步骤只能看到当前的 ASR 文本，对用户之前说过的内容一无所知。这种无状态的方式在处理孤立句子时效果尚可，但在以下场景中存在不足：</p>
 <ol>
 <li><strong>反复出现的专有名词</strong> — 用户在某句话中提到"萍萍"，但 ASR 将其识别为"平平"。没有先前上下文，LLM 没有依据判断哪个更正确。如果用户在之前的轮次中已确认了"萍萍"，这一信号就丢失了。</li>
 <li><strong>话题连续性</strong> — 对话天然地建立在之前的上下文之上。当用户说"她说今天很开心"时，LLM 无法在不知道之前提到过谁的情况下解析"她"的指代。</li>
 <li><strong>用户表达习惯</strong> — 有些用户会持续使用特定的措辞、标点风格或句式结构。无状态的增强器无法适应这些偏好。</li>
 </ol>
-<h2 id="_2">动机</h2>
+<h2 id="_2"><a href="#_2" class="heading-anchor">动机</a></h2>
 <p>核心洞察：<strong>用户近期确认的输出是反映其真实意图的最高质量信号</strong>。</p>
 <p>与原始 ASR 文本（包含错误）或 AI 增强文本（可能过度纠正）不同，最终确认的输出代表了用户的真实意图——他们已经审阅并批准了它。将这些确认的输出反馈到增强提示词中，我们给 LLM 提供了一个滚动的上下文窗口，使其能够：</p>
 <ul>
@@ -99,8 +99,8 @@
 <li><strong>话题感知增强</strong> — LLM 理解当前的对话主题，能做出符合上下文的决策。</li>
 <li><strong>风格适配</strong> — LLM 观察用户的实际写作方式，匹配其语气和格式偏好。</li>
 </ul>
-<h2 id="_3">工作原理</h2>
-<h3 id="_4">记录</h3>
+<h2 id="_3"><a href="#_3" class="heading-anchor">工作原理</a></h2>
+<h3 id="_4"><a href="#_4" class="heading-anchor">记录</a></h3>
 <p>每次语音输入会话都会记录到 <code>~/.config/VoiceText/conversation_history.jsonl</code>，不区分模式：</p>
 <pre><code class="language-json">{
     &quot;timestamp&quot;: &quot;2026-03-12T10:30:00+00:00&quot;,
@@ -115,14 +115,14 @@
 }
 </code></pre>
 <p>直接模式（<code>preview_enabled: false</code>）和预览模式（<code>preview_enabled: true</code>）的会话都会被记录。这确保不会丢失任何数据，即使后续注入策略发生变化。</p>
-<h3 id="_5">过滤：为何仅使用预览确认的记录</h3>
+<h3 id="_5"><a href="#_5" class="heading-anchor">过滤：为何仅使用预览确认的记录</a></h3>
 <p>只有 <code>preview_enabled: true</code> 的记录会被注入到 AI 提示词中。原因如下：</p>
 <ul>
 <li><strong>预览模式</strong> — 用户看到 AI 输出，可以编辑并明确确认最终文本。这个确认后的文本是可靠的。</li>
 <li><strong>直接模式</strong> — 文本直接输入，未经审阅。用户从未验证过输出，因此可能包含未纠正的 ASR 错误或 AI 过度纠正。注入未经验证的文本会导致错误传播。</li>
 </ul>
 <p>这是一个有意为之的数据质量决策：<strong>一组较小的已验证数据比一组较大的未验证数据更有价值</strong>。</p>
-<h3 id="_6">上下文注入</h3>
+<h3 id="_6"><a href="#_6" class="heading-anchor">上下文注入</a></h3>
 <p>当对话历史功能启用时，增强提示词会附加近期历史。格式设计旨在高效利用 token：</p>
 <pre><code>---
 以下是用户近期的对话记录，用于学习纠错偏好和话题上下文。
@@ -141,14 +141,14 @@
 <li><strong>相同时不显示箭头</strong> — 避免重复展示相同的文本。</li>
 <li><strong>仅包含 ASR + 最终文本</strong> — AI 增强的中间文本不会被注入，以节省 token。LLM 只需看到用户实际说了什么（ASR）和实际想表达什么（最终文本）。</li>
 </ul>
-<h3 id="_7">与其他上下文源的集成</h3>
+<h3 id="_7"><a href="#_7" class="heading-anchor">与其他上下文源的集成</a></h3>
 <p>对话历史在系统提示词中注入于词汇上下文<strong>之后</strong>，遵循相同的模式：</p>
 <pre><code>[Mode prompt]                    ← 基础增强指令
 [Vocabulary context]             ← 来自用户词汇表的相关术语（如已启用）
 [Conversation history context]   ← 近期确认的输出（如已启用）
 </code></pre>
 <p>每个上下文源都可独立开关，并能优雅降级——如果历史记录获取失败，增强过程将在没有它的情况下继续进行。</p>
-<h2 id="_8">架构</h2>
+<h2 id="_8"><a href="#_8" class="heading-anchor">架构</a></h2>
 <pre><code>Voice Input
      │
      ▼
@@ -174,7 +174,7 @@
 └──────────────────┘                  ▼
                                  log(preview_enabled=true)
 </code></pre>
-<h2 id="_9">配置</h2>
+<h2 id="_9"><a href="#_9" class="heading-anchor">配置</a></h2>
 <p>在 <code>config.json</code> 的 <code>ai_enhance</code> 下：</p>
 <pre><code class="language-json">{
     &quot;conversation_history&quot;: {
@@ -208,7 +208,7 @@
 </tbody>
 </table></div>
 <p>该开关也可在 <strong>Settings</strong> 面板（AI 标签页）中使用。</p>
-<h2 id="_10">关键文件</h2>
+<h2 id="_10"><a href="#_10" class="heading-anchor">关键文件</a></h2>
 <div class="table-wrapper"><table>
 <thead>
 <tr>

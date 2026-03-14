@@ -86,7 +86,7 @@
     </div>
 
 <p>VoiceText 不只是语音转文字 — 它构建了一个多层纠错系统，越用越聪明。</p>
-<h2 id="_1">问题所在</h2>
+<h2 id="_1"><a href="#_1" class="heading-anchor">问题所在</a></h2>
 <p>所有语音识别引擎都会犯错。即使是最好的 ASR 模型也会产生错误 — 尤其是在以下场景：</p>
 <ul>
 <li><strong>专有名词</strong> — 人名、产品名、品牌名，模型从未见过的词汇</li>
@@ -96,7 +96,7 @@
 <li><strong>上下文缺失</strong> — 每次转录都是独立的，引擎不知道你 30 秒前说了什么</li>
 </ul>
 <p>大多数语音输入工具止步于 ASR 输出，让你自己手动修正这些错误。<strong>VoiceText 采取了一种根本不同的方法</strong> — 它叠加了五个独立的纠错层，让单一策略无法捕获的错误也能被其他层捕获。</p>
-<h2 id="_2">五层纠错</h2>
+<h2 id="_2"><a href="#_2" class="heading-anchor">五层纠错</a></h2>
 <p>VoiceText 不依赖单一技术，而是叠加多个纠错层。每一层都能捕获前面层遗漏的错误：</p>
 <pre><code>  语音输入
       |
@@ -122,7 +122,7 @@
   最终文本  .............  准确、格式化、个性化
 </code></pre>
 <p>第二层和第三层通过向 LLM 的系统提示词注入相关上下文来工作。第四层加入人工监督。第五层通过将你的纠正反馈给第二层和第三层来闭合回路。最终结果是一个<strong>越用越好</strong>的系统。</p>
-<h2 id="ai">第一层：AI 增强</h2>
+<h2 id="ai"><a href="#ai" class="heading-anchor">第一层：AI 增强</a></h2>
 <p>当你启用增强模式（比如内置的<strong>纠错润色</strong>模式）时，VoiceText 会将 ASR 输出发送给 LLM，配合精心设计的系统提示词。LLM 充当智能后处理器：</p>
 <ul>
 <li><strong>修正同音错字</strong> — 通过理解上下文来判断</li>
@@ -139,7 +139,7 @@
 <blockquote>
 <p>增强模式是完全可自定义的 Markdown 文件。你可以创建翻译、格式化、代码生成或任何其他文本变换的模式。详见 <a href="enhance-modes-zh.md">AI 增强模式</a>。</p>
 </blockquote>
-<h2 id="_3">第二层：词库检索</h2>
+<h2 id="_3"><a href="#_3" class="heading-anchor">第二层：词库检索</a></h2>
 <p>通用 LLM 不知道你同事的名字、你公司的产品名称或你日常使用的专业术语。VoiceText 通过<strong>基于向量的个人词库系统</strong>来解决这个问题：</p>
 <ol>
 <li><strong>构建</strong> — VoiceText 使用 LLM 从你的纠正历史中提取专有名词和专业术语。每个词条包含正确形式、分类和常见的 ASR 误识别变体。</li>
@@ -156,10 +156,10 @@
 <blockquote>
 <p><strong>核心洞察：</strong> 词库系统本质上是一个轻量级的本地 RAG（检索增强生成）管线 — 专为语音输入纠错量身打造。</p>
 </blockquote>
-<h2 id="_4">第三层：对话历史</h2>
+<h2 id="_4"><a href="#_4" class="heading-anchor">第三层：对话历史</a></h2>
 <p>真实的对话是有连续性的。当你说"她今天很开心"时，"她"这个字只有在之前提到过某个人的情况下才有意义。VoiceText 通过将你<strong>近期确认的输出</strong>注入到 LLM 的提示词中来解决这个问题。</p>
 <p>核心洞察：<strong>你确认后的输出是你真实意图的最高质量信号。</strong> 与原始 ASR 文本（有错误）或 AI 输出（可能过度纠正）不同，最终确认的文本代表了你的真实意图。</p>
-<h3 id="_5">注入的内容</h3>
+<h3 id="_5"><a href="#_5" class="heading-anchor">注入的内容</a></h3>
 <p>只有通过预览面板确认的会话才会被包含。这是一个刻意的数据质量决策 — 少量经过验证的数据胜过大量未验证的数据。</p>
 <p><strong>注入的上下文（高效格式）：</strong></p>
 <pre><code>- 将是否开启对话历史注入的功能，做一个开关放在菜单栏里。
@@ -168,13 +168,13 @@
 - 平平对果果说我今天吃了面条。 → 萍萍对果果说我今天吃了面条。
 </code></pre>
 <p>箭头标记显示纠正模式。当 LLM 看到"平平"在之前被纠正为"萍萍"时，它就能在后续输入中自动做出同样的纠正 — <strong>不需要你手动添加到词库</strong>。</p>
-<h3 id="_6">解决三个问题</h3>
+<h3 id="_6"><a href="#_6" class="heading-anchor">解决三个问题</a></h3>
 <ul>
 <li><strong>一致的实体解析</strong> — 一旦你确认了"萍萍"，后续提到的同音词都会被自动纠正。</li>
 <li><strong>话题感知的增强</strong> — LLM 理解当前对话主题，做出上下文相关的决策。</li>
 <li><strong>风格适应</strong> — LLM 观察你的写作习惯，匹配你的语气和格式偏好。</li>
 </ul>
-<h2 id="_7">第四层：预览面板</h2>
+<h2 id="_7"><a href="#_7" class="heading-anchor">第四层：预览面板</a></h2>
 <p>预览面板是 VoiceText 的<strong>人在回路</strong>界面。在文本被输入到当前应用之前，你可以审核和修改：</p>
 <ul>
 <li><strong>对比</strong> — 原始 ASR 输出和 AI 增强结果并排显示</li>
@@ -186,7 +186,7 @@
 <blockquote>
 <p>预览面板同时也是<strong>提示词调优工作台</strong>。你可以测试不同的提示词、对比不同模型、系统性地改进增强质量。详见 <a href="prompt-optimization-workflow-zh.md">Prompt 优化工作流</a>。</p>
 </blockquote>
-<h2 id="_8">第五层：自我进化</h2>
+<h2 id="_8"><a href="#_8" class="heading-anchor">第五层：自我进化</a></h2>
 <p>这是把所有层串联起来的关键。VoiceText 创造了一个<strong>正向循环</strong>，你的每次纠正都在改进未来的纠正：</p>
 <pre><code>  你说话  ──►  ASR  ──►  AI + 词库 + 历史  ──►  预览面板
                                                       |
@@ -210,7 +210,7 @@
 <blockquote>
 <p><strong>你用 VoiceText 越多，它就越好用。</strong> 你的纠正不仅仅是在修改当前文本 — 它们在教会系统你的词汇、你的偏好和你常谈论的话题。随着时间推移，你会发现需要纠正的地方越来越少。</p>
 </blockquote>
-<h2 id="_9">完整示例：五层协同工作</h2>
+<h2 id="_9"><a href="#_9" class="heading-anchor">完整示例：五层协同工作</a></h2>
 <p>让我们跟踪一个实际场景，看看所有五层是如何协同工作的：</p>
 <p><strong>场景：</strong> 谈论同事"萍萍"和一个使用 Kubernetes 的项目。</p>
 <p><strong>第 1 步 — ASR 输出：</strong>
@@ -229,7 +229,7 @@ LLM 结合词库上下文和对话历史，产出：
 结果很完美。你按 Enter 确认。文本被输入到当前应用中。</p>
 <p><strong>第 6 步 — 自我进化：为未来记录：</strong>
 这次会话被记录。下次你再提到"萍萍"或"Kubernetes"时，系统会更有信心做出正确的纠正。</p>
-<h2 id="_10">对比其他工具</h2>
+<h2 id="_10"><a href="#_10" class="heading-anchor">对比其他工具</a></h2>
 <p>大多数语音输入工具属于以下两类之一：</p>
 <ul>
 <li><strong>基础语音输入</strong> — 转录语音并直接输入。没有纠正、没有上下文、不会学习。每个错误都需要手动修正。</li>

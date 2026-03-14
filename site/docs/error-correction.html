@@ -86,7 +86,7 @@
     </div>
 
 <p>VoiceText doesn't just transcribe — it builds a multi-layered correction system that gets smarter every time you use it.</p>
-<h2 id="the-problem">The Problem</h2>
+<h2 id="the-problem"><a href="#the-problem" class="heading-anchor">The Problem</a></h2>
 <p>Every speech-to-text engine makes mistakes. Even the best ASR models produce errors — especially with:</p>
 <ul>
 <li><strong>Proper nouns</strong> — People's names, product names, and brand names that the model has never seen</li>
@@ -96,7 +96,7 @@
 <li><strong>Context loss</strong> — Each transcription is independent — the engine doesn't know what you said 30 seconds ago</li>
 </ul>
 <p>Most voice input tools stop at the ASR output and leave you to manually fix these errors. <strong>VoiceText takes a fundamentally different approach</strong> — it layers five independent correction strategies to catch what any single strategy would miss.</p>
-<h2 id="five-layers-of-correction">Five Layers of Correction</h2>
+<h2 id="five-layers-of-correction"><a href="#five-layers-of-correction" class="heading-anchor">Five Layers of Correction</a></h2>
 <p>Instead of relying on a single technique, VoiceText stacks multiple correction layers. Each layer catches errors that the previous layers missed:</p>
 <pre><code>  Voice Input
       |
@@ -122,7 +122,7 @@
   Final Text  ........... accurate, formatted, and personalized
 </code></pre>
 <p>Layers 2 and 3 work by enriching the LLM's system prompt with relevant context. Layer 4 adds human oversight. Layer 5 closes the loop by feeding your corrections back into Layers 2 and 3. The result is a system that <strong>improves with every use</strong>.</p>
-<h2 id="layer-1-ai-enhancement">Layer 1: AI Enhancement</h2>
+<h2 id="layer-1-ai-enhancement"><a href="#layer-1-ai-enhancement" class="heading-anchor">Layer 1: AI Enhancement</a></h2>
 <p>When you enable an enhancement mode (like the built-in <strong>Proofread</strong> mode), VoiceText sends your ASR output to an LLM with a carefully crafted system prompt. The LLM acts as an intelligent post-processor:</p>
 <ul>
 <li><strong>Fixes homophones and near-homophones</strong> by understanding context</li>
@@ -139,7 +139,7 @@
 <blockquote>
 <p>Enhancement modes are fully customizable Markdown files. You can create modes for translation, formatting, code generation, or any other text transformation. See <a href="enhance-modes.md">AI Enhancement Modes</a> for details.</p>
 </blockquote>
-<h2 id="layer-2-vocabulary-retrieval">Layer 2: Vocabulary Retrieval</h2>
+<h2 id="layer-2-vocabulary-retrieval"><a href="#layer-2-vocabulary-retrieval" class="heading-anchor">Layer 2: Vocabulary Retrieval</a></h2>
 <p>Generic LLMs don't know your colleague's name, your company's product names, or the technical terms you use daily. VoiceText solves this with an <strong>embedding-based personal vocabulary system</strong>:</p>
 <ol>
 <li><strong>Build</strong> — VoiceText extracts proper nouns and technical terms from your correction history using an LLM. Each term includes its correct form, category, and common ASR misrecognitions.</li>
@@ -156,10 +156,10 @@
 <blockquote>
 <p><strong>Key insight:</strong> The vocabulary system is essentially a lightweight, local RAG (Retrieval-Augmented Generation) pipeline — purpose-built for voice input correction.</p>
 </blockquote>
-<h2 id="layer-3-conversation-history">Layer 3: Conversation History</h2>
+<h2 id="layer-3-conversation-history"><a href="#layer-3-conversation-history" class="heading-anchor">Layer 3: Conversation History</a></h2>
 <p>Real conversations have continuity. When you say "she was happy today", the word "she" only makes sense in the context of a previous sentence. VoiceText addresses this by injecting your <strong>recent confirmed outputs</strong> into the LLM's prompt.</p>
 <p>The core insight: <strong>your confirmed output is the highest-quality signal for what you actually mean.</strong> Unlike raw ASR text (which has errors) or AI output (which may over-correct), the final confirmed text represents your true intent.</p>
-<h3 id="what-gets-injected">What Gets Injected</h3>
+<h3 id="what-gets-injected"><a href="#what-gets-injected" class="heading-anchor">What Gets Injected</a></h3>
 <p>Only sessions where you used the Preview panel and confirmed the result are included. This is a deliberate quality decision — a smaller set of verified data beats a larger set of unverified data.</p>
 <p><strong>Injected context (token-efficient format):</strong></p>
 <pre><code>- Add a toggle for the conversation history injection feature in the menu bar.
@@ -168,13 +168,13 @@
 - cereal told me she had noodles today. → Ciriel told me she had noodles today.
 </code></pre>
 <p>The arrow notation shows correction patterns. When the LLM sees that "cereal" was corrected to "Ciriel" in a previous turn, it can make the same correction automatically in subsequent inputs — <strong>without you ever adding it to a dictionary</strong>.</p>
-<h3 id="three-problems-this-solves">Three Problems This Solves</h3>
+<h3 id="three-problems-this-solves"><a href="#three-problems-this-solves" class="heading-anchor">Three Problems This Solves</a></h3>
 <ul>
 <li><strong>Consistent entity resolution</strong> — Once you confirm "Ciriel", subsequent mentions are corrected automatically.</li>
 <li><strong>Topic-aware enhancement</strong> — The LLM understands the current conversation topic and makes contextually appropriate decisions.</li>
 <li><strong>Style adaptation</strong> — The LLM observes your writing patterns and matches your tone and formatting preferences.</li>
 </ul>
-<h2 id="layer-4-preview-panel">Layer 4: Preview Panel</h2>
+<h2 id="layer-4-preview-panel"><a href="#layer-4-preview-panel" class="heading-anchor">Layer 4: Preview Panel</a></h2>
 <p>The Preview panel is VoiceText's <strong>human-in-the-loop</strong> interface. Before text is typed into your active application, you can review and refine it:</p>
 <ul>
 <li><strong>Compare</strong> the raw ASR output with the AI-enhanced result side by side</li>
@@ -186,7 +186,7 @@
 <blockquote>
 <p>The Preview panel also serves as a <strong>prompt tuning workbench</strong>. You can test different prompts, compare models, and systematically improve enhancement quality. See <a href="prompt-optimization-workflow.md">Prompt Optimization Workflow</a> for the full process.</p>
 </blockquote>
-<h2 id="layer-5-self-improving-loop">Layer 5: Self-Improving Loop</h2>
+<h2 id="layer-5-self-improving-loop"><a href="#layer-5-self-improving-loop" class="heading-anchor">Layer 5: Self-Improving Loop</a></h2>
 <p>This is what ties everything together. VoiceText creates a <strong>virtuous cycle</strong> where every correction you make improves future corrections:</p>
 <pre><code>  You speak  ──►  ASR  ──►  AI + Vocab + History  ──►  Preview Panel
                                                             |
@@ -210,7 +210,7 @@
 <blockquote>
 <p><strong>The more you use VoiceText, the better it gets.</strong> Your corrections aren't just fixing the current text — they're teaching the system your vocabulary, your preferences, and your common topics. Over time, you'll find yourself making fewer and fewer corrections.</p>
 </blockquote>
-<h2 id="full-example-all-layers-in-action">Full Example: All Layers in Action</h2>
+<h2 id="full-example-all-layers-in-action"><a href="#full-example-all-layers-in-action" class="heading-anchor">Full Example: All Layers in Action</a></h2>
 <p>Let's trace a real scenario through all five layers:</p>
 <p><strong>Scenario:</strong> Talking about a colleague "Ciriel" and a project using Kubernetes.</p>
 <p><strong>Step 1 — ASR Output:</strong>
@@ -229,7 +229,7 @@ All errors corrected. Punctuation added.</p>
 The result looks perfect. You press Enter to confirm. The text is typed into your active application.</p>
 <p><strong>Step 6 — Self-Improving: Recorded for the Future:</strong>
 This session is logged. Next time you mention "Ciriel" or "Kubernetes", the system will be even more confident in making the right correction.</p>
-<h2 id="compared-to-other-tools">Compared to Other Tools</h2>
+<h2 id="compared-to-other-tools"><a href="#compared-to-other-tools" class="heading-anchor">Compared to Other Tools</a></h2>
 <p>Most voice input tools fall into one of two categories:</p>
 <ul>
 <li><strong>Basic Voice Input</strong> — Transcribes speech and types it directly. No correction, no context, no learning. You fix every error manually.</li>
