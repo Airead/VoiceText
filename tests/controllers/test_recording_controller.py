@@ -166,7 +166,9 @@ class TestStreamingIntegration:
 
         mock_apphelper.callAfter = lambda fn, *a, **kw: fn(*a, **kw)
         mock_app._transcriber.supports_streaming = True
-        mock_app._transcriber.stop_streaming.return_value = "[mock from test_streaming_release_calls_stop_streaming]"
+        # Use a descriptive string so if it leaks to terminal output (via un-mocked
+        # type_text or logging), we can immediately identify which test caused it.
+        mock_app._transcriber.stop_streaming.return_value = "[mock from test_recording_controller.py::test_streaming_release_calls_stop_streaming]"
         mock_app._sound_manager.enabled = False
 
         # Press to start streaming
@@ -203,7 +205,9 @@ class TestStreamingIntegration:
 
         mock_apphelper.callAfter = lambda fn, *a, **kw: fn(*a, **kw)
         mock_app._transcriber.supports_streaming = True
-        mock_app._transcriber.stop_streaming.return_value = "[mock from test_streaming_release_with_preview]"
+        # Use a descriptive string so if it leaks to terminal output (via un-mocked
+        # type_text or logging), we can immediately identify which test caused it.
+        mock_app._transcriber.stop_streaming.return_value = "[mock from test_recording_controller.py::test_streaming_release_with_preview]"
         mock_app._sound_manager.enabled = False
         mock_app._preview_enabled = True
 
@@ -218,7 +222,7 @@ class TestStreamingIntegration:
 
         mock_app._do_transcribe_with_preview.assert_called_once()
         call_kwargs = mock_app._do_transcribe_with_preview.call_args[1]
-        assert call_kwargs["asr_text"] == "[mock from test_streaming_release_with_preview]"
+        assert call_kwargs["asr_text"] == "[mock from test_recording_controller.py::test_streaming_release_with_preview]"
 
     def test_init_streaming_state(self, ctrl):
         assert ctrl._streaming_active is False
