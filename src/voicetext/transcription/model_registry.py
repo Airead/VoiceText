@@ -43,14 +43,14 @@ PRESETS = [
     ModelPreset(
         id="apple-speech-ondevice",
         display_name="Apple Speech (On-Device)",
-        backend="apple-speech",
+        backend="apple",
         model="on-device",
         language=None,
     ),
     ModelPreset(
         id="apple-speech-server",
         display_name="Apple Speech (Server)",
-        backend="apple-speech",
+        backend="apple",
         model="server",
         language=None,
     ),
@@ -104,12 +104,12 @@ def is_backend_available(backend: str) -> bool:
     _BACKEND_MODULES = {
         "funasr": "funasr_onnx",
         "mlx-whisper": "mlx_whisper",
-        "apple-speech": "Speech",
+        "apple": "Speech",
         "sherpa-onnx": "sherpa_onnx",
     }
 
-    # apple-speech requires macOS
-    if backend == "apple-speech":
+    # apple requires macOS
+    if backend == "apple":
         import sys
         if sys.platform != "darwin":
             _backend_available[backend] = False
@@ -138,7 +138,7 @@ def resolve_preset_from_config(
             return preset.id
         if backend_norm == "mlx-whisper" and preset.model == model:
             return preset.id
-        if backend_norm == "apple-speech" and preset.model == model:
+        if backend_norm == "apple" and preset.model == model:
             return preset.id
         if backend_norm == "sherpa-onnx" and preset.model == model:
             return preset.id
@@ -174,7 +174,7 @@ def get_model_cache_dir(preset: ModelPreset) -> Path:
 
 def is_model_cached(preset: ModelPreset) -> bool:
     """Check if a preset's model files are already downloaded."""
-    if preset.backend == "apple-speech":
+    if preset.backend == "apple":
         return True  # No model download needed
 
     if preset.backend == "mlx-whisper" and preset.model:

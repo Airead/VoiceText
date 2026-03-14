@@ -50,7 +50,7 @@ class TestCreateTranscriber:
     def test_create_apple_speech_backend(self):
         from voicetext.transcription.apple import AppleSpeechTranscriber
 
-        t = create_transcriber(backend="apple-speech", model="on-device")
+        t = create_transcriber(backend="apple", model="on-device")
         assert isinstance(t, AppleSpeechTranscriber)
         assert isinstance(t, BaseTranscriber)
         assert t._on_device is True
@@ -58,7 +58,7 @@ class TestCreateTranscriber:
     def test_create_apple_speech_server(self):
         from voicetext.transcription.apple import AppleSpeechTranscriber
 
-        t = create_transcriber(backend="apple-speech", model="server")
+        t = create_transcriber(backend="apple", model="server")
         assert isinstance(t, AppleSpeechTranscriber)
         assert t._on_device is False
 

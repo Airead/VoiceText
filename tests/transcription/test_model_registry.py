@@ -31,7 +31,7 @@ class TestPresets:
         for preset in PRESETS:
             assert preset.id
             assert preset.display_name
-            assert preset.backend in ("funasr", "mlx-whisper", "apple-speech", "sherpa-onnx")
+            assert preset.backend in ("funasr", "mlx-whisper", "apple", "sherpa-onnx")
 
     def test_funasr_preset_exists(self):
         assert "funasr-paraformer" in PRESET_BY_ID
@@ -49,7 +49,7 @@ class TestPresets:
         assert "apple-speech-ondevice" in PRESET_BY_ID
         assert "apple-speech-server" in PRESET_BY_ID
         p = PRESET_BY_ID["apple-speech-ondevice"]
-        assert p.backend == "apple-speech"
+        assert p.backend == "apple"
         assert p.model == "on-device"
         p2 = PRESET_BY_ID["apple-speech-server"]
         assert p2.model == "server"
@@ -99,11 +99,11 @@ class TestResolvePresetFromConfig:
         assert result == "mlx-whisper-medium"
 
     def test_resolve_apple_speech_ondevice(self):
-        result = resolve_preset_from_config("apple-speech", "on-device")
+        result = resolve_preset_from_config("apple", "on-device")
         assert result == "apple-speech-ondevice"
 
     def test_resolve_apple_speech_server(self):
-        result = resolve_preset_from_config("apple-speech", "server")
+        result = resolve_preset_from_config("apple", "server")
         assert result == "apple-speech-server"
 
     def test_resolve_sherpa_zipformer(self):

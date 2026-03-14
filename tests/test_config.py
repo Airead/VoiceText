@@ -212,7 +212,7 @@ class TestValidateConfig:
         assert config["asr"]["backend"] == "funasr"
 
     def test_valid_asr_backends(self):
-        for backend in ("funasr", "mlx_whisper", "apple", "api"):
+        for backend in ("funasr", "mlx-whisper", "mlx_whisper", "whisper-api", "apple", "sherpa-onnx"):
             config = self._make_config({"asr.backend": backend})
             validate_config(config)
             assert config["asr"]["backend"] == backend
