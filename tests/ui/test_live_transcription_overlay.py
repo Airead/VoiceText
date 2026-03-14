@@ -6,16 +6,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from tests.conftest import mock_panel_close_delegate
-
 
 @pytest.fixture(autouse=True)
 def _mock_appkit(mock_appkit_modules, monkeypatch):
     """Mock AppKit and Foundation modules for headless testing."""
-    import voicetext.ui.live_transcription_overlay as _lt
-
-    _lt._PanelCloseDelegate = None
-    mock_panel_close_delegate(monkeypatch, _lt)
     return mock_appkit_modules
 
 
@@ -26,7 +20,7 @@ class TestLiveTranscriptionOverlayInit:
         overlay = LiveTranscriptionOverlay()
         assert overlay._panel is None
         assert overlay._text_field is None
-        assert not overlay.is_visible
+        assert overlay._screen_center_y == 0
 
     def test_show_creates_panel(self):
         from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
@@ -66,13 +60,17 @@ class TestLiveTranscriptionOverlayText:
     @staticmethod
     def _setup_frame_mock(overlay):
         """Set up proper numeric frame mocks for text field and panel."""
-        text_frame = MagicMock()
-        text_frame.size.height = 30.0
-        overlay._text_field.frame.return_value = text_frame
+        # Mock cellSizeForBounds_ for _resize_panel
+        cell_mock = MagicMock()
+        needed_size = MagicMock()
+        needed_size.height = 30.0
+        cell_mock.cellSizeForBounds_.return_value = needed_size
+        overlay._text_field.cell.return_value = cell_mock
 
         panel_frame = MagicMock()
-        panel_frame.size.height = 60.0
+        panel_frame.size.height = 40.0
         panel_frame.origin.y = 400.0
+        panel_frame.origin.x = 200.0
         overlay._panel.frame.return_value = panel_frame
 
     def test_update_text(self):
@@ -84,7 +82,6 @@ class TestLiveTranscriptionOverlayText:
 
         overlay.update_text("hello world")
 
-        assert overlay._current_text == "hello world"
         overlay._text_field.setStringValue_.assert_called_with("hello world")
 
     def test_update_text_noop_without_show(self):
@@ -101,9 +98,14 @@ class TestLiveTranscriptionOverlayText:
         overlay.show()
         self._setup_frame_mock(overlay)
 
+        # Make height differ enough to trigger resize
+        cell_mock = overlay._text_field.cell()
+        needed = MagicMock()
+        needed.height = 60.0
+        cell_mock.cellSizeForBounds_.return_value = needed
+
         overlay.update_text("some text")
 
-        overlay._text_field.sizeToFit.assert_called()
         overlay._panel.setFrame_display_.assert_called()
 
 
@@ -118,6 +120,9 @@ class TestLiveTranscriptionOverlayLifecycle:
         overlay.hide()
 
         panel.orderOut_.assert_called()
+        assert overlay._panel is None
+        assert overlay._text_field is None
+        assert overlay._content_view is None
 
     def test_close_cleans_up(self):
         from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
@@ -130,7 +135,6 @@ class TestLiveTranscriptionOverlayLifecycle:
         assert overlay._panel is None
         assert overlay._content_view is None
         assert overlay._text_field is None
-        assert overlay._current_text == ""
 
     def test_close_without_show(self):
         from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
@@ -170,10 +174,10 @@ class TestLiveTranscriptionOverlayDarkMode:
         # Text color should be set (dynamic, not hardcoded)
         overlay._text_field.setTextColor_.assert_called_once()
 
-    def test_text_draws_no_background(self):
+    def test_text_center_aligned(self):
         from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
 
-        overlay._text_field.setDrawsBackground_.assert_called_once_with(False)
+        overlay._text_field.setAlignment_.assert_called_once_with(1)
