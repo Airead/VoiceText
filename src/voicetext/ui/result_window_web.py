@@ -247,11 +247,21 @@ let cmdHeld = false;
 function init() {
     // ASR title
     document.getElementById('asr-title').textContent = CONFIG.asrTitle;
-    document.getElementById('asr-text').textContent = CONFIG.asrText;
+    if (CONFIG.asrLoading) {
+        document.getElementById('asr-text').innerHTML = '<span class="loading">⏳ Transcribing...</span>';
+    } else {
+        document.getElementById('asr-text').textContent = CONFIG.asrText;
+    }
     document.getElementById('asr-info').textContent = CONFIG.asrInfo;
 
     // Final text
-    document.getElementById('final-text').value = CONFIG.asrText;
+    document.getElementById('final-text').value = CONFIG.asrLoading ? '' : CONFIG.asrText;
+
+    // Disable STT select during loading
+    if (CONFIG.asrLoading) {
+        const sel = document.getElementById('stt-select');
+        if (sel) sel.disabled = true;
+    }
 
     // STT popup
     if (CONFIG.sttModels.length > 0 && CONFIG.source !== 'clipboard') {
@@ -397,12 +407,9 @@ document.addEventListener('keydown', (e) => {
         return;
     }
     if (e.key === 'Enter' && !e.metaKey && !e.shiftKey && !e.altKey) {
-        // Only trigger confirm if the active element is not the textarea
-        if (document.activeElement !== document.getElementById('final-text')) {
-            e.preventDefault();
-            doConfirm(false);
-            return;
-        }
+        e.preventDefault();
+        doConfirm(false);
+        return;
     }
     // ⌘1~⌘9 mode switching
     if (e.metaKey && !e.shiftKey && !e.altKey && e.key >= '1' && e.key <= '9') {
@@ -1196,6 +1203,10 @@ class ResultPreviewPanel:
         from Foundation import NSMakeRect, NSURL
         from WebKit import WKUserContentController, WKWebView, WKWebViewConfiguration
 
+        # Enable ⌘C/⌘V/⌘A via Edit menu in the responder chain
+        from voicetext.ui.result_window import _ensure_edit_menu
+        _ensure_edit_menu()
+
         # Calculate panel height based on content
         has_modes = len(self._available_modes) > 0
         show_enhance_section = self._show_enhance or has_modes
@@ -1261,10 +1272,13 @@ class ResultPreviewPanel:
         self._message_handler = handler
 
         # Build config JSON and load HTML
+        # Detect if ASR text is empty (STT pending) — show loading in initial HTML
+        asr_loading = self._asr_text == "" and self._source != "clipboard"
         config_data = {
             "asrTitle": "Clipboard Text" if self._source == "clipboard" else "ASR",
             "asrText": self._asr_text,
             "asrInfo": self._asr_info,
+            "asrLoading": asr_loading,
             "showEnhance": self._show_enhance,
             "enhanceInfo": self._enhance_info,
             "modes": self._available_modes,
