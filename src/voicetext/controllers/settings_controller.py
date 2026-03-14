@@ -105,6 +105,7 @@ class SettingsController:
             "history_enabled": bool(
                 app._enhancer and app._enhancer.history_enabled
             ),
+            "config_dir": app._config_dir,
         }
 
         callbacks = {
@@ -133,6 +134,8 @@ class SettingsController:
             "on_show_config": lambda: app._on_show_config(None),
             "on_edit_config": lambda: app._on_enhance_edit_config(None),
             "on_reload_config": lambda: app._on_reload_config(None),
+            "on_config_dir_browse": self.config_dir_browse,
+            "on_config_dir_reset": self.config_dir_reset,
         }
 
         # Call show() directly — do NOT use callAfter, because the menu
@@ -492,3 +495,61 @@ class SettingsController:
         app = self._app
         app._config.setdefault("ui", {})["settings_last_tab"] = tab_id
         save_config(app._config, app._config_path)
+
+    def config_dir_browse(self) -> None:
+        """Open a directory picker to choose a custom config directory."""
+        from AppKit import NSOpenPanel
+
+        panel = NSOpenPanel.openPanel()
+        panel.setCanChooseDirectories_(True)
+        panel.setCanChooseFiles_(False)
+        panel.setCanCreateDirectories_(True)
+        panel.setAllowsMultipleSelection_(False)
+        panel.setTitle_("Select Config Directory")
+        panel.setPrompt_("Select")
+
+        result = panel.runModal()
+        if result != 1:  # NSModalResponseOK
+            return
+
+        url = panel.URL()
+        if not url:
+            return
+
+        new_dir = str(url.path())
+        app = self._app
+
+        # Copy entire config directory (config, enhance_modes, sounds,
+        # vocabulary, history, stats, etc.) to the new location.
+        # Existing files in the target are not overwritten.
+        import shutil
+
+        old_dir = app._config_dir
+        if os.path.isdir(old_dir) and os.path.realpath(old_dir) != os.path.realpath(new_dir):
+            shutil.copytree(old_dir, new_dir, dirs_exist_ok=True)
+            logger.info("Copied config directory %s -> %s", old_dir, new_dir)
+
+        from voicetext.config import save_config_dir_preference
+
+        save_config_dir_preference(new_dir)
+        app._settings_panel.update_config_dir(new_dir)
+        send_notification(
+            "VoiceText",
+            "Config Directory Changed",
+            f"Restart the app to use: {new_dir}",
+        )
+        logger.info("Config directory preference set to: %s", new_dir)
+
+    def config_dir_reset(self) -> None:
+        """Reset config directory to default."""
+        from voicetext.config import DEFAULT_CONFIG_DIR, reset_config_dir_preference
+
+        reset_config_dir_preference()
+        default_dir = os.path.expanduser(DEFAULT_CONFIG_DIR)
+        self._app._settings_panel.update_config_dir(default_dir)
+        send_notification(
+            "VoiceText",
+            "Config Directory Reset",
+            f"Restart the app to use default: {default_dir}",
+        )
+        logger.info("Config directory preference reset to default")

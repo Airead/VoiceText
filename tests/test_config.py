@@ -4,9 +4,18 @@ import json
 import os
 import stat
 import tempfile
+from unittest.mock import MagicMock, patch
 
 
-from voicetext.config import DEFAULT_CONFIG, load_config, save_config, validate_config, _merge_dict
+from voicetext.config import (
+    DEFAULT_CONFIG,
+    DEFAULT_CONFIG_DIR,
+    load_config,
+    resolve_config_dir,
+    save_config,
+    validate_config,
+    _merge_dict,
+)
 
 
 class TestMergeDict:
@@ -277,3 +286,103 @@ class TestValidateConfig:
         config = self._make_config({"ai_enhance.max_retries": 0})
         validate_config(config)
         assert config["ai_enhance"]["max_retries"] == 0
+
+
+class TestResolveConfigDir:
+    """Tests for resolve_config_dir with NSUserDefaults priority."""
+
+    def test_explicit_argument_takes_priority(self):
+        result = resolve_config_dir("/custom/path")
+        assert result == "/custom/path"
+
+    def test_explicit_argument_with_tilde(self):
+        result = resolve_config_dir("~/custom")
+        assert result == os.path.expanduser("~/custom")
+
+    @patch("voicetext.config._read_user_defaults_config_dir")
+    def test_user_defaults_used_when_no_argument(self, mock_read):
+        mock_read.return_value = "/from/defaults"
+        result = resolve_config_dir(None)
+        assert result == "/from/defaults"
+        mock_read.assert_called_once()
+
+    @patch("voicetext.config._read_user_defaults_config_dir")
+    def test_user_defaults_tilde_expanded(self, mock_read):
+        mock_read.return_value = "~/from/defaults"
+        result = resolve_config_dir(None)
+        assert result == os.path.expanduser("~/from/defaults")
+
+    @patch("voicetext.config._read_user_defaults_config_dir")
+    def test_falls_back_to_default_when_no_preference(self, mock_read):
+        mock_read.return_value = None
+        result = resolve_config_dir(None)
+        assert result == os.path.expanduser(DEFAULT_CONFIG_DIR)
+
+    @patch("voicetext.config._read_user_defaults_config_dir")
+    def test_explicit_argument_overrides_user_defaults(self, mock_read):
+        mock_read.return_value = "/from/defaults"
+        result = resolve_config_dir("/explicit")
+        assert result == "/explicit"
+        mock_read.assert_not_called()
+
+
+class TestConfigDirPreference:
+    """Tests for save/reset config_dir via NSUserDefaults."""
+
+    def test_save_config_dir_preference(self):
+        mock_defaults = MagicMock()
+        mock_cls = MagicMock()
+        mock_cls.alloc.return_value.initWithSuiteName_.return_value = mock_defaults
+        with patch.dict("sys.modules", {"Foundation": MagicMock(NSUserDefaults=mock_cls)}):
+            # Re-import to pick up the patched Foundation
+            import importlib
+            import voicetext.config as cfg_mod
+            importlib.reload(cfg_mod)
+            cfg_mod.save_config_dir_preference("/new/path")
+            mock_defaults.setObject_forKey_.assert_called_once_with(
+                "/new/path", "config_dir"
+            )
+            mock_defaults.synchronize.assert_called_once()
+            # Reload again to restore original module
+            importlib.reload(cfg_mod)
+
+    def test_reset_config_dir_preference(self):
+        mock_defaults = MagicMock()
+        mock_cls = MagicMock()
+        mock_cls.alloc.return_value.initWithSuiteName_.return_value = mock_defaults
+        with patch.dict("sys.modules", {"Foundation": MagicMock(NSUserDefaults=mock_cls)}):
+            import importlib
+            import voicetext.config as cfg_mod
+            importlib.reload(cfg_mod)
+            cfg_mod.reset_config_dir_preference()
+            mock_defaults.removeObjectForKey_.assert_called_once_with("config_dir")
+            mock_defaults.synchronize.assert_called_once()
+            importlib.reload(cfg_mod)
+
+    def test_read_user_defaults_returns_none_when_no_value(self):
+        """Returns None when NSUserDefaults has no config_dir set."""
+        mock_defaults = MagicMock()
+        mock_defaults.stringForKey_.return_value = None
+        mock_cls = MagicMock()
+        mock_cls.alloc.return_value.initWithSuiteName_.return_value = mock_defaults
+        with patch.dict("sys.modules", {"Foundation": MagicMock(NSUserDefaults=mock_cls)}):
+            import importlib
+            import voicetext.config as cfg_mod
+            importlib.reload(cfg_mod)
+            result = cfg_mod._read_user_defaults_config_dir()
+            assert result is None
+            importlib.reload(cfg_mod)
+
+    def test_read_user_defaults_returns_value_when_set(self):
+        """Returns the stored path when NSUserDefaults has config_dir."""
+        mock_defaults = MagicMock()
+        mock_defaults.stringForKey_.return_value = "/custom/config"
+        mock_cls = MagicMock()
+        mock_cls.alloc.return_value.initWithSuiteName_.return_value = mock_defaults
+        with patch.dict("sys.modules", {"Foundation": MagicMock(NSUserDefaults=mock_cls)}):
+            import importlib
+            import voicetext.config as cfg_mod
+            importlib.reload(cfg_mod)
+            result = cfg_mod._read_user_defaults_config_dir()
+            assert result == "/custom/config"
+            importlib.reload(cfg_mod)

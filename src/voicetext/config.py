@@ -14,12 +14,57 @@ DEFAULT_CONFIG_PATH = os.path.join(DEFAULT_CONFIG_DIR, "config.json")
 DEFAULT_ENHANCE_MODES_DIR = os.path.join(DEFAULT_CONFIG_DIR, "enhance_modes")
 
 
+BUNDLE_ID = "com.voicetext.app"
+_DEFAULTS_KEY = "config_dir"
+
+
+def _read_user_defaults_config_dir() -> Optional[str]:
+    """Read config_dir from NSUserDefaults (macOS preferences)."""
+    try:
+        from Foundation import NSUserDefaults
+
+        defaults = NSUserDefaults.alloc().initWithSuiteName_(BUNDLE_ID)
+        value = defaults.stringForKey_(_DEFAULTS_KEY)
+        if value:
+            return str(value)
+    except Exception:
+        logger.debug("NSUserDefaults not available, skipping", exc_info=True)
+    return None
+
+
+def save_config_dir_preference(path: str) -> None:
+    """Save a custom config_dir to NSUserDefaults."""
+    from Foundation import NSUserDefaults
+
+    defaults = NSUserDefaults.alloc().initWithSuiteName_(BUNDLE_ID)
+    defaults.setObject_forKey_(path, _DEFAULTS_KEY)
+    defaults.synchronize()
+    logger.info("Saved config_dir preference: %s", path)
+
+
+def reset_config_dir_preference() -> None:
+    """Remove the custom config_dir from NSUserDefaults (revert to default)."""
+    from Foundation import NSUserDefaults
+
+    defaults = NSUserDefaults.alloc().initWithSuiteName_(BUNDLE_ID)
+    defaults.removeObjectForKey_(_DEFAULTS_KEY)
+    defaults.synchronize()
+    logger.info("Reset config_dir preference to default")
+
+
 def resolve_config_dir(config_dir: Optional[str] = None) -> str:
     """Return the expanded absolute config directory path.
 
-    If *config_dir* is ``None``, returns the default ``~/.config/VoiceText``.
+    Priority: explicit argument > NSUserDefaults > default path.
     """
-    return os.path.expanduser(config_dir if config_dir else DEFAULT_CONFIG_DIR)
+    if config_dir:
+        return os.path.expanduser(config_dir)
+
+    from_defaults = _read_user_defaults_config_dir()
+    if from_defaults:
+        return os.path.expanduser(from_defaults)
+
+    return os.path.expanduser(DEFAULT_CONFIG_DIR)
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "hotkeys": {"fn": True},
