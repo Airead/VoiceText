@@ -53,7 +53,7 @@
       </a>
       <ul class="nav-links">
         <li><a href="../">&larr; Back</a></li>
-        <li><a href="../../zh/docs/provider-model-guide.html" class="lang-switch">中文</a></li>
+        <li><a href="../zh/docs/provider-model-guide.html" class="lang-switch">中文</a></li>
         <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
       </ul>
     </nav>
@@ -102,7 +102,7 @@
     </div>
 
 <p>This guide explains how to configure ASR (speech recognition) models and AI enhancement providers in VoiceText. Both GUI (Settings panel) and config file approaches are covered.</p>
-<h2 id="asr-model-selection">ASR Model Selection</h2>
+<h2 id="asr-model-selection"><a href="#asr-model-selection" class="heading-anchor">ASR Model Selection</a></h2>
 <p>VoiceText supports four ASR backends:</p>
 <div class="table-wrapper"><table>
 <thead>
@@ -140,10 +140,10 @@
 </tr>
 </tbody>
 </table></div>
-<h3 id="asr-via-gui">ASR Via GUI</h3>
+<h3 id="asr-via-gui"><a href="#asr-via-gui" class="heading-anchor">ASR Via GUI</a></h3>
 <p>Open <strong>Settings...</strong> → <strong>STT</strong> tab. All available local and remote ASR models are listed as radio buttons. Select one to switch — the active model is highlighted.</p>
 <p>If the selected MLX-Whisper model hasn't been downloaded yet, VoiceText will download it automatically on first use (the menubar icon shows <code>DL X%</code> progress). Remote ASR models from configured providers also appear in this tab.</p>
-<h3 id="asr-via-config-file">ASR Via Config File</h3>
+<h3 id="asr-via-config-file"><a href="#asr-via-config-file" class="heading-anchor">ASR Via Config File</a></h3>
 <p>Edit <code>~/.config/VoiceText/config.json</code>:</p>
 <pre><code class="language-json">{
   &quot;asr&quot;: {
@@ -187,7 +187,7 @@
 </tbody>
 </table></div>
 <p>After editing, restart VoiceText for changes to take effect.</p>
-<h3 id="available-asr-models">Available ASR Models</h3>
+<h3 id="available-asr-models"><a href="#available-asr-models" class="heading-anchor">Available ASR Models</a></h3>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -234,9 +234,9 @@
 <p><strong>Note:</strong> MLX-Whisper tiny/base/small models are not available as presets but can be used by setting <code>asr.model</code> directly (e.g., <code>"model": "mlx-community/whisper-small"</code>).</p>
 </blockquote>
 <hr />
-<h2 id="remote-asr-providers">Remote ASR Providers</h2>
+<h2 id="remote-asr-providers"><a href="#remote-asr-providers" class="heading-anchor">Remote ASR Providers</a></h2>
 <p>In addition to local ASR backends, VoiceText supports remote ASR via OpenAI-compatible audio transcription APIs (e.g. Groq, OpenAI). Remote providers are configured separately from LLM providers.</p>
-<h3 id="remote-asr-via-gui">Remote ASR Via GUI</h3>
+<h3 id="remote-asr-via-gui"><a href="#remote-asr-via-gui" class="heading-anchor">Remote ASR Via GUI</a></h3>
 <ol>
 <li>
 <p>Open <strong>Settings...</strong> → <strong>STT</strong> tab → <strong>Add Provider...</strong></p>
@@ -258,7 +258,7 @@
 <p>If verification passes, click <strong>Save</strong>. The new models appear in the <strong>STT</strong> tab.</p>
 </li>
 </ol>
-<h3 id="remote-asr-via-config-file">Remote ASR Via Config File</h3>
+<h3 id="remote-asr-via-config-file"><a href="#remote-asr-via-config-file" class="heading-anchor">Remote ASR Via Config File</a></h3>
 <p>Edit <code>~/.config/VoiceText/config.json</code> and add entries under <code>asr</code>:</p>
 <pre><code class="language-json">{
   &quot;asr&quot;: {
@@ -275,7 +275,7 @@
 }
 </code></pre>
 <p>When <code>default_provider</code> and <code>default_model</code> are set, VoiceText starts with the remote ASR model. Set both to <code>null</code> to use a local backend.</p>
-<h3 id="remote-asr-examples">Remote ASR Examples</h3>
+<h3 id="remote-asr-examples"><a href="#remote-asr-examples" class="heading-anchor">Remote ASR Examples</a></h3>
 <p><strong>Groq</strong></p>
 <pre><code class="language-json">&quot;groq&quot;: {
   &quot;base_url&quot;: &quot;https://api.groq.com/openai/v1&quot;,
@@ -291,9 +291,9 @@
 }
 </code></pre>
 <hr />
-<h2 id="ai-llm-provider-configuration">AI (LLM) Provider Configuration</h2>
+<h2 id="ai-llm-provider-configuration"><a href="#ai-llm-provider-configuration" class="heading-anchor">AI (LLM) Provider Configuration</a></h2>
 <p>AI enhancement uses OpenAI-compatible LLM providers. You can configure multiple providers and switch between them at any time.</p>
-<h3 id="provider-via-gui">Provider Via GUI</h3>
+<h3 id="provider-via-gui"><a href="#provider-via-gui" class="heading-anchor">Provider Via GUI</a></h3>
 <ol>
 <li>
 <p>Open <strong>Settings...</strong> → <strong>LLM</strong> tab → <strong>Add Provider...</strong></p>
@@ -325,7 +325,7 @@
 <p>If verification passes, click <strong>Save</strong> to add the provider.</p>
 </li>
 </ol>
-<h3 id="provider-via-config-file">Provider Via Config File</h3>
+<h3 id="provider-via-config-file"><a href="#provider-via-config-file" class="heading-anchor">Provider Via Config File</a></h3>
 <p>Edit <code>~/.config/VoiceText/config.json</code> and add entries under <code>ai_enhance.providers</code>:</p>
 <pre><code class="language-json">{
   &quot;ai_enhance&quot;: {
@@ -374,7 +374,7 @@
 </tbody>
 </table></div>
 <p>After editing, restart VoiceText for changes to take effect.</p>
-<h3 id="provider-examples">Provider Examples</h3>
+<h3 id="provider-examples"><a href="#provider-examples" class="heading-anchor">Provider Examples</a></h3>
 <p><strong>Ollama (local)</strong></p>
 <pre><code class="language-json">&quot;ollama&quot;: {
   &quot;base_url&quot;: &quot;http://localhost:11434/v1&quot;,
@@ -415,14 +415,14 @@
 <p><strong>Note on <code>extra_body</code>:</strong> Some providers require additional parameters. For example, Qwen models need <code>enable_thinking</code> to control the thinking mode. This field is passed directly in the request body alongside the standard OpenAI fields.</p>
 </blockquote>
 <hr />
-<h2 id="switching-provider-model">Switching Provider &amp; Model</h2>
-<h3 id="switching-via-gui">Switching Via GUI</h3>
+<h2 id="switching-provider-model"><a href="#switching-provider-model" class="heading-anchor">Switching Provider &amp; Model</a></h2>
+<h3 id="switching-via-gui"><a href="#switching-via-gui" class="heading-anchor">Switching Via GUI</a></h3>
 <p><strong>Switch LLM provider/model:</strong> Open <strong>Settings...</strong> → <strong>LLM</strong> tab → select from the list of available models.</p>
 <p>All models from all configured providers are shown as radio buttons. The active model is highlighted.</p>
 <p><strong>Switch STT model:</strong> Open <strong>Settings...</strong> → <strong>STT</strong> tab → select one (local or remote).</p>
 <p><strong>Toggle thinking mode:</strong> Open <strong>Settings...</strong> → <strong>AI</strong> tab → <strong>Thinking</strong> checkbox.</p>
 <p>You can also switch STT and LLM models directly from the <strong>preview panel</strong> dropdowns without opening the Settings panel.</p>
-<h3 id="switching-via-config-file">Switching Via Config File</h3>
+<h3 id="switching-via-config-file"><a href="#switching-via-config-file" class="heading-anchor">Switching Via Config File</a></h3>
 <p>Update <code>default_provider</code> and <code>default_model</code> in <code>config.json</code>:</p>
 <pre><code class="language-json">{
   &quot;ai_enhance&quot;: {
@@ -436,18 +436,18 @@
 <p><strong>Important:</strong> The <code>default_model</code> must be one of the models listed in the selected provider's <code>models</code> array.</p>
 </blockquote>
 <hr />
-<h2 id="removing-a-provider">Removing a Provider</h2>
-<h3 id="llm-provider">LLM Provider</h3>
+<h2 id="removing-a-provider"><a href="#removing-a-provider" class="heading-anchor">Removing a Provider</a></h2>
+<h3 id="llm-provider"><a href="#llm-provider" class="heading-anchor">LLM Provider</a></h3>
 <p><strong>Via GUI:</strong> Open <strong>Settings...</strong> → <strong>LLM</strong> tab → <strong>Remove...</strong> → select the provider to remove → confirm in the dialog.</p>
 <p><strong>Via Config File:</strong> Delete the provider entry from <code>ai_enhance.providers</code> in <code>config.json</code>. If it was the active provider, update <code>default_provider</code> and <code>default_model</code> to point to a remaining provider.</p>
-<h3 id="asr-provider">ASR Provider</h3>
+<h3 id="asr-provider"><a href="#asr-provider" class="heading-anchor">ASR Provider</a></h3>
 <p><strong>Via GUI:</strong> Open <strong>Settings...</strong> → <strong>STT</strong> tab → <strong>Remove...</strong> → select the provider to remove → confirm in the dialog.</p>
 <p><strong>Via Config File:</strong> Delete the provider entry from <code>asr.providers</code> in <code>config.json</code>. If it was the active provider, update <code>asr.default_provider</code> and <code>asr.default_model</code> to <code>null</code>.</p>
 <blockquote>
 <p>The currently active provider cannot be removed. Switch to a different provider/model first.</p>
 </blockquote>
 <hr />
-<h2 id="quick-start-example">Quick Start Example</h2>
+<h2 id="quick-start-example"><a href="#quick-start-example" class="heading-anchor">Quick Start Example</a></h2>
 <p>A minimal config to get started with OpenAI enhancement:</p>
 <pre><code class="language-json">{
   &quot;ai_enhance&quot;: {

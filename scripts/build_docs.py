@@ -320,6 +320,13 @@ def _convert_md(md_text: str) -> tuple[str, str]:
         flags=re.DOTALL,
     )
 
+    # Make headings clickable anchor links
+    body_html = re.sub(
+        r"<(h[234])\s+id=\"([^\"]+)\">(.+?)</\1>",
+        r'<\1 id="\2"><a href="#\2" class="heading-anchor">\3</a></\1>',
+        body_html,
+    )
+
     return body_html, toc_html
 
 
@@ -363,7 +370,7 @@ def build_doc(entry: dict, registry: list[dict]) -> None:
 
         # Language switch href
         if lang == "en":
-            lang_switch_href = f"../../zh/docs/{entry['slug']}.html"
+            lang_switch_href = f"../zh/docs/{entry['slug']}.html"
             out_dir = SITE_DIR / "docs"
             prefix = "../"
         else:

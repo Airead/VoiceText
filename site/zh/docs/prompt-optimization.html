@@ -100,13 +100,13 @@
     </div>
 
 <p>本指南面向希望系统性提升 AI 增强质量的进阶用户，介绍如何利用 Preview 面板的内置工具进行 prompt 优化。</p>
-<h2 id="_1">前提条件</h2>
+<h2 id="_1"><a href="#_1" class="heading-anchor">前提条件</a></h2>
 <ul>
 <li>已启用 Preview 模式（Settings → General → Preview）</li>
 <li>已配置至少一个 LLM 提供商（Settings → LLM）</li>
 <li>已选择一种增强模式（Settings → AI）</li>
 </ul>
-<h2 id="preview">Preview 面板概览</h2>
+<h2 id="preview"><a href="#preview" class="heading-anchor">Preview 面板概览</a></h2>
 <pre><code>┌─────────────────────────────────────────────────────┐
 │  ASR   [FunASR ▾]  10.6s    ☐ Punc   Play ▶  Save  │  ← 原始语音识别结果
 │  ┌─────────────────────────────────────────────┐    │
@@ -129,8 +129,8 @@
 │  [History]                      [Cancel]  [Copy ⌘↵] │
 └─────────────────────────────────────────────────────┘
 </code></pre>
-<h2 id="_2">核心优化工具</h2>
-<h3 id="1-play">1. Play ▶ — 确认你实际说了什么</h3>
+<h2 id="_2"><a href="#_2" class="heading-anchor">核心优化工具</a></h2>
+<h3 id="1-play"><a href="#1-play" class="heading-anchor">1. Play ▶ — 确认你实际说了什么</a></h3>
 <p>在归咎于 ASR 或 AI 之前，先回放录音。这能帮你判断问题出在哪一层：</p>
 <div class="table-wrapper"><table>
 <thead>
@@ -158,7 +158,7 @@
 </tr>
 </tbody>
 </table></div>
-<h3 id="2-prompt-prompt">2. Prompt 按钮 — 查看实际的系统 prompt</h3>
+<h3 id="2-prompt-prompt"><a href="#2-prompt-prompt" class="heading-anchor">2. Prompt 按钮 — 查看实际的系统 prompt</a></h3>
 <p>增强完成后点击 <strong>Prompt ⓘ</strong>，即可看到发送给 LLM 的完整系统 prompt。这是优化的核心工具——你无法改进看不到的东西。</p>
 <p>需要关注的要点：</p>
 <ul>
@@ -167,7 +167,7 @@
 <li>是否有"仅输出结果"的规则以防止 AI 添加额外说明？</li>
 <li>是否有 prompt 未覆盖的边界情况？</li>
 </ul>
-<h3 id="3-19">3. 模式切换器（⌘1–⌘9）— 即时对比不同模式</h3>
+<h3 id="3-19"><a href="#3-19" class="heading-anchor">3. 模式切换器（⌘1–⌘9）— 即时对比不同模式</a></h3>
 <p>按 <code>⌘1</code> 到 <code>⌘9</code> 可在不重新录音的情况下切换模式。结果会被缓存——切回之前的模式会立即显示缓存结果（标记为 <code>[cached]</code>）。</p>
 <p>用途：</p>
 <ul>
@@ -175,9 +175,9 @@
 <li>对新模式和现有模式进行 A/B 测试</li>
 <li>找出哪种模式最适合处理特定类型的内容</li>
 </ul>
-<h3 id="4-llm">4. LLM 模型下拉框 — 对比不同模型</h3>
+<h3 id="4-llm"><a href="#4-llm" class="heading-anchor">4. LLM 模型下拉框 — 对比不同模型</a></h3>
 <p>通过 AI 下拉框切换模型，查看同一 prompt 在不同 LLM 上的表现。每个（模式、模型、thinking）组合的结果都独立缓存。</p>
-<h3 id="5-thinking-ai">5. Thinking 模式 — 观察 AI 推理过程</h3>
+<h3 id="5-thinking-ai"><a href="#5-thinking-ai" class="heading-anchor">5. Thinking 模式 — 观察 AI 推理过程</a></h3>
 <p>启用 thinking 复选框，然后在增强完成后点击 <strong>🧠</strong>（大脑）按钮，即可阅读 AI 的推理过程。这能揭示：</p>
 <ul>
 <li>AI 为什么做出特定的措辞选择</li>
@@ -185,10 +185,10 @@
 <li>AI 是否正确理解了你的意图</li>
 </ul>
 <p>这对诊断 prompt 问题非常有价值——如果 AI 的推理方向错了，说明 prompt 需要修改。</p>
-<h3 id="6-final-result">6. Final Result — 修正与训练</h3>
+<h3 id="6-final-result"><a href="#6-final-result" class="heading-anchor">6. Final Result — 修正与训练</a></h3>
 <p>在确认前编辑 Final Result 以修复剩余问题。每次编辑都会被记录并标记 <code>user_corrected</code>，随着时间推移会反馈到词汇表系统中。</p>
-<h2 id="_3">逐步优化工作流</h2>
-<h3 id="1">阶段 1：识别问题</h3>
+<h2 id="_3"><a href="#_3" class="heading-anchor">逐步优化工作流</a></h2>
+<h3 id="1"><a href="#1" class="heading-anchor">阶段 1：识别问题</a></h3>
 <ol>
 <li><strong>录制</strong>一句有代表性的语音。</li>
 <li><strong>Play ▶</strong> 回放录音，确认你说的内容与预期一致。</li>
@@ -196,7 +196,7 @@
 <li><strong>阅读 AI 结果</strong> —— 增强是改善了还是损害了文本？</li>
 <li><strong>点击 Prompt</strong> —— 阅读产生该结果的系统 prompt。</li>
 </ol>
-<h3 id="2">阶段 2：诊断</h3>
+<h3 id="2"><a href="#2" class="heading-anchor">阶段 2：诊断</a></h3>
 <p>使用各项控件缩小问题范围：</p>
 <div class="table-wrapper"><table>
 <thead>
@@ -234,7 +234,7 @@
 </tr>
 </tbody>
 </table></div>
-<h3 id="3">阶段 3：编辑模式</h3>
+<h3 id="3"><a href="#3" class="heading-anchor">阶段 3：编辑模式</a></h3>
 <ol>
 <li>用文本编辑器打开 <code>~/.config/VoiceText/enhance_modes/&lt;mode_id&gt;.md</code>。
    或者使用 Settings → AI → 选择模式 → 编辑。</li>
@@ -242,35 +242,35 @@
 <li>重启应用（或重新加载配置）以加载更新后的 prompt。</li>
 <li>重新录制相同的语句并对比结果。</li>
 </ol>
-<h3 id="4">阶段 4：验证</h3>
+<h3 id="4"><a href="#4" class="heading-anchor">阶段 4：验证</a></h3>
 <ol>
 <li><strong>⌘1–⌘9</strong> 在更新后的模式和其他模式之间切换 —— 更新后的是否更好？</li>
 <li><strong>切换 LLM 模型</strong> —— 改进在不同模型间是否一致？</li>
 <li><strong>测试边界情况</strong> —— 尝试短输入、长输入、中英混合、嘈杂语音。</li>
 <li><strong>启用 thinking</strong> —— AI 的推理过程是否与你的意图一致？</li>
 </ol>
-<h3 id="5">阶段 5：持续优化</h3>
+<h3 id="5"><a href="#5" class="heading-anchor">阶段 5：持续优化</a></h3>
 <ul>
 <li><strong>坚持修正 Final Result</strong> —— 词汇表系统会从你的编辑中学习。</li>
 <li><strong>查看 History</strong>（点击 History 按钮）—— 寻找 AI 犯错的规律。</li>
 <li><strong>构建词汇表</strong>（Settings → AI → Build Vocabulary）—— 领域术语会自动积累。</li>
 </ul>
-<h2 id="_4">实际示例</h2>
-<h3 id="1ai">示例 1：AI 在翻译后添加了说明文字</h3>
+<h2 id="_4"><a href="#_4" class="heading-anchor">实际示例</a></h2>
+<h3 id="1ai"><a href="#1ai" class="heading-anchor">示例 1：AI 在翻译后添加了说明文字</a></h3>
 <p><strong>问题：</strong>"翻译为英文"模式输出时带有 "Translation: ..." 前缀。</p>
 <p><strong>诊断：</strong> 点击 Prompt → prompt 中写了"translate to English"，但没有明确禁止添加额外说明。</p>
 <p><strong>修复：</strong> 在 prompt 中添加：</p>
 <pre><code>Output only the translated text.
 Do not add any prefix, label, or explanation.
 </code></pre>
-<h3 id="2ai">示例 2：AI 错误地修改了人名</h3>
+<h3 id="2ai"><a href="#2ai" class="heading-anchor">示例 2：AI 错误地修改了人名</a></h3>
 <p><strong>问题：</strong> 你说"找萍萍确认一下"，但 AI 将其改为"找平平确认一下"。</p>
 <p><strong>诊断：</strong> 启用 thinking → AI 因缺乏上下文而将"萍萍"视为 ASR 对"平平"的识别错误。</p>
 <p><strong>修复方案：</strong>
 - 在 Final Result 中改回"萍萍" → 修正记录会被保存，随时间推移逐步建立词汇表
 - 启用对话历史（Settings → AI），让 AI 看到之前已确认使用的"萍萍"
 - 积累足够的修正后手动构建词汇表</p>
-<h3 id="3_1">示例 3：模式在不同模型上表现不一致</h3>
+<h3 id="3_1"><a href="#3_1" class="heading-anchor">示例 3：模式在不同模型上表现不一致</a></h3>
 <p><strong>问题：</strong>"命令行大神"在 GPT-4 上输出干净的 shell 命令，但在本地模型上会添加 markdown 代码块。</p>
 <p><strong>诊断：</strong> 通过下拉框切换模型，对比输出。点击 Prompt 检查。</p>
 <p><strong>修复：</strong> 让 prompt 更加明确：</p>
@@ -278,7 +278,7 @@ Do not add any prefix, label, or explanation.
 Do not wrap in markdown code blocks or backticks.
 Do not add any explanation.
 </code></pre>
-<h2 id="_5">快速参考</h2>
+<h2 id="_5"><a href="#_5" class="heading-anchor">快速参考</a></h2>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -329,7 +329,7 @@ Do not add any explanation.
 </tr>
 </tbody>
 </table></div>
-<h2 id="_6">技巧</h2>
+<h2 id="_6"><a href="#_6" class="heading-anchor">技巧</a></h2>
 <ul>
 <li><strong>一次只改一处。</strong> 编辑 prompt 时，每次只修改一个地方然后测试。同时做多处改动会让你难以判断哪个修改起了作用。</li>
 <li><strong>保存好的测试用例。</strong> 使用 <strong>Save</strong> 导出能暴露 prompt 问题的录音。编辑 prompt 后重新播放验证修复效果。</li>

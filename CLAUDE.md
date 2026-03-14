@@ -110,6 +110,16 @@ When adding new user-facing behaviors or interactions, always add corresponding 
 4. Update the stats display in `_on_show_usage_stats()`
 5. Add tests in `tests/test_usage_stats.py`
 
+## Pre-PR Rebase
+
+**MANDATORY before creating a pull request.** You MUST rebase onto the latest `main` branch before pushing:
+
+1. Back up the current branch: `git branch <branch>-backup`
+2. Fetch latest: `git fetch origin main`
+3. Rebase: `git rebase origin/main`
+4. If conflicts arise, resolve them, then `git rebase --continue`
+5. Only proceed to push/PR after a clean rebase
+
 ## Pre-PR Local Verification
 
 **MANDATORY gate before creating a pull request.** You MUST run both checks below and ensure they pass with zero errors BEFORE pushing or creating the PR. Do NOT proceed to `git push` or `gh pr create` until both pass:

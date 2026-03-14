@@ -645,6 +645,35 @@ pre.code-block {
   }
 }
 
+/* ---------- Clickable heading anchors ---------- */
+.doc-container h2[id],
+.doc-container h3[id],
+.doc-container h4[id] {
+  scroll-margin-top: 80px;
+}
+
+.heading-anchor {
+  color: inherit;
+  text-decoration: none;
+}
+
+.heading-anchor:hover {
+  color: inherit;
+  text-decoration: none;
+}
+
+.heading-anchor::after {
+  content: " #";
+  opacity: 0;
+  color: var(--purple-light);
+  font-weight: 400;
+  transition: opacity 0.2s;
+}
+
+.heading-anchor:hover::after {
+  opacity: 1;
+}
+
 /* ---------- Footer ---------- */
 .site-footer {
   padding: 40px 0;

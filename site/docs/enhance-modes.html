@@ -53,7 +53,7 @@
       </a>
       <ul class="nav-links">
         <li><a href="../">&larr; Back</a></li>
-        <li><a href="../../zh/docs/enhance-modes.html" class="lang-switch">中文</a></li>
+        <li><a href="../zh/docs/enhance-modes.html" class="lang-switch">中文</a></li>
         <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
       </ul>
     </nav>
@@ -90,7 +90,7 @@
     </div>
 
 <p>VoiceText uses AI enhancement modes to post-process transcribed text. Each mode is defined as an independent Markdown file stored in <code>~/.config/VoiceText/enhance_modes/</code>. You can add, edit, or remove modes without modifying any code.</p>
-<h2 id="how-it-works">How It Works</h2>
+<h2 id="how-it-works"><a href="#how-it-works" class="heading-anchor">How It Works</a></h2>
 <pre><code>Speech -&gt; ASR transcription -&gt; Enhancement mode (LLM) -&gt; Final text
 </code></pre>
 <ol>
@@ -98,7 +98,7 @@
 <li>All <code>.md</code> files in the directory are loaded and appear in the <strong>AI Enhance</strong> menu.</li>
 <li>When an enhancement mode is active, the transcribed text is sent to the configured LLM with the mode's prompt as the system message.</li>
 </ol>
-<h2 id="file-format">File Format</h2>
+<h2 id="file-format"><a href="#file-format" class="heading-anchor">File Format</a></h2>
 <p>Each <code>.md</code> file uses a simple YAML front matter followed by the prompt body:</p>
 <pre><code class="language-markdown">---
 label: Display Name
@@ -142,7 +142,7 @@ You can use multiple lines.
 <blockquote>
 <p>The reserved mode ID <code>off</code> disables enhancement and does not correspond to any file.</p>
 </blockquote>
-<h2 id="chain-modes">Chain Modes</h2>
+<h2 id="chain-modes"><a href="#chain-modes" class="heading-anchor">Chain Modes</a></h2>
 <p>A chain mode runs multiple enhancement steps sequentially, passing the output of each step as input to the next. This is useful for combining existing modes into a pipeline without duplicating prompts.</p>
 <p>To create a chain mode, add a <code>steps</code> field listing the mode IDs to execute in order:</p>
 <pre><code class="language-markdown">---
@@ -163,7 +163,7 @@ This mode first proofreads the text, then translates it to English.
 <blockquote>
 <p><strong>Note:</strong> The prompt body of a chain mode file is not sent to the LLM — each step uses its own mode's prompt. The body is only for documentation purposes.</p>
 </blockquote>
-<h3 id="chain-mode-example">Chain Mode Example</h3>
+<h3 id="chain-mode-example"><a href="#chain-mode-example" class="heading-anchor">Chain Mode Example</a></h3>
 <pre><code class="language-bash">cat &gt; ~/.config/VoiceText/enhance_modes/translate_en_plus.md &lt;&lt; 'EOF'
 ---
 label: Translate EN+ (纠错→翻译)
@@ -174,7 +174,7 @@ Proofread first, then translate to English.
 This prompt body is not used — each step uses its own mode's prompt.
 EOF
 </code></pre>
-<h2 id="built-in-modes">Built-in Modes</h2>
+<h2 id="built-in-modes"><a href="#built-in-modes" class="heading-anchor">Built-in Modes</a></h2>
 <p>These 4 modes are created automatically on first launch:</p>
 <div class="table-wrapper"><table>
 <thead>
@@ -217,8 +217,8 @@ EOF
 </tr>
 </tbody>
 </table></div>
-<h2 id="add-a-new-mode">Add a New Mode</h2>
-<h3 id="option-a-from-the-menu">Option A: From the Menu</h3>
+<h2 id="add-a-new-mode"><a href="#add-a-new-mode" class="heading-anchor">Add a New Mode</a></h2>
+<h3 id="option-a-from-the-menu"><a href="#option-a-from-the-menu" class="heading-anchor">Option A: From the Menu</a></h3>
 <ol>
 <li>Open <strong>Settings...</strong> → <strong>AI</strong> tab.</li>
 <li>Click <strong>Add Mode...</strong>.</li>
@@ -226,7 +226,7 @@ EOF
 <li>Enter a mode ID (e.g., <code>summarize</code>) and confirm.</li>
 <li>The new mode appears in the menu immediately.</li>
 </ol>
-<h3 id="option-b-create-a-file-manually">Option B: Create a File Manually</h3>
+<h3 id="option-b-create-a-file-manually"><a href="#option-b-create-a-file-manually" class="heading-anchor">Option B: Create a File Manually</a></h3>
 <p>Create a new <code>.md</code> file in the modes directory:</p>
 <pre><code class="language-bash">cat &gt; ~/.config/VoiceText/enhance_modes/summarize.md &lt;&lt; 'EOF'
 ---
@@ -240,7 +240,7 @@ Output only the summary without any explanation.
 EOF
 </code></pre>
 <p>Restart the app to load the new mode.</p>
-<h3 id="example-formal-email-mode">Example: Formal Email Mode</h3>
+<h3 id="example-formal-email-mode"><a href="#example-formal-email-mode" class="heading-anchor">Example: Formal Email Mode</a></h3>
 <pre><code class="language-bash">cat &gt; ~/.config/VoiceText/enhance_modes/formal_email.md &lt;&lt; 'EOF'
 ---
 label: Formal Email
@@ -253,7 +253,7 @@ Maintain the original intent and key information.
 Output only the email text without any explanation.
 EOF
 </code></pre>
-<h3 id="example-translate-to-japanese">Example: Translate to Japanese</h3>
+<h3 id="example-translate-to-japanese"><a href="#example-translate-to-japanese" class="heading-anchor">Example: Translate to Japanese</a></h3>
 <pre><code class="language-bash">cat &gt; ~/.config/VoiceText/enhance_modes/translate_ja.md &lt;&lt; 'EOF'
 ---
 label: Translate to Japanese
@@ -265,7 +265,7 @@ Preserve the original meaning and tone.
 Output only the translated text without any explanation.
 EOF
 </code></pre>
-<h2 id="edit-an-existing-mode">Edit an Existing Mode</h2>
+<h2 id="edit-an-existing-mode"><a href="#edit-an-existing-mode" class="heading-anchor">Edit an Existing Mode</a></h2>
 <p>Open the file directly with any text editor:</p>
 <pre><code class="language-bash"># Edit with your preferred editor
 open -e ~/.config/VoiceText/enhance_modes/proofread.md
@@ -276,7 +276,7 @@ vim ~/.config/VoiceText/enhance_modes/proofread.md
 <blockquote>
 <p>Built-in mode files can be freely edited. VoiceText will not overwrite a file that already exists.</p>
 </blockquote>
-<h2 id="remove-a-mode">Remove a Mode</h2>
+<h2 id="remove-a-mode"><a href="#remove-a-mode" class="heading-anchor">Remove a Mode</a></h2>
 <p>Delete the corresponding <code>.md</code> file and restart:</p>
 <pre><code class="language-bash">rm ~/.config/VoiceText/enhance_modes/summarize.md
 </code></pre>
@@ -287,7 +287,7 @@ order: 999
 ---
 Output the user's input exactly as-is, without any changes.
 </code></pre>
-<h2 id="tips">Tips</h2>
+<h2 id="tips"><a href="#tips" class="heading-anchor">Tips</a></h2>
 <ul>
 <li><strong>Ordering</strong>: Use <code>order</code> values with gaps (10, 20, 30...) so you can insert new modes between existing ones without renumbering.</li>
 <li><strong>Prompt quality</strong>: Be specific in your prompts. Tell the LLM exactly what to do and what NOT to do. Always end with "Output only the processed text without any explanation" to avoid unwanted commentary.</li>

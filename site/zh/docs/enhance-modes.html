@@ -90,7 +90,7 @@
     </div>
 
 <p>VoiceText 使用 AI 增强模式对转录文本进行后处理。每个模式定义为一个独立的 Markdown 文件，存储在 <code>~/.config/VoiceText/enhance_modes/</code> 目录中。你可以随意添加、编辑或删除模式，无需修改任何代码。</p>
-<h2 id="_1">工作原理</h2>
+<h2 id="_1"><a href="#_1" class="heading-anchor">工作原理</a></h2>
 <pre><code>语音 -&gt; ASR 转录 -&gt; 增强模式 (LLM) -&gt; 最终文本
 </code></pre>
 <ol>
@@ -98,7 +98,7 @@
 <li>目录中所有 <code>.md</code> 文件会被加载并显示在 <strong>AI Enhance</strong> 菜单中。</li>
 <li>当增强模式处于激活状态时，转录文本会被发送到已配置的 LLM，模式的提示词作为系统消息。</li>
 </ol>
-<h2 id="_2">文件格式</h2>
+<h2 id="_2"><a href="#_2" class="heading-anchor">文件格式</a></h2>
 <p>每个 <code>.md</code> 文件使用简单的 YAML front matter，后跟提示词正文：</p>
 <pre><code class="language-markdown">---
 label: 显示名称
@@ -142,7 +142,7 @@ order: 50
 <blockquote>
 <p>保留模式 ID <code>off</code> 用于禁用增强功能，不对应任何文件。</p>
 </blockquote>
-<h2 id="_3">链式模式</h2>
+<h2 id="_3"><a href="#_3" class="heading-anchor">链式模式</a></h2>
 <p>链式模式按顺序运行多个增强步骤，将每个步骤的输出作为下一个步骤的输入。这对于将现有模式组合成流水线非常有用，无需重复编写提示词。</p>
 <p>要创建链式模式，添加 <code>steps</code> 字段，列出按顺序执行的模式 ID：</p>
 <pre><code class="language-markdown">---
@@ -163,7 +163,7 @@ steps: proofread, translate_en
 <blockquote>
 <p><strong>注意：</strong> 链式模式文件的提示词正文不会被发送给 LLM——每个步骤使用其自身模式的提示词。正文仅用于文档说明。</p>
 </blockquote>
-<h3 id="_4">链式模式示例</h3>
+<h3 id="_4"><a href="#_4" class="heading-anchor">链式模式示例</a></h3>
 <pre><code class="language-bash">cat &gt; ~/.config/VoiceText/enhance_modes/translate_en_plus.md &lt;&lt; 'EOF'
 ---
 label: Translate EN+ (纠错→翻译)
@@ -174,7 +174,7 @@ Proofread first, then translate to English.
 This prompt body is not used — each step uses its own mode's prompt.
 EOF
 </code></pre>
-<h2 id="_5">内置模式</h2>
+<h2 id="_5"><a href="#_5" class="heading-anchor">内置模式</a></h2>
 <p>以下 4 个模式在首次启动时自动创建：</p>
 <div class="table-wrapper"><table>
 <thead>
@@ -217,8 +217,8 @@ EOF
 </tr>
 </tbody>
 </table></div>
-<h2 id="_6">添加新模式</h2>
-<h3 id="a">方式 A：从菜单添加</h3>
+<h2 id="_6"><a href="#_6" class="heading-anchor">添加新模式</a></h2>
+<h3 id="a"><a href="#a" class="heading-anchor">方式 A：从菜单添加</a></h3>
 <ol>
 <li>打开 <strong>Settings...</strong> → <strong>AI</strong> 标签页。</li>
 <li>点击 <strong>Add Mode...</strong>。</li>
@@ -226,7 +226,7 @@ EOF
 <li>输入模式 ID（例如 <code>summarize</code>）并确认。</li>
 <li>新模式会立即出现在菜单中。</li>
 </ol>
-<h3 id="b">方式 B：手动创建文件</h3>
+<h3 id="b"><a href="#b" class="heading-anchor">方式 B：手动创建文件</a></h3>
 <p>在模式目录中创建新的 <code>.md</code> 文件：</p>
 <pre><code class="language-bash">cat &gt; ~/.config/VoiceText/enhance_modes/summarize.md &lt;&lt; 'EOF'
 ---
@@ -240,7 +240,7 @@ Output only the summary without any explanation.
 EOF
 </code></pre>
 <p>重启应用以加载新模式。</p>
-<h3 id="_7">示例：正式邮件模式</h3>
+<h3 id="_7"><a href="#_7" class="heading-anchor">示例：正式邮件模式</a></h3>
 <pre><code class="language-bash">cat &gt; ~/.config/VoiceText/enhance_modes/formal_email.md &lt;&lt; 'EOF'
 ---
 label: Formal Email
@@ -253,7 +253,7 @@ Maintain the original intent and key information.
 Output only the email text without any explanation.
 EOF
 </code></pre>
-<h3 id="_8">示例：翻译为日文</h3>
+<h3 id="_8"><a href="#_8" class="heading-anchor">示例：翻译为日文</a></h3>
 <pre><code class="language-bash">cat &gt; ~/.config/VoiceText/enhance_modes/translate_ja.md &lt;&lt; 'EOF'
 ---
 label: Translate to Japanese
@@ -265,7 +265,7 @@ Preserve the original meaning and tone.
 Output only the translated text without any explanation.
 EOF
 </code></pre>
-<h2 id="_9">编辑现有模式</h2>
+<h2 id="_9"><a href="#_9" class="heading-anchor">编辑现有模式</a></h2>
 <p>使用任意文本编辑器直接打开文件：</p>
 <pre><code class="language-bash"># 使用你偏好的编辑器
 open -e ~/.config/VoiceText/enhance_modes/proofread.md
@@ -276,7 +276,7 @@ vim ~/.config/VoiceText/enhance_modes/proofread.md
 <blockquote>
 <p>内置模式文件可以自由编辑。VoiceText 不会覆盖已存在的文件。</p>
 </blockquote>
-<h2 id="_10">删除模式</h2>
+<h2 id="_10"><a href="#_10" class="heading-anchor">删除模式</a></h2>
 <p>删除对应的 <code>.md</code> 文件并重启：</p>
 <pre><code class="language-bash">rm ~/.config/VoiceText/enhance_modes/summarize.md
 </code></pre>
@@ -287,7 +287,7 @@ order: 999
 ---
 Output the user's input exactly as-is, without any changes.
 </code></pre>
-<h2 id="_11">使用技巧</h2>
+<h2 id="_11"><a href="#_11" class="heading-anchor">使用技巧</a></h2>
 <ul>
 <li><strong>排序</strong>：使用有间隔的 <code>order</code> 值（10, 20, 30...），这样可以在现有模式之间插入新模式而无需重新编号。</li>
 <li><strong>提示词质量</strong>：在提示词中要具体明确。告诉 LLM 该做什么以及不该做什么。始终以"仅输出处理后的文本，不要附加任何解释"结尾，以避免不必要的说明文字。</li>

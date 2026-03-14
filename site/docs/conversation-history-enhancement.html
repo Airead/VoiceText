@@ -53,7 +53,7 @@
       </a>
       <ul class="nav-links">
         <li><a href="../">&larr; Back</a></li>
-        <li><a href="../../zh/docs/conversation-history-enhancement.html" class="lang-switch">中文</a></li>
+        <li><a href="../zh/docs/conversation-history-enhancement.html" class="lang-switch">中文</a></li>
         <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
       </ul>
     </nav>
@@ -84,14 +84,14 @@
 
     </div>
 
-<h2 id="background">Background</h2>
+<h2 id="background"><a href="#background" class="heading-anchor">Background</a></h2>
 <p>VoiceText processes each voice input session independently — the AI enhancement step sees only the current ASR text and has no knowledge of what the user said before. This stateless approach works for isolated sentences but falls short when:</p>
 <ol>
 <li><strong>Recurring proper nouns</strong> — The user mentions "萍萍" in one sentence, but ASR transcribes it as "平平". Without prior context, the LLM has no basis to prefer one over the other. If the user already confirmed "萍萍" in a previous turn, that signal is lost.</li>
 <li><strong>Topic continuity</strong> — Conversations naturally build on prior context. When the user says "她说今天很开心", the LLM cannot resolve "她" without knowing who was mentioned earlier.</li>
 <li><strong>User expression patterns</strong> — Some users consistently use specific phrasing, punctuation styles, or sentence structures. A stateless enhancer cannot adapt to these preferences.</li>
 </ol>
-<h2 id="motivation">Motivation</h2>
+<h2 id="motivation"><a href="#motivation" class="heading-anchor">Motivation</a></h2>
 <p>The core insight: <strong>the user's recent confirmed outputs are the highest-quality signal for what they actually mean</strong>.</p>
 <p>Unlike raw ASR text (which contains errors) or AI-enhanced text (which may over-correct), the final confirmed output represents the user's true intent — they have reviewed and approved it. By feeding these confirmed outputs back into the enhancement prompt, we give the LLM a running context window that enables:</p>
 <ul>
@@ -99,8 +99,8 @@
 <li><strong>Topic-aware enhancement</strong> — The LLM understands the current conversation topic and can make contextually appropriate decisions.</li>
 <li><strong>Style adaptation</strong> — The LLM observes how the user actually writes and can match their tone and formatting preferences.</li>
 </ul>
-<h2 id="how-it-works">How It Works</h2>
-<h3 id="recording">Recording</h3>
+<h2 id="how-it-works"><a href="#how-it-works" class="heading-anchor">How It Works</a></h2>
+<h3 id="recording"><a href="#recording" class="heading-anchor">Recording</a></h3>
 <p>Every voice input session is recorded to <code>~/.config/VoiceText/conversation_history.jsonl</code>, regardless of mode:</p>
 <pre><code class="language-json">{
     &quot;timestamp&quot;: &quot;2026-03-12T10:30:00+00:00&quot;,
@@ -115,14 +115,14 @@
 }
 </code></pre>
 <p>Both direct mode (<code>preview_enabled: false</code>) and preview mode (<code>preview_enabled: true</code>) sessions are recorded. This ensures no data is lost, even if the injection policy changes later.</p>
-<h3 id="filtering-why-only-preview-confirmed-records">Filtering: Why Only Preview-Confirmed Records</h3>
+<h3 id="filtering-why-only-preview-confirmed-records"><a href="#filtering-why-only-preview-confirmed-records" class="heading-anchor">Filtering: Why Only Preview-Confirmed Records</a></h3>
 <p>Only records with <code>preview_enabled: true</code> are injected into the AI prompt. The reasoning:</p>
 <ul>
 <li><strong>Preview mode</strong> — The user sees the AI output, can edit it, and explicitly confirms the final text. This confirmed text is reliable.</li>
 <li><strong>Direct mode</strong> — Text is typed immediately without review. The user never validated the output, so it may contain uncorrected ASR errors or AI over-corrections. Injecting unverified text would propagate errors.</li>
 </ul>
 <p>This is a deliberate data quality decision: <strong>a smaller set of verified data is more valuable than a larger set of unverified data</strong>.</p>
-<h3 id="context-injection">Context Injection</h3>
+<h3 id="context-injection"><a href="#context-injection" class="heading-anchor">Context Injection</a></h3>
 <p>When conversation history is enabled, the enhancement prompt is augmented with recent history. The format is designed to be token-efficient:</p>
 <pre><code>---
 以下是用户近期的对话记录，用于学习纠错偏好和话题上下文。
@@ -141,14 +141,14 @@
 <li><strong>No arrow when identical</strong> — Avoids redundant repetition of the same text.</li>
 <li><strong>Only ASR + final text</strong> — The AI-enhanced intermediate text is omitted from injection to save tokens. The LLM only needs to see what the user actually said (ASR) and what they actually meant (final).</li>
 </ul>
-<h3 id="integration-with-other-context-sources">Integration with Other Context Sources</h3>
+<h3 id="integration-with-other-context-sources"><a href="#integration-with-other-context-sources" class="heading-anchor">Integration with Other Context Sources</a></h3>
 <p>Conversation history is injected into the system prompt <strong>after</strong> vocabulary context, following the same pattern:</p>
 <pre><code>[Mode prompt]                    ← base enhancement instructions
 [Vocabulary context]             ← relevant terms from user's vocabulary (if enabled)
 [Conversation history context]   ← recent confirmed outputs (if enabled)
 </code></pre>
 <p>Each context source is independently toggleable and gracefully degrades — if history retrieval fails, enhancement proceeds without it.</p>
-<h2 id="architecture">Architecture</h2>
+<h2 id="architecture"><a href="#architecture" class="heading-anchor">Architecture</a></h2>
 <pre><code>Voice Input
      │
      ▼
@@ -174,7 +174,7 @@
 └──────────────────┘                        ▼
                                    log(preview_enabled=true)
 </code></pre>
-<h2 id="configuration">Configuration</h2>
+<h2 id="configuration"><a href="#configuration" class="heading-anchor">Configuration</a></h2>
 <p>In <code>config.json</code> under <code>ai_enhance</code>:</p>
 <pre><code class="language-json">{
     &quot;conversation_history&quot;: {
@@ -208,7 +208,7 @@
 </tbody>
 </table></div>
 <p>The toggle is also available in the <strong>Settings</strong> panel (AI tab).</p>
-<h2 id="key-files">Key Files</h2>
+<h2 id="key-files"><a href="#key-files" class="heading-anchor">Key Files</a></h2>
 <div class="table-wrapper"><table>
 <thead>
 <tr>

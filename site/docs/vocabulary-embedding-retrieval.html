@@ -53,7 +53,7 @@
       </a>
       <ul class="nav-links">
         <li><a href="../">&larr; Back</a></li>
-        <li><a href="../../zh/docs/vocabulary-embedding-retrieval.html" class="lang-switch">中文</a></li>
+        <li><a href="../zh/docs/vocabulary-embedding-retrieval.html" class="lang-switch">中文</a></li>
         <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
       </ul>
     </nav>
@@ -84,19 +84,19 @@
 
     </div>
 
-<h2 id="background">Background</h2>
+<h2 id="background"><a href="#background" class="heading-anchor">Background</a></h2>
 <p>VoiceText uses LLM to correct ASR (Automatic Speech Recognition) output. ASR engines frequently misrecognize proper nouns, technical terms, and domain-specific vocabulary — replacing them with phonetically similar but incorrect characters. For example, "Kubernetes" might be transcribed as "库伯尼特斯" or "酷伯", and "Python" as "派森".</p>
 <p>A generic LLM has no knowledge of the user's personal vocabulary. Without additional context, it cannot reliably distinguish between a correct transcription and a misrecognized proper noun. This leads to two types of errors:</p>
 <ol>
 <li><strong>Missed corrections</strong> — the LLM leaves ASR errors in place because it doesn't recognize the intended term.</li>
 <li><strong>Wrong corrections</strong> — the LLM "corrects" a term to something plausible but incorrect, because it lacks domain context.</li>
 </ol>
-<h2 id="motivation">Motivation</h2>
+<h2 id="motivation"><a href="#motivation" class="heading-anchor">Motivation</a></h2>
 <p>The core idea is: <strong>if we can tell the LLM which specific terms the user frequently uses, it can make much better correction decisions</strong>.</p>
 <p>Rather than dumping an entire vocabulary list into every prompt (which would be noisy and waste tokens), we use <strong>embedding-based semantic retrieval</strong> to find only the vocabulary entries relevant to the current input text. This approach is essentially a lightweight, local RAG (Retrieval-Augmented Generation) pipeline.</p>
-<h2 id="how-it-works">How It Works</h2>
+<h2 id="how-it-works"><a href="#how-it-works" class="heading-anchor">How It Works</a></h2>
 <p>The system consists of two stages: <strong>vocabulary building</strong> and <strong>real-time retrieval</strong>.</p>
-<h3 id="stage-1-vocabulary-building">Stage 1: Vocabulary Building</h3>
+<h3 id="stage-1-vocabulary-building"><a href="#stage-1-vocabulary-building" class="heading-anchor">Stage 1: Vocabulary Building</a></h3>
 <p>VoiceText logs every user correction in <code>conversation_history.jsonl</code> — entries where the user edited the AI-enhanced text in the preview panel are marked with <code>user_corrected: true</code>. The vocabulary builder leverages these records:</p>
 <ol>
 <li>Read corrected records from <code>conversation_history.jsonl</code> (supports incremental builds via timestamp filtering).</li>
@@ -109,7 +109,7 @@
 <li>Merge new entries with existing vocabulary, deduplicating by term and accumulating frequency counts.</li>
 <li>Save the result as <code>vocabulary.json</code>.</li>
 </ol>
-<h3 id="stage-2-embedding-index-construction">Stage 2: Embedding Index Construction</h3>
+<h3 id="stage-2-embedding-index-construction"><a href="#stage-2-embedding-index-construction" class="heading-anchor">Stage 2: Embedding Index Construction</a></h3>
 <p>Once <code>vocabulary.json</code> exists, the <code>VocabularyIndex</code> builds an embedding index:</p>
 <ol>
 <li>Load vocabulary entries from <code>vocabulary.json</code>.</li>
@@ -124,7 +124,7 @@
 - Multilingual support (Chinese + English in the same embedding space)
 - Small size (~120MB), suitable for local execution
 - Good quality for semantic similarity tasks</p>
-<h3 id="stage-3-real-time-retrieval-during-enhancement">Stage 3: Real-Time Retrieval During Enhancement</h3>
+<h3 id="stage-3-real-time-retrieval-during-enhancement"><a href="#stage-3-real-time-retrieval-during-enhancement" class="heading-anchor">Stage 3: Real-Time Retrieval During Enhancement</a></h3>
 <p>When the user triggers text enhancement:</p>
 <ol>
 <li>Embed the input ASR text using the same model.</li>
@@ -142,7 +142,7 @@
 ---
 </code></pre>
 <p>This gives the LLM precise, relevant vocabulary context for each specific input, without overwhelming it with the entire vocabulary.</p>
-<h2 id="why-embedding-retrieval-instead-of-alternatives">Why Embedding Retrieval Instead of Alternatives</h2>
+<h2 id="why-embedding-retrieval-instead-of-alternatives"><a href="#why-embedding-retrieval-instead-of-alternatives" class="heading-anchor">Why Embedding Retrieval Instead of Alternatives</a></h2>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -175,7 +175,7 @@
 <li>The vocabulary grows over time as the user makes more corrections, and retrieval naturally scales without increasing prompt size.</li>
 <li>Running the embedding model locally (via fastembed) avoids additional API costs and latency.</li>
 </ul>
-<h2 id="architecture-diagram">Architecture Diagram</h2>
+<h2 id="architecture-diagram"><a href="#architecture-diagram" class="heading-anchor">Architecture Diagram</a></h2>
 <pre><code>conversation_history.jsonl (user_corrected entries)
        │
        ▼
@@ -204,7 +204,7 @@
                                     │  system_prompt + vocab_ctx  │──► LLM ──► corrected text
                                     └─────────────────────────────┘
 </code></pre>
-<h2 id="configuration">Configuration</h2>
+<h2 id="configuration"><a href="#configuration" class="heading-anchor">Configuration</a></h2>
 <p>In <code>config.json</code> under <code>ai_enhance</code>:</p>
 <pre><code class="language-json">{
     &quot;vocabulary&quot;: {
@@ -265,7 +265,7 @@
 </tr>
 </tbody>
 </table></div>
-<h2 id="key-files">Key Files</h2>
+<h2 id="key-files"><a href="#key-files" class="heading-anchor">Key Files</a></h2>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
