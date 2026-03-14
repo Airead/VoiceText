@@ -29,6 +29,9 @@ def mock_app():
             "vocabulary": {"enabled": False, "auto_build": True},
             "conversation_history": {"enabled": False},
         },
+        "ui": {
+            "settings_last_tab": "general",
+        },
     }
     app._config_path = "/tmp/test_config.json"
     app._enhancer = MagicMock()
@@ -323,6 +326,23 @@ class TestLlmRemoveProvider:
         mock_app._model_controller.on_enhance_remove_provider.assert_called_with(mock_item)
 
 
+class TestTabChange:
+    @patch("voicetext.controllers.settings_controller.save_config")
+    def test_persist_tab(self, mock_save, ctrl, mock_app):
+        ctrl.tab_change("stt")
+
+        assert mock_app._config["ui"]["settings_last_tab"] == "stt"
+        mock_save.assert_called_once()
+
+    @patch("voicetext.controllers.settings_controller.save_config")
+    def test_creates_ui_section_if_missing(self, mock_save, ctrl, mock_app):
+        mock_app._config.pop("ui", None)
+        ctrl.tab_change("ai")
+
+        assert mock_app._config["ui"]["settings_last_tab"] == "ai"
+        mock_save.assert_called_once()
+
+
 class TestOnOpenSettings:
     def test_shows_panel_with_state_and_callbacks(self, ctrl, mock_app):
         with patch("voicetext.enhance.vocabulary.get_vocab_entry_count", return_value=5):
@@ -337,6 +357,7 @@ class TestOnOpenSettings:
         assert "sound_enabled" in state
         assert "preview" in state
         assert "current_preset_id" in state
+        assert state["last_tab"] == "general"
 
         assert "on_hotkey_toggle" in callbacks
         assert "on_sound_toggle" in callbacks
@@ -344,3 +365,4 @@ class TestOnOpenSettings:
         assert "on_stt_select" in callbacks
         assert "on_llm_select" in callbacks
         assert "on_thinking_toggle" in callbacks
+        assert "on_tab_change" in callbacks

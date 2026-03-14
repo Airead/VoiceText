@@ -77,7 +77,11 @@ class SettingsController:
         if vocab_count == 0:
             vocab_count = get_vocab_entry_count(app._config_dir)
 
+        ui_cfg = app._config.get("ui", {})
+        last_tab = ui_cfg.get("settings_last_tab", "general")
+
         state = {
+            "last_tab": last_tab,
             "hotkeys": hotkeys,
             "sound_enabled": app._sound_manager.enabled,
             "visual_indicator": app._recording_indicator.enabled,
@@ -122,6 +126,7 @@ class SettingsController:
             "on_auto_build_toggle": self.auto_build_toggle,
             "on_history_toggle": self.history_toggle,
             "on_vocab_build": lambda: app._on_vocab_build(None),
+            "on_tab_change": self.tab_change,
             "on_show_config": lambda: app._on_show_config(None),
             "on_edit_config": lambda: app._on_enhance_edit_config(None),
             "on_reload_config": lambda: app._on_reload_config(None),
@@ -478,3 +483,9 @@ class SettingsController:
         app._config["ai_enhance"]["conversation_history"]["enabled"] = enabled
         save_config(app._config, app._config_path)
         logger.info("Conversation history set to: %s (from settings)", enabled)
+
+    def tab_change(self, tab_id: str) -> None:
+        """Persist the last active settings tab."""
+        app = self._app
+        app._config.setdefault("ui", {})["settings_last_tab"] = tab_id
+        save_config(app._config, app._config_path)

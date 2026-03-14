@@ -164,6 +164,12 @@ class SettingsPanel:
             self._panel = None
 
         self._build_panel(state)
+
+        # Restore last active tab
+        last_tab = state.get("last_tab", "general")
+        if self._tab_view is not None and last_tab != "general":
+            self._tab_view.selectTabViewItemWithIdentifier_(last_tab)
+
         self._panel.makeKeyAndOrderFront_(None)
         NSApp.activateIgnoringOtherApps_(True)
 
@@ -867,7 +873,7 @@ class SettingsPanel:
     # ── Tab view delegate ──────────────────────────────────────────────
 
     def tabView_didSelectTabViewItem_(self, tab_view, tab_item):
-        """Scroll to top when switching tabs."""
+        """Scroll to top when switching tabs and notify controller."""
         try:
             view = tab_item.view()
             if view is not None and hasattr(view, "documentView"):
@@ -879,6 +885,13 @@ class SettingsPanel:
                     doc_view.scrollPoint_(NSMakePoint(0, total_h))
         except Exception:
             logger.debug("Tab scroll reset failed", exc_info=True)
+
+        try:
+            tab_id = tab_item.identifier()
+            if tab_id:
+                self._call("on_tab_change", str(tab_id))
+        except Exception:
+            logger.debug("Tab change callback failed", exc_info=True)
 
     # ── Radio group helpers ──────────────────────────────────────────
 

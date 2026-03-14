@@ -85,6 +85,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "sound_volume": 0.4,
         "visual_indicator": True,
     },
+    "ui": {
+        "settings_last_tab": "general",
+    },
     "logging": {
         "level": "INFO",
     },
@@ -177,6 +180,8 @@ def validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
         ("asr.language", str, lambda v: len(v) > 0, DEFAULT_CONFIG["asr"]["language"]),
         ("logging.level", str, lambda v: v in {"DEBUG", "INFO", "WARNING", "ERROR"},
          DEFAULT_CONFIG["logging"]["level"]),
+        ("ui.settings_last_tab", str, lambda v: v in {"general", "stt", "llm", "ai"},
+         DEFAULT_CONFIG["ui"]["settings_last_tab"]),
         ("ai_enhance.timeout", (int, float), lambda v: v > 0, DEFAULT_CONFIG["ai_enhance"]["timeout"]),
         ("ai_enhance.connection_timeout", (int, float), lambda v: v > 0,
          DEFAULT_CONFIG["ai_enhance"]["connection_timeout"]),
