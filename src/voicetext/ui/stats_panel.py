@@ -167,16 +167,13 @@ function renderCards() {
     const cards = [
         { label: 'Total Transcriptions', value: t.transcriptions || 0,
           sub: `Today: ${td.transcriptions || 0}` },
-        { label: 'Total Tokens', value: formatNum(tk.total_tokens || 0),
-          sub: `\u2191${formatNum(tk.prompt_tokens || 0)} \u2193${formatNum(tk.completion_tokens || 0)}`
-            + (tk.cache_read_tokens ? ` | Cached: ${formatNum(tk.cache_read_tokens)}` : '') },
+        { label: 'Total Tokens', value: compactNum(tk.total_tokens || 0),
+          sub: formatTokenSub(tk) },
         { label: 'Accept Rate',
           value: calcRate(t.direct_accept, t.direct_accept + t.user_modification + t.cancel),
           sub: `Accept: ${t.direct_accept || 0} | Modified: ${t.user_modification || 0}` },
         { label: 'Recording Time', value: formatDuration(t.recording_seconds || 0),
           sub: `Today: ${formatDuration(td.recording_seconds || 0)}` },
-        { label: 'Days Active', value: DATA.daily.filter(d => (d.totals||{}).transcriptions > 0).length,
-          sub: cum.first_recorded ? `Since ${cum.first_recorded.slice(0, 10)}` : 'No data yet' },
     ];
 
     const container = document.getElementById('cards');
@@ -193,6 +190,12 @@ function formatNum(n) {
     return n.toLocaleString();
 }
 
+function compactNum(n) {
+    if (n < 10000) return n.toLocaleString();
+    if (n < 1000000) return (n / 1000).toFixed(1) + 'K';
+    return (n / 1000000).toFixed(2) + 'M';
+}
+
 function formatDuration(totalSec) {
     const s = Math.round(totalSec);
     if (s < 60) return s + 's';
@@ -202,6 +205,17 @@ function formatDuration(totalSec) {
     const h = Math.floor(m / 60);
     const min = m % 60;
     return h + 'h ' + min + 'm';
+}
+
+function formatTokenSub(tk) {
+    const prompt = tk.prompt_tokens || 0;
+    const comp = tk.completion_tokens || 0;
+    const cached = tk.cache_read_tokens || 0;
+    const pp = cached
+        ? '<span style="opacity:0.5">\u2191' + compactNum(cached)
+          + '</span>+' + compactNum(prompt - cached)
+        : '\u2191' + compactNum(prompt);
+    return `(${pp} \u2193${compactNum(comp)})`;
 }
 
 function calcRate(num, denom) {
