@@ -4,11 +4,24 @@ from __future__ import annotations
 
 import json
 import sys
+from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
 
 import pytest
 
 from tests.conftest import mock_panel_close_delegate
+from tests.ui._shared_result_window_tests import (
+    SharedConfirmCancelTests,
+    SharedEnhanceLabelTests,
+    SharedModeSwitchTests,
+    SharedModelChangeTests,
+    SharedPropertyTests,
+    SharedReplayCachedTests,
+    SharedShowTests,
+    SharedStreamingTests,
+    SharedThreadingTests,
+    SharedToggleTests,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -40,6 +53,111 @@ def _build_panel(panel):
     panel._panel = MagicMock()
     panel._webview = MagicMock()
     return panel
+
+
+# ---------------------------------------------------------------------------
+# Shared test fixture for web panel
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def panel_factory():
+    """Factory that returns a ready-to-test web ResultPreviewPanel."""
+
+    def _factory():
+        from voicetext.ui.result_window_web import ResultPreviewPanel
+
+        panel = _build_panel(ResultPreviewPanel())
+
+        def trigger_confirm(text, user_edited=False, enhance_text="", copy=False):
+            panel._handle_js_message({
+                "type": "confirm",
+                "text": text,
+                "enhanceText": enhance_text,
+                "userEdited": user_edited,
+                "copyToClipboard": copy,
+            })
+
+        def trigger_cancel():
+            panel._handle_js_message({"type": "cancel"})
+
+        def trigger_mode_change(index):
+            panel._handle_js_message({"type": "modeChange", "index": index})
+
+        def trigger_stt_change(index):
+            panel._handle_js_message({"type": "sttModelChange", "index": index})
+
+        def trigger_llm_change(index):
+            panel._handle_js_message({"type": "llmModelChange", "index": index})
+
+        def trigger_punc_toggle(enabled):
+            panel._handle_js_message({"type": "puncToggle", "enabled": enabled})
+
+        def trigger_thinking_toggle(enabled):
+            panel._handle_js_message({"type": "thinkingToggle", "enabled": enabled})
+
+        return SimpleNamespace(
+            panel=panel,
+            trigger_confirm=trigger_confirm,
+            trigger_cancel=trigger_cancel,
+            trigger_mode_change=trigger_mode_change,
+            trigger_stt_change=trigger_stt_change,
+            trigger_llm_change=trigger_llm_change,
+            trigger_punc_toggle=trigger_punc_toggle,
+            trigger_thinking_toggle=trigger_thinking_toggle,
+        )
+
+    return _factory
+
+
+# ---------------------------------------------------------------------------
+# Shared behavioral tests (run against web panel)
+# ---------------------------------------------------------------------------
+
+
+class TestWebShow(SharedShowTests):
+    pass
+
+
+class TestWebConfirmCancel(SharedConfirmCancelTests):
+    pass
+
+
+class TestWebModeSwitch(SharedModeSwitchTests):
+    pass
+
+
+class TestWebModelChange(SharedModelChangeTests):
+    pass
+
+
+class TestWebToggle(SharedToggleTests):
+    pass
+
+
+class TestWebStreaming(SharedStreamingTests):
+    pass
+
+
+class TestWebProperty(SharedPropertyTests):
+    pass
+
+
+class TestWebThreading(SharedThreadingTests):
+    pass
+
+
+class TestWebEnhanceLabel(SharedEnhanceLabelTests):
+    pass
+
+
+class TestWebReplayCached(SharedReplayCachedTests):
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Web-specific tests below
+# ---------------------------------------------------------------------------
 
 
 class TestShowBasic:
