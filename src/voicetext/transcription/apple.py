@@ -216,9 +216,10 @@ class AppleSpeechTranscriber(BaseTranscriber):
 
         self._stream_request = request
 
-        # Audio format: mono int16 at self sample rate
+        # Audio format: mono float32 at 16kHz
+        # AVAudioCommonFormat values: 1=Float32, 2=Float64, 3=Int16, 4=Int32
         audio_format = AVAudioFormat.alloc().initWithCommonFormat_sampleRate_channels_interleaved_(
-            1,  # AVAudioPCMFormatInt16
+            1,  # AVAudioPCMFormatFloat32
             float(16000),
             1,
             False,
@@ -262,7 +263,10 @@ class AppleSpeechTranscriber(BaseTranscriber):
         logger.info("Streaming recognition started")
 
     def feed_audio(self, samples: np.ndarray) -> None:
-        """Feed int16 audio samples to the streaming request."""
+        """Feed int16 audio samples to the streaming request.
+
+        Converts int16 → float32 (range -1.0 to 1.0) for AVAudioPCMBuffer.
+        """
         if not hasattr(self, "_stream_request") or self._stream_request is None:
             return
 
@@ -274,12 +278,13 @@ class AppleSpeechTranscriber(BaseTranscriber):
         )
         buffer.setFrameLength_(n_samples)
 
-        # Copy int16 data into the buffer
-        int16_channel = buffer.int16ChannelData()
-        if int16_channel is not None:
-            ptr = int16_channel[0]
+        # Convert int16 → float32 and copy into the buffer
+        float_samples = samples.astype(np.float32) / 32768.0
+        float_channel = buffer.floatChannelData()
+        if float_channel is not None:
+            ptr = float_channel[0]
             for i in range(n_samples):
-                ptr[i] = int(samples[i])
+                ptr[i] = float(float_samples[i])
 
         self._stream_request.appendAudioPCMBuffer_(buffer)
 
