@@ -206,6 +206,7 @@ class AppleSpeechTranscriber(BaseTranscriber):
 
         self._stream_on_partial = on_partial
         self._stream_final_text: Optional[str] = None
+        self._stream_best_text: str = ""
         self._stream_done = threading.Event()
         self._stream_cancelled = False
 
@@ -234,12 +235,17 @@ class AppleSpeechTranscriber(BaseTranscriber):
             if result is not None:
                 text = result.bestTranscription().formattedString()
                 is_final = result.isFinal()
-                try:
-                    on_partial(text, is_final)
-                except Exception:
-                    logger.debug("on_partial callback error", exc_info=True)
+                # Keep the best (longest) partial text seen so far.
+                # Apple Speech may send shorter/empty partials during
+                # silence, which would erase the displayed text.
+                if text and len(text) >= len(self._stream_best_text):
+                    self._stream_best_text = text
+                    try:
+                        on_partial(text, is_final)
+                    except Exception:
+                        logger.debug("on_partial callback error", exc_info=True)
                 if is_final:
-                    self._stream_final_text = text
+                    self._stream_final_text = self._stream_best_text or text
                     self._stream_done.set()
             elif error is not None:
                 self._stream_done.set()
@@ -298,7 +304,8 @@ class AppleSpeechTranscriber(BaseTranscriber):
 
         # Cleanup
         self._stream_runloop_stop.set()
-        text = self._stream_final_text or ""
+        # Prefer the final result; fall back to the best partial seen
+        text = self._stream_final_text or self._stream_best_text or ""
         self._cleanup_stream()
 
         logger.info("Streaming recognition stopped, result: %s", text[:100] if text else "(empty)")
@@ -320,6 +327,7 @@ class AppleSpeechTranscriber(BaseTranscriber):
         self._stream_task = None
         self._stream_audio_format = None
         self._stream_on_partial = None
+        self._stream_best_text = ""
 
     def cleanup(self) -> None:
         """Release the recognizer."""
