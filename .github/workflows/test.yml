@@ -31,16 +31,4 @@ jobs:
         run: uv run ruff check
 
       - name: Run tests
-        run: |
-          # Pytest writes JUnit XML before process exit.  modelscope daemon
-          # threads can SIGSEGV during interpreter shutdown (exit code 139),
-          # so we check the XML report instead of relying on the exit code.
-          uv run pytest tests/ -v --cov=voicetext --junitxml=results.xml || true
-          python3 -c "
-          import xml.etree.ElementTree as ET, sys
-          root = ET.parse('results.xml').getroot()
-          ts = root.find('testsuite') if root.tag == 'testsuites' else root
-          f = int(ts.attrib.get('failures', 0)) + int(ts.attrib.get('errors', 0))
-          print(f'Tests: {ts.attrib[\"tests\"]}, Failures: {f}')
-          sys.exit(1 if f else 0)
-          "
+        run: uv run pytest tests/ -v --cov=voicetext

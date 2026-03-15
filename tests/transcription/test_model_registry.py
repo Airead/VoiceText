@@ -119,26 +119,6 @@ class TestResolvePresetFromConfig:
 
 
 class TestGetModelCacheDir:
-    def test_funasr_cache_dir(self):
-        preset = PRESET_BY_ID["funasr-paraformer"]
-        cache_dir = get_model_cache_dir(preset)
-        assert isinstance(cache_dir, Path)
-        assert "modelscope" in str(cache_dir)
-        assert "iic" in str(cache_dir)
-
-    def test_mlx_whisper_cache_dir(self):
-        preset = PRESET_BY_ID["mlx-whisper-large-v3-turbo"]
-        cache_dir = get_model_cache_dir(preset)
-        assert isinstance(cache_dir, Path)
-        assert "huggingface" in str(cache_dir)
-        assert "models--mlx-community--whisper-large-v3-turbo" in str(cache_dir)
-
-    def test_mlx_whisper_medium_cache_dir(self):
-        preset = PRESET_BY_ID["mlx-whisper-medium"]
-        cache_dir = get_model_cache_dir(preset)
-        assert "models--mlx-community--whisper-medium" in str(cache_dir)
-
-
     def test_sherpa_cache_dir(self):
         preset = PRESET_BY_ID["sherpa-zipformer-zh"]
         cache_dir = get_model_cache_dir(preset)
