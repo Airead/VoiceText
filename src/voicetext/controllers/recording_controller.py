@@ -27,6 +27,10 @@ class RecordingController:
     def on_hotkey_press(self) -> None:
         """Called when hotkey is pressed down - start recording."""
         app = self._app
+        if app._config_degraded:
+            from PyObjCTools import AppHelper
+            AppHelper.callAfter(app._show_config_error_alert)
+            return
         if app._busy:
             return
         logger.info("Hotkey pressed, starting recording")
