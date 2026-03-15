@@ -32,7 +32,7 @@ def _format_time_ago(timestamp: float) -> str:
 
 
 def _paste_text(text: str) -> None:
-    """Write text to clipboard and simulate Cmd+V to paste."""
+    """Write text to clipboard and simulate Cmd+V to paste at cursor."""
     try:
         from voicetext.input import _set_pasteboard_concealed
 
@@ -50,6 +50,20 @@ def _paste_text(text: str) -> None:
         )
     except Exception:
         logger.exception("Failed to paste clipboard text")
+
+
+def _copy_to_clipboard(text: str) -> None:
+    """Write text to the system clipboard (without pasting).
+
+    Uses concealed marker so the clipboard monitor does not re-record it,
+    but moves the entry to the top of history for freshness.
+    """
+    try:
+        from voicetext.input import _set_pasteboard_concealed
+
+        _set_pasteboard_concealed(text)
+    except Exception:
+        logger.exception("Failed to copy to clipboard")
 
 
 class ClipboardSource:
@@ -85,11 +99,22 @@ class ClipboardSource:
             subtitle = entry.source_app if entry.source_app else ""
 
             text = entry.text  # Capture for lambda
+            monitor = self._monitor
+
+            def _do_paste(t=text, m=monitor):
+                m.promote(t)
+                _paste_text(t)
+
+            def _do_copy(t=text, m=monitor):
+                m.promote(t)
+                _copy_to_clipboard(t)
+
             results.append(
                 ChooserItem(
                     title=display,
                     subtitle=f"{subtitle}  {time_ago}".strip() if subtitle else time_ago,
-                    action=lambda t=text: _paste_text(t),
+                    action=_do_paste,
+                    secondary_action=_do_copy,
                 )
             )
 

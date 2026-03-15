@@ -172,16 +172,20 @@ class TestSearchLogic:
 
 class TestItemExecution:
     def test_execute_item(self):
+        import time
+
         called = []
         panel = _make_panel()
         panel._current_items = [
             ChooserItem(title="Safari", action=lambda: called.append("safari")),
             ChooserItem(title="Chrome", action=lambda: called.append("chrome")),
         ]
-        # Mock close to avoid NSApp calls, capture callAfter calls
+        # Mock close to avoid NSApp calls
         panel.close = MagicMock()
         with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn: fn()):
             panel._execute_item(0)
+        # Action runs in a deferred thread with 0.15s delay
+        time.sleep(0.3)
         assert called == ["safari"]
         panel.close.assert_called_once()
 
@@ -224,6 +228,21 @@ class TestItemExecution:
             panel._reveal_item(0)
             mock_popen.assert_not_called()
 
+    def test_secondary_action(self):
+        """Cmd+Enter should call secondary_action when no reveal_path."""
+        called = []
+        panel = _make_panel()
+        panel._current_items = [
+            ChooserItem(
+                title="Clipboard entry",
+                secondary_action=lambda: called.append("copied"),
+            ),
+        ]
+        panel.close = MagicMock()
+        with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn: fn()):
+            panel._reveal_item(0)
+        assert called == ["copied"]
+
 
 class TestJSMessageHandling:
     def test_search_message(self):
@@ -241,6 +260,8 @@ class TestJSMessageHandling:
             mock_call_after.assert_called_once()
 
     def test_execute_message(self):
+        import time
+
         called = []
         panel = _make_panel()
         panel._current_items = [
@@ -249,6 +270,7 @@ class TestJSMessageHandling:
         panel.close = MagicMock()
         with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn: fn()):
             panel._handle_js_message({"type": "execute", "index": 0})
+        time.sleep(0.3)
         assert called == [True]
 
     def test_switch_source_message(self):

@@ -111,6 +111,31 @@ def _get_keyable_panel_class():
 
 
 # ---------------------------------------------------------------------------
+# Panel delegate for resign-key (lazy-created)
+# ---------------------------------------------------------------------------
+_PanelDelegate = None
+
+
+def _get_panel_delegate_class():
+    """Return an NSObject subclass that closes the panel on focus loss."""
+    global _PanelDelegate
+    if _PanelDelegate is not None:
+        return _PanelDelegate
+
+    from Foundation import NSObject
+
+    class ChooserPanelDelegate(NSObject):
+        _panel_ref = None
+
+        def windowDidResignKey_(self, notification):
+            if self._panel_ref is not None:
+                self._panel_ref.close()
+
+    _PanelDelegate = ChooserPanelDelegate
+    return _PanelDelegate
+
+
+# ---------------------------------------------------------------------------
 # Panel
 # ---------------------------------------------------------------------------
 
@@ -130,6 +155,7 @@ class ChooserPanel:
         self._webview = None
         self._message_handler = None
         self._navigation_delegate = None
+        self._panel_delegate = None
         self._page_loaded: bool = False
         self._pending_js: list[str] = []
 
@@ -182,6 +208,8 @@ class ChooserPanel:
     def close(self) -> None:
         """Close the chooser panel."""
         if self._panel is not None:
+            self._panel.setDelegate_(None)
+            self._panel_delegate = None
             self._panel.orderOut_(None)
             self._panel = None
         if self._webview is not None:
@@ -214,11 +242,6 @@ class ChooserPanel:
 
     def _do_search(self, query: str, source_name: Optional[str] = None) -> None:
         """Run a search against the active source and push results to JS."""
-        if not query.strip():
-            self._current_items = []
-            self._eval_js("setResults([])")
-            return
-
         source_name = source_name or self._active_source
         source = self._sources.get(source_name) if source_name else None
 
@@ -230,8 +253,14 @@ class ChooserPanel:
                     query = query[len(src.prefix):].lstrip()
                     break
 
-        # If still no source, merge results from all non-prefix sources
+        # When searching across all non-prefix sources (no specific source),
+        # empty query returns nothing. When a specific source is active
+        # (e.g. clipboard via Tab/prefix), let the source decide.
         if source is None:
+            if not query.strip():
+                self._current_items = []
+                self._eval_js("setResults([])")
+                return
             all_items = []
             sorted_sources = sorted(
                 self._sources.values(),
@@ -265,7 +294,7 @@ class ChooserPanel:
                 "subtitle": item.subtitle,
                 "icon": item.icon,
                 "badge": "",
-                "hasReveal": item.reveal_path is not None,
+                "hasReveal": item.reveal_path is not None or item.secondary_action is not None,
             })
         self._eval_js(f"setResults({json.dumps(js_items, ensure_ascii=False)})")
 
@@ -300,23 +329,36 @@ class ChooserPanel:
             self._do_search(query, source_name=source_name)
 
     def _execute_item(self, index: int) -> None:
-        """Execute the action of the item at the given index."""
+        """Execute the primary action (Enter): close panel, then act."""
+        if 0 <= index < len(self._current_items):
+            item = self._current_items[index]
+            action = item.action
+            from PyObjCTools import AppHelper
+            AppHelper.callAfter(self.close)
+            if action is not None:
+                import threading
+
+                def _deferred():
+                    import time
+                    time.sleep(0.15)  # Let previous app regain focus
+                    try:
+                        action()
+                    except Exception:
+                        logger.exception(
+                            "Chooser action failed for %r", item.title
+                        )
+
+                threading.Thread(target=_deferred, daemon=True).start()
+
+    def _reveal_item(self, index: int) -> None:
+        """Execute the secondary action (Cmd+Enter).
+
+        For apps: reveal in Finder. For other items: call secondary_action.
+        """
         if 0 <= index < len(self._current_items):
             item = self._current_items[index]
             from PyObjCTools import AppHelper
-            AppHelper.callAfter(self.close)
-            if item.action is not None:
-                try:
-                    item.action()
-                except Exception:
-                    logger.exception(
-                        "Chooser action failed for %r", item.title
-                    )
 
-    def _reveal_item(self, index: int) -> None:
-        """Reveal the item in Finder (Cmd+Enter)."""
-        if 0 <= index < len(self._current_items):
-            item = self._current_items[index]
             if item.reveal_path:
                 import subprocess
                 subprocess.Popen(  # noqa: S603
@@ -324,8 +366,15 @@ class ChooserPanel:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
-                from PyObjCTools import AppHelper
                 AppHelper.callAfter(self.close)
+            elif item.secondary_action is not None:
+                AppHelper.callAfter(self.close)
+                try:
+                    item.secondary_action()
+                except Exception:
+                    logger.exception(
+                        "Chooser secondary action failed for %r", item.title
+                    )
 
     # ------------------------------------------------------------------
     # Internal: panel construction
@@ -410,6 +459,13 @@ class ChooserPanel:
         # Transparent background — the HTML provides its own
         from AppKit import NSColor
         panel.setBackgroundColor_(NSColor.clearColor())
+
+        # Close on focus loss
+        delegate_cls = _get_panel_delegate_class()
+        delegate = delegate_cls.alloc().init()
+        delegate._panel_ref = self
+        panel.setDelegate_(delegate)
+        self._panel_delegate = delegate
 
         # Round corners
         panel.contentView().setWantsLayer_(True)

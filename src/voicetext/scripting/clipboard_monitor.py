@@ -156,6 +156,22 @@ class ClipboardMonitor:
             pass
         return ""
 
+    def promote(self, text: str) -> None:
+        """Move an existing entry to the top of the history list.
+
+        If found, updates its timestamp. If not found, does nothing.
+        """
+        with self._lock:
+            for i, entry in enumerate(self._entries):
+                if entry.text == text:
+                    self._entries.pop(i)
+                    entry.timestamp = time.time()
+                    self._entries.insert(0, entry)
+                    break
+            else:
+                return
+        self._save_to_disk()
+
     def _add_entry(self, text: str, source_app: str = "") -> None:
         """Add a new entry, deduplicating consecutive identical texts."""
         with self._lock:
