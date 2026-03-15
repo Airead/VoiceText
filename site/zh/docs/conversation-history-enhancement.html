@@ -76,9 +76,17 @@
 <li><a href="#_7">与其他上下文源的集成</a></li>
 </ul>
 </li>
-<li><a href="#_8">架构</a></li>
-<li><a href="#_9">配置</a></li>
-<li><a href="#_10">关键文件</a></li>
+<li><a href="#_8">存储与归档</a><ul>
+<li><a href="#_9">自动轮转</a></li>
+<li><a href="#_10">按月归档</a></li>
+<li><a href="#_11">浏览归档记录</a></li>
+</ul>
+</li>
+<li><a href="#_12">内存缓存</a></li>
+<li><a href="#_13">历史浏览器分页</a></li>
+<li><a href="#_14">架构</a></li>
+<li><a href="#_15">配置</a></li>
+<li><a href="#_16">关键文件</a></li>
 </ul>
 </div>
 
@@ -111,9 +119,72 @@
     &quot;preview_enabled&quot;: true,
     &quot;stt_model&quot;: &quot;funasr-paraformer&quot;,
     &quot;llm_model&quot;: &quot;qwen2.5:7b&quot;,
-    &quot;user_corrected&quot;: true
+    &quot;user_corrected&quot;: true,
+    &quot;audio_duration&quot;: 3.2
 }
 </code></pre>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timestamp</code></td>
+<td>string</td>
+<td>ISO 8601 UTC 时间戳</td>
+</tr>
+<tr>
+<td><code>asr_text</code></td>
+<td>string</td>
+<td>原始 ASR 识别文本</td>
+</tr>
+<tr>
+<td><code>enhanced_text</code></td>
+<td>string</td>
+<td>AI 增强后的文本（用户审阅前）</td>
+</tr>
+<tr>
+<td><code>final_text</code></td>
+<td>string</td>
+<td>最终确认的文本</td>
+</tr>
+<tr>
+<td><code>enhance_mode</code></td>
+<td>string</td>
+<td>增强模式（<code>proofread</code>、<code>translate</code> 等）</td>
+</tr>
+<tr>
+<td><code>preview_enabled</code></td>
+<td>bool</td>
+<td>是否启用了预览模式</td>
+</tr>
+<tr>
+<td><code>stt_model</code></td>
+<td>string</td>
+<td>STT 模型标识</td>
+</tr>
+<tr>
+<td><code>llm_model</code></td>
+<td>string</td>
+<td>LLM 模型标识</td>
+</tr>
+<tr>
+<td><code>user_corrected</code></td>
+<td>bool</td>
+<td>用户是否编辑了增强文本</td>
+</tr>
+<tr>
+<td><code>audio_duration</code></td>
+<td>float</td>
+<td>录音时长（秒），精确到 0.1 秒</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>audio_duration</code> 字段记录了每次会话中用户的语音时长。该值同时通过 <code>record_recording_duration()</code> 汇总到使用统计中。</p>
 <p>直接模式（<code>preview_enabled: false</code>）和预览模式（<code>preview_enabled: true</code>）的会话都会被记录。这确保不会丢失任何数据，即使后续注入策略发生变化。</p>
 <h3 id="_5"><a href="#_5" class="heading-anchor">过滤：为何仅使用预览确认的记录</a></h3>
 <p>只有 <code>preview_enabled: true</code> 的记录会被注入到 AI 提示词中。原因如下：</p>
@@ -148,18 +219,76 @@
 [Conversation history context]   ← 近期确认的输出（如已启用）
 </code></pre>
 <p>每个上下文源都可独立开关，并能优雅降级——如果历史记录获取失败，增强过程将在没有它的情况下继续进行。</p>
-<h2 id="_8"><a href="#_8" class="heading-anchor">架构</a></h2>
+<h2 id="_8"><a href="#_8" class="heading-anchor">存储与归档</a></h2>
+<h3 id="_9"><a href="#_9" class="heading-anchor">自动轮转</a></h3>
+<p>主历史文件（<code>conversation_history.jsonl</code>）通过自动轮转机制保持有界。每次 <code>log()</code> 调用后，系统会检查是否需要轮转：</p>
+<ol>
+<li><strong>文件大小预检</strong> — 如果文件小于 4 MB，则完全跳过轮转（廉价的前置检查，避免每次写入都计算行数）。</li>
+<li><strong>记录数检查</strong> — 如果文件超过 <strong>20,000 条记录</strong>（<code>_MAX_RECORDS</code>），超出限制的最旧记录将被归档。</li>
+</ol>
+<h3 id="_10"><a href="#_10" class="heading-anchor">按月归档</a></h3>
+<p>轮转出的记录按其 <code>timestamp</code> 字段中的月份分组，追加到按月命名的归档文件中：</p>
+<pre><code>~/.config/VoiceText/
+├── conversation_history.jsonl                  # 活跃文件（最多 20,000 条记录）
+└── conversation_history_archives/
+    ├── 2025-11.jsonl
+    ├── 2025-12.jsonl
+    └── 2026-01.jsonl
+</code></pre>
+<p>每个归档文件命名为 <code>YYYY-MM.jsonl</code>，包含该月的所有记录。无法解析时间戳的记录会被放入 <code>unknown.jsonl</code>。归档文件仅追加——后续轮转会向已有的月份文件追加内容，而非覆盖。</p>
+<p>归档完成后，主文件通过临时文件 + <code>os.replace()</code> 原子替换，仅保留最近的 20,000 条记录，同时所有内存缓存被清除。</p>
+<h3 id="_11"><a href="#_11" class="heading-anchor">浏览归档记录</a></h3>
+<p>历史浏览器提供了<strong>"包含归档"</strong>开关。启用后，<code>get_all()</code> 和 <code>search()</code> 会加载所有归档文件中的记录（按文件名时间排序），并将其置于活跃记录之前。这使用户能够搜索和浏览完整历史，同时保持活跃文件不会无限增长。</p>
+<h2 id="_12"><a href="#_12" class="heading-anchor">内存缓存</a></h2>
+<p>为避免重复的磁盘读取，<code>ConversationHistory</code> 维护两级缓存：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>缓存</th>
+<th>大小</th>
+<th>用途</th>
+<th>填充时机</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>热路径（<code>_cache</code>）</td>
+<td>最近 200 条记录</td>
+<td>为 <code>get_recent()</code> 提供上下文注入服务</td>
+<td>首次 <code>get_recent()</code> 调用时惰性加载</td>
+</tr>
+<tr>
+<td>完整缓存（<code>_full_cache</code>）</td>
+<td>活跃文件全部记录</td>
+<td>为历史浏览器的 <code>get_all()</code> 和 <code>search()</code> 服务</td>
+<td>首次 <code>get_all()</code>/<code>search()</code> 调用时惰性加载</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>热路径缓存</strong> — 存储最近 200 条原始（未过滤）记录。由 <code>log()</code>、<code>update_record()</code> 和 <code>delete_record()</code> 就地更新。由于上下文注入通常只需从尾部过滤出 10 条记录，200 条缓存提供了充足的余量，无需加载整个文件。</p>
+<p><strong>完整缓存</strong> — 存储活跃 JSONL 文件中所有已解析的记录。通过比较文件的 <code>mtime</code> 检测过期——如果文件被外部修改，下次访问时会重新加载。调用方应在不再需要数据时调用 <code>release_full_cache()</code>（例如关闭历史浏览器窗口时）以及时释放内存。</p>
+<p>轮转事件后，两级缓存均被完全清除。</p>
+<h2 id="_13"><a href="#_13" class="heading-anchor">历史浏览器分页</a></h2>
+<p>基于 Web 的历史浏览器（<code>history_browser_window_web.py</code>）以每页 <strong>100 条记录</strong>（<code>PAGE_SIZE = 100</code>）的方式显示。Python 后端根据过滤后的记录总数计算总页数，仅将当前页的记录发送给 WKWebView 前端。前端渲染分页器，提供上一页/下一页导航和"第 X / Y 页"指示器。</p>
+<p>当搜索关键词、时间过滤器或归档开关发生变化时，分页会重置到第 0 页。</p>
+<h2 id="_14"><a href="#_14" class="heading-anchor">架构</a></h2>
 <pre><code>Voice Input
      │
      ▼
 ┌──────────┐     ┌───────────────────────────────────┐
 │ ASR      │────►│ conversation_history.jsonl         │
-└──────────┘     │  (仅追加，记录所有会话)              │
-     │           └─────────────────┬─────────────────┘
-     ▼                             │
-┌──────────┐                       │ get_recent(n=10)
-│ Enhancer │◄──────────────────────┘ filter: preview_enabled=true
-│          │
+└──────────┘     │  （最多 20,000 条记录）               │
+     │           └────────┬──────────────┬────────────┘
+     │                    │              │ _maybe_rotate()
+     │                    │              ▼
+     │                    │   ┌──────────────────────────┐
+     │                    │   │ archives/YYYY-MM.jsonl    │
+     │                    │   │ （按月归档，仅追加）         │
+     │                    │   └──────────────────────────┘
+     ▼                    │
+┌──────────┐              │ get_recent(n=10)
+│ Enhancer │◄─────────────┘ filter: preview_enabled=true
+│          │                经由热路径缓存（200 条记录）
 │ system_prompt = base_prompt      │
 │            + vocab_context       │
 │            + history_context ◄───┘
@@ -172,9 +301,10 @@
 │ Preview Panel    │──► 用户确认 ──► type_text
 │ (预览模式)        │                  │
 └──────────────────┘                  ▼
-                                 log(preview_enabled=true)
+                                 log(preview_enabled=true,
+                                      audio_duration=N.Ns)
 </code></pre>
-<h2 id="_9"><a href="#_9" class="heading-anchor">配置</a></h2>
+<h2 id="_15"><a href="#_15" class="heading-anchor">配置</a></h2>
 <p>在 <code>config.json</code> 的 <code>ai_enhance</code> 下：</p>
 <pre><code class="language-json">{
     &quot;conversation_history&quot;: {
@@ -208,7 +338,7 @@
 </tbody>
 </table></div>
 <p>该开关也可在 <strong>Settings</strong> 面板（AI 标签页）中使用。</p>
-<h2 id="_10"><a href="#_10" class="heading-anchor">关键文件</a></h2>
+<h2 id="_16"><a href="#_16" class="heading-anchor">关键文件</a></h2>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -218,12 +348,20 @@
 </thead>
 <tbody>
 <tr>
-<td><code>src/voicetext/conversation_history.py</code></td>
-<td>JSONL 记录、读取、过滤及提示词格式化</td>
+<td><code>src/voicetext/enhance/conversation_history.py</code></td>
+<td>JSONL 记录、读取、缓存、轮转、归档及提示词格式化</td>
 </tr>
 <tr>
-<td><code>src/voicetext/enhancer.py</code></td>
+<td><code>src/voicetext/enhance/enhancer.py</code></td>
 <td>将历史上下文集成到增强提示词中</td>
+</tr>
+<tr>
+<td><code>src/voicetext/ui/history_browser_window_web.py</code></td>
+<td>基于 Web 的历史浏览器，支持分页和归档开关</td>
+</tr>
+<tr>
+<td><code>src/voicetext/usage_stats.py</code></td>
+<td>通过 <code>record_recording_duration()</code> 汇总 <code>audio_duration</code></td>
 </tr>
 <tr>
 <td><code>src/voicetext/app.py</code></td>

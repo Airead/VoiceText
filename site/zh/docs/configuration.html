@@ -67,28 +67,39 @@
       <h2>目录</h2>
       <div class="toc">
 <ul>
-<li><a href="#_1">完整默认配置</a></li>
-<li><a href="#_2">配置项说明</a><ul>
-<li><a href="#_3">通用设置</a></li>
-<li><a href="#_4">音频设置</a></li>
+<li><a href="#_1">配置目录解析</a></li>
+<li><a href="#_2">完整默认配置</a></li>
+<li><a href="#_3">配置项说明</a><ul>
+<li><a href="#_4">通用设置</a></li>
+<li><a href="#_5">音频设置</a></li>
 <li><a href="#asr">语音识别（ASR）</a></li>
-<li><a href="#_5">输出设置</a></li>
+<li><a href="#_6">输出设置</a></li>
 <li><a href="#ai">AI 增强</a></li>
-<li><a href="#_6">词汇检索</a></li>
-<li><a href="#_7">对话历史</a></li>
-<li><a href="#_8">剪贴板增强</a></li>
-<li><a href="#_9">反馈设置</a></li>
-<li><a href="#_10">日志设置</a></li>
+<li><a href="#_7">词汇检索</a></li>
+<li><a href="#_8">对话历史</a></li>
+<li><a href="#_9">剪贴板增强</a></li>
+<li><a href="#_10">反馈设置</a></li>
+<li><a href="#_11">界面</a></li>
+<li><a href="#_12">脚本</a></li>
+<li><a href="#_13">日志设置</a></li>
 </ul>
 </li>
-<li><a href="#_11">环境变量</a></li>
+<li><a href="#_14">环境变量</a></li>
 </ul>
 </div>
 
     </div>
 
-<p>默认配置文件路径：<code>~/.config/VoiceText/config.json</code>。可通过命令行参数传入 JSON 配置文件来覆盖默认配置。只需包含你想修改的字段，其余字段将使用默认值。</p>
-<h2 id="_1"><a href="#_1" class="heading-anchor">完整默认配置</a></h2>
+<p>默认配置文件路径：<code>~/.config/VoiceText/config.json</code>。只需包含你想修改的字段，其余字段将使用默认值。</p>
+<h2 id="_1"><a href="#_1" class="heading-anchor">配置目录解析</a></h2>
+<p>配置目录按以下优先级解析：</p>
+<ol>
+<li><strong>命令行参数</strong> -- 将目录路径作为第一个位置参数传入：<code>voicetext /path/to/config-dir</code></li>
+<li><strong>NSUserDefaults</strong> -- 通过设置界面保存的自定义目录（存储在 <code>com.voicetext.app</code> / <code>config_dir</code> 下）</li>
+<li><strong>默认路径</strong> -- <code>~/.config/VoiceText/</code></li>
+</ol>
+<p>配置文件始终是解析后目录中的 <code>config.json</code>。</p>
+<h2 id="_2"><a href="#_2" class="heading-anchor">完整默认配置</a></h2>
 <pre><code class="language-json">{
   &quot;hotkeys&quot;: {&quot;fn&quot;: true},
   &quot;audio&quot;: {
@@ -99,11 +110,11 @@
     &quot;silence_rms&quot;: 20
   },
   &quot;asr&quot;: {
-    &quot;backend&quot;: &quot;funasr&quot;,
+    &quot;backend&quot;: &quot;apple&quot;,
     &quot;use_vad&quot;: true,
     &quot;use_punc&quot;: true,
     &quot;language&quot;: &quot;zh&quot;,
-    &quot;model&quot;: null,
+    &quot;model&quot;: &quot;on-device&quot;,
     &quot;preset&quot;: null,
     &quot;temperature&quot;: 0.0,
     &quot;default_provider&quot;: null,
@@ -113,7 +124,8 @@
   &quot;output&quot;: {
     &quot;method&quot;: &quot;auto&quot;,
     &quot;append_newline&quot;: false,
-    &quot;preview&quot;: true
+    &quot;preview&quot;: true,
+    &quot;preview_type&quot;: &quot;web&quot;
   },
   &quot;ai_enhance&quot;: {
     &quot;enabled&quot;: false,
@@ -150,15 +162,24 @@
   &quot;feedback&quot;: {
     &quot;sound_enabled&quot;: true,
     &quot;sound_volume&quot;: 0.4,
-    &quot;visual_indicator&quot;: true
+    &quot;visual_indicator&quot;: true,
+    &quot;restart_key&quot;: &quot;cmd&quot;,
+    &quot;cancel_key&quot;: &quot;space&quot;
+  },
+  &quot;ui&quot;: {
+    &quot;settings_last_tab&quot;: &quot;general&quot;
   },
   &quot;logging&quot;: {
     &quot;level&quot;: &quot;INFO&quot;
+  },
+  &quot;scripting&quot;: {
+    &quot;enabled&quot;: false,
+    &quot;script_dir&quot;: null
   }
 }
 </code></pre>
-<h2 id="_2"><a href="#_2" class="heading-anchor">配置项说明</a></h2>
-<h3 id="_3"><a href="#_3" class="heading-anchor">通用设置</a></h3>
+<h2 id="_3"><a href="#_3" class="heading-anchor">配置项说明</a></h2>
+<h3 id="_4"><a href="#_4" class="heading-anchor">通用设置</a></h3>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -171,11 +192,11 @@
 <tr>
 <td><code>hotkeys</code></td>
 <td><code>{"fn": true}</code></td>
-<td>热键映射。可用键名：<code>fn</code>、<code>f1</code>–<code>f12</code>、<code>esc</code>、<code>space</code>、<code>cmd</code>、<code>ctrl</code>、<code>alt</code>、<code>shift</code>。值设为 <code>true</code> 表示启用</td>
+<td>热键映射。可用键名：<code>fn</code>、<code>f1</code>--<code>f12</code>、<code>esc</code>、<code>space</code>、<code>cmd</code>、<code>ctrl</code>、<code>alt</code>、<code>shift</code>。值设为 <code>true</code> 表示启用</td>
 </tr>
 </tbody>
 </table></div>
-<h3 id="_4"><a href="#_4" class="heading-anchor">音频设置</a></h3>
+<h3 id="_5"><a href="#_5" class="heading-anchor">音频设置</a></h3>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -224,8 +245,8 @@
 <tbody>
 <tr>
 <td><code>asr.backend</code></td>
-<td><code>"funasr"</code></td>
-<td>ASR 后端引擎：<code>funasr</code>、<code>mlx-whisper</code>、<code>apple</code> 或 <code>whisper-api</code></td>
+<td><code>"apple"</code></td>
+<td>ASR 后端引擎：<code>apple</code>、<code>funasr</code>、<code>mlx-whisper</code>、<code>whisper-api</code> 或 <code>sherpa-onnx</code></td>
 </tr>
 <tr>
 <td><code>asr.use_vad</code></td>
@@ -244,8 +265,8 @@
 </tr>
 <tr>
 <td><code>asr.model</code></td>
-<td><code>null</code></td>
-<td>模型标识符（例如 <code>mlx-community/whisper-small</code>）</td>
+<td><code>"on-device"</code></td>
+<td>模型标识符（例如 Apple 使用 <code>on-device</code>，MLX-Whisper 使用 <code>mlx-community/whisper-small</code>）</td>
 </tr>
 <tr>
 <td><code>asr.preset</code></td>
@@ -274,7 +295,7 @@
 </tr>
 </tbody>
 </table></div>
-<h3 id="_5"><a href="#_5" class="heading-anchor">输出设置</a></h3>
+<h3 id="_6"><a href="#_6" class="heading-anchor">输出设置</a></h3>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -298,6 +319,11 @@
 <td><code>output.preview</code></td>
 <td><code>true</code></td>
 <td>显示浮动预览面板，在输入前查看和确认识别结果</td>
+</tr>
+<tr>
+<td><code>output.preview_type</code></td>
+<td><code>"web"</code></td>
+<td>预览面板实现方式：<code>web</code>（基于 WebView）或 <code>native</code>（基于 AppKit）</td>
 </tr>
 </tbody>
 </table></div>
@@ -353,7 +379,7 @@
 </tr>
 </tbody>
 </table></div>
-<h3 id="_6"><a href="#_6" class="heading-anchor">词汇检索</a></h3>
+<h3 id="_7"><a href="#_7" class="heading-anchor">词汇检索</a></h3>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -395,7 +421,7 @@
 </tr>
 </tbody>
 </table></div>
-<h3 id="_7"><a href="#_7" class="heading-anchor">对话历史</a></h3>
+<h3 id="_8"><a href="#_8" class="heading-anchor">对话历史</a></h3>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -417,7 +443,10 @@
 </tr>
 </tbody>
 </table></div>
-<h3 id="_8"><a href="#_8" class="heading-anchor">剪贴板增强</a></h3>
+<blockquote>
+<p><strong>注意：</strong> 对话历史超过 20,000 条记录时会自动轮转归档。旧记录按月归档到 <code>conversation_history_archives/</code> 目录下的 JSONL 文件中。此上限不可配置。</p>
+</blockquote>
+<h3 id="_9"><a href="#_9" class="heading-anchor">剪贴板增强</a></h3>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -434,7 +463,7 @@
 </tr>
 </tbody>
 </table></div>
-<h3 id="_9"><a href="#_9" class="heading-anchor">反馈设置</a></h3>
+<h3 id="_10"><a href="#_10" class="heading-anchor">反馈设置</a></h3>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -452,16 +481,65 @@
 <tr>
 <td><code>feedback.sound_volume</code></td>
 <td><code>0.4</code></td>
-<td>声音音量（0.0 – 1.0）</td>
+<td>声音音量（0.0 -- 1.0）</td>
 </tr>
 <tr>
 <td><code>feedback.visual_indicator</code></td>
 <td><code>true</code></td>
 <td>显示浮动录音指示器及音频电平条</td>
 </tr>
+<tr>
+<td><code>feedback.restart_key</code></td>
+<td><code>"cmd"</code></td>
+<td>按住触发热键时重新开始录音的按键。可选值：<code>space</code>、<code>cmd</code>、<code>ctrl</code>、<code>alt</code>、<code>shift</code>、<code>esc</code></td>
+</tr>
+<tr>
+<td><code>feedback.cancel_key</code></td>
+<td><code>"space"</code></td>
+<td>按住触发热键时取消录音的按键。可选值：<code>space</code>、<code>cmd</code>、<code>ctrl</code>、<code>alt</code>、<code>shift</code>、<code>esc</code></td>
+</tr>
 </tbody>
 </table></div>
-<h3 id="_10"><a href="#_10" class="heading-anchor">日志设置</a></h3>
+<h3 id="_11"><a href="#_11" class="heading-anchor">界面</a></h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>键名</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ui.settings_last_tab</code></td>
+<td><code>"general"</code></td>
+<td>设置窗口中上次激活的标签页（自动持久化）。可选值：<code>general</code>、<code>stt</code>、<code>llm</code>、<code>ai</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="_12"><a href="#_12" class="heading-anchor">脚本</a></h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>键名</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scripting.enabled</code></td>
+<td><code>false</code></td>
+<td>启用 Lua 脚本系统</td>
+</tr>
+<tr>
+<td><code>scripting.script_dir</code></td>
+<td><code>null</code></td>
+<td>Lua 脚本的自定义目录（null 表示使用 <code>&lt;配置目录&gt;/scripts</code>）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="_13"><a href="#_13" class="heading-anchor">日志设置</a></h3>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -478,7 +556,7 @@
 </tr>
 </tbody>
 </table></div>
-<h2 id="_11"><a href="#_11" class="heading-anchor">环境变量</a></h2>
+<h2 id="_14"><a href="#_14" class="heading-anchor">环境变量</a></h2>
 <div class="table-wrapper"><table>
 <thead>
 <tr>

@@ -75,7 +75,8 @@
 <li><a href="#3-19">3. 模式切换器（⌘1–⌘9）— 即时对比不同模式</a></li>
 <li><a href="#4-llm">4. LLM 模型下拉框 — 对比不同模型</a></li>
 <li><a href="#5-thinking-ai">5. Thinking 模式 — 观察 AI 推理过程</a></li>
-<li><a href="#6-final-result">6. Final Result — 修正与训练</a></li>
+<li><a href="#6-preview-history">6. Preview History — 浏览历史结果</a></li>
+<li><a href="#7-final-result">7. Final Result — 修正与训练</a></li>
 </ul>
 </li>
 <li><a href="#_3">逐步优化工作流</a><ul>
@@ -107,8 +108,9 @@
 <li>已选择一种增强模式（Settings → AI）</li>
 </ul>
 <h2 id="preview"><a href="#preview" class="heading-anchor">Preview 面板概览</a></h2>
+<p>Preview 面板使用 WKWebView 渲染，采用现代 HTML/CSS/JS 界面，自动适配浅色和深色模式。</p>
 <pre><code>┌─────────────────────────────────────────────────────┐
-│  ASR   [FunASR ▾]  10.6s    ☐ Punc   Play ▶  Save  │  ← 原始语音识别结果
+│  ASR   [STT 模型 ▾]  10.6s  ☐ Punc   Play ▶  Save  │  ← 原始语音识别结果
 │  ┌─────────────────────────────────────────────┐    │
 │  │ 根据目前程序的preview界面你能想到用户...       │    │
 │  └─────────────────────────────────────────────┘    │
@@ -126,7 +128,7 @@
 │  │ 最终文本 — 确认前可在此编辑                    │    │
 │  └─────────────────────────────────────────────┘    │
 │                                                     │
-│  [History]                      [Cancel]  [Copy ⌘↵] │
+│  [History ▾]                  [Cancel]  [Confirm ⏎]  │
 └─────────────────────────────────────────────────────┘
 </code></pre>
 <h2 id="_2"><a href="#_2" class="heading-anchor">核心优化工具</a></h2>
@@ -169,6 +171,7 @@
 </ul>
 <h3 id="3-19"><a href="#3-19" class="heading-anchor">3. 模式切换器（⌘1–⌘9）— 即时对比不同模式</a></h3>
 <p>按 <code>⌘1</code> 到 <code>⌘9</code> 可在不重新录音的情况下切换模式。结果会被缓存——切回之前的模式会立即显示缓存结果（标记为 <code>[cached]</code>）。</p>
+<p>快速连续切换模式时会进行防抖处理（300 毫秒）。如果你按了 <code>⌘3</code> 后立即按 <code>⌘5</code>，只有 <code>⌘5</code> 对应的增强请求会被发送给 LLM。上一个模式正在进行的流式增强会被立即取消，不会浪费 token。</p>
 <p>用途：</p>
 <ul>
 <li>对比不同 prompt 处理相同输入的效果</li>
@@ -185,8 +188,12 @@
 <li>AI 是否正确理解了你的意图</li>
 </ul>
 <p>这对诊断 prompt 问题非常有价值——如果 AI 的推理方向错了，说明 prompt 需要修改。</p>
-<h3 id="6-final-result"><a href="#6-final-result" class="heading-anchor">6. Final Result — 修正与训练</a></h3>
+<h3 id="6-preview-history"><a href="#6-preview-history" class="heading-anchor">6. Preview History — 浏览历史结果</a></h3>
+<p>点击面板底部的 <strong>History</strong> 按钮，会弹出一个下拉列表，显示最近 10 条预览记录（存储在内存中，仅限当前会话）。每条记录显示操作图标、时间戳、增强模式和文本预览。</p>
+<p>点击任意记录可将其加载回面板——ASR 文本、增强结果、最终文本和音频播放按钮都会恢复。这让你无需重新录音即可回顾之前的结果，便于对比 prompt 修改前后对相同输入的影响。</p>
+<h3 id="7-final-result"><a href="#7-final-result" class="heading-anchor">7. Final Result — 修正与训练</a></h3>
 <p>在确认前编辑 Final Result 以修复剩余问题。每次编辑都会被记录并标记 <code>user_corrected</code>，随着时间推移会反馈到词汇表系统中。</p>
+<p>点击 <strong>Confirm</strong> 或 <strong>Cancel</strong> 时，正在进行的流式增强会被立即取消以节省 token。你不需要等待 AI 生成完毕就可以确认文本。</p>
 <h2 id="_3"><a href="#_3" class="heading-anchor">逐步优化工作流</a></h2>
 <h3 id="1"><a href="#1" class="heading-anchor">阶段 1：识别问题</a></h3>
 <ol>
@@ -252,7 +259,7 @@
 <h3 id="5"><a href="#5" class="heading-anchor">阶段 5：持续优化</a></h3>
 <ul>
 <li><strong>坚持修正 Final Result</strong> —— 词汇表系统会从你的编辑中学习。</li>
-<li><strong>查看 History</strong>（点击 History 按钮）—— 寻找 AI 犯错的规律。</li>
+<li><strong>查看 History</strong>（点击 History 下拉菜单）—— 浏览历史结果，寻找 AI 犯错的规律。</li>
 <li><strong>构建词汇表</strong>（Settings → AI → Build Vocabulary）—— 领域术语会自动积累。</li>
 </ul>
 <h2 id="_4"><a href="#_4" class="heading-anchor">实际示例</a></h2>
@@ -324,8 +331,8 @@ Do not add any explanation.
 <td>使用 Google Translate 交叉验证</td>
 </tr>
 <tr>
-<td><strong>History</strong></td>
-<td>回顾历史修正中的规律</td>
+<td><strong>History ▾</strong></td>
+<td>浏览最近 10 条预览记录 —— 对比 prompt 修改前后的效果</td>
 </tr>
 </tbody>
 </table></div>
@@ -336,6 +343,7 @@ Do not add any explanation.
 <li><strong>使用编号规则。</strong> 相比段落式指令，LLM 更能稳定地遵循带编号规则的结构化 prompt。</li>
 <li><strong>始终提及 ASR 上下文。</strong> 在 prompt 中加入"The user's input comes from ASR and may contain recognition errors"—— 这能显著提升对识别错误的容错能力。</li>
 <li><strong>关注 token 数量。</strong> Tokens 显示（↑prompt ↓completion）有助于判断 prompt 效率。如果 ↑ 值很高而 ↓ 值很低，说明 prompt 可能过于冗长。</li>
+<li><strong>满意就尽早确认。</strong> 点击 Confirm 或 Cancel 会立即取消正在进行的增强流式传输，节省 token。你不需要等待 AI 生成完毕。</li>
 </ul>
 
     <div class="doc-nav">

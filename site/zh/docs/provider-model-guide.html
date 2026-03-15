@@ -103,7 +103,7 @@
 
 <p>本指南说明如何在 VoiceText 中配置 ASR（语音识别）模型和 AI 增强服务商。涵盖 GUI（设置面板）和配置文件两种方式。</p>
 <h2 id="asr"><a href="#asr" class="heading-anchor">ASR 模型选择</a></h2>
-<p>VoiceText 支持四种 ASR 后端：</p>
+<p>VoiceText 支持五种 ASR 后端：</p>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -115,8 +115,20 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>FunASR Paraformer</strong>（默认）</td>
+<td><strong>Apple Speech</strong>（默认）</td>
+<td>多语言，无需下载</td>
+<td>CPU/Neural Engine</td>
+<td>设备端或服务器端</td>
+</tr>
+<tr>
+<td><strong>FunASR Paraformer</strong></td>
 <td>中文语音</td>
+<td>CPU (ONNX)</td>
+<td>是（首次下载后）</td>
+</tr>
+<tr>
+<td><strong>Sherpa-ONNX</strong></td>
+<td>流式识别，轻量中文模型</td>
 <td>CPU (ONNX)</td>
 <td>是（首次下载后）</td>
 </tr>
@@ -125,12 +137,6 @@
 <td>多语言，Apple Silicon</td>
 <td>GPU (MLX)</td>
 <td>是（首次下载后）</td>
-</tr>
-<tr>
-<td><strong>Apple Speech</strong></td>
-<td>多语言，无需下载</td>
-<td>CPU/Neural Engine</td>
-<td>设备端或服务器端</td>
 </tr>
 <tr>
 <td><strong>Whisper API</strong>（远程）</td>
@@ -166,7 +172,7 @@
 <tbody>
 <tr>
 <td><code>backend</code></td>
-<td><code>"funasr"</code>、<code>"mlx-whisper"</code> 或 <code>"apple"</code></td>
+<td><code>"apple"</code>、<code>"funasr"</code>、<code>"sherpa-onnx"</code>、<code>"mlx-whisper"</code> 或 <code>"whisper-api"</code></td>
 </tr>
 <tr>
 <td><code>preset</code></td>
@@ -178,7 +184,7 @@
 </tr>
 <tr>
 <td><code>language</code></td>
-<td>MLX-Whisper 的语言代码（<code>"zh"</code>、<code>"en"</code>、<code>"ja"</code> 等），FunASR 忽略此字段</td>
+<td>语言代码（<code>"zh"</code>、<code>"en"</code>、<code>"ja"</code> 等）。MLX-Whisper 和 Apple Speech 使用此字段。FunASR 和 Sherpa-ONNX 忽略此字段（语言由模型决定）</td>
 </tr>
 <tr>
 <td><code>temperature</code></td>
@@ -199,22 +205,34 @@
 </thead>
 <tbody>
 <tr>
+<td><code>apple-speech-ondevice</code></td>
+<td>apple</td>
+<td>Apple Speech（设备端）</td>
+<td>内置</td>
+</tr>
+<tr>
+<td><code>apple-speech-server</code></td>
+<td>apple</td>
+<td>Apple Speech（服务器端）</td>
+<td>内置</td>
+</tr>
+<tr>
 <td><code>funasr-paraformer</code></td>
 <td>funasr</td>
 <td>Paraformer-large（中文）</td>
 <td>~400 MB</td>
 </tr>
 <tr>
-<td><code>apple-speech-ondevice</code></td>
-<td>apple-speech</td>
-<td>Apple Speech（设备端）</td>
-<td>内置</td>
+<td><code>sherpa-zipformer-zh</code></td>
+<td>sherpa-onnx</td>
+<td>Zipformer Chinese 14M</td>
+<td>~28 MB</td>
 </tr>
 <tr>
-<td><code>apple-speech-server</code></td>
-<td>apple-speech</td>
-<td>Apple Speech（服务器端）</td>
-<td>内置</td>
+<td><code>sherpa-paraformer-zh</code></td>
+<td>sherpa-onnx</td>
+<td>Paraformer 双语（中英）</td>
+<td>~220 MB</td>
 </tr>
 <tr>
 <td><code>mlx-whisper-medium</code></td>
@@ -231,7 +249,7 @@
 </tbody>
 </table></div>
 <blockquote>
-<p><strong>注意：</strong> MLX-Whisper 的 tiny/base/small 模型没有预设，但可以通过直接设置 <code>asr.model</code> 来使用（例如 <code>"model": "mlx-community/whisper-small"</code>）。</p>
+<p><strong>注意：</strong> MLX-Whisper 的 tiny/base/small 模型没有预设，但可以通过直接设置 <code>asr.model</code> 来使用（例如 <code>"model": "mlx-community/whisper-small"</code>）。Sherpa-ONNX 模型会在首次使用时自动从 HuggingFace 下载。</p>
 </blockquote>
 <hr />
 <h2 id="asr_3"><a href="#asr_3" class="heading-anchor">远程 ASR 服务商</a></h2>

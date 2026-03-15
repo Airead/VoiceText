@@ -75,7 +75,8 @@
 <li><a href="#3-mode-switcher-19-compare-modes-instantly">3. Mode Switcher (⌘1–⌘9) — Compare Modes Instantly</a></li>
 <li><a href="#4-llm-model-dropdown-compare-models">4. LLM Model Dropdown — Compare Models</a></li>
 <li><a href="#5-thinking-mode-observe-ai-reasoning">5. Thinking Mode — Observe AI Reasoning</a></li>
-<li><a href="#6-final-result-correct-and-train">6. Final Result — Correct and Train</a></li>
+<li><a href="#6-preview-history-browse-previous-results">6. Preview History — Browse Previous Results</a></li>
+<li><a href="#7-final-result-correct-and-train">7. Final Result — Correct and Train</a></li>
 </ul>
 </li>
 <li><a href="#step-by-step-optimization-workflow">Step-by-Step Optimization Workflow</a><ul>
@@ -107,8 +108,9 @@
 <li>An enhancement mode selected (Settings → AI)</li>
 </ul>
 <h2 id="the-preview-panel-at-a-glance"><a href="#the-preview-panel-at-a-glance" class="heading-anchor">The Preview Panel at a Glance</a></h2>
+<p>The preview panel is rendered using WKWebView with a modern HTML/CSS/JS interface that adapts to light and dark mode automatically.</p>
 <pre><code>┌─────────────────────────────────────────────────────┐
-│  ASR   [FunASR ▾]  10.6s    ☐ Punc   Play ▶  Save  │  ← Raw speech recognition
+│  ASR   [STT model ▾]  10.6s  ☐ Punc   Play ▶  Save │  ← Raw speech recognition
 │  ┌─────────────────────────────────────────────┐    │
 │  │ 根据目前程序的preview界面你能想到用户...       │    │
 │  └─────────────────────────────────────────────┘    │
@@ -126,7 +128,7 @@
 │  │ Your final text — edit here before confirm   │    │
 │  └─────────────────────────────────────────────┘    │
 │                                                     │
-│  [History]                      [Cancel]  [Copy ⌘↵] │
+│  [History ▾]                  [Cancel]  [Confirm ⏎]  │
 └─────────────────────────────────────────────────────┘
 </code></pre>
 <h2 id="core-tools-for-prompt-optimization"><a href="#core-tools-for-prompt-optimization" class="heading-anchor">Core Tools for Prompt Optimization</a></h2>
@@ -169,6 +171,7 @@
 </ul>
 <h3 id="3-mode-switcher-19-compare-modes-instantly"><a href="#3-mode-switcher-19-compare-modes-instantly" class="heading-anchor">3. Mode Switcher (⌘1–⌘9) — Compare Modes Instantly</a></h3>
 <p>Press <code>⌘1</code> through <code>⌘9</code> to switch modes without re-recording. Results are cached — switching back shows the previous result instantly (marked <code>[cached]</code>).</p>
+<p>Rapid mode switching is debounced (300 ms). If you press <code>⌘3</code> then immediately <code>⌘5</code>, only the <code>⌘5</code> enhancement request is sent to the LLM. Any in-flight streaming enhancement from the previous mode is cancelled immediately, so no tokens are wasted on intermediate switches.</p>
 <p>Use this to:</p>
 <ul>
 <li>Compare how different prompts handle the same input</li>
@@ -185,8 +188,12 @@
 <li>Whether the AI understood your intent correctly</li>
 </ul>
 <p>This is invaluable for diagnosing prompt issues — if the AI's reasoning is wrong, the prompt needs clarification.</p>
-<h3 id="6-final-result-correct-and-train"><a href="#6-final-result-correct-and-train" class="heading-anchor">6. Final Result — Correct and Train</a></h3>
+<h3 id="6-preview-history-browse-previous-results"><a href="#6-preview-history-browse-previous-results" class="heading-anchor">6. Preview History — Browse Previous Results</a></h3>
+<p>Click the <strong>History</strong> button at the bottom of the panel to open a dropdown listing the last 10 preview records (stored in memory for the current session). Each entry shows an action icon, timestamp, enhancement mode, and a text preview.</p>
+<p>Click any entry to load that record back into the panel — ASR text, enhanced text, final text, and audio playback buttons are all restored. This lets you revisit earlier results without re-recording, which is useful for comparing how a prompt edit affected the same input across sessions.</p>
+<h3 id="7-final-result-correct-and-train"><a href="#7-final-result-correct-and-train" class="heading-anchor">7. Final Result — Correct and Train</a></h3>
 <p>Edit the Final Result to fix any remaining issues before confirming. Each edit is recorded with a <code>user_corrected</code> flag, which feeds into the vocabulary system over time.</p>
+<p>When you click <strong>Confirm</strong> or <strong>Cancel</strong>, any in-flight streaming enhancement is cancelled immediately to save tokens. You do not need to wait for the AI to finish before confirming your text.</p>
 <h2 id="step-by-step-optimization-workflow"><a href="#step-by-step-optimization-workflow" class="heading-anchor">Step-by-Step Optimization Workflow</a></h2>
 <h3 id="phase-1-identify-the-problem"><a href="#phase-1-identify-the-problem" class="heading-anchor">Phase 1: Identify the Problem</a></h3>
 <ol>
@@ -252,7 +259,7 @@
 <h3 id="phase-5-refine-over-time"><a href="#phase-5-refine-over-time" class="heading-anchor">Phase 5: Refine Over Time</a></h3>
 <ul>
 <li><strong>Correct Final Results</strong> consistently — the vocabulary system learns from your edits.</li>
-<li><strong>Review History</strong> (click History button) — look for patterns in what the AI gets wrong.</li>
+<li><strong>Review History</strong> (click History dropdown) — browse previous results and look for patterns in what the AI gets wrong.</li>
 <li><strong>Build vocabulary</strong> (Settings → AI → Build Vocabulary) — domain terms accumulate automatically.</li>
 </ul>
 <h2 id="practical-examples"><a href="#practical-examples" class="heading-anchor">Practical Examples</a></h2>
@@ -324,8 +331,8 @@ Do not add any explanation.
 <td>Cross-check with Google Translate</td>
 </tr>
 <tr>
-<td><strong>History</strong></td>
-<td>Review patterns in past corrections</td>
+<td><strong>History ▾</strong></td>
+<td>Browse last 10 preview records — compare results across prompt edits</td>
 </tr>
 </tbody>
 </table></div>
@@ -336,6 +343,7 @@ Do not add any explanation.
 <li><strong>Use numbered rules.</strong> LLMs follow structured prompts with numbered rules more consistently than paragraph instructions.</li>
 <li><strong>Always mention ASR context.</strong> Include "The user's input comes from ASR and may contain recognition errors" in your prompts — it significantly improves error tolerance.</li>
 <li><strong>Check token counts.</strong> The Tokens display (↑prompt ↓completion) helps you judge prompt efficiency. A prompt with high ↑ and low ↓ may be too verbose.</li>
+<li><strong>Confirm early if satisfied.</strong> Clicking Confirm or Cancel immediately cancels any in-flight enhancement stream, saving tokens. You do not need to wait for the AI to finish generating.</li>
 </ul>
 
     <div class="doc-nav">

@@ -76,6 +76,14 @@
 <li><a href="#integration-with-other-context-sources">Integration with Other Context Sources</a></li>
 </ul>
 </li>
+<li><a href="#storage-and-archiving">Storage and Archiving</a><ul>
+<li><a href="#auto-rotation">Auto-Rotation</a></li>
+<li><a href="#monthly-archives">Monthly Archives</a></li>
+<li><a href="#browsing-archived-records">Browsing Archived Records</a></li>
+</ul>
+</li>
+<li><a href="#in-memory-cache">In-Memory Cache</a></li>
+<li><a href="#history-browser-pagination">History Browser Pagination</a></li>
 <li><a href="#architecture">Architecture</a></li>
 <li><a href="#configuration">Configuration</a></li>
 <li><a href="#key-files">Key Files</a></li>
@@ -111,9 +119,72 @@
     &quot;preview_enabled&quot;: true,
     &quot;stt_model&quot;: &quot;funasr-paraformer&quot;,
     &quot;llm_model&quot;: &quot;qwen2.5:7b&quot;,
-    &quot;user_corrected&quot;: true
+    &quot;user_corrected&quot;: true,
+    &quot;audio_duration&quot;: 3.2
 }
 </code></pre>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timestamp</code></td>
+<td>string</td>
+<td>ISO 8601 UTC timestamp of the session</td>
+</tr>
+<tr>
+<td><code>asr_text</code></td>
+<td>string</td>
+<td>Raw ASR transcription</td>
+</tr>
+<tr>
+<td><code>enhanced_text</code></td>
+<td>string</td>
+<td>AI-enhanced text (before user review)</td>
+</tr>
+<tr>
+<td><code>final_text</code></td>
+<td>string</td>
+<td>Final confirmed text</td>
+</tr>
+<tr>
+<td><code>enhance_mode</code></td>
+<td>string</td>
+<td>Enhancement mode (<code>proofread</code>, <code>translate</code>, etc.)</td>
+</tr>
+<tr>
+<td><code>preview_enabled</code></td>
+<td>bool</td>
+<td>Whether preview mode was active</td>
+</tr>
+<tr>
+<td><code>stt_model</code></td>
+<td>string</td>
+<td>STT model identifier</td>
+</tr>
+<tr>
+<td><code>llm_model</code></td>
+<td>string</td>
+<td>LLM model identifier</td>
+</tr>
+<tr>
+<td><code>user_corrected</code></td>
+<td>bool</td>
+<td>Whether the user edited the enhanced text</td>
+</tr>
+<tr>
+<td><code>audio_duration</code></td>
+<td>float</td>
+<td>Recording duration in seconds, rounded to 0.1s</td>
+</tr>
+</tbody>
+</table></div>
+<p>The <code>audio_duration</code> field tracks how long the user spoke for each session. This value is also aggregated in usage statistics via <code>record_recording_duration()</code>.</p>
 <p>Both direct mode (<code>preview_enabled: false</code>) and preview mode (<code>preview_enabled: true</code>) sessions are recorded. This ensures no data is lost, even if the injection policy changes later.</p>
 <h3 id="filtering-why-only-preview-confirmed-records"><a href="#filtering-why-only-preview-confirmed-records" class="heading-anchor">Filtering: Why Only Preview-Confirmed Records</a></h3>
 <p>Only records with <code>preview_enabled: true</code> are injected into the AI prompt. The reasoning:</p>
@@ -148,18 +219,76 @@
 [Conversation history context]   ← recent confirmed outputs (if enabled)
 </code></pre>
 <p>Each context source is independently toggleable and gracefully degrades — if history retrieval fails, enhancement proceeds without it.</p>
+<h2 id="storage-and-archiving"><a href="#storage-and-archiving" class="heading-anchor">Storage and Archiving</a></h2>
+<h3 id="auto-rotation"><a href="#auto-rotation" class="heading-anchor">Auto-Rotation</a></h3>
+<p>The main history file (<code>conversation_history.jsonl</code>) is kept bounded by an automatic rotation mechanism. After each <code>log()</code> call, the system checks whether rotation is needed:</p>
+<ol>
+<li><strong>Size pre-check</strong> -- If the file is smaller than 4 MB, rotation is skipped entirely (cheap guard to avoid counting lines on every write).</li>
+<li><strong>Record count check</strong> -- If the file exceeds <strong>20,000 records</strong> (<code>_MAX_RECORDS</code>), the oldest records beyond this limit are archived.</li>
+</ol>
+<h3 id="monthly-archives"><a href="#monthly-archives" class="heading-anchor">Monthly Archives</a></h3>
+<p>Rotated records are grouped by the month in their <code>timestamp</code> field and appended to per-month archive files:</p>
+<pre><code>~/.config/VoiceText/
+├── conversation_history.jsonl                  # Active file (up to 20,000 records)
+└── conversation_history_archives/
+    ├── 2025-11.jsonl
+    ├── 2025-12.jsonl
+    └── 2026-01.jsonl
+</code></pre>
+<p>Each archive file is named <code>YYYY-MM.jsonl</code> and contains all records from that month. Records whose timestamp cannot be parsed are placed in <code>unknown.jsonl</code>. Archives are append-only -- subsequent rotations add to existing month files rather than overwriting them.</p>
+<p>After archiving, the main file is atomically replaced (via a temp file + <code>os.replace()</code>) with only the most recent 20,000 records, and all in-memory caches are invalidated.</p>
+<h3 id="browsing-archived-records"><a href="#browsing-archived-records" class="heading-anchor">Browsing Archived Records</a></h3>
+<p>The History Browser provides an <strong>"Include archived"</strong> toggle. When enabled, <code>get_all()</code> and <code>search()</code> load records from all archive files (sorted chronologically by filename) and prepend them to the active records. This allows users to search and browse their full history without the active file growing unbounded.</p>
+<h2 id="in-memory-cache"><a href="#in-memory-cache" class="heading-anchor">In-Memory Cache</a></h2>
+<p>To avoid repeated disk reads, <code>ConversationHistory</code> maintains a two-tier cache:</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Cache</th>
+<th>Size</th>
+<th>Purpose</th>
+<th>Populated</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hot-path (<code>_cache</code>)</td>
+<td>Last 200 records</td>
+<td>Serves <code>get_recent()</code> for context injection</td>
+<td>Lazily on first <code>get_recent()</code> call</td>
+</tr>
+<tr>
+<td>Full (<code>_full_cache</code>)</td>
+<td>All records in the active file</td>
+<td>Serves <code>get_all()</code> and <code>search()</code> for the History Browser</td>
+<td>Lazily on first <code>get_all()</code>/<code>search()</code> call</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Hot-path cache</strong> -- Stores the most recent 200 raw (unfiltered) records. Updated in-place by <code>log()</code>, <code>update_record()</code>, and <code>delete_record()</code>. Since context injection typically needs only 10 entries filtered from the tail, 200 cached records provide ample headroom without loading the entire file.</p>
+<p><strong>Full cache</strong> -- Stores all parsed records from the active JSONL file. Staleness is detected by comparing the file's <code>mtime</code> -- if the file has been modified externally, the cache is reloaded on the next access. Callers should call <code>release_full_cache()</code> when the data is no longer needed (e.g., when the History Browser window is closed) to free memory promptly.</p>
+<p>Both caches are fully invalidated after a rotation event.</p>
+<h2 id="history-browser-pagination"><a href="#history-browser-pagination" class="heading-anchor">History Browser Pagination</a></h2>
+<p>The web-based History Browser (<code>history_browser_window_web.py</code>) displays records in pages of <strong>100 entries</strong> (<code>PAGE_SIZE = 100</code>). The Python backend computes total pages from the filtered record count and sends only the current page's records to the WKWebView frontend. The frontend renders a pager with previous/next navigation and a "Page X / Y" indicator.</p>
+<p>Pagination is reset to page 0 whenever the search query, time filter, or archive toggle changes.</p>
 <h2 id="architecture"><a href="#architecture" class="heading-anchor">Architecture</a></h2>
 <pre><code>Voice Input
      │
      ▼
 ┌──────────┐     ┌───────────────────────────────────┐
 │ ASR      │────►│ conversation_history.jsonl         │
-└──────────┘     │  (append-only, all sessions)       │
-     │           └─────────────────┬─────────────────┘
-     ▼                             │
-┌──────────┐                       │ get_recent(n=10)
-│ Enhancer │◄──────────────────────┘ filter: preview_enabled=true
-│          │
+└──────────┘     │  (up to 20,000 records)            │
+     │           └────────┬──────────────┬────────────┘
+     │                    │              │ _maybe_rotate()
+     │                    │              ▼
+     │                    │   ┌──────────────────────────┐
+     │                    │   │ archives/YYYY-MM.jsonl    │
+     │                    │   │ (monthly, append-only)    │
+     │                    │   └──────────────────────────┘
+     ▼                    │
+┌──────────┐              │ get_recent(n=10)
+│ Enhancer │◄─────────────┘ filter: preview_enabled=true
+│          │                via hot-path cache (200 records)
 │ system_prompt = base_prompt      │
 │            + vocab_context       │
 │            + history_context ◄───┘
@@ -172,7 +301,8 @@
 │ Preview Panel    │──► user confirms ──► type_text
 │ (preview mode)   │                        │
 └──────────────────┘                        ▼
-                                   log(preview_enabled=true)
+                                   log(preview_enabled=true,
+                                        audio_duration=N.Ns)
 </code></pre>
 <h2 id="configuration"><a href="#configuration" class="heading-anchor">Configuration</a></h2>
 <p>In <code>config.json</code> under <code>ai_enhance</code>:</p>
@@ -218,12 +348,20 @@
 </thead>
 <tbody>
 <tr>
-<td><code>src/voicetext/conversation_history.py</code></td>
-<td>JSONL recording, reading, filtering, and prompt formatting</td>
+<td><code>src/voicetext/enhance/conversation_history.py</code></td>
+<td>JSONL recording, reading, caching, rotation, archiving, and prompt formatting</td>
 </tr>
 <tr>
-<td><code>src/voicetext/enhancer.py</code></td>
+<td><code>src/voicetext/enhance/enhancer.py</code></td>
 <td>Integrates history context into enhancement prompts</td>
+</tr>
+<tr>
+<td><code>src/voicetext/ui/history_browser_window_web.py</code></td>
+<td>Web-based History Browser with pagination and archive toggle</td>
+</tr>
+<tr>
+<td><code>src/voicetext/usage_stats.py</code></td>
+<td>Aggregates <code>audio_duration</code> via <code>record_recording_duration()</code></td>
 </tr>
 <tr>
 <td><code>src/voicetext/app.py</code></td>

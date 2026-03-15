@@ -67,6 +67,7 @@
       <h2>Table of Contents</h2>
       <div class="toc">
 <ul>
+<li><a href="#config-directory-resolution">Config Directory Resolution</a></li>
 <li><a href="#full-default-configuration">Full Default Configuration</a></li>
 <li><a href="#options">Options</a><ul>
 <li><a href="#general">General</a></li>
@@ -78,6 +79,8 @@
 <li><a href="#conversation-history">Conversation History</a></li>
 <li><a href="#clipboard-enhancement">Clipboard Enhancement</a></li>
 <li><a href="#feedback">Feedback</a></li>
+<li><a href="#ui">UI</a></li>
+<li><a href="#scripting">Scripting</a></li>
 <li><a href="#logging">Logging</a></li>
 </ul>
 </li>
@@ -87,7 +90,15 @@
 
     </div>
 
-<p>Default config path: <code>~/.config/VoiceText/config.json</code>. Pass a JSON config file as a command-line argument to override. Only the fields you want to change are needed; everything else uses defaults.</p>
+<p>Default config path: <code>~/.config/VoiceText/config.json</code>. Only the fields you want to change are needed; everything else uses defaults.</p>
+<h2 id="config-directory-resolution"><a href="#config-directory-resolution" class="heading-anchor">Config Directory Resolution</a></h2>
+<p>The config directory is resolved with the following priority:</p>
+<ol>
+<li><strong>CLI argument</strong> -- pass a directory path as the first positional argument: <code>voicetext /path/to/config-dir</code></li>
+<li><strong>NSUserDefaults</strong> -- a custom directory saved via the Settings UI (stored under <code>com.voicetext.app</code> / <code>config_dir</code>)</li>
+<li><strong>Default</strong> -- <code>~/.config/VoiceText/</code></li>
+</ol>
+<p>The config file is always <code>config.json</code> inside the resolved directory.</p>
 <h2 id="full-default-configuration"><a href="#full-default-configuration" class="heading-anchor">Full Default Configuration</a></h2>
 <pre><code class="language-json">{
   &quot;hotkeys&quot;: {&quot;fn&quot;: true},
@@ -99,11 +110,11 @@
     &quot;silence_rms&quot;: 20
   },
   &quot;asr&quot;: {
-    &quot;backend&quot;: &quot;funasr&quot;,
+    &quot;backend&quot;: &quot;apple&quot;,
     &quot;use_vad&quot;: true,
     &quot;use_punc&quot;: true,
     &quot;language&quot;: &quot;zh&quot;,
-    &quot;model&quot;: null,
+    &quot;model&quot;: &quot;on-device&quot;,
     &quot;preset&quot;: null,
     &quot;temperature&quot;: 0.0,
     &quot;default_provider&quot;: null,
@@ -113,7 +124,8 @@
   &quot;output&quot;: {
     &quot;method&quot;: &quot;auto&quot;,
     &quot;append_newline&quot;: false,
-    &quot;preview&quot;: true
+    &quot;preview&quot;: true,
+    &quot;preview_type&quot;: &quot;web&quot;
   },
   &quot;ai_enhance&quot;: {
     &quot;enabled&quot;: false,
@@ -150,10 +162,19 @@
   &quot;feedback&quot;: {
     &quot;sound_enabled&quot;: true,
     &quot;sound_volume&quot;: 0.4,
-    &quot;visual_indicator&quot;: true
+    &quot;visual_indicator&quot;: true,
+    &quot;restart_key&quot;: &quot;cmd&quot;,
+    &quot;cancel_key&quot;: &quot;space&quot;
+  },
+  &quot;ui&quot;: {
+    &quot;settings_last_tab&quot;: &quot;general&quot;
   },
   &quot;logging&quot;: {
     &quot;level&quot;: &quot;INFO&quot;
+  },
+  &quot;scripting&quot;: {
+    &quot;enabled&quot;: false,
+    &quot;script_dir&quot;: null
   }
 }
 </code></pre>
@@ -171,7 +192,7 @@
 <tr>
 <td><code>hotkeys</code></td>
 <td><code>{"fn": true}</code></td>
-<td>Hotkey map. Keys: <code>fn</code>, <code>f1</code>–<code>f12</code>, <code>esc</code>, <code>space</code>, <code>cmd</code>, <code>ctrl</code>, <code>alt</code>, <code>shift</code>. Values: <code>true</code> to enable</td>
+<td>Hotkey map. Keys: <code>fn</code>, <code>f1</code>--<code>f12</code>, <code>esc</code>, <code>space</code>, <code>cmd</code>, <code>ctrl</code>, <code>alt</code>, <code>shift</code>. Values: <code>true</code> to enable</td>
 </tr>
 </tbody>
 </table></div>
@@ -224,8 +245,8 @@
 <tbody>
 <tr>
 <td><code>asr.backend</code></td>
-<td><code>"funasr"</code></td>
-<td>ASR backend: <code>funasr</code>, <code>mlx-whisper</code>, <code>apple</code>, or <code>whisper-api</code></td>
+<td><code>"apple"</code></td>
+<td>ASR backend: <code>apple</code>, <code>funasr</code>, <code>mlx-whisper</code>, <code>whisper-api</code>, or <code>sherpa-onnx</code></td>
 </tr>
 <tr>
 <td><code>asr.use_vad</code></td>
@@ -244,8 +265,8 @@
 </tr>
 <tr>
 <td><code>asr.model</code></td>
-<td><code>null</code></td>
-<td>Model identifier (e.g. <code>mlx-community/whisper-small</code>)</td>
+<td><code>"on-device"</code></td>
+<td>Model identifier (e.g. <code>on-device</code> for Apple, <code>mlx-community/whisper-small</code> for MLX-Whisper)</td>
 </tr>
 <tr>
 <td><code>asr.preset</code></td>
@@ -298,6 +319,11 @@
 <td><code>output.preview</code></td>
 <td><code>true</code></td>
 <td>Show floating preview panel for reviewing results before input</td>
+</tr>
+<tr>
+<td><code>output.preview_type</code></td>
+<td><code>"web"</code></td>
+<td>Preview panel implementation: <code>web</code> (WebView-based) or <code>native</code> (AppKit-based)</td>
 </tr>
 </tbody>
 </table></div>
@@ -417,6 +443,9 @@
 </tr>
 </tbody>
 </table></div>
+<blockquote>
+<p><strong>Note:</strong> Conversation history is automatically rotated when it exceeds 20,000 records. Older records are archived into monthly JSONL files under <code>conversation_history_archives/</code>. This limit is not configurable.</p>
+</blockquote>
 <h3 id="clipboard-enhancement"><a href="#clipboard-enhancement" class="heading-anchor">Clipboard Enhancement</a></h3>
 <div class="table-wrapper"><table>
 <thead>
@@ -452,12 +481,61 @@
 <tr>
 <td><code>feedback.sound_volume</code></td>
 <td><code>0.4</code></td>
-<td>Sound volume (0.0 – 1.0)</td>
+<td>Sound volume (0.0 -- 1.0)</td>
 </tr>
 <tr>
 <td><code>feedback.visual_indicator</code></td>
 <td><code>true</code></td>
 <td>Show floating recording indicator with audio level bars</td>
+</tr>
+<tr>
+<td><code>feedback.restart_key</code></td>
+<td><code>"cmd"</code></td>
+<td>Key to restart recording while the trigger hotkey is held. Options: <code>space</code>, <code>cmd</code>, <code>ctrl</code>, <code>alt</code>, <code>shift</code>, <code>esc</code></td>
+</tr>
+<tr>
+<td><code>feedback.cancel_key</code></td>
+<td><code>"space"</code></td>
+<td>Key to cancel recording while the trigger hotkey is held. Options: <code>space</code>, <code>cmd</code>, <code>ctrl</code>, <code>alt</code>, <code>shift</code>, <code>esc</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="ui"><a href="#ui" class="heading-anchor">UI</a></h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ui.settings_last_tab</code></td>
+<td><code>"general"</code></td>
+<td>Last active tab in the Settings window (persisted automatically). Values: <code>general</code>, <code>stt</code>, <code>llm</code>, <code>ai</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="scripting"><a href="#scripting" class="heading-anchor">Scripting</a></h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scripting.enabled</code></td>
+<td><code>false</code></td>
+<td>Enable the Lua scripting system</td>
+</tr>
+<tr>
+<td><code>scripting.script_dir</code></td>
+<td><code>null</code></td>
+<td>Custom directory for Lua scripts (null = <code>&lt;config_dir&gt;/scripts</code>)</td>
 </tr>
 </tbody>
 </table></div>
