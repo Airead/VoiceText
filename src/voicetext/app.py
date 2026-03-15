@@ -426,11 +426,14 @@ class VoiceTextApp(StatusBarApp):
         file_handler.setLevel(log_level)
         file_handler.setFormatter(logging.Formatter(fmt))
 
+        # Root logger stays at INFO to suppress noisy third-party DEBUG output
+        # (numba, urllib3, etc.). Only our own logger gets the user-configured level.
         logging.basicConfig(
-            level=log_level,
+            level=logging.INFO,
             format=fmt,
             handlers=[logging.StreamHandler(), file_handler],
         )
+        logging.getLogger("voicetext").setLevel(log_level)
 
     @staticmethod
     def _sf_symbol_image(name: str, description: str = "") -> Any:
