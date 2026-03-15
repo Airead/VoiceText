@@ -67,6 +67,8 @@ def _show_alert(text: str, duration: float) -> None:
     panel.setHasShadow_(True)
     panel.setIgnoresMouseEvents_(True)
     panel.setMovableByWindowBackground_(False)
+    panel.setHidesOnDeactivate_(False)
+    panel.setCollectionBehavior_(1 << 4)  # canJoinAllSpaces
 
     # Round corners
     panel.contentView().setWantsLayer_(True)
