@@ -101,7 +101,9 @@ class ClipboardMonitor:
         """Stop the background polling thread."""
         self._stop_event.set()
         if self._thread is not None:
-            self._thread.join(timeout=2.0)
+            self._thread.join(timeout=5.0)
+            if self._thread.is_alive():
+                logger.warning("Clipboard monitor thread did not stop in time")
             self._thread = None
         logger.info("Clipboard monitor stopped")
 
@@ -190,10 +192,11 @@ class ClipboardMonitor:
                     self._entries.pop(i)
                     entry.timestamp = time.time()
                     self._entries.insert(0, entry)
+                    snapshot = [asdict(e) for e in self._entries]
                     break
             else:
                 return
-        self._save_to_disk()
+        self._save_to_disk(snapshot)
 
     def promote_image(self, image_path: str) -> None:
         """Move an existing image entry to the top of the history list."""
@@ -203,10 +206,11 @@ class ClipboardMonitor:
                     self._entries.pop(i)
                     entry.timestamp = time.time()
                     self._entries.insert(0, entry)
+                    snapshot = [asdict(e) for e in self._entries]
                     break
             else:
                 return
-        self._save_to_disk()
+        self._save_to_disk(snapshot)
 
     def _add_image_entry(
         self, image_data: bytes, image_type: str, source_app: str = ""
@@ -240,8 +244,9 @@ class ClipboardMonitor:
                 removed_entries = self._entries[self._max_items:]
                 self._entries = self._entries[: self._max_items]
                 removed = [e.image_path for e in removed_entries if e.image_path]
+            snapshot = [asdict(e) for e in self._entries]
 
-        if self._save_to_disk() and removed:
+        if self._save_to_disk(snapshot) and removed:
             self._cleanup_image_files(removed)
         logger.debug("Clipboard image entry added: %s (%dx%d)", filename, width, height)
 
@@ -270,13 +275,17 @@ class ClipboardMonitor:
                     return None
                 png_data = bytes(png_ns)
 
-            # Generate filename: timestamp + short hash
+            # Generate filename: timestamp + hash of full content
             ts = int(time.time())
-            short_hash = hashlib.md5(png_data[:4096]).hexdigest()[:6]
-            filename = f"{ts}_{short_hash}.png"
+            content_hash = hashlib.sha256(png_data).hexdigest()[:12]
+            filename = f"{ts}_{content_hash}.png"
 
             os.makedirs(self._image_dir, exist_ok=True)
             filepath = os.path.join(self._image_dir, filename)
+            # Avoid overwriting an existing file (hash collision)
+            if os.path.isfile(filepath):
+                filename = f"{ts}_{content_hash}_1.png"
+                filepath = os.path.join(self._image_dir, filename)
             with open(filepath, "wb") as f:
                 f.write(png_data)
 
@@ -329,22 +338,29 @@ class ClipboardMonitor:
                 removed_entries = self._entries[self._max_items:]
                 self._entries = self._entries[: self._max_items]
                 removed = [e.image_path for e in removed_entries if e.image_path]
+            snapshot = [asdict(e) for e in self._entries]
 
-        if self._save_to_disk() and removed:
+        if self._save_to_disk(snapshot) and removed:
             self._cleanup_image_files(removed)
         logger.debug("Clipboard entry added: %s...", text[:40])
 
-    def _save_to_disk(self) -> bool:
-        """Persist entries to JSON file. Returns True on success."""
+    def _save_to_disk(self, snapshot: Optional[list] = None) -> bool:
+        """Persist entries to JSON file. Returns True on success.
+
+        *snapshot* should be a pre-serialized list of dicts captured inside
+        the lock to avoid race conditions.  When ``None``, a fresh snapshot
+        is taken (legacy / ``clear()`` path).
+        """
         if not self._persist_path:
             return True
         try:
             path = os.path.expanduser(self._persist_path)
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            with self._lock:
-                data = [asdict(e) for e in self._entries]
+            if snapshot is None:
+                with self._lock:
+                    snapshot = [asdict(e) for e in self._entries]
             with open(path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+                json.dump(snapshot, f, ensure_ascii=False, indent=2)
             return True
         except Exception:
             logger.debug("Failed to save clipboard history", exc_info=True)

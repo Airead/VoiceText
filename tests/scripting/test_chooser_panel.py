@@ -244,6 +244,20 @@ class TestItemExecution:
             panel._reveal_item(0)
         assert called == ["copied"]
 
+    def test_stale_version_rejected(self):
+        """Execute with an old version should be ignored."""
+        called = []
+        panel = _make_panel()
+        panel._current_items = [
+            ChooserItem(title="Old", action=lambda: called.append("old")),
+        ]
+        panel._items_version = 5
+        panel.close = MagicMock()
+        with patch("PyObjCTools.AppHelper.callAfter"):
+            panel._execute_item(0, version=3)  # stale
+        assert called == []
+        panel.close.assert_not_called()
+
 
 class TestJSMessageHandling:
     def test_search_message(self):
@@ -335,7 +349,10 @@ class TestPushItemsToJS:
         ]
         panel._push_items_to_js()
         call_args = panel._eval_js.call_args[0][0]
-        parsed = json.loads(call_args[len("setResults("):-1])
+        # Format: setResults([...],version) — extract the JSON array
+        inner = call_args[len("setResults("):-1]
+        json_part = inner.rsplit(",", 1)[0]
+        parsed = json.loads(json_part)
         assert parsed[0]["preview"]["type"] == "text"
         assert parsed[0]["preview"]["content"] == "hello world"
 
@@ -344,5 +361,17 @@ class TestPushItemsToJS:
         panel._current_items = [ChooserItem(title="Test")]
         panel._push_items_to_js()
         call_args = panel._eval_js.call_args[0][0]
-        parsed = json.loads(call_args[len("setResults("):-1])
+        inner = call_args[len("setResults("):-1]
+        json_part = inner.rsplit(",", 1)[0]
+        parsed = json.loads(json_part)
         assert "preview" not in parsed[0]
+
+    def test_version_increments(self):
+        panel = _make_panel()
+        panel._current_items = [ChooserItem(title="A")]
+        panel._push_items_to_js()
+        v1 = panel._items_version
+        panel._current_items = [ChooserItem(title="B")]
+        panel._push_items_to_js()
+        v2 = panel._items_version
+        assert v2 == v1 + 1

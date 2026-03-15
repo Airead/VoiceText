@@ -11,6 +11,7 @@ import base64
 import hashlib
 import logging
 import os
+import threading
 from typing import List, Optional
 
 from voicetext.scripting.sources import ChooserItem, ChooserSource
@@ -241,11 +242,25 @@ class AppSource:
         if not self._scanned:
             self._apps = _scan_apps()
             self._scanned = True
+            self._preload_icons_async()
 
     def rescan(self) -> None:
         """Force a rescan of application directories."""
         self._apps = _scan_apps()
         self._scanned = True
+        self._preload_icons_async()
+
+    def _preload_icons_async(self) -> None:
+        """Preload all app icons in a background thread."""
+        apps = list(self._apps)
+
+        def _load():
+            for app in apps:
+                path = app["path"]
+                if path not in self._icon_cache:
+                    self._get_icon(path)
+
+        threading.Thread(target=_load, daemon=True).start()
 
     def search(self, query: str) -> List[ChooserItem]:
         """Search apps by substring matching, running apps first.

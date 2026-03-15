@@ -162,6 +162,8 @@ class ChooserPanel:
         self._sources: Dict[str, ChooserSource] = {}
         self._active_source: Optional[str] = None
         self._current_items: List[ChooserItem] = []
+        self._items_version: int = 0  # incremented on every setResults push
+        self._closing: bool = False
 
         self._on_close: Optional[Callable] = None
 
@@ -207,19 +209,37 @@ class ChooserPanel:
 
     def close(self) -> None:
         """Close the chooser panel."""
+        if self._closing:
+            return
+        self._closing = True
+
+        if self._webview is not None:
+            self._webview.setNavigationDelegate_(None)
+            # Remove the script message handler to break the reference cycle
+            try:
+                config = self._webview.configuration()
+                if config:
+                    config.userContentController().removeScriptMessageHandlerForName_(
+                        "chooser"
+                    )
+            except Exception:
+                pass
+        if self._message_handler is not None:
+            self._message_handler._panel_ref = None
+        if self._navigation_delegate is not None:
+            self._navigation_delegate._panel_ref = None
         if self._panel is not None:
             self._panel.setDelegate_(None)
             self._panel_delegate = None
             self._panel.orderOut_(None)
             self._panel = None
-        if self._webview is not None:
-            self._webview.setNavigationDelegate_(None)
         self._webview = None
         self._message_handler = None
         self._navigation_delegate = None
         self._page_loaded = False
         self._pending_js = []
         self._current_items = []
+        self._closing = False
 
         from AppKit import NSApp
         NSApp.setActivationPolicy_(1)  # Accessory (statusbar-only)
@@ -287,6 +307,7 @@ class ChooserPanel:
 
     def _push_items_to_js(self) -> None:
         """Serialize current items and send to the web view."""
+        self._items_version += 1
         js_items = []
         for item in self._current_items:
             js_item = {
@@ -299,7 +320,10 @@ class ChooserPanel:
             if item.preview is not None:
                 js_item["preview"] = item.preview
             js_items.append(js_item)
-        self._eval_js(f"setResults({json.dumps(js_items, ensure_ascii=False)})")
+        self._eval_js(
+            f"setResults({json.dumps(js_items, ensure_ascii=False)},"
+            f"{self._items_version})"
+        )
 
     # ------------------------------------------------------------------
     # JS message handler
@@ -315,11 +339,13 @@ class ChooserPanel:
 
         elif msg_type == "execute":
             index = body.get("index", 0)
-            self._execute_item(index)
+            version = body.get("version", self._items_version)
+            self._execute_item(index, version)
 
         elif msg_type == "reveal":
             index = body.get("index", 0)
-            self._reveal_item(index)
+            version = body.get("version", self._items_version)
+            self._reveal_item(index, version)
 
         elif msg_type == "close":
             from PyObjCTools import AppHelper
@@ -335,8 +361,11 @@ class ChooserPanel:
             index = body.get("index", -1)
             self._send_preview(index)
 
-    def _execute_item(self, index: int) -> None:
+    def _execute_item(self, index: int, version: int = 0) -> None:
         """Execute the primary action (Enter): close panel, then act."""
+        if version and version != self._items_version:
+            logger.debug("Stale execute (v%d != v%d), ignored", version, self._items_version)
+            return
         if 0 <= index < len(self._current_items):
             item = self._current_items[index]
             action = item.action
@@ -357,11 +386,13 @@ class ChooserPanel:
 
                 threading.Thread(target=_deferred, daemon=True).start()
 
-    def _reveal_item(self, index: int) -> None:
+    def _reveal_item(self, index: int, version: int = 0) -> None:
         """Execute the secondary action (Cmd+Enter).
 
         For apps: reveal in Finder. For other items: call secondary_action.
         """
+        if version and version != self._items_version:
+            return
         if 0 <= index < len(self._current_items):
             item = self._current_items[index]
             from PyObjCTools import AppHelper
@@ -421,25 +452,25 @@ class ChooserPanel:
 
     def _push_sources_to_js(self) -> None:
         """Send the list of registered sources to JS for tab rendering."""
+        sorted_sources = sorted(
+            self._sources.values(), key=lambda s: s.priority, reverse=True
+        )
+
         src_list = []
         default_name = None
-        for src in sorted(
-            self._sources.values(), key=lambda s: s.priority, reverse=True
-        ):
+        for src in sorted_sources:
             label = src.name.capitalize()
             if src.prefix:
                 label = f"{src.name.capitalize()} ({src.prefix})"
+            else:
+                # First non-prefix source is the default
+                if default_name is None:
+                    default_name = src.name
             src_list.append({"name": src.name, "label": label})
-            if default_name is None:
-                default_name = src.name
 
-        # Set default active source to the first non-prefix source
-        for src in sorted(
-            self._sources.values(), key=lambda s: s.priority, reverse=True
-        ):
-            if src.prefix is None:
-                default_name = src.name
-                break
+        # Fallback: use first source if all have prefixes
+        if default_name is None and src_list:
+            default_name = src_list[0]["name"]
 
         if self._active_source is None:
             self._active_source = default_name

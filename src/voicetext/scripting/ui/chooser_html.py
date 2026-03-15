@@ -222,6 +222,7 @@ var items = [];
 var selectedIndex = -1;
 var currentSource = null;
 var sources = [];
+var itemsVersion = 0;
 
 // --- DOM ---
 var searchInput = document.getElementById('search-input');
@@ -288,7 +289,7 @@ function renderItems() {
         row.addEventListener('click', function() {
             selectedIndex = i;
             renderItems();
-            post('execute', { index: i });
+            post('execute', { index: i, version: itemsVersion });
         });
 
         resultList.appendChild(row);
@@ -422,9 +423,9 @@ document.addEventListener('keydown', function(e) {
         e.preventDefault();
         if (selectedIndex >= 0 && selectedIndex < items.length) {
             if (e.metaKey) {
-                post('reveal', { index: selectedIndex });
+                post('reveal', { index: selectedIndex, version: itemsVersion });
             } else {
-                post('execute', { index: selectedIndex });
+                post('execute', { index: selectedIndex, version: itemsVersion });
             }
         }
         return;
@@ -433,8 +434,9 @@ document.addEventListener('keydown', function(e) {
 
 // --- Python -> JS API ---
 
-function setResults(newItems) {
+function setResults(newItems, version) {
     items = newItems || [];
+    itemsVersion = version || 0;
     selectedIndex = items.length > 0 ? 0 : -1;
     renderItems();
 }
