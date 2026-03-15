@@ -10,9 +10,11 @@ A practical guide for advanced users who want to systematically improve AI enhan
 
 ## The Preview Panel at a Glance
 
+The preview panel is rendered using WKWebView with a modern HTML/CSS/JS interface that adapts to light and dark mode automatically.
+
 ```
 ┌─────────────────────────────────────────────────────┐
-│  ASR   [FunASR ▾]  10.6s    ☐ Punc   Play ▶  Save  │  ← Raw speech recognition
+│  ASR   [STT model ▾]  10.6s  ☐ Punc   Play ▶  Save │  ← Raw speech recognition
 │  ┌─────────────────────────────────────────────┐    │
 │  │ 根据目前程序的preview界面你能想到用户...       │    │
 │  └─────────────────────────────────────────────┘    │
@@ -30,7 +32,7 @@ A practical guide for advanced users who want to systematically improve AI enhan
 │  │ Your final text — edit here before confirm   │    │
 │  └─────────────────────────────────────────────┘    │
 │                                                     │
-│  [History]                      [Cancel]  [Copy ⌘↵] │
+│  [History ▾]                  [Cancel]  [Confirm ⏎]  │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -61,6 +63,8 @@ What to look for:
 
 Press `⌘1` through `⌘9` to switch modes without re-recording. Results are cached — switching back shows the previous result instantly (marked `[cached]`).
 
+Rapid mode switching is debounced (300 ms). If you press `⌘3` then immediately `⌘5`, only the `⌘5` enhancement request is sent to the LLM. Any in-flight streaming enhancement from the previous mode is cancelled immediately, so no tokens are wasted on intermediate switches.
+
 Use this to:
 
 - Compare how different prompts handle the same input
@@ -81,9 +85,17 @@ Enable the thinking checkbox, then click the **🧠** (brain) button after enhan
 
 This is invaluable for diagnosing prompt issues — if the AI's reasoning is wrong, the prompt needs clarification.
 
-### 6. Final Result — Correct and Train
+### 6. Preview History — Browse Previous Results
+
+Click the **History** button at the bottom of the panel to open a dropdown listing the last 10 preview records (stored in memory for the current session). Each entry shows an action icon, timestamp, enhancement mode, and a text preview.
+
+Click any entry to load that record back into the panel — ASR text, enhanced text, final text, and audio playback buttons are all restored. This lets you revisit earlier results without re-recording, which is useful for comparing how a prompt edit affected the same input across sessions.
+
+### 7. Final Result — Correct and Train
 
 Edit the Final Result to fix any remaining issues before confirming. Each edit is recorded with a `user_corrected` flag, which feeds into the vocabulary system over time.
+
+When you click **Confirm** or **Cancel**, any in-flight streaming enhancement is cancelled immediately to save tokens. You do not need to wait for the AI to finish before confirming your text.
 
 ## Step-by-Step Optimization Workflow
 
@@ -125,7 +137,7 @@ Use the controls to narrow down the issue:
 ### Phase 5: Refine Over Time
 
 - **Correct Final Results** consistently — the vocabulary system learns from your edits.
-- **Review History** (click History button) — look for patterns in what the AI gets wrong.
+- **Review History** (click History dropdown) — browse previous results and look for patterns in what the AI gets wrong.
 - **Build vocabulary** (Settings → AI → Build Vocabulary) — domain terms accumulate automatically.
 
 ## Practical Examples
@@ -179,7 +191,7 @@ Do not add any explanation.
 | **🧠** | Read the AI's reasoning — diagnose misunderstandings |
 | **Final Result** | Correct errors — trains vocabulary over time |
 | **Translate ↗** | Cross-check with Google Translate |
-| **History** | Review patterns in past corrections |
+| **History ▾** | Browse last 10 preview records — compare results across prompt edits |
 
 ## Tips
 
@@ -188,3 +200,4 @@ Do not add any explanation.
 - **Use numbered rules.** LLMs follow structured prompts with numbered rules more consistently than paragraph instructions.
 - **Always mention ASR context.** Include "The user's input comes from ASR and may contain recognition errors" in your prompts — it significantly improves error tolerance.
 - **Check token counts.** The Tokens display (↑prompt ↓completion) helps you judge prompt efficiency. A prompt with high ↑ and low ↓ may be too verbose.
+- **Confirm early if satisfied.** Clicking Confirm or Cancel immediately cancels any in-flight enhancement stream, saving tokens. You do not need to wait for the AI to finish generating.

@@ -34,9 +34,25 @@ Every voice input session is recorded to `~/.config/VoiceText/conversation_histo
     "preview_enabled": true,
     "stt_model": "funasr-paraformer",
     "llm_model": "qwen2.5:7b",
-    "user_corrected": true
+    "user_corrected": true,
+    "audio_duration": 3.2
 }
 ```
+
+| Field | Type | Description |
+|---|---|---|
+| `timestamp` | string | ISO 8601 UTC timestamp of the session |
+| `asr_text` | string | Raw ASR transcription |
+| `enhanced_text` | string | AI-enhanced text (before user review) |
+| `final_text` | string | Final confirmed text |
+| `enhance_mode` | string | Enhancement mode (`proofread`, `translate`, etc.) |
+| `preview_enabled` | bool | Whether preview mode was active |
+| `stt_model` | string | STT model identifier |
+| `llm_model` | string | LLM model identifier |
+| `user_corrected` | bool | Whether the user edited the enhanced text |
+| `audio_duration` | float | Recording duration in seconds, rounded to 0.1s |
+
+The `audio_duration` field tracks how long the user spoke for each session. This value is also aggregated in usage statistics via `record_recording_duration()`.
 
 Both direct mode (`preview_enabled: false`) and preview mode (`preview_enabled: true`) sessions are recorded. This ensures no data is lost, even if the injection policy changes later.
 
@@ -84,6 +100,57 @@ Conversation history is injected into the system prompt **after** vocabulary con
 
 Each context source is independently toggleable and gracefully degrades — if history retrieval fails, enhancement proceeds without it.
 
+## Storage and Archiving
+
+### Auto-Rotation
+
+The main history file (`conversation_history.jsonl`) is kept bounded by an automatic rotation mechanism. After each `log()` call, the system checks whether rotation is needed:
+
+1. **Size pre-check** -- If the file is smaller than 4 MB, rotation is skipped entirely (cheap guard to avoid counting lines on every write).
+2. **Record count check** -- If the file exceeds **20,000 records** (`_MAX_RECORDS`), the oldest records beyond this limit are archived.
+
+### Monthly Archives
+
+Rotated records are grouped by the month in their `timestamp` field and appended to per-month archive files:
+
+```
+~/.config/VoiceText/
+├── conversation_history.jsonl                  # Active file (up to 20,000 records)
+└── conversation_history_archives/
+    ├── 2025-11.jsonl
+    ├── 2025-12.jsonl
+    └── 2026-01.jsonl
+```
+
+Each archive file is named `YYYY-MM.jsonl` and contains all records from that month. Records whose timestamp cannot be parsed are placed in `unknown.jsonl`. Archives are append-only -- subsequent rotations add to existing month files rather than overwriting them.
+
+After archiving, the main file is atomically replaced (via a temp file + `os.replace()`) with only the most recent 20,000 records, and all in-memory caches are invalidated.
+
+### Browsing Archived Records
+
+The History Browser provides an **"Include archived"** toggle. When enabled, `get_all()` and `search()` load records from all archive files (sorted chronologically by filename) and prepend them to the active records. This allows users to search and browse their full history without the active file growing unbounded.
+
+## In-Memory Cache
+
+To avoid repeated disk reads, `ConversationHistory` maintains a two-tier cache:
+
+| Cache | Size | Purpose | Populated |
+|---|---|---|---|
+| Hot-path (`_cache`) | Last 200 records | Serves `get_recent()` for context injection | Lazily on first `get_recent()` call |
+| Full (`_full_cache`) | All records in the active file | Serves `get_all()` and `search()` for the History Browser | Lazily on first `get_all()`/`search()` call |
+
+**Hot-path cache** -- Stores the most recent 200 raw (unfiltered) records. Updated in-place by `log()`, `update_record()`, and `delete_record()`. Since context injection typically needs only 10 entries filtered from the tail, 200 cached records provide ample headroom without loading the entire file.
+
+**Full cache** -- Stores all parsed records from the active JSONL file. Staleness is detected by comparing the file's `mtime` -- if the file has been modified externally, the cache is reloaded on the next access. Callers should call `release_full_cache()` when the data is no longer needed (e.g., when the History Browser window is closed) to free memory promptly.
+
+Both caches are fully invalidated after a rotation event.
+
+## History Browser Pagination
+
+The web-based History Browser (`history_browser_window_web.py`) displays records in pages of **100 entries** (`PAGE_SIZE = 100`). The Python backend computes total pages from the filtered record count and sends only the current page's records to the WKWebView frontend. The frontend renders a pager with previous/next navigation and a "Page X / Y" indicator.
+
+Pagination is reset to page 0 whenever the search query, time filter, or archive toggle changes.
+
 ## Architecture
 
 ```
@@ -92,12 +159,18 @@ Voice Input
      ▼
 ┌──────────┐     ┌───────────────────────────────────┐
 │ ASR      │────►│ conversation_history.jsonl         │
-└──────────┘     │  (append-only, all sessions)       │
-     │           └─────────────────┬─────────────────┘
-     ▼                             │
-┌──────────┐                       │ get_recent(n=10)
-│ Enhancer │◄──────────────────────┘ filter: preview_enabled=true
-│          │
+└──────────┘     │  (up to 20,000 records)            │
+     │           └────────┬──────────────┬────────────┘
+     │                    │              │ _maybe_rotate()
+     │                    │              ▼
+     │                    │   ┌──────────────────────────┐
+     │                    │   │ archives/YYYY-MM.jsonl    │
+     │                    │   │ (monthly, append-only)    │
+     │                    │   └──────────────────────────┘
+     ▼                    │
+┌──────────┐              │ get_recent(n=10)
+│ Enhancer │◄─────────────┘ filter: preview_enabled=true
+│          │                via hot-path cache (200 records)
 │ system_prompt = base_prompt      │
 │            + vocab_context       │
 │            + history_context ◄───┘
@@ -110,7 +183,8 @@ Voice Input
 │ Preview Panel    │──► user confirms ──► type_text
 │ (preview mode)   │                        │
 └──────────────────┘                        ▼
-                                   log(preview_enabled=true)
+                                   log(preview_enabled=true,
+                                        audio_duration=N.Ns)
 ```
 
 ## Configuration
@@ -137,7 +211,9 @@ The toggle is also available in the **Settings** panel (AI tab).
 
 | File | Purpose |
 |---|---|
-| `src/voicetext/conversation_history.py` | JSONL recording, reading, filtering, and prompt formatting |
-| `src/voicetext/enhancer.py` | Integrates history context into enhancement prompts |
+| `src/voicetext/enhance/conversation_history.py` | JSONL recording, reading, caching, rotation, archiving, and prompt formatting |
+| `src/voicetext/enhance/enhancer.py` | Integrates history context into enhancement prompts |
+| `src/voicetext/ui/history_browser_window_web.py` | Web-based History Browser with pagination and archive toggle |
+| `src/voicetext/usage_stats.py` | Aggregates `audio_duration` via `record_recording_duration()` |
 | `src/voicetext/app.py` | Records sessions in both output paths; menu toggle |
 | `src/voicetext/config.py` | Default configuration for conversation history |

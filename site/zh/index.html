@@ -61,14 +61,14 @@
 
       <div class="feature-card fade-in">
         <div class="feature-icon">&#128268;</div>
-        <h3>离线优先</h3>
-        <p>默认使用 FunASR ONNX 模型 — 无需联网，完全离线，保护隐私。</p>
+        <h3>零配置启动</h3>
+        <p>默认使用 Apple 设备端语音识别 — 无需下载模型、无需 API 密钥，开箱即用。可随时切换到 FunASR 或 MLX-Whisper 获取更高准确度。</p>
       </div>
 
       <div class="feature-card fade-in">
         <div class="feature-icon">&#127911;</div>
         <h3>多引擎支持</h3>
-        <p>FunASR（中文优化）、MLX-Whisper（99 种语言，Apple GPU 加速）、Apple Speech（系统内置）及远程 Whisper API。</p>
+        <p>五大语音引擎：Apple Speech（系统内置）、FunASR（中文优化）、MLX-Whisper（99 种语言，Apple GPU 加速）、Sherpa-ONNX 及远程 Whisper API。</p>
       </div>
 
       <div class="feature-card fade-in">
@@ -90,6 +90,30 @@
       </div>
 
       <div class="feature-card fade-in">
+        <div class="feature-icon">&#127908;</div>
+        <h3>实时流式转写</h3>
+        <p>录音时浮动显示实时转写结果 — 边说边看，文字即时呈现。</p>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon">&#128197;</div>
+        <h3>历史记录与统计</h3>
+        <p>浏览历史转写记录，支持标签筛选、时间范围过滤和删除。交互式堆叠柱状图直观展示使用趋势。</p>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon">&#128187;</div>
+        <h3>脚本系统</h3>
+        <p>基于 Python 的插件系统，通过 Leader 键和快捷键自动化 macOS 操作 — 提示框、剪贴板、Shell 命令等。</p>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon">&#127761;</div>
+        <h3>深色模式</h3>
+        <p>所有面板和窗口全面支持深色模式，自动跟随 macOS 系统外观设置。</p>
+      </div>
+
+      <div class="feature-card fade-in">
         <div class="feature-icon">&#9889;</div>
         <h3>轻量级</h3>
         <p>仅在菜单栏运行，不占 Dock 位置。资源占用极小，快捷键即时响应。</p>
@@ -108,7 +132,7 @@
       <div class="step fade-in">
         <div class="step-number">1</div>
         <h3>按住录音</h3>
-        <p>按住 <code>fn</code> 键（或自定义快捷键）开始说话。浮动指示器显示录音状态和音量条。</p>
+        <p>按住 <code>fn</code> 键（或自定义快捷键）开始说话。浮动指示器显示录音状态和音量条，实时转写浮层同步显示识别结果。按 <code>Space</code> 重新开始，<code>ESC</code> 或 <code>Fn+Cmd</code> 取消录音。</p>
       </div>
       <div class="step fade-in">
         <div class="step-number">2</div>
@@ -118,7 +142,7 @@
       <div class="step fade-in">
         <div class="step-number">3</div>
         <h3>自动输入</h3>
-        <p>转写结果自动输入到当前活动应用，或在预览面板中显示供编辑和确认。</p>
+        <p>转写结果自动输入到当前活动应用，或在 Web 预览面板中显示，供编辑、对比模型和确认。</p>
       </div>
     </div>
     <div class="screenshot fade-in">
@@ -146,7 +170,14 @@
         </thead>
         <tbody>
           <tr>
-            <td><strong>FunASR</strong> <span class="badge">默认</span></td>
+            <td><strong>Apple Speech</strong> <span class="badge">默认</span></td>
+            <td>多语言</td>
+            <td>快</td>
+            <td>良好</td>
+            <td>无需下载（系统内置）</td>
+          </tr>
+          <tr>
+            <td><strong>FunASR</strong></td>
             <td>中文</td>
             <td>快</td>
             <td>高</td>
@@ -160,11 +191,11 @@
             <td>75 MB – 1.6 GB</td>
           </tr>
           <tr>
-            <td><strong>Apple Speech</strong></td>
+            <td><strong>Sherpa-ONNX</strong></td>
             <td>多语言</td>
             <td>快</td>
-            <td>良好</td>
-            <td>无需下载（系统内置）</td>
+            <td>高</td>
+            <td>因模型而异</td>
           </tr>
           <tr>
             <td><strong>Whisper API</strong></td>

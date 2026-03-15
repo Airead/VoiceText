@@ -1,6 +1,16 @@
 # Configuration
 
-Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file as a command-line argument to override. Only the fields you want to change are needed; everything else uses defaults.
+Default config path: `~/.config/VoiceText/config.json`. Only the fields you want to change are needed; everything else uses defaults.
+
+## Config Directory Resolution
+
+The config directory is resolved with the following priority:
+
+1. **CLI argument** -- pass a directory path as the first positional argument: `voicetext /path/to/config-dir`
+2. **NSUserDefaults** -- a custom directory saved via the Settings UI (stored under `com.voicetext.app` / `config_dir`)
+3. **Default** -- `~/.config/VoiceText/`
+
+The config file is always `config.json` inside the resolved directory.
 
 ## Full Default Configuration
 
@@ -15,11 +25,11 @@ Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file 
     "silence_rms": 20
   },
   "asr": {
-    "backend": "funasr",
+    "backend": "apple",
     "use_vad": true,
     "use_punc": true,
     "language": "zh",
-    "model": null,
+    "model": "on-device",
     "preset": null,
     "temperature": 0.0,
     "default_provider": null,
@@ -29,7 +39,8 @@ Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file 
   "output": {
     "method": "auto",
     "append_newline": false,
-    "preview": true
+    "preview": true,
+    "preview_type": "web"
   },
   "ai_enhance": {
     "enabled": false,
@@ -66,10 +77,19 @@ Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file 
   "feedback": {
     "sound_enabled": true,
     "sound_volume": 0.4,
-    "visual_indicator": true
+    "visual_indicator": true,
+    "restart_key": "cmd",
+    "cancel_key": "space"
+  },
+  "ui": {
+    "settings_last_tab": "general"
   },
   "logging": {
     "level": "INFO"
+  },
+  "scripting": {
+    "enabled": false,
+    "script_dir": null
   }
 }
 ```
@@ -80,7 +100,7 @@ Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file 
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `hotkeys` | `{"fn": true}` | Hotkey map. Keys: `fn`, `f1`–`f12`, `esc`, `space`, `cmd`, `ctrl`, `alt`, `shift`. Values: `true` to enable |
+| `hotkeys` | `{"fn": true}` | Hotkey map. Keys: `fn`, `f1`--`f12`, `esc`, `space`, `cmd`, `ctrl`, `alt`, `shift`. Values: `true` to enable |
 
 ### Audio
 
@@ -96,11 +116,11 @@ Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file 
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `asr.backend` | `"funasr"` | ASR backend: `funasr`, `mlx-whisper`, `apple`, or `whisper-api` |
+| `asr.backend` | `"apple"` | ASR backend: `apple`, `funasr`, `mlx-whisper`, `whisper-api`, or `sherpa-onnx` |
 | `asr.use_vad` | `true` | Enable voice activity detection (prevents hallucination on silence) |
 | `asr.use_punc` | `true` | Enable automatic punctuation restoration |
 | `asr.language` | `"zh"` | Language code (used by MLX-Whisper and Whisper API) |
-| `asr.model` | `null` | Model identifier (e.g. `mlx-community/whisper-small`) |
+| `asr.model` | `"on-device"` | Model identifier (e.g. `on-device` for Apple, `mlx-community/whisper-small` for MLX-Whisper) |
 | `asr.preset` | `null` | Preset ID from model registry (e.g. `mlx-whisper-small`) |
 | `asr.temperature` | `0.0` | Decoding temperature (MLX-Whisper and Whisper API) |
 | `asr.default_provider` | `null` | Default remote ASR provider name (e.g. `"groq"`) |
@@ -114,6 +134,7 @@ Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file 
 | `output.method` | `"auto"` | Text injection method: `auto`, `clipboard`, or `applescript` |
 | `output.append_newline` | `false` | Append a newline after typed text |
 | `output.preview` | `true` | Show floating preview panel for reviewing results before input |
+| `output.preview_type` | `"web"` | Preview panel implementation: `web` (WebView-based) or `native` (AppKit-based) |
 
 ### AI Enhancement
 
@@ -146,6 +167,8 @@ Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file 
 | `ai_enhance.conversation_history.enabled` | `false` | Enable conversation history context injection |
 | `ai_enhance.conversation_history.max_entries` | `10` | Number of recent confirmed entries to inject |
 
+> **Note:** Conversation history is automatically rotated when it exceeds 20,000 records. Older records are archived into monthly JSONL files under `conversation_history_archives/`. This limit is not configurable.
+
 ### Clipboard Enhancement
 
 | Key | Default | Description |
@@ -157,8 +180,23 @@ Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `feedback.sound_enabled` | `true` | Enable sound feedback for recording start/stop |
-| `feedback.sound_volume` | `0.4` | Sound volume (0.0 – 1.0) |
+| `feedback.sound_volume` | `0.4` | Sound volume (0.0 -- 1.0) |
 | `feedback.visual_indicator` | `true` | Show floating recording indicator with audio level bars |
+| `feedback.restart_key` | `"cmd"` | Key to restart recording while the trigger hotkey is held. Options: `space`, `cmd`, `ctrl`, `alt`, `shift`, `esc` |
+| `feedback.cancel_key` | `"space"` | Key to cancel recording while the trigger hotkey is held. Options: `space`, `cmd`, `ctrl`, `alt`, `shift`, `esc` |
+
+### UI
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `ui.settings_last_tab` | `"general"` | Last active tab in the Settings window (persisted automatically). Values: `general`, `stt`, `llm`, `ai` |
+
+### Scripting
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `scripting.enabled` | `false` | Enable the Lua scripting system |
+| `scripting.script_dir` | `null` | Custom directory for Lua scripts (null = `<config_dir>/scripts`) |
 
 ### Logging
 

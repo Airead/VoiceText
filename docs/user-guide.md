@@ -62,16 +62,18 @@ On first launch, macOS will ask for:
 
 Grant all requested permissions in **System Settings → Privacy & Security**.
 
-### First Launch: Model Download
+### First Launch: Ready Immediately
 
-**Important:** On first launch, VoiceText needs to download the default FunASR speech recognition model (~500 MB). During download:
+The default ASR backend is **Apple On-Device Speech** — it uses the built-in macOS speech recognizer, so **no model download is needed**. VoiceText is ready to transcribe right after granting permissions.
 
-- The menubar icon changes to a **download icon** (⬇) with a percentage like `DL 45%`
-- **Please wait for the download to complete** before trying to transcribe — this may take a few minutes depending on your network speed
-- Click menubar → **View Logs...** to open the built-in log viewer and monitor download progress in real time
-- Once loading finishes, the icon changes back to a **microphone icon** (🎙) and the status shows "Ready"
-
-> **Tip:** If the download fails or is interrupted, delete `~/.cache/modelscope/` and restart VoiceText to retry.
+> **Note:** If you later switch to FunASR or MLX-Whisper in Settings, VoiceText will need to download a model (~75 MB to ~1.6 GB depending on the model). During download:
+>
+> - The menubar icon changes to a **download icon** (⬇) with a percentage like `DL 45%`
+> - **Please wait for the download to complete** before trying to transcribe
+> - Click menubar → **View Logs...** to open the built-in log viewer and monitor download progress in real time
+> - Once loading finishes, the icon changes back to a **microphone icon** (🎙) and the status shows "Ready"
+>
+> **Tip:** If a download fails or is interrupted, delete the cache directory (`~/.cache/modelscope/` for FunASR, `~/.cache/huggingface/` for MLX-Whisper) and restart VoiceText to retry.
 
 ### Your First Transcription
 
@@ -147,6 +149,20 @@ All model selection, AI enhancement configuration, and hotkey management are don
 
 While holding `fn`, a floating indicator with audio level bars shows you're recording. A sound plays on start and stop (configurable in Settings → General).
 
+When the ASR backend supports streaming (e.g., Apple Speech), a **live transcription overlay** appears below the recording indicator, showing partial transcription text in real time as you speak. This gives you immediate visual feedback without waiting for the recording to end.
+
+### Recording Controls
+
+While holding the recording hotkey, you can press additional keys to control the session:
+
+| Key (while holding `fn`) | Action |
+|---|---|
+| `Cmd` (default) | **Restart recording** — discards current audio and starts a new recording |
+| `Space` (default) | **Cancel recording** — discards audio and returns to idle |
+| `Z` | **Show last preview** — cancels recording and opens the last preview result |
+
+The restart and cancel keys can be customized in Settings → General (or via config: `feedback.restart_key` and `feedback.cancel_key`).
+
 ---
 
 ## Level 3: Choosing the Right ASR Backend
@@ -157,9 +173,9 @@ While holding `fn`, a floating indicator with audio level bars shows you're reco
 
 | Backend | Language | Speed | Accuracy | Download Size |
 |---|---|---|---|---|
-| **FunASR** (default) | Chinese | Fast | High (Chinese) | ~500 MB |
+| **Apple Speech** (default) | Multiple | Fast | Good | None (built-in) |
+| **FunASR** | Chinese | Fast | High (Chinese) | ~500 MB |
 | **MLX-Whisper** | 99 languages | Medium | High | 75 MB – 1.6 GB |
-| **Apple Speech** | Multiple | Fast | Good | None (built-in) |
 | **Whisper API** | Multiple | Depends on network | High | None (cloud) |
 
 ### How to Switch
@@ -175,9 +191,9 @@ Click a radio button to switch. The model will start loading (or downloading if 
 
 ### Recommendations
 
-- **Chinese only** → FunASR (best accuracy, fully offline)
-- **English or multilingual** → MLX-Whisper small or large-v3-turbo
-- **Quick test, no download** → Apple Speech
+- **Zero-setup, any language** → Apple Speech (default — no download, supports real-time streaming)
+- **Chinese only** → FunASR (best accuracy for Chinese, fully offline)
+- **English or multilingual, high accuracy** → MLX-Whisper small or large-v3-turbo
 - **Best accuracy, don't mind latency** → Whisper API via Groq (free tier available)
 
 ---
@@ -252,6 +268,17 @@ When you switch modes in the preview panel, VoiceText **caches** completed resul
 
 The cache is cleared when new audio is recorded.
 
+### Preview History
+
+VoiceText keeps an **in-memory history** of your last 10 preview results (cleared on app restart). This lets you go back to a previous transcription without re-recording.
+
+- **History dropdown:** Click the clock icon in the preview panel's toolbar to open a dropdown showing recent previews. Select one to reload it into the panel.
+- **Quick recall:** Press `fn+Z` at any time (even outside the preview panel) to cancel any active recording and instantly open the most recent preview result.
+
+### Web Preview Panel
+
+The preview panel uses a modern **WKWebView-based** (HTML/CSS/JS) interface by default, providing a polished look with dark mode support. You can switch between the web-based and native AppKit preview in Settings → General → **Web Preview** toggle.
+
 ### Other Preview Features
 
 | Feature | How |
@@ -277,11 +304,22 @@ Turn off Preview: **Settings...** → General tab → uncheck **Preview**.
 
 Now when you release the hotkey, text is typed directly into the active app — no panel, no confirmation needed.
 
-### Streaming Overlay
+### Real-Time Streaming STT
 
-With AI enhancement active in direct mode, a **streaming overlay** appears showing the LLM processing your text in real-time. You can see tokens appear as they're generated.
+When using an ASR backend that supports streaming (currently Apple Speech), VoiceText shows a **live transcription overlay** during recording. Partial text appears in real-time as you speak, giving you instant feedback before you even release the hotkey.
 
-- Press **Esc** to cancel enhancement and discard the result
+This works in both Preview and Direct modes. In Direct mode, it is especially useful because you can see the transcription forming and decide whether to keep or cancel it.
+
+### AI Streaming Overlay
+
+In direct mode, after recording ends, a **streaming overlay** appears showing the processing pipeline:
+
+1. **Transcription phase** — the overlay first shows the ASR result (or streams partial text if the backend supports it)
+2. **Enhancement phase** (if AI enhancement is active) — the LLM processes the text in real-time, with tokens appearing as they are generated
+
+Controls during the overlay:
+
+- Press **Esc** to cancel transcription/enhancement and discard the result
 - The overlay shows token count and processing status
 - Once complete, the final text is typed automatically
 
@@ -465,7 +503,18 @@ Settings → **AI** tab → toggle **Conversation History**.
 
 #### Browse History
 
-Menubar → **Browse History...** opens a searchable, filterable view of all past transcriptions. You can filter by mode, model, and whether corrections were made.
+Menubar → **Browse History...** opens a full-featured history browser with:
+
+- **Text search** — search across all transcription text fields
+- **Tag filters** — click tag pills to filter by enhance mode (proofread, translate, etc.), STT model, LLM model, or whether corrections were made
+- **Time range filtering** — filter by today, last 7 days, last 30 days, or all time
+- **Record deletion** — select a record and click Delete to remove it
+- **Edit and save** — modify the final text of any record and save changes
+- **Archived records** — check the "Archived" toggle to include records from monthly archives
+
+#### Auto-Rotation and Archiving
+
+When conversation history exceeds **20,000 records**, VoiceText automatically archives older records into monthly files under `~/.config/VoiceText/conversation_history_archives/YYYY-MM.jsonl`. The main history file keeps the most recent 20,000 records for fast access, while archived records remain searchable through the history browser.
 
 See [Vocabulary Embedding Retrieval](vocabulary-embedding-retrieval.md) and [Conversation History Enhancement](conversation-history-enhancement.md) for technical details.
 
@@ -481,12 +530,20 @@ Menubar → **Settings...** opens a panel with 4 tabs:
 
 | Tab | What you can configure |
 |---|---|
-| **General** | Recording hotkeys, sound feedback, visual indicator, preview toggle |
+| **General** | Recording hotkeys, sound feedback, visual indicator, preview toggle, web/native preview, restart/cancel key selection, scripting toggle, custom config directory |
 | **STT** | Local ASR model selection, remote ASR provider management |
 | **LLM** | LLM provider and model selection, provider management |
-| **AI** | Enhancement mode, thinking mode, vocabulary, conversation history, auto build |
+| **AI** | Enhancement mode (displayed in defined order, not alphabetical), thinking mode, vocabulary, conversation history, auto build |
 
-At the bottom, toolbar buttons provide quick access to **Show Config**, **Edit Config**, and **Reload Config**.
+The Settings panel **remembers the last active tab** across sessions. At the bottom, toolbar buttons provide quick access to **Show Config**, **Edit Config**, and **Reload Config**.
+
+#### Custom Config Directory
+
+In the General tab, you can set a **custom config directory** to store VoiceText configuration files in a location of your choice (e.g., a synced folder). After changing the directory, VoiceText will prompt you to restart for the change to take effect.
+
+#### Scripting Toggle
+
+The General tab includes a **Scripting** toggle to enable or disable the scripting/plugin system. When enabled, VoiceText loads and executes Lua scripts from the configured script directory. See the [Scripting Documentation](scripting.md) for details on writing plugins.
 
 ### Hotkey Configuration
 
@@ -531,7 +588,9 @@ Multiple recording hotkeys can be enabled simultaneously by adding entries to th
 
 ### Configuration File
 
-Location: `~/.config/VoiceText/config.json`
+Default location: `~/.config/VoiceText/config.json`
+
+The config directory can be changed to a custom path via Settings → General → Config Directory (stored in macOS preferences, survives config file changes).
 
 You only need to include fields you want to change — everything else uses defaults. After editing, click **Reload Config** in the Settings toolbar to apply without restarting.
 
@@ -547,10 +606,14 @@ Log files are also available on disk at the path above if you prefer an external
 
 ### Usage Statistics
 
-Menubar → **Usage Stats** shows:
-- Total and today's transcription count
-- Enhancement usage by mode
-- Stored data counts (conversations, vocabulary entries)
+Menubar → **Usage Stats** opens an interactive statistics dashboard with:
+
+- **Summary cards** — total transcriptions (with today's count), total tokens consumed (with cached input token breakdown), accept rate, and total recording time
+- **Interactive charts** (powered by Chart.js) with selectable time ranges (7/14/30 days):
+  - **Daily Transcriptions** — stacked bar chart showing Direct vs Preview mode usage per day
+  - **User Actions** — stacked bar chart of Accept / Modified / Cancel actions per day
+  - **Token Usage** — stacked bar chart of Prompt / Completion / Cached tokens per day
+  - **Enhance Modes** — stacked bar chart showing usage of each enhancement mode per day
 
 ### Common Issues
 
@@ -559,7 +622,7 @@ Menubar → **Usage Stats** shows:
 - Try switching output method in config: `"output": {"method": "clipboard"}`
 
 #### Model download takes too long
-- The menubar shows `DL X%` during download — this is normal for first launch
+- The menubar shows `DL X%` during download — this is normal when switching to a model for the first time
 - FunASR: ~500 MB, MLX-Whisper large-v3-turbo: ~1.6 GB
 - Check the log viewer for detailed progress
 - If partially downloaded, delete the cache directory (`~/.cache/modelscope/` for FunASR, `~/.cache/huggingface/` for MLX-Whisper) and restart
@@ -582,6 +645,9 @@ Menubar → **Usage Stats** shows:
 | Shortcut | Context | Action |
 |---|---|---|
 | `fn` (hold/release) | Global | Record / stop and transcribe |
+| `fn` + `Cmd` | During recording | Restart recording (discard current audio, start new) |
+| `fn` + `Space` | During recording | Cancel recording (discard audio, return to idle) |
+| `fn` + `Z` | During recording | Cancel recording and show last preview history |
 | `Ctrl+Cmd+V` | Global | Clipboard enhancement |
 | `Enter` | Preview panel | Confirm and type text |
 | `⌘+Enter` | Preview panel | Copy to clipboard |
@@ -589,6 +655,8 @@ Menubar → **Usage Stats** shows:
 | `⌘1` – `⌘9` | Preview panel | Switch enhancement mode |
 | `⌘A/C/V/X` | Preview panel | Standard edit shortcuts |
 | `⌘Z` / `⌘⇧Z` | Preview panel | Undo / Redo |
+
+> **Note:** The restart key (`Cmd`) and cancel key (`Space`) are configurable in Settings → General or via config (`feedback.restart_key` and `feedback.cancel_key`). Available choices: `cmd`, `ctrl`, `alt`, `shift`, `space`, `esc`.
 
 ---
 
@@ -600,6 +668,7 @@ You now know everything VoiceText offers. Here are some ideas to get the most ou
 - **Build chain modes** — proofread → translate, or summarize → format
 - **Accumulate vocabulary** — the more you correct, the smarter it gets
 - **Try different models** — compare Groq's speed vs local Ollama's privacy vs OpenAI's accuracy
+- **Write scripts** — extend VoiceText with Lua plugins for custom hotkey actions (see [Scripting Documentation](scripting.md))
 - **Browse [Enhancement Mode Examples](enhance-mode-examples.md)** for inspiration
 
 For technical details on any feature, see the [documentation index](../README.md#documentation).

@@ -1,6 +1,16 @@
 # 配置说明
 
-默认配置文件路径：`~/.config/VoiceText/config.json`。可通过命令行参数传入 JSON 配置文件来覆盖默认配置。只需包含你想修改的字段，其余字段将使用默认值。
+默认配置文件路径：`~/.config/VoiceText/config.json`。只需包含你想修改的字段，其余字段将使用默认值。
+
+## 配置目录解析
+
+配置目录按以下优先级解析：
+
+1. **命令行参数** -- 将目录路径作为第一个位置参数传入：`voicetext /path/to/config-dir`
+2. **NSUserDefaults** -- 通过设置界面保存的自定义目录（存储在 `com.voicetext.app` / `config_dir` 下）
+3. **默认路径** -- `~/.config/VoiceText/`
+
+配置文件始终是解析后目录中的 `config.json`。
 
 ## 完整默认配置
 
@@ -15,11 +25,11 @@
     "silence_rms": 20
   },
   "asr": {
-    "backend": "funasr",
+    "backend": "apple",
     "use_vad": true,
     "use_punc": true,
     "language": "zh",
-    "model": null,
+    "model": "on-device",
     "preset": null,
     "temperature": 0.0,
     "default_provider": null,
@@ -29,7 +39,8 @@
   "output": {
     "method": "auto",
     "append_newline": false,
-    "preview": true
+    "preview": true,
+    "preview_type": "web"
   },
   "ai_enhance": {
     "enabled": false,
@@ -66,10 +77,19 @@
   "feedback": {
     "sound_enabled": true,
     "sound_volume": 0.4,
-    "visual_indicator": true
+    "visual_indicator": true,
+    "restart_key": "cmd",
+    "cancel_key": "space"
+  },
+  "ui": {
+    "settings_last_tab": "general"
   },
   "logging": {
     "level": "INFO"
+  },
+  "scripting": {
+    "enabled": false,
+    "script_dir": null
   }
 }
 ```
@@ -80,7 +100,7 @@
 
 | 键名 | 默认值 | 说明 |
 |-----|---------|-------------|
-| `hotkeys` | `{"fn": true}` | 热键映射。可用键名：`fn`、`f1`–`f12`、`esc`、`space`、`cmd`、`ctrl`、`alt`、`shift`。值设为 `true` 表示启用 |
+| `hotkeys` | `{"fn": true}` | 热键映射。可用键名：`fn`、`f1`--`f12`、`esc`、`space`、`cmd`、`ctrl`、`alt`、`shift`。值设为 `true` 表示启用 |
 
 ### 音频设置
 
@@ -96,11 +116,11 @@
 
 | 键名 | 默认值 | 说明 |
 |-----|---------|-------------|
-| `asr.backend` | `"funasr"` | ASR 后端引擎：`funasr`、`mlx-whisper`、`apple` 或 `whisper-api` |
+| `asr.backend` | `"apple"` | ASR 后端引擎：`apple`、`funasr`、`mlx-whisper`、`whisper-api` 或 `sherpa-onnx` |
 | `asr.use_vad` | `true` | 启用语音活动检测（可防止静音时产生幻觉输出） |
 | `asr.use_punc` | `true` | 启用自动标点恢复 |
 | `asr.language` | `"zh"` | 语言代码（用于 MLX-Whisper 和 Whisper API） |
-| `asr.model` | `null` | 模型标识符（例如 `mlx-community/whisper-small`） |
+| `asr.model` | `"on-device"` | 模型标识符（例如 Apple 使用 `on-device`，MLX-Whisper 使用 `mlx-community/whisper-small`） |
 | `asr.preset` | `null` | 模型注册表中的预设 ID（例如 `mlx-whisper-small`） |
 | `asr.temperature` | `0.0` | 解码温度（用于 MLX-Whisper 和 Whisper API） |
 | `asr.default_provider` | `null` | 默认远程 ASR 提供商名称（例如 `"groq"`） |
@@ -114,6 +134,7 @@
 | `output.method` | `"auto"` | 文本注入方式：`auto`（自动）、`clipboard`（剪贴板）或 `applescript` |
 | `output.append_newline` | `false` | 在输出文本后追加换行符 |
 | `output.preview` | `true` | 显示浮动预览面板，在输入前查看和确认识别结果 |
+| `output.preview_type` | `"web"` | 预览面板实现方式：`web`（基于 WebView）或 `native`（基于 AppKit） |
 
 ### AI 增强
 
@@ -146,6 +167,8 @@
 | `ai_enhance.conversation_history.enabled` | `false` | 启用对话历史上下文注入 |
 | `ai_enhance.conversation_history.max_entries` | `10` | 注入的最近已确认条目数量 |
 
+> **注意：** 对话历史超过 20,000 条记录时会自动轮转归档。旧记录按月归档到 `conversation_history_archives/` 目录下的 JSONL 文件中。此上限不可配置。
+
 ### 剪贴板增强
 
 | 键名 | 默认值 | 说明 |
@@ -157,8 +180,23 @@
 | 键名 | 默认值 | 说明 |
 |-----|---------|-------------|
 | `feedback.sound_enabled` | `true` | 启用录音开始/停止的声音反馈 |
-| `feedback.sound_volume` | `0.4` | 声音音量（0.0 – 1.0） |
+| `feedback.sound_volume` | `0.4` | 声音音量（0.0 -- 1.0） |
 | `feedback.visual_indicator` | `true` | 显示浮动录音指示器及音频电平条 |
+| `feedback.restart_key` | `"cmd"` | 按住触发热键时重新开始录音的按键。可选值：`space`、`cmd`、`ctrl`、`alt`、`shift`、`esc` |
+| `feedback.cancel_key` | `"space"` | 按住触发热键时取消录音的按键。可选值：`space`、`cmd`、`ctrl`、`alt`、`shift`、`esc` |
+
+### 界面
+
+| 键名 | 默认值 | 说明 |
+|-----|---------|-------------|
+| `ui.settings_last_tab` | `"general"` | 设置窗口中上次激活的标签页（自动持久化）。可选值：`general`、`stt`、`llm`、`ai` |
+
+### 脚本
+
+| 键名 | 默认值 | 说明 |
+|-----|---------|-------------|
+| `scripting.enabled` | `false` | 启用 Lua 脚本系统 |
+| `scripting.script_dir` | `null` | Lua 脚本的自定义目录（null 表示使用 `<配置目录>/scripts`） |
 
 ### 日志设置
 

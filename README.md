@@ -2,14 +2,17 @@
 
 A macOS menubar speech-to-text application. Hold a hotkey to record, release to transcribe and automatically type the result into the active application.
 
-- **Offline-first**: Uses [FunASR](https://github.com/modelscope/FunASR) ONNX models by default — no cloud dependency
-- **Multi-backend**: Supports FunASR (Chinese-optimized), [MLX-Whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper) (99 languages, Apple Silicon GPU), Apple Speech (macOS built-in), and remote Whisper API (OpenAI-compatible, e.g. Groq)
+- **Offline-first**: Uses Apple On-Device speech recognition by default — no model download, no cloud dependency
+- **Multi-backend**: Supports Apple Speech (macOS built-in, default), [FunASR](https://github.com/modelscope/FunASR) (Chinese-optimized ONNX), [MLX-Whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper) (99 languages, Apple Silicon GPU), and remote Whisper API (OpenAI-compatible, e.g. Groq)
+- **Live Transcription**: Real-time streaming overlay shows partial transcription results while you are still recording
 - **AI Enhancement**: Optional LLM-powered text proofreading, formatting, completion, and translation via OpenAI-compatible APIs — with session-level caching to avoid redundant API calls
 - **Chain Modes**: Multi-step enhancement pipelines (e.g., proofread then translate) defined via simple Markdown files
 - **Direct Mode Streaming**: Real-time streaming overlay shows AI enhancement progress without preview panel
 - **Clipboard Enhancement**: AI-enhance selected text in any app with a hotkey — copies selection, enhances via LLM, and outputs the result
 - **Vocabulary Retrieval**: Personal vocabulary index with embedding-based retrieval to improve correction of proper nouns and domain terms, with automatic background building
 - **Conversation History**: Injects recent confirmed outputs into the AI prompt for topic continuity and consistent entity resolution
+- **Scripting**: Python-based scripting system with leader keys, global hotkeys, alerts, timers, and pasteboard access for custom automation
+- **Dark Mode**: Full dark mode support across all UI panels, adapting automatically to macOS appearance
 - **Lightweight**: Runs as a menubar-only app (hidden from Dock)
 
 ## Quick Start
@@ -60,7 +63,7 @@ uv run python -m voicetext path/to/config.json
 - Option 1: no additional requirements
 - Options 2 & 3: Python 3.13+ and [uv](https://github.com/astral-sh/uv)
 
-ASR models will be downloaded automatically on first launch (FunASR ~500 MB cached in `~/.cache/modelscope/`, MLX-Whisper models cached in `~/.cache/huggingface/`). The menubar icon shows download progress (`DL X%`) — please wait for the download to complete before trying to transcribe.
+The default backend (Apple Speech) requires no model download. If you switch to FunASR or MLX-Whisper, models will be downloaded automatically on first use (FunASR ~500 MB cached in `~/.cache/modelscope/`, MLX-Whisper models cached in `~/.cache/huggingface/`). The menubar icon shows download progress (`DL X%`) — please wait for the download to complete before trying to transcribe.
 
 ### Permissions
 
@@ -68,21 +71,27 @@ On first launch the app will prompt for:
 
 - **Microphone** — for audio recording
 - **Accessibility** — for typing text into other applications
-- **Speech Recognition** — required only if using the Apple Speech backend
+- **Speech Recognition** — required for the default Apple Speech backend
 
 ## Usage
 
-1. The app starts with a **microphone icon** (🎙) in the menubar. On first launch, it downloads the default ASR model (~500 MB) — the icon shows a download indicator with progress percentage. Wait for the icon to return to the microphone and the status to show "Ready".
-2. Hold the hotkey (default: `fn`) to record — a floating indicator with audio level bars shows recording status.
+1. The app starts with a **microphone icon** (🎙) in the menubar. With the default Apple Speech backend, the app is ready immediately — no model download needed.
+2. Hold the hotkey (default: `fn`) to record — a floating indicator with audio level bars shows recording status. If the ASR backend supports streaming, a live transcription overlay shows partial results in real time.
 3. Release to transcribe — the recognized text is typed into the active window.
 
-### Direct Mode (Default)
+While recording (holding the hotkey), additional keys are available:
 
-When **Preview** is disabled, results are typed directly. If AI enhancement is active, a streaming overlay shows real-time enhancement progress with token usage. Press `Esc` to cancel.
+| Key | Action |
+|-----|--------|
+| `Cmd` (default) | Restart recording — discard current audio and start over |
+| `Space` (default) | Cancel recording — discard audio without transcribing |
+| `Z` (default) | Cancel and show the most recent preview history record |
 
-### Preview Mode
+The restart and cancel keys are configurable in the Settings panel (General tab).
 
-When **Preview** is enabled, a floating panel shows the result for review before input. In the preview panel you can:
+### Preview Mode (Default)
+
+When **Preview** is enabled (the default), a WKWebView-based floating panel shows the result for review before input. In the preview panel you can:
 
 - Edit the text before confirming
 - Press `Enter` to confirm and type, or `⌘+Enter` to copy to clipboard
@@ -93,6 +102,10 @@ When **Preview** is enabled, a floating panel shows the result for review before
 - Open Google Translate for the current text
 
 Switching between modes or settings reuses cached results when available, avoiding redundant API calls. Cached results are marked with `[cached]`.
+
+### Direct Mode
+
+When **Preview** is disabled, results are typed directly. If AI enhancement is active, a streaming overlay shows real-time enhancement progress with token usage. Press `Esc` to cancel.
 
 ### Clipboard Enhancement
 
@@ -122,18 +135,22 @@ Click the menubar icon to access:
 └── Quit
 ```
 
-The **Settings** panel (4 tabs) centralizes all configuration:
+The **Settings** panel (4 tabs) centralizes all configuration. The last active tab is remembered across sessions.
 
 | Tab | Controls |
 |-----|----------|
-| **General** | Recording hotkeys, sound feedback, visual indicator, preview toggle |
-| **STT** | Local ASR model selection (FunASR, MLX-Whisper, Apple Speech), remote ASR provider management |
+| **General** | Recording hotkeys, restart/cancel key selection, sound feedback, visual indicator, preview toggle, custom config directory, scripting toggle |
+| **STT** | Local ASR model selection (Apple Speech, FunASR, MLX-Whisper), remote ASR provider management |
 | **LLM** | LLM provider/model selection, add/remove providers |
-| **AI** | Enhancement mode, thinking mode, vocabulary, conversation history, auto build |
+| **AI** | Enhancement mode (sorted by display order), thinking mode, vocabulary, conversation history, auto build |
 
 ## ASR Backends
 
-### FunASR (default)
+### Apple Speech (default)
+
+macOS built-in speech recognition using the SFSpeechRecognizer framework. Uses on-device recognition by default — no model download required, ready to use immediately. Supports on-device and server-based recognition for multiple languages (Chinese, English, Japanese, Korean, and more). Requires Speech Recognition permission in System Settings. Supports real-time streaming transcription during recording.
+
+### FunASR
 
 Offline Chinese speech recognition using ONNX models. Includes voice activity detection (VAD) and automatic punctuation restoration.
 
@@ -148,10 +165,6 @@ OpenAI Whisper running on Apple Metal GPU via MLX. Supports 99 languages with mu
 | Whisper small | `mlx-community/whisper-small` | ~460 MB |
 | Whisper medium | `mlx-community/whisper-medium` | ~1.5 GB |
 | Whisper large-v3-turbo | `mlx-community/whisper-large-v3-turbo` | ~1.6 GB |
-
-### Apple Speech
-
-macOS built-in speech recognition using the SFSpeechRecognizer framework. Supports on-device and server-based recognition for multiple languages (Chinese, English, Japanese, Korean, and more). Requires Speech Recognition permission in System Settings. No model download needed.
 
 ### Whisper API (Remote)
 
@@ -217,9 +230,47 @@ VoiceText can inject recent conversation history into the AI enhancement prompt,
 
 See [docs/conversation-history-enhancement.md](docs/conversation-history-enhancement.md) for detailed design and motivation.
 
+## History Browser
+
+Access via menubar → **Browse History...** to search and browse past transcriptions. Features include:
+
+- **Full-text search** across ASR and enhanced text
+- **Tag filters** — filter by enhancement mode, STT/LLM model, or correction status
+- **Time range** — filter by today, last 7 days, last 30 days, or all time
+- **Record deletion** — delete individual records from the history
+- **Archived history** — toggle the "Archived" checkbox to include records from monthly archive files. Conversation history is automatically rotated: when the main file grows too large, older records are archived into monthly JSONL files under `conversation_history_archives/`
+
+## Usage Statistics
+
+Access via menubar → **Usage Stats** to view interactive charts and counters. The statistics panel uses WKWebView with Chart.js and includes:
+
+- **Interactive stacked bar charts** — daily transcription counts (direct vs. preview mode), token usage breakdown
+- **Recording duration tracking** — cumulative and daily recording time
+- **Token usage** — prompt, completion, total, and cached tokens with cost-awareness
+- **Per-mode breakdown** — usage counts for each enhancement mode
+
+Statistics are stored with both cumulative totals and per-day breakdowns.
+
+## Scripting
+
+VoiceText includes a Python-based scripting system for custom automation. Enable it in Settings → General → **Scripting**, then create scripts at `~/.config/VoiceText/scripts/init.py`.
+
+The scripting API (`vt` namespace) provides:
+
+- **Leader keys** — hold a trigger key (e.g., right Command) to see a floating panel of mappings, then press a second key to launch apps or run commands
+- **Global hotkeys** — bind arbitrary key combinations to Python callbacks
+- **Alerts and notifications** — show floating alerts or macOS notifications
+- **Timers** — schedule one-shot or repeating callbacks
+- **Pasteboard** — read and write the system clipboard
+- **Execute** — run shell commands
+
+See [docs/scripting.md](docs/scripting.md) for the full API reference and examples.
+
 ## Configuration
 
 Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file as a command-line argument to override. Only the fields you want to change are needed; everything else uses defaults.
+
+The config directory can be changed via Settings → General → **Config Directory** (stored in macOS `NSUserDefaults` so it persists independently of the config file itself). Use the **Reset** button to revert to the default location.
 
 See [docs/configuration.md](docs/configuration.md) for the full default configuration, all available options, and environment variables.
 
@@ -237,34 +288,52 @@ Logs are saved to `~/Library/Logs/VoiceText/voicetext.log` with rotation (5 MB p
 
 ```
 src/voicetext/
-├── app.py                    # Menubar application with enhancement caching
-├── config.py                 # Configuration loading and defaults
-├── hotkey.py                 # Global hotkey listener (Quartz)
-├── recorder.py               # Audio recording (sounddevice)
-├── sound_manager.py          # Sound feedback for recording start/stop
-├── recording_indicator.py    # Floating recording indicator with audio level bars
-├── transcriber.py            # Abstract transcriber interface and factory
-├── transcriber_funasr.py     # FunASR ONNX backend
-├── transcriber_mlx.py        # MLX-Whisper backend
-├── transcriber_apple.py      # Apple Speech Recognition backend (SFSpeechRecognizer)
-├── transcriber_whisper_api.py # Remote Whisper API backend (OpenAI-compatible)
-├── model_registry.py         # Model preset registry and cache management
-├── enhancer.py               # AI text enhancement (OpenAI-compatible API)
-├── mode_loader.py            # Enhancement mode definitions, chain steps, and file loading
-├── auto_vocab_builder.py     # Automatic vocabulary building triggered by correction count
-├── result_window.py          # Floating preview panel with cached result replay
-├── streaming_overlay.py      # Floating overlay for direct mode AI streaming
-├── settings_window.py        # Tabbed settings panel (General, STT, LLM, AI)
-├── history_browser_window.py # Conversation history browser with search and filters
-├── log_viewer_window.py      # Log viewer panel
-├── translate_webview.py      # Google Translate webview for quick translation
-├── vocabulary.py             # Vocabulary embedding index and retrieval
-├── vocabulary_builder.py     # Extract vocabulary from conversation history via LLM
-├── vocab_build_window.py     # Vocabulary build progress UI
-├── conversation_history.py   # Conversation history recording and context injection
-├── usage_stats.py            # Usage statistics with cumulative and daily breakdown
-├── punctuation.py            # Punctuation restoration (CT-Transformer)
-└── input.py                  # Text injection (clipboard / AppleScript)
+├── app.py                       # Menubar application with enhancement caching
+├── config.py                    # Configuration loading and defaults
+├── hotkey.py                    # Global hotkey listener (Quartz)
+├── input.py                     # Text injection (clipboard / AppleScript)
+├── usage_stats.py               # Usage statistics with cumulative and daily breakdown
+├── audio/                       # Recording, sound feedback, recording indicator
+│   ├── recorder.py              # Audio recording (sounddevice)
+│   ├── sound_manager.py         # Sound feedback for recording start/stop
+│   └── recording_indicator.py   # Floating recording indicator with audio level bars
+├── transcription/               # ASR backends
+│   ├── base.py                  # Abstract transcriber interface and factory
+│   ├── funasr.py                # FunASR ONNX backend
+│   ├── mlx.py                   # MLX-Whisper backend
+│   ├── apple.py                 # Apple Speech backend (SFSpeechRecognizer)
+│   ├── whisper_api.py           # Remote Whisper API backend (OpenAI-compatible)
+│   ├── model_registry.py        # Model preset registry and cache management
+│   └── punctuation.py           # Punctuation restoration (CT-Transformer)
+├── enhance/                     # AI text enhancement and vocabulary
+│   ├── enhancer.py              # AI text enhancement (OpenAI-compatible API)
+│   ├── mode_loader.py           # Enhancement mode definitions, chain steps, and file loading
+│   ├── conversation_history.py  # Conversation history with monthly archiving
+│   ├── preview_history.py       # In-memory preview history store
+│   ├── vocabulary.py            # Vocabulary embedding index and retrieval
+│   ├── vocabulary_builder.py    # Extract vocabulary from conversation history via LLM
+│   └── auto_vocab_builder.py    # Automatic vocabulary building triggered by correction count
+├── ui/                          # UI panels and windows
+│   ├── result_window_web.py     # WKWebView-based preview panel (default)
+│   ├── result_window.py         # AppKit-based preview panel (native fallback)
+│   ├── streaming_overlay.py     # Floating overlay for direct mode AI streaming
+│   ├── live_transcription_overlay.py  # Real-time transcription overlay during recording
+│   ├── settings_window.py       # Tabbed settings panel (General, STT, LLM, AI)
+│   ├── history_browser_window_web.py  # WKWebView history browser with tag filters
+│   ├── stats_panel.py           # Statistics charts panel (Chart.js via WKWebView)
+│   ├── log_viewer_window.py     # Log viewer panel
+│   ├── translate_webview.py     # Google Translate webview
+│   └── vocab_build_window.py    # Vocabulary build progress UI
+├── controllers/                 # Business logic controllers
+│   ├── recording_controller.py  # Hotkey → recording → transcription flow
+│   ├── preview_controller.py    # Preview panel lifecycle and history
+│   ├── enhance_controller.py    # AI enhancement orchestration
+│   ├── settings_controller.py   # Settings panel state management
+│   └── ...
+└── scripting/                   # Python-based scripting/plugin system
+    ├── engine.py                # Script loading and lifecycle
+    ├── registry.py              # Plugin registry
+    └── api/                     # Scripting API (hotkey, alert, timer, pasteboard, ...)
 ```
 
 ## Documentation
@@ -277,6 +346,7 @@ src/voicetext/
 - [Prompt Optimization Workflow](docs/prompt-optimization-workflow.md) — how to use the Preview panel to systematically improve prompts
 - [Vocabulary Embedding Retrieval](docs/vocabulary-embedding-retrieval.md) — design and motivation of the vocabulary retrieval system
 - [Conversation History Enhancement](docs/conversation-history-enhancement.md) — how conversation history improves AI enhancement accuracy
+- [Scripting](docs/scripting.md) — Python-based scripting system with leader keys, hotkeys, and automation APIs
 
 ## License
 

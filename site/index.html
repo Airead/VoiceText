@@ -61,14 +61,14 @@
 
       <div class="feature-card fade-in">
         <div class="feature-icon">&#128268;</div>
-        <h3>Offline-First</h3>
-        <p>Uses FunASR ONNX models by default — no cloud dependency, full privacy. Works without an internet connection.</p>
+        <h3>Zero Setup</h3>
+        <p>Apple On-Device speech recognition works out of the box — no downloads, no API keys. Switch to FunASR or MLX-Whisper for higher accuracy when needed.</p>
       </div>
 
       <div class="feature-card fade-in">
         <div class="feature-icon">&#127911;</div>
         <h3>Multi-Engine</h3>
-        <p>FunASR (Chinese), MLX-Whisper (99 languages, Apple GPU), Apple Speech (built-in), and remote Whisper API.</p>
+        <p>Five ASR backends: Apple Speech (built-in), FunASR (Chinese), MLX-Whisper (99 languages, Apple GPU), Sherpa-ONNX, and remote Whisper API.</p>
       </div>
 
       <div class="feature-card fade-in">
@@ -90,6 +90,30 @@
       </div>
 
       <div class="feature-card fade-in">
+        <div class="feature-icon">&#127908;</div>
+        <h3>Real-time Streaming</h3>
+        <p>Live transcription overlay shows partial results as you speak — see your words appear in real time during recording.</p>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon">&#128197;</div>
+        <h3>History &amp; Statistics</h3>
+        <p>Browse past transcriptions with tag filters, time ranges, and deletion. Interactive stacked bar charts visualize your usage patterns.</p>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon">&#128187;</div>
+        <h3>Scripting System</h3>
+        <p>Python-based plugin system with leader keys and hotkeys for macOS automation — alerts, clipboard, shell commands, and more.</p>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon">&#127761;</div>
+        <h3>Dark Mode</h3>
+        <p>Full dark mode support across all panels and windows. UI adapts automatically to your macOS appearance setting.</p>
+      </div>
+
+      <div class="feature-card fade-in">
         <div class="feature-icon">&#9889;</div>
         <h3>Lightweight</h3>
         <p>Runs as a menubar-only app — hidden from Dock. Minimal resource usage with instant hotkey response.</p>
@@ -108,7 +132,7 @@
       <div class="step fade-in">
         <div class="step-number">1</div>
         <h3>Hold to Record</h3>
-        <p>Hold the <code>fn</code> key (or your custom hotkey) and speak. A floating indicator shows recording status with audio level bars.</p>
+        <p>Hold the <code>fn</code> key (or your custom hotkey) and speak. A floating indicator shows recording status with audio level bars, and a live transcription overlay displays partial results in real time. Press <code>Space</code> to restart, <code>ESC</code> or <code>Fn+Cmd</code> to cancel.</p>
       </div>
       <div class="step fade-in">
         <div class="step-number">2</div>
@@ -118,7 +142,7 @@
       <div class="step fade-in">
         <div class="step-number">3</div>
         <h3>Text is Typed</h3>
-        <p>The result is automatically typed into the active application, or shown in a preview panel for review and editing.</p>
+        <p>The result is automatically typed into the active application, or shown in a web-based preview panel for review, editing, and model comparison.</p>
       </div>
     </div>
     <div class="screenshot fade-in">
@@ -146,7 +170,14 @@
         </thead>
         <tbody>
           <tr>
-            <td><strong>FunASR</strong> <span class="badge">Default</span></td>
+            <td><strong>Apple Speech</strong> <span class="badge">Default</span></td>
+            <td>Multiple</td>
+            <td>Fast</td>
+            <td>Good</td>
+            <td>None (built-in)</td>
+          </tr>
+          <tr>
+            <td><strong>FunASR</strong></td>
             <td>Chinese</td>
             <td>Fast</td>
             <td>High</td>
@@ -160,11 +191,11 @@
             <td>75 MB – 1.6 GB</td>
           </tr>
           <tr>
-            <td><strong>Apple Speech</strong></td>
+            <td><strong>Sherpa-ONNX</strong></td>
             <td>Multiple</td>
             <td>Fast</td>
-            <td>Good</td>
-            <td>None (built-in)</td>
+            <td>High</td>
+            <td>Varies by model</td>
           </tr>
           <tr>
             <td><strong>Whisper API</strong></td>
