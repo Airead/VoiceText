@@ -76,6 +76,7 @@ class ChooserAPI:
                     ChooserItem(
                         title=item.get("title", ""),
                         subtitle=item.get("subtitle", ""),
+                        icon=item.get("icon", ""),
                         action=item.get("action"),
                         reveal_path=item.get("reveal_path"),
                     )

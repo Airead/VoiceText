@@ -92,9 +92,14 @@ body { display: flex; flex-direction: column; }
 }
 .result-item {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 14px; cursor: default;
+    padding: 6px 14px; cursor: default;
     transition: background 0.1s;
-    gap: 12px;
+    gap: 10px;
+}
+.result-item .icon {
+    width: 32px; height: 32px; flex-shrink: 0;
+    border-radius: 6px;
+    image-rendering: -webkit-optimize-contrast;
 }
 .result-item:hover { background: var(--item-hover); }
 .result-item.selected { background: var(--item-selected); }
@@ -194,6 +199,14 @@ function renderItems() {
     items.forEach(function(item, i) {
         const row = document.createElement('div');
         row.className = 'result-item' + (i === selectedIndex ? ' selected' : '');
+
+        if (item.icon) {
+            const img = document.createElement('img');
+            img.className = 'icon';
+            img.src = item.icon;
+            img.draggable = false;
+            row.appendChild(img);
+        }
 
         const left = document.createElement('div');
         left.className = 'left';

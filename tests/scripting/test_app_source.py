@@ -160,6 +160,56 @@ class TestAppSource:
             result = src.search("new")
         assert len(result) == 1
 
+    def test_search_by_display_name(self, tmp_path):
+        """Should match against localized display_name as well."""
+        (tmp_path / "Notes.app").mkdir()
+
+        with patch(
+            "voicetext.scripting.sources.app_source._APP_DIRS",
+            [str(tmp_path)],
+        ), patch(
+            "voicetext.scripting.sources.app_source._get_display_name",
+            side_effect=lambda path, fallback: "备忘录" if "Notes" in path else fallback,
+        ):
+            src = AppSource()
+            src._ensure_scanned()
+
+        with patch(
+            "voicetext.scripting.sources.app_source._get_running_app_names",
+            return_value=set(),
+        ):
+            # Search by Chinese display name
+            result = src.search("备忘")
+            assert len(result) == 1
+            assert result[0].title == "备忘录"
+
+            # Search by English bundle name still works
+            result = src.search("notes")
+            assert len(result) == 1
+            assert result[0].title == "备忘录"
+
+    def test_running_matches_display_name(self, tmp_path):
+        """Running status should match against localized name too."""
+        (tmp_path / "Notes.app").mkdir()
+
+        with patch(
+            "voicetext.scripting.sources.app_source._APP_DIRS",
+            [str(tmp_path)],
+        ), patch(
+            "voicetext.scripting.sources.app_source._get_display_name",
+            side_effect=lambda path, fallback: "备忘录" if "Notes" in path else fallback,
+        ):
+            src = AppSource()
+            src._ensure_scanned()
+
+        with patch(
+            "voicetext.scripting.sources.app_source._get_running_app_names",
+            return_value={"备忘录"},
+        ):
+            result = src.search("notes")
+            assert len(result) == 1
+            assert result[0].subtitle == "Running"
+
     def test_as_chooser_source(self, tmp_path):
         src = self._make_source(tmp_path)
         cs = src.as_chooser_source()

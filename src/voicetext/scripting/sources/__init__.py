@@ -12,6 +12,7 @@ class ChooserItem:
 
     title: str
     subtitle: str = ""
+    icon: str = ""  # data: URI (base64 PNG) or empty
     action: Optional[Callable] = field(default=None, repr=False)
     reveal_path: Optional[str] = None  # For Cmd+Enter (reveal in Finder)
 

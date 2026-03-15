@@ -263,6 +263,7 @@ class ChooserPanel:
             js_items.append({
                 "title": item.title,
                 "subtitle": item.subtitle,
+                "icon": item.icon,
                 "badge": "",
                 "hasReveal": item.reveal_path is not None,
             })
