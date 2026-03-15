@@ -121,6 +121,35 @@ class PreviewController:
         )
         self._preview_history.add(record)
 
+    def on_show_last_preview(self) -> None:
+        """Show the most recent preview history record in a new preview panel."""
+        record = self._preview_history.get(0)
+        if record is None:
+            logger.info("No preview history to show")
+            return
+
+        app = self._app
+        if app._busy:
+            logger.info("Preview history ignored: busy")
+            return
+
+        app._busy = True
+
+        def _run():
+            try:
+                self.do_transcribe_with_preview(
+                    asr_text=record.asr_text,
+                    use_enhance=bool(app._enhancer and app._enhancer.is_active),
+                    audio_duration=record.audio_duration,
+                    wav_data=record.wav_data,
+                    initial_history_index=0,
+                )
+            except Exception as e:
+                logger.error("Show last preview failed: %s", e)
+                app._busy = False
+
+        threading.Thread(target=_run, daemon=True).start()
+
     def on_select_history(self, index: int) -> None:
         """Handle history item selection from the preview panel dropdown."""
         record = self._preview_history.get(index)
@@ -226,8 +255,12 @@ class PreviewController:
     def do_transcribe_with_preview(
         self, asr_text: str | None, use_enhance: bool,
         audio_duration: float, wav_data: bytes | None = None,
+        initial_history_index: int | None = None,
     ) -> None:
         """Show preview with ASR text (or run STT in background).
+
+        If *initial_history_index* is set, the panel loads that history
+        record immediately after opening (no STT / enhancement).
 
         If *asr_text* is ``None``, STT runs in a background thread
         and STT runs in the background.
@@ -394,7 +427,10 @@ class PreviewController:
                     preview_history_items=self._build_history_items(),
                     animate_from_frame=indicator_frame,
                 )
-                if need_stt:
+                if initial_history_index is not None:
+                    # Load cached history record — skip STT and enhancement
+                    self.on_select_history(initial_history_index)
+                elif need_stt:
                     # Show loading state and disable STT popup during transcription
                     app._preview_panel.set_asr_loading()
                     if use_enhance:

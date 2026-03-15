@@ -476,6 +476,8 @@ class MultiHotkeyListener:
         restart_key: str = "cmd",
         on_cancel: Optional[Callable[[], None]] = None,
         cancel_key: str = "space",
+        on_preview_history: Optional[Callable[[], None]] = None,
+        preview_history_key: str = "z",
     ) -> None:
         self._on_press = on_press
         self._on_release = on_release
@@ -484,6 +486,8 @@ class MultiHotkeyListener:
         self._on_cancel = on_cancel
         self._cancel_key = cancel_key.strip().lower()
         self._cancel_requested = False
+        self._on_preview_history = on_preview_history
+        self._preview_history_key = preview_history_key.strip().lower()
         self._target_vks: Dict[int, str] = {}  # vk -> name
         self._enabled_names: set = set()
         self._held: set = set()  # set of currently held key names
@@ -507,8 +511,12 @@ class MultiHotkeyListener:
             self._enabled_names.add(n)
 
     def start(self) -> None:
-        # Use active tap when on_restart or on_cancel is set so we can swallow keys
-        listen_only = self._on_restart is None and self._on_cancel is None
+        # Use active tap when callbacks need to swallow keys
+        listen_only = (
+            self._on_restart is None
+            and self._on_cancel is None
+            and self._on_preview_history is None
+        )
         self._listener = _QuartzAllKeysListener(
             on_press=self._handle_press,
             on_release=self._handle_release,
@@ -669,6 +677,12 @@ class MultiHotkeyListener:
                     action = "restart"
                 elif self._on_cancel and self._held and name == self._cancel_key:
                     action = "cancel"
+                elif (
+                    self._on_preview_history
+                    and self._held
+                    and name == self._preview_history_key
+                ):
+                    action = "preview_history"
                 else:
                     return False
 
@@ -689,6 +703,12 @@ class MultiHotkeyListener:
                     target=self._run_cancel, daemon=True
                 ).start()
                 return True  # swallow the cancel key event
+            elif action == "preview_history":
+                self._cancel_requested = True
+                threading.Thread(
+                    target=self._run_preview_history, daemon=True
+                ).start()
+                return True  # swallow the key event
         except Exception:
             logger.warning("_handle_press exception", exc_info=True)
         return False
@@ -699,6 +719,13 @@ class MultiHotkeyListener:
             self._on_cancel()
         except Exception as e:
             logger.error("on_cancel callback error: %s", e)
+
+    def _run_preview_history(self) -> None:
+        """Run on_preview_history callback in a background thread."""
+        try:
+            self._on_preview_history()
+        except Exception as e:
+            logger.error("on_preview_history callback error: %s", e)
 
     def _handle_release(self, name: str) -> None:
         try:

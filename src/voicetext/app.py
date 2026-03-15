@@ -477,6 +477,7 @@ class VoiceTextApp(StatusBarApp):
         fb_cfg = self._config.get("feedback", {})
         restart_key = fb_cfg.get("restart_key", "cmd")
         cancel_key = fb_cfg.get("cancel_key", "space")
+        preview_history_key = fb_cfg.get("preview_history_key", "z")
         active_keys = [k for k, v in hotkeys.items() if v]
         if active_keys:
             self._hotkey_listener = MultiHotkeyListener(
@@ -487,6 +488,8 @@ class VoiceTextApp(StatusBarApp):
                 on_cancel=self._recording_controller.on_cancel_recording,
                 restart_key=restart_key,
                 cancel_key=cancel_key,
+                on_preview_history=self._recording_controller.on_preview_history,
+                preview_history_key=preview_history_key,
             )
             self._hotkey_listener.start()
 

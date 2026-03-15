@@ -103,6 +103,15 @@ class RecordingController:
             self.start_recording_indicator()
             app._recording_started.set()
 
+    def on_preview_history(self) -> None:
+        """Called when preview_history_key is pressed during recording — cancel and show history."""
+        app = self._app
+        # Cancel recording first (same as on_cancel_recording)
+        if app._recorder.is_recording:
+            self.on_cancel_recording()
+        # Show last preview history record
+        app._preview_controller.on_show_last_preview()
+
     def on_cancel_recording(self) -> None:
         """Called when cancel key (cmd) is pressed during recording — discard and stop."""
         app = self._app
