@@ -1,8 +1,15 @@
 """Tests for the App search data source."""
 
+import os
+
 from unittest.mock import patch
 
-from voicetext.scripting.sources.app_source import AppSource, _scan_apps
+from voicetext.scripting.sources.app_source import (
+    AppSource,
+    _cache_key,
+    _png_to_data_uri,
+    _scan_apps,
+)
 
 
 class TestScanApps:
@@ -217,3 +224,132 @@ class TestAppSource:
         assert cs.prefix is None
         assert cs.priority == 10
         assert cs.search is not None
+
+
+class TestIconDiskCache:
+    """Tests for the disk-based icon cache."""
+
+    _FAKE_PNG = b"\x89PNG\r\n\x1a\nfake"
+
+    def test_save_and_load(self, tmp_path):
+        """Icon should be saved to disk and loaded on next access."""
+        cache_dir = str(tmp_path / "icons")
+        app_dir = tmp_path / "apps"
+        app_dir.mkdir()
+        (app_dir / "Test.app").mkdir()
+        app_path = str(app_dir / "Test.app")
+
+        src = AppSource(icon_cache_dir=cache_dir)
+
+        with patch(
+            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            return_value=self._FAKE_PNG,
+        ):
+            uri1 = src._get_icon(app_path)
+
+        assert uri1 == _png_to_data_uri(self._FAKE_PNG)
+
+        # Verify files written to disk
+        key = _cache_key(app_path)
+        assert os.path.isfile(os.path.join(cache_dir, f"{key}.png"))
+        assert os.path.isfile(os.path.join(cache_dir, f"{key}.meta"))
+
+        # New instance should load from disk without calling AppKit
+        src2 = AppSource(icon_cache_dir=cache_dir)
+        with patch(
+            "voicetext.scripting.sources.app_source._get_app_icon_png",
+        ) as mock_extract:
+            uri2 = src2._get_icon(app_path)
+            mock_extract.assert_not_called()
+
+        assert uri2 == uri1
+
+    def test_cache_invalidated_on_mtime_change(self, tmp_path):
+        """Cache should be invalidated when app mtime changes."""
+        cache_dir = str(tmp_path / "icons")
+        app_dir = tmp_path / "apps"
+        app_dir.mkdir()
+        app_path_obj = app_dir / "Test.app"
+        app_path_obj.mkdir()
+        app_path = str(app_path_obj)
+
+        src = AppSource(icon_cache_dir=cache_dir)
+
+        with patch(
+            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            return_value=self._FAKE_PNG,
+        ):
+            src._get_icon(app_path)
+
+        # Simulate app update by changing mtime
+        new_mtime = os.path.getmtime(app_path) + 100
+        os.utime(app_path, (new_mtime, new_mtime))
+
+        new_png = b"\x89PNG\r\n\x1a\nnew_icon"
+        src2 = AppSource(icon_cache_dir=cache_dir)
+        with patch(
+            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            return_value=new_png,
+        ):
+            uri = src2._get_icon(app_path)
+
+        assert uri == _png_to_data_uri(new_png)
+
+    def test_missing_cache_dir_created(self, tmp_path):
+        """Cache dir should be auto-created on first save."""
+        cache_dir = str(tmp_path / "nonexistent" / "icons")
+        app_dir = tmp_path / "apps"
+        app_dir.mkdir()
+        (app_dir / "Test.app").mkdir()
+        app_path = str(app_dir / "Test.app")
+
+        src = AppSource(icon_cache_dir=cache_dir)
+        with patch(
+            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            return_value=self._FAKE_PNG,
+        ):
+            src._get_icon(app_path)
+
+        assert os.path.isdir(cache_dir)
+
+    def test_no_icon_returns_empty(self, tmp_path):
+        """AppKit returning None should cache empty string."""
+        cache_dir = str(tmp_path / "icons")
+        app_dir = tmp_path / "apps"
+        app_dir.mkdir()
+        (app_dir / "Test.app").mkdir()
+        app_path = str(app_dir / "Test.app")
+
+        src = AppSource(icon_cache_dir=cache_dir)
+        with patch(
+            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            return_value=None,
+        ):
+            uri = src._get_icon(app_path)
+
+        assert uri == ""
+        # Should not write cache files for failed extraction
+        key = _cache_key(app_path)
+        assert not os.path.isfile(os.path.join(cache_dir, f"{key}.png"))
+
+    def test_memory_cache_avoids_disk_read(self, tmp_path):
+        """Second call should use in-memory cache, not disk."""
+        cache_dir = str(tmp_path / "icons")
+        app_dir = tmp_path / "apps"
+        app_dir.mkdir()
+        (app_dir / "Test.app").mkdir()
+        app_path = str(app_dir / "Test.app")
+
+        src = AppSource(icon_cache_dir=cache_dir)
+        with patch(
+            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            return_value=self._FAKE_PNG,
+        ):
+            uri1 = src._get_icon(app_path)
+
+        # Patch disk load to verify it's not called on second access
+        with patch.object(src, "_load_icon_from_disk") as mock_disk:
+            uri2 = src._get_icon(app_path)
+            mock_disk.assert_not_called()
+
+        assert uri1 == uri2

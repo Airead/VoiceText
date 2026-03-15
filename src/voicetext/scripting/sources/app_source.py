@@ -8,15 +8,17 @@ matching with running apps ranked first.
 from __future__ import annotations
 
 import base64
+import hashlib
 import logging
 import os
-from typing import List
+from typing import List, Optional
 
 from voicetext.scripting.sources import ChooserItem, ChooserSource
 
 logger = logging.getLogger(__name__)
 
 _ICON_SIZE = 32
+_DEFAULT_ICON_CACHE_DIR = os.path.expanduser("~/.config/VoiceText/icon_cache")
 
 # Directories to scan for applications
 _APP_DIRS = [
@@ -46,8 +48,8 @@ def _get_display_name(path: str, fallback: str) -> str:
     return fallback
 
 
-def _get_app_icon_data_uri(path: str) -> str:
-    """Return a data:image/png;base64 URI for the app icon, or empty string."""
+def _get_app_icon_png(path: str) -> Optional[bytes]:
+    """Return raw PNG bytes for the app icon, or None on failure."""
     try:
         from AppKit import (
             NSBitmapImageRep,
@@ -61,7 +63,7 @@ def _get_app_icon_data_uri(path: str) -> str:
         ws = NSWorkspace.sharedWorkspace()
         icon = ws.iconForFile_(path)
         if icon is None:
-            return ""
+            return None
 
         # Render into a fixed-size image to control pixel output
         size = NSSize(_ICON_SIZE, _ICON_SIZE)
@@ -77,11 +79,21 @@ def _get_app_icon_data_uri(path: str) -> str:
 
         rep = NSBitmapImageRep.imageRepWithData_(target.TIFFRepresentation())
         png_data = rep.representationUsingType_properties_(NSPNGFileType, None)
-        b64 = base64.b64encode(bytes(png_data)).decode("ascii")
-        return f"data:image/png;base64,{b64}"
+        return bytes(png_data) if png_data else None
     except Exception:
         logger.debug("Failed to get icon for %s", path, exc_info=True)
-        return ""
+        return None
+
+
+def _png_to_data_uri(png_bytes: bytes) -> str:
+    """Convert raw PNG bytes to a data:image/png;base64 URI."""
+    b64 = base64.b64encode(png_bytes).decode("ascii")
+    return f"data:image/png;base64,{b64}"
+
+
+def _cache_key(path: str) -> str:
+    """Return a stable cache filename for an app path."""
+    return hashlib.md5(path.encode()).hexdigest()
 
 
 def _scan_apps() -> list[dict]:
@@ -155,19 +167,75 @@ class AppSource:
 
     Scans app directories once on init and caches the list.
     Running status is checked on every search for fresh results.
-    Icons are extracted lazily and cached per app path.
+    Icons are extracted lazily and cached to disk for fast subsequent loads.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, icon_cache_dir: Optional[str] = None) -> None:
         self._apps: list[dict] = []
         self._scanned = False
-        self._icon_cache: dict[str, str] = {}  # path → data URI
+        self._icon_cache: dict[str, str] = {}  # path → data URI (memory)
+        self._icon_cache_dir = icon_cache_dir or _DEFAULT_ICON_CACHE_DIR
 
     def _get_icon(self, path: str) -> str:
-        """Return cached icon data URI, extracting on first call."""
-        if path not in self._icon_cache:
-            self._icon_cache[path] = _get_app_icon_data_uri(path)
-        return self._icon_cache[path]
+        """Return cached icon data URI, checking disk then extracting."""
+        if path in self._icon_cache:
+            return self._icon_cache[path]
+
+        data_uri = self._load_icon_from_disk(path)
+        if data_uri:
+            self._icon_cache[path] = data_uri
+            return data_uri
+
+        png = _get_app_icon_png(path)
+        if png is None:
+            self._icon_cache[path] = ""
+            return ""
+
+        data_uri = _png_to_data_uri(png)
+        self._icon_cache[path] = data_uri
+        self._save_icon_to_disk(path, png)
+        return data_uri
+
+    def _load_icon_from_disk(self, app_path: str) -> str:
+        """Load a cached icon from disk if it exists and is still fresh."""
+        key = _cache_key(app_path)
+        png_path = os.path.join(self._icon_cache_dir, f"{key}.png")
+        meta_path = os.path.join(self._icon_cache_dir, f"{key}.meta")
+
+        if not os.path.isfile(png_path) or not os.path.isfile(meta_path):
+            return ""
+
+        try:
+            with open(meta_path, "r") as f:
+                cached_mtime = float(f.read().strip())
+
+            current_mtime = os.path.getmtime(app_path)
+            if cached_mtime != current_mtime:
+                return ""  # app updated, cache stale
+
+            with open(png_path, "rb") as f:
+                png = f.read()
+            return _png_to_data_uri(png) if png else ""
+        except Exception:
+            logger.debug("Failed to load cached icon for %s", app_path, exc_info=True)
+            return ""
+
+    def _save_icon_to_disk(self, app_path: str, png: bytes) -> None:
+        """Save icon PNG and metadata to disk cache."""
+        try:
+            os.makedirs(self._icon_cache_dir, exist_ok=True)
+            key = _cache_key(app_path)
+            png_path = os.path.join(self._icon_cache_dir, f"{key}.png")
+            meta_path = os.path.join(self._icon_cache_dir, f"{key}.meta")
+
+            with open(png_path, "wb") as f:
+                f.write(png)
+
+            mtime = os.path.getmtime(app_path)
+            with open(meta_path, "w") as f:
+                f.write(str(mtime))
+        except Exception:
+            logger.debug("Failed to cache icon for %s", app_path, exc_info=True)
 
     def _ensure_scanned(self) -> None:
         if not self._scanned:
