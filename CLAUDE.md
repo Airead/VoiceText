@@ -116,13 +116,12 @@ Do NOT use Claude Code's built-in `EnterWorktree`. All worktrees are managed by 
 
 ## Pre-PR Rebase
 
-**MANDATORY before creating a pull request.** You MUST rebase onto the latest `main` branch before pushing:
+**MANDATORY before creating a pull request.** First check if the branch needs rebasing (`git fetch origin main && git merge-base --is-ancestor origin/main HEAD`). If the branch is already up-to-date with `main`, skip the rebase. Otherwise:
 
 1. Back up the current branch: `git branch <branch>-backup`
-2. Fetch latest: `git fetch origin main`
-3. Rebase: `git rebase origin/main`
-4. If conflicts arise, resolve them, then `git rebase --continue`
-5. Only proceed to push/PR after a clean rebase
+2. Rebase: `git rebase origin/main`
+3. If conflicts arise, resolve them, then `git rebase --continue`
+4. Only proceed to push/PR after a clean rebase
 
 ## Pre-PR Local Verification
 
