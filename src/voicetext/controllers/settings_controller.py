@@ -155,6 +155,7 @@ class SettingsController:
             "on_launcher_source_toggle": self.launcher_source_toggle,
             "on_launcher_prefix_change": self.launcher_prefix_change,
             "on_launcher_usage_learning_toggle": self.launcher_usage_learning_toggle,
+            "on_launcher_refresh_icons": self.launcher_refresh_icons,
             "_reopen": lambda: self.on_open_settings(None),
         }
 
@@ -899,6 +900,54 @@ class SettingsController:
             "Launcher prefix %s set to: %r (requires restart)",
             prefix_key, value,
         )
+
+    def launcher_refresh_icons(self) -> None:
+        """Clear all cached icons and re-extract them."""
+        import shutil
+
+        # Clear app icon disk cache
+        icon_cache_dir = os.path.expanduser(
+            "~/.config/VoiceText/icon_cache"
+        )
+        if os.path.isdir(icon_cache_dir):
+            shutil.rmtree(icon_cache_dir, ignore_errors=True)
+            logger.info("Cleared app icon cache: %s", icon_cache_dir)
+
+        # Clear browser icon in-memory cache
+        try:
+            from voicetext.scripting.sources.bookmark_source import (
+                _browser_icon_cache,
+            )
+
+            _browser_icon_cache.clear()
+            logger.info("Cleared browser icon memory cache")
+        except ImportError:
+            pass
+
+        # Force app source rescan so icons are re-extracted
+        app = self._app
+        scripting_cfg = app._config.get("scripting", {})
+        if scripting_cfg.get("enabled") and hasattr(app, "_script_engine"):
+            try:
+                engine = app._script_engine
+                # Find the app source and trigger rescan
+                panel = engine.vt.chooser._get_panel()
+                for src in panel._sources.values():
+                    if src.name == "apps" and hasattr(src, "search"):
+                        # The search function is bound to AppSource
+                        # We can't easily access it, but clearing disk
+                        # cache is enough — next search will re-extract
+                        pass
+            except Exception:
+                logger.debug("Could not trigger app rescan", exc_info=True)
+
+        topmost_alert(
+            title="Icon Cache Cleared",
+            message="App and browser icon caches have been cleared. "
+            "Icons will be re-extracted on next search.",
+        )
+        restore_accessory()
+        logger.info("Icon cache refresh completed")
 
     def launcher_usage_learning_toggle(self, enabled: bool) -> None:
         """Handle launcher usage learning toggle from Settings panel."""

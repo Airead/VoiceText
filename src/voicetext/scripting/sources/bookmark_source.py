@@ -6,6 +6,7 @@ Activated via the "bm" prefix (e.g. "bm github").
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -15,6 +16,8 @@ from typing import Dict, List, Optional
 from voicetext.scripting.sources import ChooserItem, ChooserSource, fuzzy_match
 
 logger = logging.getLogger(__name__)
+
+_ICON_SIZE = 32
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +316,89 @@ _BROWSER_LABELS = {
     "firefox": "Firefox",
 }
 
+# App name for each browser (used to find the .app bundle)
+_BROWSER_APP_NAMES = {
+    "chrome": "Google Chrome.app",
+    "edge": "Microsoft Edge.app",
+    "brave": "Brave Browser.app",
+    "arc": "Arc.app",
+    "safari": "Safari.app",
+    "firefox": "Firefox.app",
+}
+
+# Directories to search for browser .app bundles
+_APP_SEARCH_DIRS = [
+    "/Applications",
+    os.path.expanduser("~/Applications"),
+    "/System/Applications",
+]
+
+# In-memory icon cache: browser_id -> data URI string
+_browser_icon_cache: Dict[str, str] = {}
+
+
+def _find_browser_app(browser: str) -> str:
+    """Find the .app bundle path for a browser, searching multiple dirs."""
+    app_name = _BROWSER_APP_NAMES.get(browser, "")
+    if not app_name:
+        return ""
+    for search_dir in _APP_SEARCH_DIRS:
+        candidate = os.path.join(search_dir, app_name)
+        if os.path.isdir(candidate):
+            return candidate
+    return ""
+
+
+def _get_browser_icon(browser: str) -> str:
+    """Return a base64 data URI for the browser's app icon."""
+    if browser in _browser_icon_cache:
+        return _browser_icon_cache[browser]
+
+    app_path = _find_browser_app(browser)
+    if not app_path:
+        _browser_icon_cache[browser] = ""
+        return ""
+
+    try:
+        from AppKit import (
+            NSBitmapImageRep,
+            NSCompositingOperationCopy,
+            NSImage,
+            NSPNGFileType,
+            NSWorkspace,
+        )
+        from Foundation import NSMakeRect, NSSize
+
+        ws = NSWorkspace.sharedWorkspace()
+        icon = ws.iconForFile_(app_path)
+        if icon is None:
+            _browser_icon_cache[browser] = ""
+            return ""
+
+        size = NSSize(_ICON_SIZE, _ICON_SIZE)
+        target = NSImage.alloc().initWithSize_(size)
+        target.lockFocus()
+        icon.drawInRect_fromRect_operation_fraction_(
+            NSMakeRect(0, 0, _ICON_SIZE, _ICON_SIZE),
+            NSMakeRect(0, 0, icon.size().width, icon.size().height),
+            NSCompositingOperationCopy,
+            1.0,
+        )
+        target.unlockFocus()
+
+        rep = NSBitmapImageRep.imageRepWithData_(target.TIFFRepresentation())
+        png_data = rep.representationUsingType_properties_(NSPNGFileType, None)
+        if png_data:
+            b64 = base64.b64encode(bytes(png_data)).decode("ascii")
+            uri = f"data:image/png;base64,{b64}"
+            _browser_icon_cache[browser] = uri
+            return uri
+    except Exception:
+        logger.debug("Failed to get icon for %s", browser, exc_info=True)
+
+    _browser_icon_cache[browser] = ""
+    return ""
+
 
 def read_all_bookmarks() -> List[Bookmark]:
     """Read bookmarks from all supported browsers."""
@@ -388,7 +474,12 @@ class BookmarkSource:
             logger.info("Loaded %d bookmarks from all browsers", len(self._bookmarks))
 
     def search(self, query: str) -> List[ChooserItem]:
-        """Search bookmarks by name, URL domain, or folder path."""
+        """Search bookmarks by name, URL domain, or folder path.
+
+        Supports multi-term AND matching: ``"gh rust"`` matches bookmarks
+        where both "gh" and "rust" fuzzy-match any combination of fields
+        (name, domain, folder path, browser label).
+        """
         self._ensure_loaded()
 
         q = query.strip()
@@ -396,16 +487,32 @@ class BookmarkSource:
             # Show recent bookmarks (first 20) when no query
             return self._to_items(self._bookmarks[:20])
 
+        terms = q.split()
+
         results: list[tuple[int, Bookmark]] = []
         for bm in self._bookmarks:
-            # Multi-field fuzzy match: name, domain, folder_path
-            best_score = 0
-            for field in (bm.name, bm.domain(), bm.folder_path):
-                matched, score = fuzzy_match(q, field)
-                if matched and score > best_score:
-                    best_score = score
-            if best_score > 0:
-                results.append((best_score, bm))
+            fields = (
+                bm.name,
+                bm.domain(),
+                bm.folder_path,
+                _BROWSER_LABELS.get(bm.browser, ""),
+            )
+            total_score = 0
+            all_matched = True
+            for term in terms:
+                best = 0
+                for field in fields:
+                    matched, score = fuzzy_match(term, field)
+                    if matched and score > best:
+                        best = score
+                if best == 0:
+                    all_matched = False
+                    break
+                total_score += best
+            if all_matched:
+                # Average score across terms
+                avg_score = total_score // len(terms)
+                results.append((avg_score, bm))
 
         results.sort(key=lambda x: (-x[0], x[1].name.lower()))
         return self._to_items([bm for _, bm in results[:50]])
@@ -425,6 +532,7 @@ class BookmarkSource:
             items.append(ChooserItem(
                 title=bm.name,
                 subtitle=subtitle,
+                icon=_get_browser_icon(bm.browser),
                 item_id=f"bm:{bm.browser}:{bm.url[:80]}",
                 action=lambda u=bm.url, b=bm.browser: _open_url_in_browser(u, b),
                 reveal_path=None,

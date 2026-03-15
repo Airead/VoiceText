@@ -1112,6 +1112,31 @@ class SettingsPanel:
             pad + 12, y, content_w - 24, doc_view,
         )
 
+        y -= self._SECTION_GAP
+
+        # --- Maintenance section ---
+        y -= self._LABEL_HEIGHT
+        doc_view.addSubview_(
+            self._make_label("Maintenance", pad, y, content_w, label_font)
+        )
+
+        from AppKit import NSButton
+
+        y -= (28 + self._ROW_GAP)
+        refresh_btn = NSButton.alloc().initWithFrame_(
+            NSMakeRect(pad + 12, y, 180, 28)
+        )
+        refresh_btn.setTitle_("Refresh Icon Cache")
+        refresh_btn.setBezelStyle_(1)
+        refresh_btn.setFont_(small_font)
+        refresh_btn.setTarget_(self)
+        refresh_btn.setAction_(b"launcherRefreshIconsClicked:")
+        doc_view.addSubview_(refresh_btn)
+        y = self._add_hint(
+            "Clear cached app and browser icons and re-extract them",
+            pad + 12, y, content_w - 24, doc_view,
+        )
+
         scroll.setDocumentView_(doc_view)
         tab_item.setView_(scroll)
 
@@ -1467,6 +1492,9 @@ class SettingsPanel:
     def launcherUsageLearningToggled_(self, sender):
         enabled = sender.state() == 1
         self._call("on_launcher_usage_learning_toggle", enabled)
+
+    def launcherRefreshIconsClicked_(self, sender):
+        self._call("on_launcher_refresh_icons")
 
     # ── State update methods (called from app.py for sync) ───────────
 

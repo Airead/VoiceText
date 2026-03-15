@@ -298,6 +298,46 @@ class TestBookmarkSource:
         assert "Dev" in results[0].subtitle
         assert "Chrome" in results[0].subtitle
 
+    def test_multi_term_and_matching(self):
+        """Multiple terms should all match (AND logic)."""
+        source = BookmarkSource()
+        source._bookmarks = [
+            Bookmark("AWS Console", "https://aws.amazon.com", browser="safari"),
+            Bookmark("aws secrets manager", "https://aws.amazon.com/sm",
+                     folder_path="Bookmarks Bar > f2pool", browser="chrome",
+                     profile="Profile 1"),
+            Bookmark("Google Docs", "https://docs.google.com", browser="chrome"),
+        ]
+        source._last_refresh = float("inf")
+
+        # Both "sa" and "aws" must match
+        results = source.search("sa aws")
+        # "sa" matches "safari" (browser label) for AWS Console
+        # "aws" matches name for both AWS items
+        titles = [r.title for r in results]
+        assert "AWS Console" in titles
+        assert "Google Docs" not in titles
+
+    def test_multi_term_no_match_if_one_missing(self):
+        source = BookmarkSource()
+        source._bookmarks = [
+            Bookmark("GitHub", "https://github.com", browser="chrome"),
+        ]
+        source._last_refresh = float("inf")
+        results = source.search("git xyz")
+        assert len(results) == 0
+
+    def test_search_by_browser_label(self):
+        source = BookmarkSource()
+        source._bookmarks = [
+            Bookmark("Apple", "https://apple.com", browser="safari"),
+            Bookmark("Google", "https://google.com", browser="chrome"),
+        ]
+        source._last_refresh = float("inf")
+        results = source.search("safari")
+        assert len(results) == 1
+        assert results[0].title == "Apple"
+
     def test_max_results_capped(self):
         source = BookmarkSource()
         source._bookmarks = [
