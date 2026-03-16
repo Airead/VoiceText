@@ -880,9 +880,15 @@ class SettingsController:
         )
         chooser_cfg["enabled"] = enabled
         save_config(app._config, app._config_path)
-        logger.info(
-            "Launcher set to: %s (requires restart)", enabled
-        )
+
+        engine = getattr(app, "_script_engine", None)
+        if engine is not None:
+            if enabled:
+                engine.enable_chooser()
+            else:
+                engine.disable_chooser()
+
+        logger.info("Launcher set to: %s", enabled)
 
     def launcher_hotkey_change(self, hotkey: str) -> None:
         """Handle launcher hotkey change from Settings panel."""
@@ -890,11 +896,15 @@ class SettingsController:
         chooser_cfg = app._config.setdefault("scripting", {}).setdefault(
             "chooser", {}
         )
+        old_hotkey = chooser_cfg.get("hotkey", "")
         chooser_cfg["hotkey"] = hotkey
         save_config(app._config, app._config_path)
-        logger.info(
-            "Launcher hotkey set to: %s (requires restart)", hotkey
-        )
+
+        engine = getattr(app, "_script_engine", None)
+        if engine is not None and chooser_cfg.get("enabled", True):
+            engine.rebind_chooser_hotkey(old_hotkey, hotkey)
+
+        logger.info("Launcher hotkey set to: %s", hotkey)
 
     def launcher_source_toggle(self, config_key: str, enabled: bool) -> None:
         """Handle launcher source toggle from Settings panel."""
@@ -905,13 +915,12 @@ class SettingsController:
         chooser_cfg[config_key] = enabled
         save_config(app._config, app._config_path)
 
-        # Apply clipboard toggle immediately without restart
         engine = getattr(app, "_script_engine", None)
-        if config_key == "clipboard_history" and engine is not None:
+        if engine is not None and chooser_cfg.get("enabled", True):
             if enabled:
-                engine.enable_clipboard()
+                engine.enable_source(config_key)
             else:
-                engine.disable_clipboard()
+                engine.disable_source(config_key)
 
         logger.info("Launcher source %s set to: %s", config_key, enabled)
 
@@ -922,12 +931,30 @@ class SettingsController:
             "chooser", {}
         )
         prefixes = chooser_cfg.setdefault("prefixes", {})
+        old_value = prefixes.get(prefix_key, "")
         prefixes[prefix_key] = value
         save_config(app._config, app._config_path)
-        logger.info(
-            "Launcher prefix %s set to: %r (requires restart)",
-            prefix_key, value,
-        )
+
+        # Re-register the source with the new prefix
+        engine = getattr(app, "_script_engine", None)
+        source_config_map = {
+            "clipboard": "clipboard_history",
+            "files": "file_search",
+            "snippets": "snippets",
+            "bookmarks": "bookmarks",
+        }
+        config_key = source_config_map.get(prefix_key)
+        if (
+            engine is not None
+            and config_key
+            and chooser_cfg.get("enabled", True)
+            and chooser_cfg.get(config_key, True)
+            and old_value != value
+        ):
+            engine.disable_source(config_key)
+            engine.enable_source(config_key)
+
+        logger.info("Launcher prefix %s set to: %r", prefix_key, value)
 
     def launcher_refresh_icons(self) -> None:
         """Clear all cached icons and re-extract them."""
@@ -1030,6 +1057,9 @@ class SettingsController:
         )
         chooser_cfg["usage_learning"] = enabled
         save_config(app._config, app._config_path)
-        logger.info(
-            "Launcher usage learning set to: %s (requires restart)", enabled
-        )
+
+        engine = getattr(app, "_script_engine", None)
+        if engine is not None and chooser_cfg.get("enabled", True):
+            engine.set_usage_learning(enabled)
+
+        logger.info("Launcher usage learning set to: %s", enabled)

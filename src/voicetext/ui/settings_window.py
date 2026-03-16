@@ -1003,7 +1003,7 @@ class SettingsPanel:
             b"launcherEnabledToggled:", doc_view,
         )
         y = self._add_hint(
-            "Disable to skip launcher registration and hotkey binding (requires restart)",
+            "Disable to skip launcher registration and hotkey binding",
             pad + 12, y, content_w - 24, doc_view,
         )
 
