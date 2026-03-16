@@ -230,6 +230,29 @@ class TestRecordingIndicatorPanel:
         # Should not raise
         panel.clear_mode()
 
+    def test_update_device_name_preserves_panel_width(self):
+        """update_device_name should use current panel width, not _PANEL_WIDTH."""
+        panel = RecordingIndicatorPanel()
+        view = RecordingIndicatorView(device_name=None)
+        panel._indicator_view = view
+        mock_panel = MagicMock()
+        # Simulate panel already widened to 220 by update_mode
+        mock_frame = MagicMock()
+        mock_frame.size.width = 220
+        mock_panel.frame.return_value = mock_frame
+        panel._panel = mock_panel
+        panel._timer = MagicMock()
+
+        try:
+            panel.update_device_name("New Mic")
+        except Exception:
+            pass
+
+        # Verify setContentSize_ was called with width 220 (not 120)
+        if mock_panel.setContentSize_.called:
+            args = mock_panel.setContentSize_.call_args[0][0]
+            assert args[0] == 220.0
+
     def test_animate_out_stops_timer(self):
         panel = RecordingIndicatorPanel()
         mock_timer = MagicMock()

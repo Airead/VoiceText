@@ -477,17 +477,18 @@ class RecordingIndicatorPanel:
             self._indicator_view._label_attrs = None
 
             new_height = _PANEL_HEIGHT_WITH_LABEL
+            current_width = int(self._panel.frame().size.width)
 
-            # Resize panel and content view
-            content_view = self._indicator_view.create_view(_PANEL_WIDTH, new_height)
-            self._panel.setContentSize_((float(_PANEL_WIDTH), float(new_height)))
+            # Resize panel and content view (preserve current width)
+            content_view = self._indicator_view.create_view(current_width, new_height)
+            self._panel.setContentSize_((float(current_width), float(new_height)))
             self._panel.setContentView_(content_view)
 
             # Re-center on screen
             screen = NSScreen.mainScreen()
             if screen:
                 sf = screen.visibleFrame()
-                x = sf.origin.x + (sf.size.width - _PANEL_WIDTH) / 2
+                x = sf.origin.x + (sf.size.width - current_width) / 2
                 y = sf.origin.y + (sf.size.height - new_height) / 2
                 self._panel.setFrameOrigin_((x, y))
 
