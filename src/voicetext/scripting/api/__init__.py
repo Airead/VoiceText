@@ -14,6 +14,8 @@ from .eventtap import keystroke as _keystroke_fn
 from .execute import execute as _execute_fn
 from .notify import notify as _notify_fn
 from .pasteboard import PasteboardAPI
+from .snippets import SnippetsAPI
+from .store import StoreAPI
 from .timer import TimerAPI
 
 logger = logging.getLogger(__name__)
@@ -29,9 +31,12 @@ class _VTNamespace:
         self._registry = registry
         self.app = AppAPI()
         self.pasteboard = PasteboardAPI()
+        self.snippets = SnippetsAPI()
         self.timer = TimerAPI(registry)
-        # HotkeyAPI is created lazily to avoid circular imports
+        self.store = StoreAPI()
+        # HotkeyAPI and ChooserAPI are created lazily to avoid circular imports
         self._hotkey_api = None
+        self._chooser_api = None
         self._reload_callback: Optional[Callable] = None
 
     @property
@@ -42,6 +47,15 @@ class _VTNamespace:
 
             self._hotkey_api = HotkeyAPI(self._registry)
         return self._hotkey_api
+
+    @property
+    def chooser(self):
+        """Access the chooser API (lazy init)."""
+        if self._chooser_api is None:
+            from .chooser import ChooserAPI
+
+            self._chooser_api = ChooserAPI()
+        return self._chooser_api
 
     def leader(self, trigger_key: str, mappings: List[dict]) -> None:
         """Register a leader-key configuration.
@@ -72,6 +86,34 @@ class _VTNamespace:
             )
         self._registry.register_leader(trigger_key, parsed)
 
+    def on(
+        self, event_name: str, callback: Optional[Callable] = None
+    ) -> Callable:
+        """Register a global event listener.
+
+        Supported events: ``recording_start``, ``recording_stop``,
+        ``transcription_done``, ``enhancement_done``, ``output_text``.
+
+        Can be used as a decorator::
+
+            @vt.on("transcription_done")
+            def on_transcribe(data):
+                print(data["asr_text"])
+
+        Or called directly::
+
+            vt.on("recording_start", my_handler)
+        """
+        if callback is not None:
+            self._registry.register_event(event_name, callback)
+            return callback
+
+        def decorator(func: Callable) -> Callable:
+            self._registry.register_event(event_name, func)
+            return func
+
+        return decorator
+
     def alert(self, text: str, duration: float = 2.0) -> None:
         """Show a brief floating alert message."""
         _alert_fn(text, duration)
@@ -84,9 +126,35 @@ class _VTNamespace:
         """Synthesize a keystroke."""
         _keystroke_fn(key, modifiers)
 
-    def execute(self, command: str, background: bool = True) -> str | None:
-        """Execute a shell command."""
-        return _execute_fn(command, background)
+    def execute(
+        self,
+        command: str,
+        background: bool = True,
+        timeout: int = 30,
+        on_done: Optional[Callable] = None,
+    ) -> dict | None:
+        """Execute a shell command.
+
+        Returns a dict with ``stdout``, ``stderr``, ``returncode`` when
+        *background* is False.  Returns None when *background* is True.
+        """
+        return _execute_fn(
+            command, background=background, timeout=timeout, on_done=on_done
+        )
+
+    def type_text(self, text: str, method: str = "auto") -> None:
+        """Type text into the currently focused application.
+
+        Args:
+            text: The text to type.
+            method: ``"auto"``, ``"paste"`` (clipboard), or ``"key"``
+                    (AppleScript keystroke).
+        """
+        _METHOD_MAP = {"paste": "clipboard", "key": "applescript"}
+        mapped = _METHOD_MAP.get(method, method)
+        from voicetext.input import type_text as _type_text
+
+        _type_text(text, method=mapped)
 
     def date(self, fmt: str = "%Y-%m-%d") -> str:
         """Return formatted current date/time."""

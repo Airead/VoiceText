@@ -153,6 +153,29 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "scripting": {
         "enabled": False,
         "script_dir": None,
+        "chooser": {
+            "enabled": True,
+            "hotkey": "cmd+space",
+            "clipboard_history": True,
+            "clipboard_max_items": 50,
+            "app_search": True,
+            "file_search": True,
+            "snippets": True,
+            "bookmarks": True,
+            "usage_learning": True,
+            "prefixes": {
+                "clipboard": "cb",
+                "files": "f",
+                "snippets": "sn",
+                "bookmarks": "bm",
+            },
+            "source_hotkeys": {
+                "clipboard": "",
+                "files": "",
+                "snippets": "",
+                "bookmarks": "",
+            },
+        },
     },
 }
 
@@ -315,7 +338,7 @@ def validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
         ("asr.language", str, lambda v: len(v) > 0, DEFAULT_CONFIG["asr"]["language"]),
         ("logging.level", str, lambda v: v in {"DEBUG", "INFO", "WARNING", "ERROR"},
          DEFAULT_CONFIG["logging"]["level"]),
-        ("ui.settings_last_tab", str, lambda v: v in {"general", "stt", "llm", "ai"},
+        ("ui.settings_last_tab", str, lambda v: v in {"general", "stt", "llm", "ai", "launcher"},
          DEFAULT_CONFIG["ui"]["settings_last_tab"]),
         ("ai_enhance.timeout", (int, float), lambda v: v > 0, DEFAULT_CONFIG["ai_enhance"]["timeout"]),
         ("ai_enhance.connection_timeout", (int, float), lambda v: v > 0,

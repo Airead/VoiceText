@@ -106,6 +106,13 @@ class SettingsPanel:
         self._history_check = None
         self._config_dir_field = None
 
+        # Launcher tab controls
+        self._launcher_source_checks: Dict[str, object] = {}
+        self._launcher_prefix_fields: Dict[str, object] = {}
+        self._launcher_hotkey_field = None
+        self._launcher_source_hotkey_labels: Dict[str, object] = {}
+        self._launcher_source_hotkey_btns: Dict[str, object] = {}
+
     def show(
         self,
         state: Dict,
@@ -152,9 +159,7 @@ class SettingsPanel:
                 - on_auto_build_toggle: (enabled) -> None
                 - on_history_toggle: (enabled) -> None
                 - on_vocab_build: () -> None
-                - on_show_config: () -> None
-                - on_edit_config: () -> None
-                - on_reload_config: () -> None
+                - on_reveal_config_folder: () -> None
         """
         from AppKit import NSApp
 
@@ -237,21 +242,14 @@ class SettingsPanel:
         btn_h = self._TOOLBAR_HEIGHT
         btn_gap = 8
 
-        toolbar_buttons = [
-            ("Show Config", "on_show_config"),
-            ("Edit Config", "on_edit_config"),
-            ("Reload Config", "on_reload_config"),
-        ]
-        bx = pad
-        for title, cb_name in toolbar_buttons:
-            btn = NSButton.alloc().initWithFrame_(NSMakeRect(bx, y, btn_w, btn_h))
-            btn.setTitle_(title)
-            btn.setBezelStyle_(1)  # NSRoundedBezelStyle
-            btn.setTarget_(self)
-            btn.setAction_(b"toolbarButtonClicked:")
-            self._set_meta(btn, cb_name=cb_name)
-            content.addSubview_(btn)
-            bx += btn_w + btn_gap
+        reveal_btn = NSButton.alloc().initWithFrame_(
+            NSMakeRect(pad, y, btn_w * 2 + btn_gap, btn_h)
+        )
+        reveal_btn.setTitle_("Reveal Config Folder")
+        reveal_btn.setBezelStyle_(1)  # NSRoundedBezelStyle
+        reveal_btn.setTarget_(self)
+        reveal_btn.setAction_(b"revealConfigFolderClicked:")
+        content.addSubview_(reveal_btn)
 
         y += btn_h + pad
 
@@ -281,6 +279,11 @@ class SettingsPanel:
         ai_tab.setLabel_("AI")
         self._build_ai_tab(ai_tab, state, inner_w)
         tab_view.addTabViewItem_(ai_tab)
+
+        launcher_tab = NSTabViewItem.alloc().initWithIdentifier_("launcher")
+        launcher_tab.setLabel_("Launcher")
+        self._build_launcher_tab(launcher_tab, state, inner_w)
+        tab_view.addTabViewItem_(launcher_tab)
 
         # Set tab delegate for scroll-to-top on tab switch
         tab_view.setDelegate_(self)
@@ -455,7 +458,7 @@ class SettingsPanel:
             b"soundCheckChanged:", doc_view,
         )
         y = self._add_hint(
-            "Play sound effects when recording starts and stops",
+            "Adds ~350ms delay before recording to avoid capturing the sound",
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -947,6 +950,281 @@ class SettingsPanel:
         scroll.setDocumentView_(doc_view)
         tab_item.setView_(scroll)
 
+    def _build_launcher_tab(self, tab_item, state: Dict, tab_width: float) -> None:
+        """Build the Launcher tab: source toggles, prefix config, hotkey."""
+        from AppKit import (
+            NSButton,
+            NSColor,
+            NSFont,
+            NSScrollView,
+            NSTextField,
+            NSView,
+        )
+        from Foundation import NSMakeRect
+
+        content_w = tab_width - 24
+        content_h = (
+            self._PANEL_HEIGHT - self._TOOLBAR_HEIGHT - self._PADDING * 2 - 80
+        )
+
+        scroll = NSScrollView.alloc().initWithFrame_(
+            NSMakeRect(0, 0, content_w, content_h)
+        )
+        scroll.setHasVerticalScroller_(True)
+        scroll.setHasHorizontalScroller_(False)
+
+        pad = 12
+        label_font = NSFont.boldSystemFontOfSize_(13.0)
+        small_font = NSFont.systemFontOfSize_(12.0)
+
+        total_h = 5000
+        doc_view = NSView.alloc().initWithFrame_(
+            NSMakeRect(0, 0, content_w - 20, total_h)
+        )
+        y = total_h - pad
+
+        launcher_state = state.get("launcher", {})
+        prefixes = launcher_state.get("prefixes", {})
+
+        # --- Scripting dependency warning ---
+        if not state.get("scripting_enabled", False):
+            y -= (self._HINT_HEIGHT + self._HINT_GAP)
+            warn = self._make_hint(
+                "\u26a0 Launcher requires Scripting to be enabled "
+                "(General \u2192 Scripting)",
+                pad, y, content_w - 24,
+            )
+            from AppKit import NSColor
+            warn.setTextColor_(NSColor.systemOrangeColor())
+            doc_view.addSubview_(warn)
+
+        # --- Enable Launcher toggle ---
+        y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
+        self._launcher_enabled_check = self._make_switch(
+            "Enable Launcher", pad, y, content_w - 24,
+            launcher_state.get("enabled", True), label_font,
+            b"launcherEnabledToggled:", doc_view,
+        )
+        y = self._add_hint(
+            "Disable to skip launcher registration and hotkey binding",
+            pad + 12, y, content_w - 24, doc_view,
+        )
+
+        y -= self._SECTION_GAP
+
+        # --- Hotkey section ---
+        y -= self._LABEL_HEIGHT
+        doc_view.addSubview_(
+            self._make_label("Hotkey", pad, y, content_w, label_font)
+        )
+        y = self._add_hint(
+            "Global hotkey to toggle the launcher panel",
+            pad + 12, y, content_w - 24, doc_view,
+        )
+
+        y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
+        hotkey_val = launcher_state.get("hotkey", "cmd+space")
+        hotkey_label = self._make_label("Hotkey:", pad + 12, y, 60, small_font)
+        doc_view.addSubview_(hotkey_label)
+
+        hotkey_field = NSTextField.alloc().initWithFrame_(
+            NSMakeRect(pad + 80, y, 160, self._CONTROL_HEIGHT)
+        )
+        hotkey_field.setStringValue_(hotkey_val)
+        hotkey_field.setFont_(small_font)
+        hotkey_field.setEditable_(True)
+        hotkey_field.setBezeled_(True)
+        hotkey_field.setDrawsBackground_(True)
+        hotkey_field.setBackgroundColor_(NSColor.controlBackgroundColor())
+        hotkey_field.setTextColor_(NSColor.labelColor())
+        hotkey_field.setPlaceholderString_("e.g. cmd+space")
+        hotkey_field.setTarget_(self)
+        hotkey_field.setAction_(b"launcherHotkeyChanged:")
+        doc_view.addSubview_(hotkey_field)
+        self._launcher_hotkey_field = hotkey_field
+
+        y -= self._SECTION_GAP
+
+        # --- Data Sources section ---
+        y -= self._LABEL_HEIGHT
+        doc_view.addSubview_(
+            self._make_label("Data Sources", pad, y, content_w, label_font)
+        )
+        y = self._add_hint(
+            "Enable/disable sources and customize their prefix triggers",
+            pad + 12, y, content_w - 24, doc_view,
+        )
+
+        sources = [
+            ("app_search", "Applications", None),
+            ("clipboard_history", "Clipboard History", "clipboard"),
+            ("file_search", "File Search", "files"),
+            ("snippets", "Snippets", "snippets"),
+            ("bookmarks", "Bookmarks", "bookmarks"),
+        ]
+
+        self._launcher_source_checks.clear()
+        self._launcher_prefix_fields.clear()
+        self._launcher_source_hotkey_labels.clear()
+        self._launcher_source_hotkey_btns.clear()
+
+        source_hotkeys = launcher_state.get("source_hotkeys", {})
+        prefix_label_w = 50
+        prefix_field_w = 60
+
+        for config_key, label, prefix_key in sources:
+            enabled = launcher_state.get(config_key, True)
+            prefix_val = prefixes.get(prefix_key, "") if prefix_key else ""
+
+            y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
+
+            # Enable/disable checkbox
+            check = self._make_switch(
+                label, pad + 12, y, 140,
+                enabled, small_font,
+                b"launcherSourceToggled:", doc_view,
+            )
+            self._set_meta(check, config_key=config_key)
+            self._launcher_source_checks[config_key] = check
+
+            # Prefix input field (only for sources that have prefixes)
+            if prefix_key:
+                prefix_label = self._make_label(
+                    "Prefix:", pad + 155, y + 2, prefix_label_w, small_font,
+                )
+                doc_view.addSubview_(prefix_label)
+
+                prefix_field = NSTextField.alloc().initWithFrame_(
+                    NSMakeRect(
+                        pad + 155 + prefix_label_w + 4, y,
+                        prefix_field_w, self._CONTROL_HEIGHT,
+                    )
+                )
+                prefix_field.setStringValue_(prefix_val)
+                prefix_field.setFont_(small_font)
+                prefix_field.setEditable_(True)
+                prefix_field.setBezeled_(True)
+                prefix_field.setDrawsBackground_(True)
+                prefix_field.setBackgroundColor_(
+                    NSColor.controlBackgroundColor()
+                )
+                prefix_field.setTextColor_(NSColor.labelColor())
+                prefix_field.setPlaceholderString_(prefix_val)
+                prefix_field.setTarget_(self)
+                prefix_field.setAction_(b"launcherPrefixChanged:")
+                self._set_meta(prefix_field, prefix_key=prefix_key)
+                doc_view.addSubview_(prefix_field)
+                self._launcher_prefix_fields[prefix_key] = prefix_field
+
+                # Source hotkey label + Record/Clear button
+                hotkey_val = source_hotkeys.get(prefix_key, "")
+                hk_x = pad + 155 + prefix_label_w + 4 + prefix_field_w + 8
+
+                hk_label = NSTextField.labelWithString_(hotkey_val or "None")
+                hk_label.setFrame_(
+                    NSMakeRect(hk_x, y + 2, 90, self._CONTROL_HEIGHT)
+                )
+                hk_label.setFont_(small_font)
+                hk_label.setTextColor_(NSColor.secondaryLabelColor())
+                doc_view.addSubview_(hk_label)
+                self._launcher_source_hotkey_labels[prefix_key] = hk_label
+
+                btn_x = hk_x + 94
+                if hotkey_val:
+                    btn_title = "Clear"
+                    btn_action = b"launcherSourceHotkeyClear:"
+                else:
+                    btn_title = "Record"
+                    btn_action = b"launcherSourceHotkeyRecord:"
+                hk_btn = NSButton.alloc().initWithFrame_(
+                    NSMakeRect(btn_x, y - 1, 60, 22)
+                )
+                hk_btn.setTitle_(btn_title)
+                hk_btn.setBezelStyle_(1)
+                hk_btn.setFont_(NSFont.systemFontOfSize_(10.0))
+                hk_btn.setTarget_(self)
+                hk_btn.setAction_(btn_action)
+                self._set_meta(hk_btn, source_key=prefix_key)
+                doc_view.addSubview_(hk_btn)
+                self._launcher_source_hotkey_btns[prefix_key] = hk_btn
+
+        y -= self._SECTION_GAP
+
+        # --- Options section ---
+        y -= self._LABEL_HEIGHT
+        doc_view.addSubview_(
+            self._make_label("Options", pad, y, content_w, label_font)
+        )
+
+        y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
+        self._make_switch(
+            "Usage Learning", pad + 12, y, content_w - 24,
+            launcher_state.get("usage_learning", True), small_font,
+            b"launcherUsageLearningToggled:", doc_view,
+        )
+        y = self._add_hint(
+            "Learn from your selections to rank frequently used items higher",
+            pad + 12, y, content_w - 24, doc_view,
+        )
+
+        y -= self._SECTION_GAP
+
+        # --- Maintenance section ---
+        y -= self._LABEL_HEIGHT
+        doc_view.addSubview_(
+            self._make_label("Maintenance", pad, y, content_w, label_font)
+        )
+
+        from AppKit import NSButton
+
+        y -= (28 + self._ROW_GAP)
+        refresh_btn = NSButton.alloc().initWithFrame_(
+            NSMakeRect(pad + 12, y, 180, 28)
+        )
+        refresh_btn.setTitle_("Refresh Icon Cache")
+        refresh_btn.setBezelStyle_(1)
+        refresh_btn.setFont_(small_font)
+        refresh_btn.setTarget_(self)
+        refresh_btn.setAction_(b"launcherRefreshIconsClicked:")
+        doc_view.addSubview_(refresh_btn)
+        y = self._add_hint(
+            "Clear cached app and browser icons and re-extract them",
+            pad + 12, y, content_w - 24, doc_view,
+        )
+
+        # --- Disable controls based on scripting/launcher state ---
+        scripting_on = state.get("scripting_enabled", False)
+        launcher_on = launcher_state.get("enabled", True)
+
+        # Controls that require scripting to be enabled (everything
+        # except the warning label itself)
+        all_launcher_controls = [
+            self._launcher_enabled_check,
+            hotkey_field,
+            refresh_btn,
+        ]
+        for check in self._launcher_source_checks.values():
+            all_launcher_controls.append(check)
+        for field in self._launcher_prefix_fields.values():
+            all_launcher_controls.append(field)
+        for btn in self._launcher_source_hotkey_btns.values():
+            all_launcher_controls.append(btn)
+
+        # Controls below the "Enable Launcher" toggle that also require
+        # the launcher itself to be enabled
+        sub_controls = [c for c in all_launcher_controls
+                        if c is not self._launcher_enabled_check]
+
+        if not scripting_on:
+            for ctrl in all_launcher_controls:
+                ctrl.setEnabled_(False)
+        elif not launcher_on:
+            for ctrl in sub_controls:
+                ctrl.setEnabled_(False)
+
+        scroll.setDocumentView_(doc_view)
+        tab_item.setView_(scroll)
+
     # ── Helper methods ───────────────────────────────────────────────
 
     @staticmethod
@@ -1127,11 +1405,8 @@ class SettingsPanel:
     # protocol support where setTarget_ accepts any Python object and
     # setAction_ dispatches via Python attribute lookup.
 
-    def toolbarButtonClicked_(self, sender):
-        meta = self._get_meta(sender)
-        cb_name = meta.get("cb_name")
-        if cb_name:
-            self._call(cb_name)
+    def revealConfigFolderClicked_(self, sender):
+        self._call("on_reveal_config_folder")
 
     def hotkeyCheckChanged_(self, sender):
         meta = self._get_meta(sender)
@@ -1277,6 +1552,48 @@ class SettingsPanel:
     def configDirResetClicked_(self, sender):
         self._call("on_config_dir_reset")
 
+    def launcherEnabledToggled_(self, sender):
+        enabled = sender.state() == 1
+        self._call("on_launcher_toggle", enabled)
+
+    def launcherHotkeyChanged_(self, sender):
+        value = str(sender.stringValue()).strip()
+        if value:
+            self._call("on_launcher_hotkey_change", value)
+
+    def launcherSourceToggled_(self, sender):
+        meta = self._get_meta(sender)
+        config_key = meta.get("config_key", "")
+        enabled = sender.state() == 1
+        if config_key:
+            self._call("on_launcher_source_toggle", config_key, enabled)
+
+    def launcherPrefixChanged_(self, sender):
+        meta = self._get_meta(sender)
+        prefix_key = meta.get("prefix_key", "")
+        value = str(sender.stringValue()).strip()
+        if prefix_key:
+            self._call("on_launcher_prefix_change", prefix_key, value)
+
+    def launcherUsageLearningToggled_(self, sender):
+        enabled = sender.state() == 1
+        self._call("on_launcher_usage_learning_toggle", enabled)
+
+    def launcherSourceHotkeyRecord_(self, sender):
+        meta = self._get_meta(sender)
+        source_key = meta.get("source_key", "")
+        if source_key:
+            self._call("on_launcher_source_hotkey_record", source_key)
+
+    def launcherSourceHotkeyClear_(self, sender):
+        meta = self._get_meta(sender)
+        source_key = meta.get("source_key", "")
+        if source_key:
+            self._call("on_launcher_source_hotkey_clear", source_key)
+
+    def launcherRefreshIconsClicked_(self, sender):
+        self._call("on_launcher_refresh_icons")
+
     # ── State update methods (called from app.py for sync) ───────────
 
     def update_hotkey(self, key_name: str, enabled: bool) -> None:
@@ -1322,3 +1639,18 @@ class SettingsPanel:
         """Update the config directory display field."""
         if self._config_dir_field:
             self._config_dir_field.setStringValue_(path)
+
+    def update_source_hotkey(self, source_key: str, hotkey: str) -> None:
+        """Update the hotkey label and button for a source after recording."""
+        label = self._launcher_source_hotkey_labels.get(source_key)
+        if label:
+            label.setStringValue_(hotkey or "None")
+
+        btn = self._launcher_source_hotkey_btns.get(source_key)
+        if btn:
+            if hotkey:
+                btn.setTitle_("Clear")
+                btn.setAction_(b"launcherSourceHotkeyClear:")
+            else:
+                btn.setTitle_("Record")
+                btn.setAction_(b"launcherSourceHotkeyRecord:")

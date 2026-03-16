@@ -31,6 +31,7 @@ _SPECIAL_VK = {
     "f5": 96, "f6": 97, "f7": 98, "f8": 100,
     "f9": 101, "f10": 109, "f11": 103, "f12": 111,
     "fn": 63, "esc": 53, "space": 49,
+    "return": 36, "delete": 51, "tab": 48,
     "up": 126, "down": 125, "left": 123, "right": 124,
 }
 
@@ -50,6 +51,9 @@ _VK_TO_NAME.update({vk: name for name, (vk, _flag) in _MOD_VK.items()})
 
 # All known key names (for validation)
 _ALL_KEY_NAMES = set(_KEYCODE_MAP) | set(_SPECIAL_VK) | set(_MOD_VK) | {"option", "command"}
+
+# Modifier key names (for combo hotkey recording)
+MODIFIER_KEY_NAMES = set(_MOD_VK.keys())  # {"cmd", "cmd_r", "ctrl", ...}
 
 # Modifier flag constants
 _MOD_FLAGS = {
@@ -107,10 +111,16 @@ def _parse_hotkey_for_quartz(hotkey_str: str) -> tuple[int, int]:
     mod_flags = 0
     trigger_keys = []
     for part in parts:
+        if part == "option":
+            part = "alt"
+        elif part == "command":
+            part = "cmd"
         if part in _MOD_FLAGS:
             mod_flags |= _MOD_FLAGS[part]
         elif part in _KEYCODE_MAP:
-            trigger_keys.append(part)
+            trigger_keys.append(("letter", part))
+        elif part in _SPECIAL_VK:
+            trigger_keys.append(("special", part))
         else:
             raise ValueError(f"Unknown key in hotkey: {part!r}")
 
@@ -121,7 +131,9 @@ def _parse_hotkey_for_quartz(hotkey_str: str) -> tuple[int, int]:
             f"Hotkey must include exactly one trigger key, got {len(trigger_keys)}: {hotkey_str!r}"
         )
 
-    return mod_flags, _KEYCODE_MAP[trigger_keys[0]]
+    kind, key = trigger_keys[0]
+    vk = _KEYCODE_MAP[key] if kind == "letter" else _SPECIAL_VK[key]
+    return mod_flags, vk
 
 
 # ---------------------------------------------------------------------------

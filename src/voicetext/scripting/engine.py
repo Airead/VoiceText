@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from voicetext.scripting.registry import ScriptingRegistry
 
@@ -14,11 +14,20 @@ logger = logging.getLogger(__name__)
 class ScriptEngine:
     """Load user scripts and manage the scripting lifecycle."""
 
-    def __init__(self, script_dir: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        script_dir: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
+    ) -> None:
         self._script_dir = os.path.expanduser(
             script_dir or "~/.config/VoiceText/scripts"
         )
+        self._config = config or {}
         self._registry = ScriptingRegistry()
+        self._clipboard_monitor = None
+        self._usage_tracker = None
+        self._snippet_store = None
+        self._snippet_expander = None
 
         # Create vt namespace and install as module singleton
         from voicetext.scripting.api import _VTNamespace
@@ -34,8 +43,11 @@ class ScriptEngine:
         return self._vt
 
     def start(self) -> None:
-        """Load scripts and start all listeners."""
+        """Load scripts, register built-in sources, and start all listeners."""
+        self._register_builtin_sources()
         self._load_scripts()
+        self._bind_chooser_hotkey()
+        self._bind_source_hotkeys()
         # Start hotkey/leader listeners after scripts register their bindings
         self._vt.hotkey.start()
         logger.info("Script engine started (script_dir=%s)", self._script_dir)
@@ -43,6 +55,15 @@ class ScriptEngine:
     def stop(self) -> None:
         """Stop all listeners and clean up."""
         self._vt.hotkey.stop()
+        if self._clipboard_monitor is not None:
+            self._clipboard_monitor.stop()
+            self._clipboard_monitor = None
+        if self._snippet_expander is not None:
+            self._snippet_expander.stop()
+            self._snippet_expander = None
+        self._vt.pasteboard._set_monitor(None)
+        self._vt.snippets._set_store(None)
+        self._vt.store.flush_sync()
         self._registry.clear()
         logger.info("Script engine stopped")
 
@@ -50,11 +71,390 @@ class ScriptEngine:
         """Reload all scripts: stop, clear, re-load, start."""
         logger.info("Reloading scripts...")
         self.stop()
-        # Reset hotkey API so it creates a fresh listener
+        # Reset APIs so they create fresh instances
         self._vt._hotkey_api = None
+        self._vt._chooser_api = None
+        self._register_builtin_sources()
         self._load_scripts()
+        self._bind_chooser_hotkey()
+        self._bind_source_hotkeys()
         self._vt.hotkey.start()
         logger.info("Scripts reloaded")
+
+    # ── Runtime chooser on/off ─────────────────────────────────────
+
+    def enable_chooser(self) -> None:
+        """Enable the chooser at runtime: register sources, bind hotkeys."""
+        self._register_builtin_sources()
+        self._bind_chooser_hotkey()
+        self._bind_source_hotkeys()
+        self._vt.hotkey.start()
+        logger.info("Chooser enabled at runtime")
+
+    def disable_chooser(self) -> None:
+        """Disable the chooser at runtime: unbind hotkeys, stop monitors, clear sources."""
+        chooser_config = self._config.get("chooser", {})
+
+        # Unbind chooser hotkey
+        hotkey_str = chooser_config.get("hotkey")
+        if hotkey_str:
+            self._vt.hotkey.unbind(hotkey_str)
+
+        # Unbind source hotkeys
+        source_hotkeys = chooser_config.get("source_hotkeys", {})
+        for hotkey_str in source_hotkeys.values():
+            if hotkey_str:
+                self._vt.hotkey.unbind(hotkey_str)
+
+        # Stop clipboard monitor
+        if self._clipboard_monitor is not None:
+            self._clipboard_monitor.stop()
+            self._clipboard_monitor = None
+
+        # Stop snippet expander
+        if self._snippet_expander is not None:
+            self._snippet_expander.stop()
+            self._snippet_expander = None
+
+        self._snippet_store = None
+        self._usage_tracker = None
+        self._vt.pasteboard._set_monitor(None)
+        self._vt.snippets._set_store(None)
+
+        # Clear all registered sources
+        panel = self._vt.chooser._get_panel()
+        panel._sources.clear()
+        panel._usage_tracker = None
+
+        logger.info("Chooser disabled at runtime")
+
+    # ── Runtime per-source on/off ────────────────────────────────
+
+    def enable_clipboard(self) -> None:
+        """Start the clipboard monitor and register its chooser source."""
+        if self._clipboard_monitor is not None:
+            return  # already running
+        try:
+            from voicetext.scripting.clipboard_monitor import ClipboardMonitor
+            from voicetext.scripting.sources.clipboard_source import ClipboardSource
+
+            chooser_config = self._config.get("chooser", {})
+            max_days = chooser_config.get("clipboard_max_days", 7)
+            persist_path = os.path.expanduser(
+                "~/.config/VoiceText/clipboard_history.json"
+            )
+            prefixes = chooser_config.get("prefixes", {})
+
+            self._clipboard_monitor = ClipboardMonitor(
+                max_days=max_days,
+                persist_path=persist_path,
+            )
+            self._clipboard_monitor.start()
+            self._vt.pasteboard._set_monitor(self._clipboard_monitor)
+
+            cb_source = ClipboardSource(self._clipboard_monitor)
+            self._vt.chooser.register_source(
+                cb_source.as_chooser_source(
+                    prefix=prefixes.get("clipboard", "cb"),
+                )
+            )
+            logger.info("Clipboard monitor enabled at runtime")
+        except Exception:
+            logger.exception("Failed to enable clipboard monitor")
+
+    def disable_clipboard(self) -> None:
+        """Stop the clipboard monitor and unregister its chooser source."""
+        if self._clipboard_monitor is not None:
+            self._clipboard_monitor.stop()
+            self._clipboard_monitor = None
+        self._vt.pasteboard._set_monitor(None)
+        self._vt.chooser.unregister_source("clipboard")
+        logger.info("Clipboard monitor disabled at runtime")
+
+    def enable_source(self, config_key: str) -> None:
+        """Register a single source at runtime by config key."""
+        chooser_config = self._config.get("chooser", {})
+        prefixes = chooser_config.get("prefixes", {})
+        source_map = {
+            "app_search": ("apps", self._enable_app_source),
+            "clipboard_history": ("clipboard", lambda p: self.enable_clipboard()),
+            "file_search": ("files", self._enable_file_source),
+            "snippets": ("snippets", self._enable_snippet_source),
+            "bookmarks": ("bookmarks", self._enable_bookmark_source),
+        }
+        entry = source_map.get(config_key)
+        if not entry:
+            return
+        _name, enabler = entry
+        prefix = prefixes.get(_name, "") if _name != "apps" else ""
+        enabler(prefix)
+
+    def disable_source(self, config_key: str) -> None:
+        """Unregister a single source at runtime by config key."""
+        source_name_map = {
+            "app_search": "apps",
+            "clipboard_history": "clipboard",
+            "file_search": "files",
+            "snippets": "snippets",
+            "bookmarks": "bookmarks",
+        }
+        source_name = source_name_map.get(config_key)
+        if not source_name:
+            return
+        if config_key == "clipboard_history":
+            self.disable_clipboard()
+        elif config_key == "snippets":
+            if self._snippet_expander is not None:
+                self._snippet_expander.stop()
+                self._snippet_expander = None
+            self._snippet_store = None
+            self._vt.snippets._set_store(None)
+            self._vt.chooser.unregister_source(source_name)
+        else:
+            self._vt.chooser.unregister_source(source_name)
+        logger.info("Source %s disabled at runtime", config_key)
+
+    def _enable_app_source(self, _prefix: str) -> None:
+        try:
+            from voicetext.scripting.sources.app_source import AppSource
+
+            app_source = AppSource()
+            self._vt.chooser.register_source(app_source.as_chooser_source())
+            logger.info("App source enabled at runtime")
+        except Exception:
+            logger.exception("Failed to enable app source")
+
+    def _enable_file_source(self, prefix: str) -> None:
+        try:
+            from voicetext.scripting.sources.file_source import FileSource
+
+            file_source = FileSource()
+            self._vt.chooser.register_source(
+                file_source.as_chooser_source(prefix=prefix)
+            )
+            logger.info("File source enabled at runtime")
+        except Exception:
+            logger.exception("Failed to enable file source")
+
+    def _enable_snippet_source(self, prefix: str) -> None:
+        try:
+            from voicetext.scripting.sources.snippet_source import (
+                SnippetSource,
+                SnippetStore,
+            )
+
+            self._snippet_store = SnippetStore()
+            self._vt.snippets._set_store(self._snippet_store)
+            snippet_source = SnippetSource(self._snippet_store)
+            self._vt.chooser.register_source(
+                snippet_source.as_chooser_source(prefix=prefix)
+            )
+            # Also start expander if configured
+            chooser_config = self._config.get("chooser", {})
+            if chooser_config.get("snippet_expansion", True):
+                from voicetext.scripting.snippet_expander import SnippetExpander
+
+                self._snippet_expander = SnippetExpander(self._snippet_store)
+                self._snippet_expander.start()
+            logger.info("Snippet source enabled at runtime")
+        except Exception:
+            logger.exception("Failed to enable snippet source")
+
+    def _enable_bookmark_source(self, prefix: str) -> None:
+        try:
+            from voicetext.scripting.sources.bookmark_source import BookmarkSource
+
+            bookmark_source = BookmarkSource()
+            self._vt.chooser.register_source(
+                bookmark_source.as_chooser_source(prefix=prefix)
+            )
+            logger.info("Bookmark source enabled at runtime")
+        except Exception:
+            logger.exception("Failed to enable bookmark source")
+
+    def rebind_chooser_hotkey(self, old_hotkey: str, new_hotkey: str) -> None:
+        """Unbind old chooser hotkey and bind the new one at runtime."""
+        if old_hotkey:
+            self._vt.hotkey.unbind(old_hotkey)
+        if new_hotkey:
+            self._vt.hotkey.bind(new_hotkey, lambda: self._vt.chooser.toggle())
+            self._vt.hotkey.start()
+        logger.info("Chooser hotkey rebound: %s -> %s", old_hotkey, new_hotkey)
+
+    def set_usage_learning(self, enabled: bool) -> None:
+        """Enable or disable the usage learning tracker at runtime."""
+        panel = self._vt.chooser._get_panel()
+        if enabled:
+            if self._usage_tracker is None:
+                try:
+                    from voicetext.scripting.sources.usage_tracker import UsageTracker
+
+                    self._usage_tracker = UsageTracker()
+                except Exception:
+                    logger.exception("Failed to create usage tracker")
+                    return
+            panel._usage_tracker = self._usage_tracker
+            logger.info("Usage learning enabled at runtime")
+        else:
+            self._usage_tracker = None
+            panel._usage_tracker = None
+            logger.info("Usage learning disabled at runtime")
+
+    def _register_builtin_sources(self) -> None:
+        """Register built-in chooser sources."""
+        chooser_config = self._config.get("chooser", {})
+        if not chooser_config.get("enabled", True):
+            logger.info("Chooser disabled via config, skipping source registration")
+            return
+
+        # Usage learning tracker
+        if chooser_config.get("usage_learning", True):
+            try:
+                from voicetext.scripting.sources.usage_tracker import UsageTracker
+
+                self._usage_tracker = UsageTracker()
+                # Inject tracker into the chooser panel
+                panel = self._vt.chooser._get_panel()
+                panel._usage_tracker = self._usage_tracker
+                logger.info("Usage learning tracker enabled")
+            except Exception:
+                logger.exception("Failed to set up usage tracker")
+
+        prefixes = chooser_config.get("prefixes", {})
+
+        # App search source
+        if chooser_config.get("app_search", True):
+            try:
+                from voicetext.scripting.sources.app_source import AppSource
+
+                app_source = AppSource()
+                self._vt.chooser.register_source(app_source.as_chooser_source())
+                logger.info("Built-in app search source registered")
+            except Exception:
+                logger.exception("Failed to register app search source")
+
+        # Clipboard history source
+        if chooser_config.get("clipboard_history", True):
+            try:
+                from voicetext.scripting.clipboard_monitor import ClipboardMonitor
+                from voicetext.scripting.sources.clipboard_source import (
+                    ClipboardSource,
+                )
+
+                max_days = chooser_config.get("clipboard_max_days", 7)
+                persist_path = os.path.expanduser(
+                    "~/.config/VoiceText/clipboard_history.json"
+                )
+
+                self._clipboard_monitor = ClipboardMonitor(
+                    max_days=max_days,
+                    persist_path=persist_path,
+                )
+                self._clipboard_monitor.start()
+                self._vt.pasteboard._set_monitor(self._clipboard_monitor)
+
+                cb_source = ClipboardSource(self._clipboard_monitor)
+                self._vt.chooser.register_source(
+                    cb_source.as_chooser_source(
+                        prefix=prefixes.get("clipboard", "cb"),
+                    )
+                )
+                logger.info("Built-in clipboard source registered")
+            except Exception:
+                logger.exception("Failed to register clipboard source")
+
+        # File search source
+        if chooser_config.get("file_search", True):
+            try:
+                from voicetext.scripting.sources.file_source import FileSource
+
+                file_source = FileSource()
+                self._vt.chooser.register_source(
+                    file_source.as_chooser_source(
+                        prefix=prefixes.get("files", "f"),
+                    )
+                )
+                logger.info("Built-in file search source registered")
+            except Exception:
+                logger.exception("Failed to register file search source")
+
+        # Snippet source
+        if chooser_config.get("snippets", True):
+            try:
+                from voicetext.scripting.sources.snippet_source import (
+                    SnippetSource,
+                    SnippetStore,
+                )
+
+                self._snippet_store = SnippetStore()
+                self._vt.snippets._set_store(self._snippet_store)
+                snippet_source = SnippetSource(self._snippet_store)
+                self._vt.chooser.register_source(
+                    snippet_source.as_chooser_source(
+                        prefix=prefixes.get("snippets", "sn"),
+                    )
+                )
+                logger.info("Built-in snippet source registered")
+            except Exception:
+                logger.exception("Failed to register snippet source")
+
+        # Snippet keyword auto-expansion
+        if chooser_config.get("snippet_expansion", True) and self._snippet_store:
+            try:
+                from voicetext.scripting.snippet_expander import SnippetExpander
+
+                self._snippet_expander = SnippetExpander(self._snippet_store)
+                self._snippet_expander.start()
+                logger.info("Snippet keyword expander started")
+            except Exception:
+                logger.exception("Failed to start snippet expander")
+
+        # Bookmark search source
+        if chooser_config.get("bookmarks", True):
+            try:
+                from voicetext.scripting.sources.bookmark_source import (
+                    BookmarkSource,
+                )
+
+                bookmark_source = BookmarkSource()
+                self._vt.chooser.register_source(
+                    bookmark_source.as_chooser_source(
+                        prefix=prefixes.get("bookmarks", "bm"),
+                    )
+                )
+                logger.info("Built-in bookmark source registered")
+            except Exception:
+                logger.exception("Failed to register bookmark source")
+
+    def _bind_chooser_hotkey(self) -> None:
+        """Bind the chooser toggle hotkey from config."""
+        chooser_config = self._config.get("chooser", {})
+        if not chooser_config.get("enabled", True):
+            return
+        hotkey_str = chooser_config.get("hotkey")
+        if hotkey_str:
+            self._vt.hotkey.bind(hotkey_str, lambda: self._vt.chooser.toggle())
+            logger.info("Chooser hotkey bound: %s", hotkey_str)
+
+    def _bind_source_hotkeys(self) -> None:
+        """Bind per-source direct hotkeys from config."""
+        chooser_config = self._config.get("chooser", {})
+        if not chooser_config.get("enabled", True):
+            return
+        source_hotkeys = chooser_config.get("source_hotkeys", {})
+        prefixes = chooser_config.get("prefixes", {})
+        for source_key, hotkey_str in source_hotkeys.items():
+            if hotkey_str:
+                prefix = prefixes.get(source_key, "")
+                if not prefix:
+                    continue
+                self._vt.hotkey.bind(
+                    hotkey_str,
+                    lambda p=prefix: self._vt.chooser.show_source(p),
+                )
+                logger.info(
+                    "Source hotkey bound: %s -> %s", hotkey_str, source_key,
+                )
 
     def _load_scripts(self) -> None:
         """Execute init.py in the scripts directory."""

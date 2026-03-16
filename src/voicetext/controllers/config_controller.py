@@ -70,8 +70,9 @@ class ConfigController:
         """Handle log level change from the log viewer panel."""
         log_level = getattr(logging, level_name, logging.INFO)
 
-        # Update all loggers
-        logging.getLogger().setLevel(log_level)
+        # Only update our own logger and handlers; root stays at INFO
+        # to avoid flooding with third-party DEBUG output (numba, etc.).
+        logging.getLogger("voicetext").setLevel(log_level)
         for handler in logging.getLogger().handlers:
             handler.setLevel(log_level)
 
@@ -204,10 +205,10 @@ class ConfigController:
         app._preview_enabled = new_config["output"].get("preview", True)
         app._preview_item.state = 1 if app._preview_enabled else 0
 
-        # Logging level
+        # Logging level — only update our own logger, not root
         level_name = new_config["logging"]["level"]
         log_level = getattr(logging, level_name, logging.INFO)
-        logging.getLogger().setLevel(log_level)
+        logging.getLogger("voicetext").setLevel(log_level)
         for handler in logging.getLogger().handlers:
             handler.setLevel(log_level)
 

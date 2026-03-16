@@ -3,9 +3,32 @@
 from __future__ import annotations
 
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+# ---------------------------------------------------------------------------
+# Global safety fixtures — prevent tests from touching real system resources
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _no_real_clipboard_polling():
+    """Prevent ClipboardMonitor from polling the real system clipboard."""
+    with patch(
+        "voicetext.scripting.clipboard_monitor.ClipboardMonitor._check_clipboard",
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _no_real_snippet_tap():
+    """Prevent SnippetExpander from creating a real Quartz CGEventTap."""
+    with patch(
+        "voicetext.scripting.snippet_expander.SnippetExpander.start",
+    ):
+        yield
 
 
 class MockAppKitModules:

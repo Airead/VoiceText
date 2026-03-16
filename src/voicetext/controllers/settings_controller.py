@@ -34,6 +34,19 @@ class SettingsController:
     def __init__(self, app: VoiceTextApp) -> None:
         self._app = app
 
+    def _save_and_reload(self) -> None:
+        """Save config and reload the Settings panel if it is visible.
+
+        Safe to call from any thread — the UI reload is dispatched to the
+        main thread automatically.
+        """
+        from PyObjCTools import AppHelper
+
+        app = self._app
+        save_config(app._config, app._config_path)
+        if app._settings_panel.is_visible:
+            AppHelper.callAfter(self.on_open_settings, None)
+
     def on_open_settings(self, _) -> None:
         """Open the Settings panel with current state and callbacks."""
         from voicetext.enhance.vocabulary import get_vocab_entry_count
@@ -114,6 +127,7 @@ class SettingsController:
             "scripting_enabled": app._config.get("scripting", {}).get(
                 "enabled", False
             ),
+            "launcher": self._build_launcher_state(),
         }
 
         callbacks = {
@@ -145,11 +159,17 @@ class SettingsController:
             "on_history_toggle": self.history_toggle,
             "on_vocab_build": lambda: app._on_vocab_build(None),
             "on_tab_change": self.tab_change,
-            "on_show_config": lambda: app._on_show_config(None),
-            "on_edit_config": lambda: app._on_enhance_edit_config(None),
-            "on_reload_config": lambda: app._on_reload_config(None),
+            "on_reveal_config_folder": self.reveal_config_folder,
             "on_config_dir_browse": self.config_dir_browse,
             "on_config_dir_reset": self.config_dir_reset,
+            "on_launcher_toggle": self.launcher_toggle,
+            "on_launcher_hotkey_change": self.launcher_hotkey_change,
+            "on_launcher_source_toggle": self.launcher_source_toggle,
+            "on_launcher_prefix_change": self.launcher_prefix_change,
+            "on_launcher_usage_learning_toggle": self.launcher_usage_learning_toggle,
+            "on_launcher_refresh_icons": self.launcher_refresh_icons,
+            "on_launcher_source_hotkey_record": self.launcher_source_hotkey_record,
+            "on_launcher_source_hotkey_clear": self.launcher_source_hotkey_clear,
             "_reopen": lambda: self.on_open_settings(None),
         }
 
@@ -170,7 +190,7 @@ class SettingsController:
                 app._config["hotkeys"][key_name] = True
         else:
             app._config["hotkeys"][key_name] = False
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
 
         if app._hotkey_listener:
             if enabled:
@@ -197,7 +217,7 @@ class SettingsController:
             hotkeys[key_name] = True
         else:
             hotkeys[key_name] = {"mode": mode_id}
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
         logger.info("Hotkey %s mode set to: %s", key_name, mode_id)
 
     def hotkey_delete(self, key_name: str) -> None:
@@ -209,7 +229,7 @@ class SettingsController:
             return
 
         app._config.get("hotkeys", {}).pop(key_name, None)
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
 
         if app._hotkey_listener:
             app._hotkey_listener.disable_key(key_name)
@@ -226,7 +246,7 @@ class SettingsController:
         app = self._app
         fb_cfg = app._config.setdefault("feedback", {})
         fb_cfg["restart_key"] = key_name
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
 
         if app._hotkey_listener:
             app._hotkey_listener.set_restart_key(key_name)
@@ -237,7 +257,7 @@ class SettingsController:
         app = self._app
         fb_cfg = app._config.setdefault("feedback", {})
         fb_cfg["cancel_key"] = key_name
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
 
         if app._hotkey_listener:
             app._hotkey_listener.set_cancel_key(key_name)
@@ -248,7 +268,7 @@ class SettingsController:
         app = self._app
         scripting_cfg = app._config.setdefault("scripting", {})
         scripting_cfg["enabled"] = enabled
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
         logger.info("Scripting set to: %s (requires restart)", enabled)
 
     def sound_toggle(self, enabled: bool) -> None:
@@ -259,7 +279,7 @@ class SettingsController:
 
         fb_cfg = app._config.setdefault("feedback", {})
         fb_cfg["sound_enabled"] = enabled
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
 
     def visual_toggle(self, enabled: bool) -> None:
         """Handle visual indicator toggle from Settings panel."""
@@ -269,7 +289,7 @@ class SettingsController:
 
         fb_cfg = app._config.setdefault("feedback", {})
         fb_cfg["visual_indicator"] = enabled
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
 
     def show_device_name_toggle(self, enabled: bool) -> None:
         """Handle show device name toggle from Settings panel."""
@@ -279,7 +299,7 @@ class SettingsController:
 
         fb_cfg = app._config.setdefault("feedback", {})
         fb_cfg["show_device_name"] = enabled
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
 
     def preview_toggle(self, enabled: bool) -> None:
         """Handle preview toggle from Settings panel."""
@@ -288,7 +308,7 @@ class SettingsController:
         app._preview_item.state = 1 if enabled else 0
 
         app._config["output"]["preview"] = enabled
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
         logger.info("Preview set to: %s (from settings)", enabled)
 
     def preview_type_toggle(self, use_web: bool) -> None:
@@ -306,7 +326,7 @@ class SettingsController:
         app._enhance_controller._preview_panel = app._preview_panel
 
         app._config["output"]["preview_type"] = new_type
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
         logger.info("Preview type set to: %s (from settings)", new_type)
 
     def stt_select(self, preset_id: str) -> None:
@@ -403,7 +423,7 @@ class SettingsController:
                 app._config["asr"]["language"] = preset.language
                 app._config["asr"]["default_provider"] = None
                 app._config["asr"]["default_model"] = None
-                save_config(app._config, app._config_path)
+                self._save_and_reload()
 
                 app._set_status("VT")
                 logger.info("Switched to model: %s (from settings)", preset.display_name)
@@ -500,7 +520,7 @@ class SettingsController:
             app._config["asr"]["language"] = preset.language
             app._config["asr"]["default_provider"] = None
             app._config["asr"]["default_model"] = None
-            save_config(app._config, app._config_path)
+            self._save_and_reload()
 
             app._set_status("VT")
             logger.info(
@@ -585,7 +605,7 @@ class SettingsController:
 
                 app._config["asr"]["default_provider"] = provider
                 app._config["asr"]["default_model"] = model
-                save_config(app._config, app._config_path)
+                self._save_and_reload()
 
                 app._set_status("VT")
                 logger.info("Switched to remote ASR: %s / %s (from settings)",
@@ -630,7 +650,7 @@ class SettingsController:
         app._config.setdefault("ai_enhance", {})
         app._config["ai_enhance"]["default_provider"] = provider
         app._config["ai_enhance"]["default_model"] = model
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
         logger.info("LLM model set to: %s / %s (from settings)", provider, model)
 
     def llm_remove_provider(self) -> None:
@@ -675,7 +695,7 @@ class SettingsController:
         app._config.setdefault("ai_enhance", {})
         app._config["ai_enhance"]["enabled"] = mode_id != MODE_OFF
         app._config["ai_enhance"]["mode"] = mode_id
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
         logger.info("AI enhance mode set to: %s (from settings)", mode_id)
 
     def thinking_toggle(self, enabled: bool) -> None:
@@ -688,7 +708,7 @@ class SettingsController:
 
         app._config.setdefault("ai_enhance", {})
         app._config["ai_enhance"]["thinking"] = enabled
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
         logger.info("AI thinking set to: %s (from settings)", enabled)
 
     def vocab_toggle(self, enabled: bool) -> None:
@@ -702,7 +722,7 @@ class SettingsController:
         app._config.setdefault("ai_enhance", {})
         app._config["ai_enhance"].setdefault("vocabulary", {})
         app._config["ai_enhance"]["vocabulary"]["enabled"] = enabled
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
         logger.info("Vocabulary set to: %s (from settings)", enabled)
 
     def auto_build_toggle(self, enabled: bool) -> None:
@@ -714,7 +734,7 @@ class SettingsController:
         app._config.setdefault("ai_enhance", {})
         app._config["ai_enhance"].setdefault("vocabulary", {})
         app._config["ai_enhance"]["vocabulary"]["auto_build"] = enabled
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
         logger.info("Auto vocabulary build set to: %s (from settings)", enabled)
 
     def history_toggle(self, enabled: bool) -> None:
@@ -728,14 +748,20 @@ class SettingsController:
         app._config.setdefault("ai_enhance", {})
         app._config["ai_enhance"].setdefault("conversation_history", {})
         app._config["ai_enhance"]["conversation_history"]["enabled"] = enabled
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
         logger.info("Conversation history set to: %s (from settings)", enabled)
+
+    def reveal_config_folder(self) -> None:
+        """Open the config directory in Finder."""
+        import subprocess
+
+        subprocess.Popen(["open", self._app._config_dir])
 
     def tab_change(self, tab_id: str) -> None:
         """Persist the last active settings tab."""
         app = self._app
         app._config.setdefault("ui", {})["settings_last_tab"] = tab_id
-        save_config(app._config, app._config_path)
+        self._save_and_reload()
 
     def config_dir_browse(self) -> None:
         """Open a directory picker to choose a custom config directory."""
@@ -833,3 +859,224 @@ class SettingsController:
 
         from voicetext.statusbar import quit_application
         quit_application()
+
+    # ── Launcher tab ─────────────────────────────────────────────────
+
+    def _build_launcher_state(self) -> dict:
+        """Build launcher state dict for the settings panel."""
+        app = self._app
+        chooser_cfg = app._config.get("scripting", {}).get("chooser", {})
+        return {
+            "enabled": chooser_cfg.get("enabled", True),
+            "hotkey": chooser_cfg.get("hotkey", "cmd+space"),
+            "app_search": chooser_cfg.get("app_search", True),
+            "clipboard_history": chooser_cfg.get("clipboard_history", True),
+            "file_search": chooser_cfg.get("file_search", True),
+            "snippets": chooser_cfg.get("snippets", True),
+            "bookmarks": chooser_cfg.get("bookmarks", True),
+            "usage_learning": chooser_cfg.get("usage_learning", True),
+            "prefixes": chooser_cfg.get("prefixes", {
+                "clipboard": "cb",
+                "files": "f",
+                "snippets": "sn",
+                "bookmarks": "bm",
+            }),
+            "source_hotkeys": chooser_cfg.get("source_hotkeys", {
+                "clipboard": "",
+                "files": "",
+                "snippets": "",
+                "bookmarks": "",
+            }),
+        }
+
+    def launcher_toggle(self, enabled: bool) -> None:
+        """Handle launcher enable/disable toggle from Settings panel."""
+        app = self._app
+        chooser_cfg = app._config.setdefault("scripting", {}).setdefault(
+            "chooser", {}
+        )
+        chooser_cfg["enabled"] = enabled
+        self._save_and_reload()
+
+        engine = getattr(app, "_script_engine", None)
+        if engine is not None:
+            if enabled:
+                engine.enable_chooser()
+            else:
+                engine.disable_chooser()
+
+        logger.info("Launcher set to: %s", enabled)
+
+    def launcher_hotkey_change(self, hotkey: str) -> None:
+        """Handle launcher hotkey change from Settings panel."""
+        app = self._app
+        chooser_cfg = app._config.setdefault("scripting", {}).setdefault(
+            "chooser", {}
+        )
+        old_hotkey = chooser_cfg.get("hotkey", "")
+        chooser_cfg["hotkey"] = hotkey
+        self._save_and_reload()
+
+        engine = getattr(app, "_script_engine", None)
+        if engine is not None and chooser_cfg.get("enabled", True):
+            engine.rebind_chooser_hotkey(old_hotkey, hotkey)
+
+        logger.info("Launcher hotkey set to: %s", hotkey)
+
+    def launcher_source_toggle(self, config_key: str, enabled: bool) -> None:
+        """Handle launcher source toggle from Settings panel."""
+        app = self._app
+        chooser_cfg = app._config.setdefault("scripting", {}).setdefault(
+            "chooser", {}
+        )
+        chooser_cfg[config_key] = enabled
+        self._save_and_reload()
+
+        engine = getattr(app, "_script_engine", None)
+        if engine is not None and chooser_cfg.get("enabled", True):
+            if enabled:
+                engine.enable_source(config_key)
+            else:
+                engine.disable_source(config_key)
+
+        logger.info("Launcher source %s set to: %s", config_key, enabled)
+
+    def launcher_prefix_change(self, prefix_key: str, value: str) -> None:
+        """Handle launcher prefix change from Settings panel."""
+        app = self._app
+        chooser_cfg = app._config.setdefault("scripting", {}).setdefault(
+            "chooser", {}
+        )
+        prefixes = chooser_cfg.setdefault("prefixes", {})
+        old_value = prefixes.get(prefix_key, "")
+        prefixes[prefix_key] = value
+        self._save_and_reload()
+
+        # Re-register the source with the new prefix
+        engine = getattr(app, "_script_engine", None)
+        source_config_map = {
+            "clipboard": "clipboard_history",
+            "files": "file_search",
+            "snippets": "snippets",
+            "bookmarks": "bookmarks",
+        }
+        config_key = source_config_map.get(prefix_key)
+        if (
+            engine is not None
+            and config_key
+            and chooser_cfg.get("enabled", True)
+            and chooser_cfg.get(config_key, True)
+            and old_value != value
+        ):
+            engine.disable_source(config_key)
+            engine.enable_source(config_key)
+
+        logger.info("Launcher prefix %s set to: %r", prefix_key, value)
+
+    def launcher_refresh_icons(self) -> None:
+        """Clear all cached icons and re-extract them."""
+        import shutil
+
+        # Clear app icon disk cache
+        icon_cache_dir = os.path.expanduser(
+            "~/.config/VoiceText/icon_cache"
+        )
+        if os.path.isdir(icon_cache_dir):
+            shutil.rmtree(icon_cache_dir, ignore_errors=True)
+            logger.info("Cleared app icon cache: %s", icon_cache_dir)
+
+        # Clear browser icon in-memory cache
+        try:
+            from voicetext.scripting.sources.bookmark_source import (
+                _browser_icon_cache,
+            )
+
+            _browser_icon_cache.clear()
+            logger.info("Cleared browser icon memory cache")
+        except ImportError:
+            pass
+
+        # Force app source rescan so icons are re-extracted
+        app = self._app
+        scripting_cfg = app._config.get("scripting", {})
+        if scripting_cfg.get("enabled") and hasattr(app, "_script_engine"):
+            try:
+                engine = app._script_engine
+                # Find the app source and trigger rescan
+                panel = engine.vt.chooser._get_panel()
+                for src in panel._sources.values():
+                    if src.name == "apps" and hasattr(src, "search"):
+                        # The search function is bound to AppSource
+                        # We can't easily access it, but clearing disk
+                        # cache is enough — next search will re-extract
+                        pass
+            except Exception:
+                logger.debug("Could not trigger app rescan", exc_info=True)
+
+        topmost_alert(
+            title="Icon Cache Cleared",
+            message="App and browser icon caches have been cleared. "
+            "Icons will be re-extracted on next search.",
+        )
+        restore_accessory()
+        logger.info("Icon cache refresh completed")
+
+    def launcher_source_hotkey_record(self, source_key: str) -> None:
+        """Record a combo hotkey for a specific data source."""
+        app = self._app
+        recorded_key = app.record_combo_hotkey_modal()
+        if recorded_key:
+            chooser_cfg = app._config.setdefault("scripting", {}).setdefault(
+                "chooser", {}
+            )
+            source_hotkeys = chooser_cfg.setdefault("source_hotkeys", {})
+            source_hotkeys[source_key] = recorded_key
+            self._save_and_reload()
+
+            # Dynamically bind the new hotkey
+            prefixes = chooser_cfg.get("prefixes", {})
+            prefix = prefixes.get(source_key, "")
+            if prefix and hasattr(app, "_script_engine"):
+                app._script_engine.vt.hotkey.bind(
+                    recorded_key,
+                    lambda p=prefix: app._script_engine.vt.chooser.show_source(p),
+                )
+                app._script_engine.vt.hotkey.start()
+
+            app._settings_panel.update_source_hotkey(source_key, recorded_key)
+            logger.info(
+                "Source hotkey recorded: %s -> %s", source_key, recorded_key,
+            )
+
+    def launcher_source_hotkey_clear(self, source_key: str) -> None:
+        """Clear the hotkey for a specific data source."""
+        app = self._app
+        chooser_cfg = app._config.setdefault("scripting", {}).setdefault(
+            "chooser", {}
+        )
+        source_hotkeys = chooser_cfg.setdefault("source_hotkeys", {})
+        old_hotkey = source_hotkeys.get(source_key, "")
+        source_hotkeys[source_key] = ""
+        self._save_and_reload()
+
+        # Unbind the old hotkey
+        if old_hotkey and hasattr(app, "_script_engine"):
+            app._script_engine.vt.hotkey.unbind(old_hotkey)
+
+        app._settings_panel.update_source_hotkey(source_key, "")
+        logger.info("Source hotkey cleared: %s", source_key)
+
+    def launcher_usage_learning_toggle(self, enabled: bool) -> None:
+        """Handle launcher usage learning toggle from Settings panel."""
+        app = self._app
+        chooser_cfg = app._config.setdefault("scripting", {}).setdefault(
+            "chooser", {}
+        )
+        chooser_cfg["usage_learning"] = enabled
+        self._save_and_reload()
+
+        engine = getattr(app, "_script_engine", None)
+        if engine is not None and chooser_cfg.get("enabled", True):
+            engine.set_usage_learning(enabled)
+
+        logger.info("Launcher usage learning set to: %s", enabled)

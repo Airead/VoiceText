@@ -27,6 +27,10 @@ class HotkeyAPI:
         """Bind a hotkey combination (e.g. "ctrl+cmd+v")."""
         self._registry.register_hotkey(hotkey_str, callback)
 
+    def unbind(self, hotkey_str: str) -> None:
+        """Remove and stop a hotkey binding."""
+        self._registry.unregister_hotkey(hotkey_str)
+
     def start(self) -> None:
         """Start all hotkey and leader-key listeners."""
         self._start_leader_listener()

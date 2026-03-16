@@ -26,6 +26,18 @@ class RecordingController:
         self._prefer_mode: Optional[str] = None
         # Saved state for restoring after a per-hotkey mode override
         self._saved_mode: Optional[tuple] = None  # (enhance_mode, enhancer_mode, enhancer_enabled)
+        # Set by on_cancel_recording to abort a pending _delayed_start
+        self._cancel_delayed = threading.Event()
+
+    def _fire_scripting_event(self, event_name: str, **kwargs) -> None:
+        """Fire a scripting event if the script engine is available."""
+        engine = getattr(self._app, "_script_engine", None)
+        if engine is None:
+            return
+        try:
+            engine.vt._registry.fire_event(event_name, **kwargs)
+        except Exception:
+            logger.debug("Failed to fire scripting event %s", event_name)
 
     def on_hotkey_press(self, key_name: str = "") -> None:
         """Called when hotkey is pressed down - start recording."""
@@ -50,29 +62,34 @@ class RecordingController:
                 self._apply_prefer_mode(prefer_mode)
 
         logger.info("Hotkey pressed, starting recording")
+        self._fire_scripting_event("recording_start")
         app._set_status("Recording...")
         app._sound_manager.play("start")
         if app._sound_manager.enabled:
             app._usage_stats.record_sound_feedback()
 
         app._recording_started.clear()
+        self._cancel_delayed.clear()
 
         def _delayed_start():
             import time
             time.sleep(0.35)
-            if not app._busy:
+            if not app._busy and not self._cancel_delayed.is_set():
                 self._start_recording_and_update_indicator()
             app._recording_started.set()
 
-        # Show indicator immediately (without device name) so the user
-        # gets instant visual feedback while the recorder initialises.
-        self.start_recording_indicator(None)
-        self._show_mode_on_indicator()
-
         if app._sound_manager.enabled:
+            # Show indicator immediately in grayscale while sound plays
+            initial_dev = app._recorder.last_device_name if app._recording_indicator.show_device_name else None
+            self.start_recording_indicator(initial_dev)
+            self._show_mode_on_indicator()
+            if app._transcriber.supports_streaming:
+                from PyObjCTools import AppHelper
+                AppHelper.callAfter(self._show_live_overlay, False)
             threading.Thread(target=_delayed_start, daemon=True).start()
         else:
-            self._start_recording_and_update_indicator()
+            # No sound delay — start recording first, then show in active state
+            self._start_recording_and_update_indicator(show_active=True)
             app._recording_started.set()
 
     def _apply_prefer_mode(self, mode: str) -> None:
@@ -197,15 +214,31 @@ class RecordingController:
         """Switch to the next mode while recording."""
         self._navigate_mode(+1)
 
-    def _start_recording_and_update_indicator(self) -> None:
-        """Start the recorder and update the indicator with the device name."""
+    def _start_recording_and_update_indicator(self, show_active: bool = False) -> None:
+        """Start the recorder and update the indicator with the device name.
+
+        Args:
+            show_active: If True, the indicator and live overlay have not been
+                shown yet.  Show them now directly in active (color) state so
+                the user never sees the grayscale phase.
+        """
         from PyObjCTools import AppHelper
 
         app = self._app
         dev_name = app._recorder.start()
         self._start_streaming_if_supported()
-        if dev_name and app._recording_indicator.show_device_name:
-            AppHelper.callAfter(app._recording_indicator.update_device_name, dev_name)
+
+        if show_active:
+            # No sound delay path — show everything in active state at once
+            indicator_dev = dev_name if app._recording_indicator.show_device_name else None
+            self.start_recording_indicator(indicator_dev)
+            self._show_mode_on_indicator()
+            AppHelper.callAfter(app._recording_indicator.set_recording_active)
+        else:
+            # Sound delay path — indicator already visible in grayscale
+            if dev_name and app._recording_indicator.show_device_name:
+                AppHelper.callAfter(app._recording_indicator.update_device_name, dev_name)
+            AppHelper.callAfter(app._recording_indicator.set_recording_active)
 
     def on_restart_recording(self) -> None:
         """Called when restart key (space) is pressed during recording."""
@@ -232,6 +265,7 @@ class RecordingController:
 
         # Reset state
         app._recording_started.clear()
+        self._cancel_delayed.clear()
 
         # Replay prompt sound and restart recording
         app._set_status("Recording...")
@@ -242,32 +276,41 @@ class RecordingController:
         def _delayed_start():
             import time
             time.sleep(0.35)
-            if not app._busy:
+            if not app._busy and not self._cancel_delayed.is_set():
                 self._start_recording_and_update_indicator()
             app._recording_started.set()
 
-        self.start_recording_indicator(None)
-        self._show_mode_on_indicator()
-
         if app._sound_manager.enabled:
+            initial_dev = app._recorder.last_device_name if app._recording_indicator.show_device_name else None
+            self.start_recording_indicator(initial_dev)
+            self._show_mode_on_indicator()
+            if app._transcriber.supports_streaming:
+                from PyObjCTools import AppHelper
+                AppHelper.callAfter(self._show_live_overlay, False)
             threading.Thread(target=_delayed_start, daemon=True).start()
         else:
-            self._start_recording_and_update_indicator()
+            self._start_recording_and_update_indicator(show_active=True)
             app._recording_started.set()
 
     def on_preview_history(self) -> None:
         """Called when preview_history_key is pressed during recording — cancel and show history."""
-        app = self._app
-        # Cancel recording first (same as on_cancel_recording)
-        if app._recorder.is_recording:
-            self.on_cancel_recording()
+        self.on_cancel_recording()
         # Show last preview history record
-        app._preview_controller.on_show_last_preview()
+        self._app._preview_controller.on_show_last_preview()
 
     def on_cancel_recording(self) -> None:
         """Called when cancel key (cmd) is pressed during recording — discard and stop."""
         app = self._app
         if not app._recorder.is_recording:
+            # Recording hasn't started yet (e.g. still in sound feedback
+            # delay).  Signal _delayed_start to skip recorder.start(),
+            # then clean up indicator and overlays.
+            self._cancel_delayed.set()
+            self._hide_live_overlay()
+            self.stop_recording_indicator()
+            app._recording_started.set()
+            app._set_status("VT")
+            self._restore_mode()
             return
         logger.info("Cancel key pressed, cancelling recording")
 
@@ -279,7 +322,10 @@ class RecordingController:
             except Exception:
                 logger.exception("Failed to stop streaming during cancel")
             self._streaming_active = False
-            self._hide_live_overlay()
+
+        # Always hide live overlay (it may have been shown in faded state
+        # before streaming actually started)
+        self._hide_live_overlay()
 
         # Stop current recording and discard audio
         app._recorder.stop()
@@ -319,6 +365,8 @@ class RecordingController:
             except Exception as e:
                 logger.error("Failed to record recording duration: %s", e)
         app._last_audio_duration = audio_duration
+
+        self._fire_scripting_event("recording_stop", audio_duration=audio_duration)
 
         if streaming_active:
             # Streaming path: get final text from the streaming session
@@ -481,15 +529,23 @@ class RecordingController:
             app._recorder.set_on_audio_chunk(app._transcriber.feed_audio)
             self._streaming_active = True
 
-            # Show live overlay on main thread
-            AppHelper.callAfter(self._show_live_overlay)
+            # Activate the overlay (already shown in faded state),
+            # or show it now if it wasn't pre-created.
+            if self._live_overlay is not None:
+                AppHelper.callAfter(self._live_overlay.set_active)
+            else:
+                AppHelper.callAfter(self._show_live_overlay)
             logger.info("Streaming transcription started")
         except Exception:
             logger.exception("Failed to start streaming, will use batch mode")
             self._streaming_active = False
 
-    def _show_live_overlay(self) -> None:
-        """Show the live transcription overlay (must be called on main thread)."""
+    def _show_live_overlay(self, active: bool = True) -> None:
+        """Show the live transcription overlay (must be called on main thread).
+
+        Args:
+            active: If False, the overlay is shown in a faded state.
+        """
         try:
             app = self._app
             if hasattr(app, "_live_overlay") and app._live_overlay is not None:
@@ -497,8 +553,8 @@ class RecordingController:
             else:
                 from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
                 self._live_overlay = LiveTranscriptionOverlay()
-            self._live_overlay.show()
-            logger.info("Live transcription overlay shown")
+            self._live_overlay.show(active=active)
+            logger.info("Live transcription overlay shown (active=%s)", active)
         except Exception:
             logger.exception("Failed to show live overlay")
 
@@ -603,6 +659,8 @@ class RecordingController:
         except Exception as e:
             logger.error("Failed to record usage stats: %s", e)
 
+        self._fire_scripting_event("transcription_done", asr_text=asr_text)
+
         text = asr_text
         enhanced_text = None
         cancel_event = threading.Event()
@@ -657,6 +715,9 @@ class RecordingController:
                     enhanced_text = None
                 else:
                     enhanced_text = text
+                    self._fire_scripting_event(
+                        "enhancement_done", enhanced_text=enhanced_text
+                    )
             except Exception as e:
                 logger.error("AI enhancement failed: %s", e)
                 text = asr_text
@@ -674,6 +735,8 @@ class RecordingController:
         if cancel_event.is_set():
             app._set_status("VT")
             return
+
+        self._fire_scripting_event("output_text", final_text=text.strip())
 
         type_text(
             text.strip(),

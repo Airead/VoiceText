@@ -13,6 +13,7 @@ class TestVTNamespace:
         assert hasattr(vt, "app")
         assert hasattr(vt, "pasteboard")
         assert hasattr(vt, "timer")
+        assert hasattr(vt, "store")
         assert hasattr(vt, "hotkey")
         assert callable(vt.leader)
         assert callable(vt.alert)
@@ -21,6 +22,8 @@ class TestVTNamespace:
         assert callable(vt.execute)
         assert callable(vt.date)
         assert callable(vt.reload)
+        assert callable(vt.on)
+        assert callable(vt.type_text)
 
     def test_leader_parses_dicts(self):
         reg = ScriptingRegistry()
@@ -67,9 +70,65 @@ class TestVTNamespace:
         mock_send.assert_called_once_with("Test", "", "msg")
 
     @patch("voicetext.scripting.api.execute._run")
-    def test_execute(self, mock_run):
-        mock_run.return_value = "ok"
+    def test_execute_returns_dict(self, mock_run):
+        mock_run.return_value = {"stdout": "ok", "stderr": "", "returncode": 0}
         reg = ScriptingRegistry()
         vt = _VTNamespace(reg)
         result = vt.execute("echo hi", background=False)
-        assert result == "ok"
+        assert result == {"stdout": "ok", "stderr": "", "returncode": 0}
+
+    @patch("voicetext.scripting.api.execute._run")
+    def test_execute_passes_timeout(self, mock_run):
+        mock_run.return_value = {"stdout": "", "stderr": "", "returncode": 0}
+        reg = ScriptingRegistry()
+        vt = _VTNamespace(reg)
+        vt.execute("cmd", background=False, timeout=60)
+        mock_run.assert_called_once_with("cmd", timeout=60)
+
+    def test_on_registers_event(self):
+        reg = ScriptingRegistry()
+        vt = _VTNamespace(reg)
+
+        def handler(data):
+            pass
+
+        result = vt.on("test_event", handler)
+        assert result is handler
+        assert handler in reg._event_listeners["test_event"]
+
+    def test_on_as_decorator(self):
+        reg = ScriptingRegistry()
+        vt = _VTNamespace(reg)
+
+        @vt.on("transcription_done")
+        def handler(data):
+            pass
+
+        assert handler in reg._event_listeners["transcription_done"]
+
+    @patch("voicetext.input.type_text")
+    def test_type_text_auto(self, mock_type):
+        reg = ScriptingRegistry()
+        vt = _VTNamespace(reg)
+        vt.type_text("hello")
+        mock_type.assert_called_once_with("hello", method="auto")
+
+    @patch("voicetext.input.type_text")
+    def test_type_text_paste_method(self, mock_type):
+        reg = ScriptingRegistry()
+        vt = _VTNamespace(reg)
+        vt.type_text("hello", method="paste")
+        mock_type.assert_called_once_with("hello", method="clipboard")
+
+    @patch("voicetext.input.type_text")
+    def test_type_text_key_method(self, mock_type):
+        reg = ScriptingRegistry()
+        vt = _VTNamespace(reg)
+        vt.type_text("hello", method="key")
+        mock_type.assert_called_once_with("hello", method="applescript")
+
+    def test_store_is_store_api(self):
+        from voicetext.scripting.api.store import StoreAPI
+        reg = ScriptingRegistry()
+        vt = _VTNamespace(reg)
+        assert isinstance(vt.store, StoreAPI)
