@@ -140,6 +140,7 @@ This mirrors the CI pipeline in `.github/workflows/test.yml`.
 
 1. Ensure all changes are committed and tests pass (`uv run pytest tests/`)
 2. Update version in `pyproject.toml` (single source of truth — all other files read from it dynamically)
-3. Commit the version bump **together with `uv.lock`** if it has changes: `git add pyproject.toml uv.lock && git commit -m "chore: bump version to X.Y.Z"`
-4. Tag: `git tag vX.Y.Z`
-5. Push: `git push && git push --tags`
+3. Run `uv lock` to sync `uv.lock` with the new version — this is **required** because `uv.lock` records the package version and won't update until `uv lock` is explicitly run
+4. Commit the version bump together with `uv.lock`: `git add pyproject.toml uv.lock && git commit -m "chore: bump version to X.Y.Z"`
+5. Tag: `git tag vX.Y.Z`
+6. Push: `git push && git push --tags`
