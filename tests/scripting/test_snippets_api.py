@@ -23,11 +23,15 @@ class _FakeStore:
                 return s
         return None
 
-    def add(self, name: str, keyword: str, content: str, category: str = "") -> bool:
+    def add(
+        self, name: str, keyword: str, content: str, category: str = "",
+        auto_expand: bool = True,
+    ) -> bool:
         if self.find_by_keyword(keyword) is not None:
             return False
         self._snippets.append({
-            "name": name, "keyword": keyword, "content": content, "category": category,
+            "name": name, "keyword": keyword, "content": content,
+            "category": category, "auto_expand": auto_expand,
         })
         return True
 
@@ -47,6 +51,7 @@ class _FakeStore:
         new_keyword: Optional[str] = None,
         content: Optional[str] = None,
         new_category: Optional[str] = None,
+        new_auto_expand: Optional[bool] = None,
     ) -> bool:
         for s in self._snippets:
             if s["name"] == name and s.get("category", "") == category:
@@ -58,6 +63,8 @@ class _FakeStore:
                     s["content"] = content
                 if new_category is not None:
                     s["category"] = new_category
+                if new_auto_expand is not None:
+                    s["auto_expand"] = new_auto_expand
                 return True
         return False
 
@@ -135,6 +142,22 @@ class TestSnippetsAPI:
     def test_update_no_store(self):
         api = SnippetsAPI()
         assert api.update("x", content="y") is False
+
+    def test_add_with_auto_expand(self):
+        api, store = self._api_with_store()
+        assert api.add(name="T", keyword="t", content="c", auto_expand=False) is True
+        assert store.snippets[0]["auto_expand"] is False
+
+    def test_add_default_auto_expand(self):
+        api, store = self._api_with_store()
+        assert api.add(name="T", keyword="t", content="c") is True
+        assert store.snippets[0]["auto_expand"] is True
+
+    def test_update_auto_expand(self):
+        api, store = self._api_with_store()
+        store.add(name="T", keyword="t", content="c")
+        assert api.update("t", new_auto_expand=False) is True
+        assert store.find_by_keyword("t")["auto_expand"] is False
 
     def test_set_store_none(self):
         api, _ = self._api_with_store()

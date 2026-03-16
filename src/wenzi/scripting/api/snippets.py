@@ -43,6 +43,7 @@ class SnippetsAPI:
         keyword: str,
         content: str,
         category: str = "",
+        auto_expand: bool = True,
     ) -> bool:
         """Add a new snippet.
 
@@ -54,6 +55,7 @@ class SnippetsAPI:
             return False
         return self._store.add(
             name=name, keyword=keyword, content=content, category=category,
+            auto_expand=auto_expand,
         )
 
     def remove(self, keyword: str) -> bool:
@@ -78,6 +80,7 @@ class SnippetsAPI:
         new_keyword: Optional[str] = None,
         content: Optional[str] = None,
         new_category: Optional[str] = None,
+        new_auto_expand: Optional[bool] = None,
     ) -> bool:
         """Update an existing snippet identified by its keyword.
 
@@ -96,4 +99,5 @@ class SnippetsAPI:
             new_keyword=new_keyword,
             content=content,
             new_category=new_category,
+            new_auto_expand=new_auto_expand,
         )

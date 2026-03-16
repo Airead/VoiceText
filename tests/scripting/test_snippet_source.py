@@ -71,6 +71,18 @@ class TestParseFrontmatter:
         assert meta["keyword"] == "@@x"
         assert meta["author"] == "me"
 
+    def test_auto_expand_false(self):
+        text = '---\nkeyword: "@@email"\nauto_expand: false\n---\ncontent'
+        meta, body = _parse_frontmatter(text)
+        assert meta["auto_expand"] == "false"
+        assert meta["keyword"] == "@@email"
+        assert body == "content"
+
+    def test_auto_expand_true(self):
+        text = '---\nkeyword: "@@email"\nauto_expand: true\n---\ncontent'
+        meta, body = _parse_frontmatter(text)
+        assert meta["auto_expand"] == "true"
+
 
 class TestFormatSnippetFile:
     def test_with_keyword(self):
@@ -88,6 +100,32 @@ class TestFormatSnippetFile:
         meta, body = _parse_frontmatter(text)
         assert meta["keyword"] == original_kw
         assert body == original_content
+
+    def test_auto_expand_false(self):
+        result = _format_snippet_file("@@email", "content", auto_expand=False)
+        assert "auto_expand: false" in result
+        assert 'keyword: "@@email"' in result
+
+    def test_auto_expand_true_omitted(self):
+        result = _format_snippet_file("@@email", "content", auto_expand=True)
+        assert "auto_expand" not in result
+
+    def test_auto_expand_false_no_keyword(self):
+        result = _format_snippet_file("", "content", auto_expand=False)
+        assert result.startswith("---")
+        assert "auto_expand: false" in result
+        assert "keyword" not in result
+
+    def test_no_keyword_no_auto_expand_no_frontmatter(self):
+        result = _format_snippet_file("", "content", auto_expand=True)
+        assert result == "content"
+
+    def test_roundtrip_auto_expand_false(self):
+        text = _format_snippet_file("@@e", "body", auto_expand=False)
+        meta, body = _parse_frontmatter(text)
+        assert meta["keyword"] == "@@e"
+        assert meta["auto_expand"] == "false"
+        assert body == "body"
 
 
 class TestSanitizeFilename:
@@ -323,6 +361,56 @@ class TestSnippetStore:
     def test_update_nonexistent(self):
         store, _, _ = self._make_store()
         assert store.update("nope", content="x") is False
+
+    def test_add_with_auto_expand_false(self):
+        store, sdir, _ = self._make_store()
+        assert store.add("email", "@@e", "e@x.com", auto_expand=False) is True
+        s = store.snippets[0]
+        assert s["auto_expand"] is False
+        # Verify file on disk contains auto_expand: false
+        with open(s["file_path"], "r") as f:
+            text = f.read()
+        assert "auto_expand: false" in text
+
+    def test_add_default_auto_expand_true(self):
+        store, _, _ = self._make_store()
+        assert store.add("email", "@@e", "e@x.com") is True
+        assert store.snippets[0]["auto_expand"] is True
+
+    def test_load_auto_expand_false_from_disk(self):
+        def setup(d):
+            path = os.path.join(d, "email.md")
+            with open(path, "w") as f:
+                f.write('---\nkeyword: "@@e"\nauto_expand: false\n---\ne@x.com')
+
+        store, _, _ = self._make_store(setup)
+        assert store.snippets[0]["auto_expand"] is False
+
+    def test_load_auto_expand_default_true(self):
+        def setup(d):
+            _write_snippet(d, "email", "@@e", "e@x.com")
+
+        store, _, _ = self._make_store(setup)
+        assert store.snippets[0]["auto_expand"] is True
+
+    def test_update_auto_expand(self):
+        def setup(d):
+            _write_snippet(d, "email", "@@e", "e@x.com")
+
+        store, _, _ = self._make_store(setup)
+        assert store.snippets[0]["auto_expand"] is True
+        assert store.update("email", new_auto_expand=False) is True
+        assert store.snippets[0]["auto_expand"] is False
+        # Verify file on disk
+        with open(store.snippets[0]["file_path"], "r") as f:
+            text = f.read()
+        assert "auto_expand: false" in text
+
+    def test_update_preserves_auto_expand(self):
+        store, _, _ = self._make_store()
+        store.add("email", "@@e", "e@x.com", auto_expand=False)
+        assert store.update("email", content="new@x.com") is True
+        assert store.snippets[0]["auto_expand"] is False
 
     def test_find_by_keyword(self):
         def setup(d):

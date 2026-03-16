@@ -113,6 +113,30 @@ class TestBufferAndMatching:
         # One of them should match (whichever comes first in iteration)
         expand_mock.assert_called_once()
 
+    def test_check_expansion_skips_auto_expand_false(self):
+        def setup(d):
+            path = os.path.join(d, "email.md")
+            with open(path, "w") as f:
+                f.write('---\nkeyword: "@@e"\nauto_expand: false\n---\ne@x.com')
+
+        expander = self._make_expander(setup)
+        expand_mock = MagicMock()
+        with patch.object(expander, "_expand", expand_mock):
+            expander._check_expansion("text @@e")
+
+        expand_mock.assert_not_called()
+
+    def test_check_expansion_allows_auto_expand_true(self):
+        def setup(d):
+            _write_snippet(d, "email", "@@e", "e@x.com")
+
+        expander = self._make_expander(setup)
+        expand_mock = MagicMock()
+        with patch.object(expander, "_expand", expand_mock):
+            expander._check_expansion("text @@e")
+
+        expand_mock.assert_called_once()
+
     def test_expanding_flag_prevents_reentrance(self):
         def setup(d):
             _write_snippet(d, "test", ";;t", "content")

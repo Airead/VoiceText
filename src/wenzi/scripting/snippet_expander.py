@@ -206,6 +206,8 @@ class SnippetExpander:
             keyword = s.get("keyword", "")
             if not keyword:
                 continue
+            if not s.get("auto_expand", True):
+                continue
             if buf.endswith(keyword):
                 content = s.get("content", "")
                 raw = s.get("raw", False)
