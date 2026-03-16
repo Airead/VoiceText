@@ -284,7 +284,7 @@ class SnippetStore:
                         if not isinstance(entry, dict):
                             continue
                         kw = entry.get("keyword", "")
-                        ct = entry.get("content", "")
+                        ct = entry.get("content", "").rstrip("\n")
                         nm = entry.get("name", "") or kw or base_name
                         raw = bool(entry.get("raw", False))
                         entry_ae = entry.get("auto_expand")
@@ -307,7 +307,7 @@ class SnippetStore:
                     self._snippets.append({
                         "name": base_name,
                         "keyword": meta.get("keyword", ""),
-                        "content": body,
+                        "content": body.rstrip("\n"),
                         "category": category,
                         "file_path": file_path,
                         "raw": bool(meta.get("raw", False)),

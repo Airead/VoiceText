@@ -233,6 +233,21 @@ class TestSnippetStore:
         assert s["keyword"] == ""
         assert s["content"] == "Just plain text, no frontmatter."
 
+    def test_trailing_newlines_stripped(self):
+        def setup(d):
+            # Simulate editors that append trailing newlines on save
+            path = os.path.join(d, "trail.md")
+            with open(path, "w") as f:
+                f.write("---\nkeyword: @@t\n---\nhello\n\n")
+            path2 = os.path.join(d, "plain.txt")
+            with open(path2, "w") as f:
+                f.write("world\n")
+
+        store, _, _ = self._make_store(setup)
+        by_name = {s["name"]: s for s in store.snippets}
+        assert by_name["trail"]["content"] == "hello"
+        assert by_name["plain"]["content"] == "world"
+
     def test_hidden_files_skipped(self):
         def setup(d):
             _write_snippet(d, "visible", "", "yes")
