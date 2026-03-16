@@ -1,12 +1,12 @@
 """Tests for combo hotkey recording helpers."""
 
-from voicetext.app import (
+from wenzi.app import (
     _MOD_CANONICAL,
     _MOD_DISPLAY_ORDER,
     build_combo_string,
     format_combo_display,
 )
-from voicetext.hotkey import MODIFIER_KEY_NAMES, _SPECIAL_VK, _VK_TO_NAME
+from wenzi.hotkey import MODIFIER_KEY_NAMES, _SPECIAL_VK, _VK_TO_NAME
 
 
 class TestModifierKeyNames:

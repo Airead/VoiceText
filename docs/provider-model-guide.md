@@ -1,6 +1,6 @@
 # Provider & Model Setup Guide
 
-This guide explains how to configure ASR (speech recognition) models and AI enhancement providers in VoiceText. Both GUI (Settings panel) and config file approaches are covered.
+This guide explains how to configure ASR (speech recognition) models and AI enhancement providers in 闻字. Both GUI (Settings panel) and config file approaches are covered.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ This guide explains how to configure ASR (speech recognition) models and AI enha
 
 ## ASR Model Selection
 
-VoiceText supports five ASR backends:
+闻字 supports five ASR backends:
 
 | Backend | Best For | GPU | Offline |
 |---------|----------|-----|---------|
@@ -39,11 +39,11 @@ VoiceText supports five ASR backends:
 
 Open **Settings...** → **STT** tab. All available local and remote ASR models are listed as radio buttons. Select one to switch — the active model is highlighted.
 
-If the selected MLX-Whisper model hasn't been downloaded yet, VoiceText will download it automatically on first use (the menubar icon shows `DL X%` progress). Remote ASR models from configured providers also appear in this tab.
+If the selected MLX-Whisper model hasn't been downloaded yet, 闻字 will download it automatically on first use (the menubar icon shows `DL X%` progress). Remote ASR models from configured providers also appear in this tab.
 
 ### ASR Via Config File
 
-Edit `~/.config/VoiceText/config.json`:
+Edit `~/.config/WenZi/config.json`:
 
 ```json
 {
@@ -67,7 +67,7 @@ Key fields:
 | `language` | Language code (`"zh"`, `"en"`, `"ja"`, etc.). Used by MLX-Whisper and Apple Speech. Ignored by FunASR and Sherpa-ONNX (language is determined by the model) |
 | `temperature` | Decoding temperature for MLX-Whisper. `0.0` = greedy |
 
-After editing, restart VoiceText for changes to take effect.
+After editing, restart 闻字 for changes to take effect.
 
 ### Available ASR Models
 
@@ -87,7 +87,7 @@ After editing, restart VoiceText for changes to take effect.
 
 ## Remote ASR Providers
 
-In addition to local ASR backends, VoiceText supports remote ASR via OpenAI-compatible audio transcription APIs (e.g. Groq, OpenAI). Remote providers are configured separately from LLM providers.
+In addition to local ASR backends, 闻字 supports remote ASR via OpenAI-compatible audio transcription APIs (e.g. Groq, OpenAI). Remote providers are configured separately from LLM providers.
 
 ### Remote ASR Via GUI
 
@@ -103,13 +103,13 @@ In addition to local ASR backends, VoiceText supports remote ASR via OpenAI-comp
      whisper-large-v3
    ```
 
-3. Click **Verify** — VoiceText will test the connection by sending a short silent audio clip.
+3. Click **Verify** — 闻字 will test the connection by sending a short silent audio clip.
 
 4. If verification passes, click **Save**. The new models appear in the **STT** tab.
 
 ### Remote ASR Via Config File
 
-Edit `~/.config/VoiceText/config.json` and add entries under `asr`:
+Edit `~/.config/WenZi/config.json` and add entries under `asr`:
 
 ```json
 {
@@ -127,7 +127,7 @@ Edit `~/.config/VoiceText/config.json` and add entries under `asr`:
 }
 ```
 
-When `default_provider` and `default_model` are set, VoiceText starts with the remote ASR model. Set both to `null` to use a local backend.
+When `default_provider` and `default_model` are set, 闻字 starts with the remote ASR model. Set both to `null` to use a local backend.
 
 ### Remote ASR Examples
 
@@ -178,13 +178,13 @@ AI enhancement uses OpenAI-compatible LLM providers. You can configure multiple 
    - **models**: List your available models, one per line under `models:`
    - **extra_body** (optional): Additional JSON parameters sent with every request
 
-4. Click **Verify** — VoiceText will test the connection using the first model in your list.
+4. Click **Verify** — 闻字 will test the connection using the first model in your list.
 
 5. If verification passes, click **Save** to add the provider.
 
 ### Provider Via Config File
 
-Edit `~/.config/VoiceText/config.json` and add entries under `ai_enhance.providers`:
+Edit `~/.config/WenZi/config.json` and add entries under `ai_enhance.providers`:
 
 ```json
 {
@@ -211,7 +211,7 @@ Each provider entry requires:
 | `models` | Yes | Array of model names available from this provider |
 | `extra_body` | No | JSON object with extra request parameters |
 
-After editing, restart VoiceText for changes to take effect.
+After editing, restart 闻字 for changes to take effect.
 
 ### Provider Examples
 

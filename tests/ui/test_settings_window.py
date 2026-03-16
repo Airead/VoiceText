@@ -12,7 +12,7 @@ from tests.conftest import mock_panel_close_delegate
 @pytest.fixture(autouse=True)
 def _mock_appkit(mock_appkit_modules, monkeypatch):
     """Mock AppKit and Foundation modules for headless testing."""
-    import voicetext.ui.settings_window as _sw
+    import wenzi.ui.settings_window as _sw
 
     mock_panel_close_delegate(monkeypatch, _sw)
     return mock_appkit_modules
@@ -73,7 +73,7 @@ class TestSettingsPanelInit:
     """Tests for SettingsPanel initialization."""
 
     def test_init_defaults(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         assert panel._panel is None
@@ -81,7 +81,7 @@ class TestSettingsPanelInit:
         assert not panel.is_visible
 
     def test_show_creates_panel(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         state = _make_state()
@@ -94,7 +94,7 @@ class TestSettingsPanelInit:
         assert panel._callbacks == callbacks
 
     def test_show_rebuilds_panel_each_time(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         state = _make_state()
@@ -115,7 +115,7 @@ class TestSettingsPanelClose:
     """Tests for closing the settings panel."""
 
     def test_close_clears_delegate(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         panel.show(_make_state(), _make_callbacks())
@@ -128,7 +128,7 @@ class TestSettingsCallbacks:
     """Tests for callback invocation from action handlers."""
 
     def _make_panel(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         state = _make_state()
@@ -320,7 +320,7 @@ class TestEnhanceModeOrder:
     """Tests that enhance modes preserve insertion order from state."""
 
     def test_modes_follow_state_order(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         state = _make_state()
@@ -342,7 +342,7 @@ class TestSettingsStateUpdate:
     """Tests for state update methods."""
 
     def _make_panel(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         state = _make_state()
@@ -377,7 +377,7 @@ class TestHintHelpers:
     """Tests for _make_hint and _add_hint helper methods."""
 
     def test_make_hint_returns_label(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         hint = SettingsPanel._make_hint("test hint", 10, 100, 200)
         # Should call labelWithString_ and configure font/color
@@ -385,14 +385,14 @@ class TestHintHelpers:
 
     def test_make_hint_sets_font_and_color(self):
         from AppKit import NSColor
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         hint = SettingsPanel._make_hint("hello", 0, 0, 100)
         hint.setFont_.assert_called_once()
         hint.setTextColor_.assert_called_once_with(NSColor.secondaryLabelColor())
 
     def test_add_hint_returns_updated_y(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         parent = MagicMock()
@@ -403,7 +403,7 @@ class TestHintHelpers:
         assert new_y == expected_y
 
     def test_add_hint_adds_subview(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         parent = MagicMock()
@@ -416,21 +416,21 @@ class TestModelSizeDisplay:
     """Tests for model size display in STT tab."""
 
     def test_format_size_mb(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         assert panel._format_size(50 * 1024 * 1024) == "50 MB"
         assert panel._format_size(512 * 1024 * 1024) == "512 MB"
 
     def test_format_size_gb(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         assert panel._format_size(2 * 1024 * 1024 * 1024) == "2.0 GB"
         assert panel._format_size(int(1.5 * 1024 * 1024 * 1024)) == "1.5 GB"
 
     def test_stt_tab_shows_sizes(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         state = _make_state()
@@ -448,13 +448,13 @@ class TestTabScrollReset:
     """Tests for tab change scroll-to-top behavior."""
 
     def test_tab_delegate_method_exists(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         assert hasattr(panel, "tabView_didSelectTabViewItem_")
 
     def test_tab_delegate_does_not_raise(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         state = _make_state()
@@ -466,7 +466,7 @@ class TestTabScrollReset:
         panel.tabView_didSelectTabViewItem_(panel._tab_view, mock_tab_item)
 
     def test_tab_change_fires_callback(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         state = _make_state()
@@ -480,7 +480,7 @@ class TestTabScrollReset:
         callbacks["on_tab_change"].assert_called_once_with("stt")
 
     def test_last_tab_restored_on_show(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         state = _make_state()
@@ -492,7 +492,7 @@ class TestTabScrollReset:
         panel._tab_view.selectTabViewItemWithIdentifier_.assert_called_with("llm")
 
     def test_default_tab_no_extra_select(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         state = _make_state()
@@ -507,7 +507,7 @@ class TestSettingsCallbackErrorHandling:
     """Tests for error handling in callbacks."""
 
     def test_callback_exception_logged_not_raised(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         state = _make_state()
@@ -522,7 +522,7 @@ class TestSettingsCallbackErrorHandling:
         panel.soundCheckChanged_(sender)
 
     def test_missing_callback_logged_not_raised(self):
-        from voicetext.ui.settings_window import SettingsPanel
+        from wenzi.ui.settings_window import SettingsPanel
 
         panel = SettingsPanel()
         state = _make_state()

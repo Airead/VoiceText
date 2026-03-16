@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 
 import numpy as np
 
-from voicetext.audio.recorder import Recorder
+from wenzi.audio.recorder import Recorder
 
 
 class TestRecorder:
@@ -18,7 +18,7 @@ class TestRecorder:
         r = Recorder()
         assert r.stop() is None
 
-    @patch("voicetext.audio.recorder.sd.RawInputStream")
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
     def test_start_stop_cycle(self, mock_stream_cls):
         mock_stream = MagicMock()
         mock_stream_cls.return_value = mock_stream
@@ -40,7 +40,7 @@ class TestRecorder:
         mock_stream.start.assert_called_once()
         mock_stream.stop.assert_called_once()
 
-    @patch("voicetext.audio.recorder.sd.RawInputStream")
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
     def test_silence_detection_discards_quiet_audio(self, mock_stream_cls):
         mock_stream = MagicMock()
         mock_stream_cls.return_value = mock_stream
@@ -56,7 +56,7 @@ class TestRecorder:
         wav_data = r.stop()
         assert wav_data is None
 
-    @patch("voicetext.audio.recorder.sd.RawInputStream")
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
     def test_silence_detection_passes_loud_audio(self, mock_stream_cls):
         mock_stream = MagicMock()
         mock_stream_cls.return_value = mock_stream
@@ -80,7 +80,7 @@ class TestRecorder:
         r = Recorder()
         assert r.current_level == 0.0
 
-    @patch("voicetext.audio.recorder.sd.RawInputStream")
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
     def test_current_level_after_callback(self, mock_stream_cls):
         mock_stream = MagicMock()
         mock_stream_cls.return_value = mock_stream
@@ -94,7 +94,7 @@ class TestRecorder:
         r._callback(frame_data, 320, None, None)
         assert abs(r.current_level - 0.625) < 0.01
 
-    @patch("voicetext.audio.recorder.sd.RawInputStream")
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
     def test_current_level_capped_at_one(self, mock_stream_cls):
         mock_stream = MagicMock()
         mock_stream_cls.return_value = mock_stream
@@ -107,7 +107,7 @@ class TestRecorder:
         r._callback(frame_data, 320, None, None)
         assert r.current_level == 1.0
 
-    @patch("voicetext.audio.recorder.sd.RawInputStream")
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
     def test_rms_calculated_in_callback(self, mock_stream_cls):
         mock_stream = MagicMock()
         mock_stream_cls.return_value = mock_stream
@@ -119,7 +119,7 @@ class TestRecorder:
         r._callback(frame_data, 320, None, None)
         assert abs(r._current_rms - 500.0) < 1.0
 
-    @patch("voicetext.audio.recorder.sd.RawInputStream")
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
     def test_max_session_bytes(self, mock_stream_cls):
         mock_stream = MagicMock()
         mock_stream_cls.return_value = mock_stream
@@ -134,7 +134,7 @@ class TestRecorder:
 
         assert r._queue.qsize() == 1
 
-    @patch("voicetext.audio.recorder.sd.RawInputStream")
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
     def test_start_skips_device_query_when_disabled(self, mock_stream_cls):
         """start() should skip _query_device_name when disabled."""
         mock_stream = MagicMock()
@@ -151,7 +151,7 @@ class TestRecorder:
         assert r._last_device_name is None
         r.stop()
 
-    @patch("voicetext.audio.recorder.sd.RawInputStream")
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
     def test_start_queries_device_name_when_enabled(self, mock_stream_cls):
         """start() should call _query_device_name when enabled (default)."""
         mock_stream = MagicMock()
@@ -166,7 +166,7 @@ class TestRecorder:
             assert name == "TestMic"
         r.stop()
 
-    @patch("voicetext.audio.recorder.sd.RawInputStream")
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
     def test_stop_returns_data_when_stream_close_hangs(self, mock_stream_cls):
         """stop() should return audio data even if stream.stop() hangs."""
         mock_stream = MagicMock()

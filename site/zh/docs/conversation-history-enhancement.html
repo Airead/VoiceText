@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>会话历史增强 — VoiceText</title>
+  <title>会话历史增强 — WenZi</title>
   <link rel="icon" type="image/png" href="../../images/icon.png">
   <link rel="stylesheet" href="../../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../../" class="nav-brand">
-        <img src="../../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../../">&larr; 返回</a></li>
         <li><a href="../../docs/conversation-history-enhancement.html" class="lang-switch">English</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -94,7 +94,7 @@
     </div>
 
 <h2 id="_1"><a href="#_1" class="heading-anchor">背景</a></h2>
-<p>VoiceText 对每次语音输入会话进行独立处理——AI 增强步骤只能看到当前的 ASR 文本，对用户之前说过的内容一无所知。这种无状态的方式在处理孤立句子时效果尚可，但在以下场景中存在不足：</p>
+<p>闻字 对每次语音输入会话进行独立处理——AI 增强步骤只能看到当前的 ASR 文本，对用户之前说过的内容一无所知。这种无状态的方式在处理孤立句子时效果尚可，但在以下场景中存在不足：</p>
 <ol>
 <li><strong>反复出现的专有名词</strong> — 用户在某句话中提到"萍萍"，但 ASR 将其识别为"平平"。没有先前上下文，LLM 没有依据判断哪个更正确。如果用户在之前的轮次中已确认了"萍萍"，这一信号就丢失了。</li>
 <li><strong>话题连续性</strong> — 对话天然地建立在之前的上下文之上。当用户说"她说今天很开心"时，LLM 无法在不知道之前提到过谁的情况下解析"她"的指代。</li>
@@ -110,7 +110,7 @@
 </ul>
 <h2 id="_3"><a href="#_3" class="heading-anchor">工作原理</a></h2>
 <h3 id="_4"><a href="#_4" class="heading-anchor">记录</a></h3>
-<p>每次语音输入会话都会记录到 <code>~/.config/VoiceText/conversation_history.jsonl</code>，不区分模式：</p>
+<p>每次语音输入会话都会记录到 <code>~/.config/WenZi/conversation_history.jsonl</code>，不区分模式：</p>
 <pre><code class="language-json">{
     &quot;timestamp&quot;: &quot;2026-03-12T10:30:00+00:00&quot;,
     &quot;asr_text&quot;: &quot;果果今天在公园里遇到了平平。&quot;,
@@ -229,7 +229,7 @@
 </ol>
 <h3 id="_10"><a href="#_10" class="heading-anchor">按月归档</a></h3>
 <p>轮转出的记录按其 <code>timestamp</code> 字段中的月份分组，追加到按月命名的归档文件中：</p>
-<pre><code>~/.config/VoiceText/
+<pre><code>~/.config/WenZi/
 ├── conversation_history.jsonl                  # 活跃文件（最多 20,000 条记录）
 └── conversation_history_archives/
     ├── 2025-11.jsonl
@@ -349,27 +349,27 @@
 </thead>
 <tbody>
 <tr>
-<td><code>src/voicetext/enhance/conversation_history.py</code></td>
+<td><code>src/wenzi/enhance/conversation_history.py</code></td>
 <td>JSONL 记录、读取、缓存、轮转、归档及提示词格式化</td>
 </tr>
 <tr>
-<td><code>src/voicetext/enhance/enhancer.py</code></td>
+<td><code>src/wenzi/enhance/enhancer.py</code></td>
 <td>将历史上下文集成到增强提示词中</td>
 </tr>
 <tr>
-<td><code>src/voicetext/ui/history_browser_window_web.py</code></td>
+<td><code>src/wenzi/ui/history_browser_window_web.py</code></td>
 <td>基于 Web 的历史浏览器，支持分页和归档开关</td>
 </tr>
 <tr>
-<td><code>src/voicetext/usage_stats.py</code></td>
+<td><code>src/wenzi/usage_stats.py</code></td>
 <td>通过 <code>record_recording_duration()</code> 汇总 <code>audio_duration</code></td>
 </tr>
 <tr>
-<td><code>src/voicetext/app.py</code></td>
+<td><code>src/wenzi/app.py</code></td>
 <td>在两个输出路径中记录会话；菜单开关</td>
 </tr>
 <tr>
-<td><code>src/voicetext/config.py</code></td>
+<td><code>src/wenzi/config.py</code></td>
 <td>对话历史的默认配置</td>
 </tr>
 </tbody>

@@ -27,14 +27,14 @@ def _mock_webkit(monkeypatch):
     mock_nav_cls.alloc.return_value.init.return_value = mock_nav_delegate
 
     with patch(
-        "voicetext.ui.streaming_overlay._get_nav_delegate_class",
+        "wenzi.ui.streaming_overlay._get_nav_delegate_class",
         return_value=mock_nav_cls,
     ):
         yield
 
 
 def _make_panel():
-    from voicetext.ui.streaming_overlay import StreamingOverlayPanel
+    from wenzi.ui.streaming_overlay import StreamingOverlayPanel
 
     return StreamingOverlayPanel()
 
@@ -325,10 +325,10 @@ class TestStreamingOverlayPanel:
         panel = _make_panel()
         panel.show(asr_text="test")
         with patch(
-            "voicetext.ui.streaming_overlay.StreamingOverlayPanel._is_mouse_over_panel",
+            "wenzi.ui.streaming_overlay.StreamingOverlayPanel._is_mouse_over_panel",
             return_value=False,
         ), patch(
-            "voicetext.ui.streaming_overlay.StreamingOverlayPanel._fade_out_and_close",
+            "wenzi.ui.streaming_overlay.StreamingOverlayPanel._fade_out_and_close",
         ) as mock_fade:
             panel._delayedCloseCheck_(None)
             mock_fade.assert_called_once()
@@ -337,7 +337,7 @@ class TestStreamingOverlayPanel:
         panel = _make_panel()
         panel.show(asr_text="test")
         with patch(
-            "voicetext.ui.streaming_overlay.StreamingOverlayPanel._is_mouse_over_panel",
+            "wenzi.ui.streaming_overlay.StreamingOverlayPanel._is_mouse_over_panel",
             return_value=True,
         ):
             panel._delayedCloseCheck_(None)

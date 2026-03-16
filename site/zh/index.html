@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VoiceText — macOS 语音转文字</title>
+  <title>WenZi — macOS Speech-to-Text</title>
   <meta name="description" content="macOS 菜单栏语音转文字应用。按住快捷键录音，松开即转写并自动输入。离线优先、多引擎、AI 增强。" />
   <link rel="icon" href="../images/icon.png" />
   <link rel="alternate" hreflang="en" href="../" />
@@ -16,8 +16,8 @@
 <header class="site-header">
   <nav class="nav container">
     <a class="nav-brand" href="./">
-      <img src="../images/icon.png" alt="VoiceText 图标" />
-      VoiceText
+      <img src="../images/icon.png" alt="WenZi icon" />
+      WenZi
     </a>
     <ul class="nav-links">
       <li><a href="#features" class="nav-link-text">功能特性</a></li>
@@ -25,7 +25,7 @@
       <li><a href="#backends" class="nav-link-text">语音引擎</a></li>
       <li><a href="#installation" class="nav-link-text">安装</a></li>
       <li><a href="#docs" class="nav-link-text">文档</a></li>
-      <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+      <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       <li><a href="../" class="lang-switch">English</a></li>
     </ul>
   </nav>
@@ -34,17 +34,17 @@
 <!-- ========== Hero ========== -->
 <section class="hero">
   <div class="container">
-    <img src="../images/icon.png" alt="VoiceText" class="hero-icon" />
+    <img src="../images/icon.png" alt="WenZi" class="hero-icon" />
     <h1>语音转文字，<span>即时输入</span></h1>
     <p class="tagline">
       macOS 菜单栏应用 — 按住快捷键录音，松开即转写并自动输入到当前应用。
       离线优先、多引擎、AI 增强。
     </p>
     <div class="hero-buttons">
-      <a id="download-btn" href="https://github.com/Airead/VoiceText/releases/latest" class="btn btn-primary">
+      <a id="download-btn" href="https://github.com/Airead/WenZi/releases/latest" class="btn btn-primary">
         &#11015; 下载
       </a>
-      <a href="https://github.com/Airead/VoiceText" class="btn btn-secondary" target="_blank">
+      <a href="https://github.com/Airead/WenZi" class="btn btn-secondary" target="_blank">
         &#9733; GitHub
       </a>
     </div>
@@ -137,7 +137,7 @@
       <div class="step fade-in">
         <div class="step-number">2</div>
         <h3>松开转写</h3>
-        <p>松开按键 — VoiceText 使用选定的语音引擎转写语音，可选 AI 增强处理。</p>
+        <p>松开按键 — WenZi 使用选定的语音引擎转写语音，可选 AI 增强处理。</p>
       </div>
       <div class="step fade-in">
         <div class="step-number">3</div>
@@ -149,7 +149,7 @@
       <p class="screenshot-caption">预览面板 — 查看、编辑、切换模式、对比模型，确认后再输出</p>
       <picture>
         <source srcset="../images/dark_preview_zh.png" media="(prefers-color-scheme: dark)" />
-        <img src="../images/light_preview_zh.png" alt="VoiceText 预览面板：ASR 结果、AI 增强、模式切换和可编辑的最终结果" />
+        <img src="../images/light_preview_zh.png" alt="WenZi preview面板：ASR 结果、AI 增强、模式切换和可编辑的最终结果" />
       </picture>
     </div>
   </div>
@@ -232,13 +232,13 @@
             <span class="install-badge">推荐</span>
             <h3>下载安装</h3>
             <p class="install-desc">最简单的方式。无需 Python、无需构建工具 — 下载、拖入、启动，即刻使用。</p>
-            <a id="download-btn-install" href="https://github.com/Airead/VoiceText/releases/latest" class="btn btn-primary">
+            <a id="download-btn-install" href="https://github.com/Airead/WenZi/releases/latest" class="btn btn-primary">
               &#11015; 下载最新版本
             </a>
           </div>
           <div class="install-featured-right">
             <div class="install-steps">
-              <div class="install-step"><span class="install-step-num">1</span> 从 <a href="https://github.com/Airead/VoiceText/releases/latest">Releases</a> 下载 <code>VoiceText.app</code></div>
+              <div class="install-step"><span class="install-step-num">1</span> 从 <a href="https://github.com/Airead/WenZi/releases/latest">Releases</a> 下载 <code>WenZi.app</code></div>
               <div class="install-step"><span class="install-step-num">2</span> 拖入 <code>/Applications</code></div>
               <div class="install-step"><span class="install-step-num">3</span> 双击启动</div>
               <div class="install-step"><span class="install-step-num">4</span> 授予<strong>麦克风</strong>和<strong>辅助功能</strong>权限</div>
@@ -257,8 +257,8 @@
           </div>
         </div>
         <div class="install-body">
-          <pre class="code-block">git clone https://github.com/Airead/VoiceText
-cd VoiceText
+          <pre class="code-block">git clone https://github.com/Airead/WenZi
+cd WenZi
 uv sync
 ./scripts/build.sh</pre>
         </div>
@@ -273,10 +273,10 @@ uv sync
           </div>
         </div>
         <div class="install-body">
-          <pre class="code-block">git clone https://github.com/Airead/VoiceText
-cd VoiceText
+          <pre class="code-block">git clone https://github.com/Airead/WenZi
+cd WenZi
 uv sync
-uv run python -m voicetext</pre>
+uv run python -m wenzi</pre>
         </div>
       </div>
 
@@ -288,7 +288,7 @@ uv run python -m voicetext</pre>
 <section id="docs">
   <div class="container">
     <h2 class="section-title fade-in">文档</h2>
-    <p class="section-subtitle fade-in">深入了解 VoiceText 的每个功能</p>
+    <p class="section-subtitle fade-in">深入了解 WenZi 的每个功能</p>
     <div class="docs-grid">
 
       <a href="docs/user-guide.html" class="doc-card fade-in">
@@ -379,15 +379,15 @@ uv run python -m voicetext</pre>
 <footer class="site-footer">
   <div class="container">
     <ul class="footer-links">
-      <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
-      <li><a href="https://github.com/Airead/VoiceText/releases" target="_blank">版本发布</a></li>
+      <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
+      <li><a href="https://github.com/Airead/WenZi/releases" target="_blank">版本发布</a></li>
       <li><a href="docs/user-guide.html">用户指南</a></li>
       <li><a href="docs/configuration.html">配置参考</a></li>
       <li><a href="docs/enhance-modes.html">增强模式</a></li>
       <li><a href="docs/provider-model-guide.html">提供商指南</a></li>
       <li><a href="../">English</a></li>
     </ul>
-    <p>MIT License &copy; VoiceText</p>
+    <p>MIT License &copy; WenZi</p>
   </div>
 </footer>
 

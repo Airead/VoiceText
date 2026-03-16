@@ -8,8 +8,8 @@ import os
 import tempfile
 from unittest.mock import MagicMock, patch
 
-from voicetext.scripting.snippet_expander import SnippetExpander
-from voicetext.scripting.sources.snippet_source import (
+from wenzi.scripting.snippet_expander import SnippetExpander
+from wenzi.scripting.sources.snippet_source import (
     SnippetStore,
     _format_snippet_file,
 )
@@ -139,10 +139,10 @@ class TestExpand:
         with (
             patch.object(expander, "_send_backspaces") as mock_bs,
             patch(
-                "voicetext.scripting.sources.snippet_source._expand_placeholders",
+                "wenzi.scripting.sources.snippet_source._expand_placeholders",
                 return_value="expanded content",
             ),
-            patch("voicetext.input._set_pasteboard_concealed") as mock_paste,
+            patch("wenzi.input._set_pasteboard_concealed") as mock_paste,
             patch("subprocess.run") as mock_run,
         ):
             expander._expand(";;test", "raw content")
@@ -160,7 +160,7 @@ class TestExpand:
                 expander, "_send_backspaces", side_effect=Exception("fail"),
             ),
             patch(
-                "voicetext.scripting.sources.snippet_source._expand_placeholders",
+                "wenzi.scripting.sources.snippet_source._expand_placeholders",
                 return_value="x",
             ),
         ):
@@ -176,10 +176,10 @@ class TestExpand:
         with (
             patch.object(expander, "_send_backspaces"),
             patch(
-                "voicetext.scripting.sources.snippet_source._expand_placeholders",
+                "wenzi.scripting.sources.snippet_source._expand_placeholders",
                 return_value="2026-03-16",
             ) as mock_ep,
-            patch("voicetext.input._set_pasteboard_concealed"),
+            patch("wenzi.input._set_pasteboard_concealed"),
             patch("subprocess.run"),
         ):
             expander._expand(";;d", "{date}")
@@ -192,25 +192,25 @@ class TestEngineIntegration:
 
     def test_engine_creates_expander_when_snippets_enabled(self):
         with (
-            patch("voicetext.scripting.engine.ScriptingRegistry"),
-            patch("voicetext.scripting.api._VTNamespace") as mock_vt_cls,
+            patch("wenzi.scripting.engine.ScriptingRegistry"),
+            patch("wenzi.scripting.api._VTNamespace") as mock_vt_cls,
         ):
             mock_vt = MagicMock()
             mock_vt_cls.return_value = mock_vt
 
-            from voicetext.scripting.engine import ScriptEngine
+            from wenzi.scripting.engine import ScriptEngine
 
             engine = ScriptEngine(config={"chooser": {"snippets": True}})
 
             with (
                 patch(
-                    "voicetext.scripting.sources.snippet_source.SnippetStore",
+                    "wenzi.scripting.sources.snippet_source.SnippetStore",
                 ) as mock_store_cls,
                 patch(
-                    "voicetext.scripting.sources.snippet_source.SnippetSource",
+                    "wenzi.scripting.sources.snippet_source.SnippetSource",
                 ),
                 patch(
-                    "voicetext.scripting.snippet_expander.SnippetExpander",
+                    "wenzi.scripting.snippet_expander.SnippetExpander",
                 ) as mock_exp_cls,
             ):
                 mock_store_cls.return_value = MagicMock()
@@ -224,13 +224,13 @@ class TestEngineIntegration:
 
     def test_engine_stops_expander(self):
         with (
-            patch("voicetext.scripting.engine.ScriptingRegistry"),
-            patch("voicetext.scripting.api._VTNamespace") as mock_vt_cls,
+            patch("wenzi.scripting.engine.ScriptingRegistry"),
+            patch("wenzi.scripting.api._VTNamespace") as mock_vt_cls,
         ):
             mock_vt = MagicMock()
             mock_vt_cls.return_value = mock_vt
 
-            from voicetext.scripting.engine import ScriptEngine
+            from wenzi.scripting.engine import ScriptEngine
 
             engine = ScriptEngine()
             mock_expander = MagicMock()

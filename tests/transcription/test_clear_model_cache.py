@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from voicetext.transcription.model_registry import (
+from wenzi.transcription.model_registry import (
     ModelPreset,
     clear_model_cache,
 )
@@ -24,7 +24,7 @@ class TestClearModelCache:
         )
 
         with patch(
-            "voicetext.transcription.model_registry.get_model_cache_dir",
+            "wenzi.transcription.model_registry.get_model_cache_dir",
             return_value=cache_dir,
         ):
             result = clear_model_cache(preset)
@@ -44,7 +44,7 @@ class TestClearModelCache:
         )
 
         with patch(
-            "voicetext.transcription.model_registry.get_model_cache_dir",
+            "wenzi.transcription.model_registry.get_model_cache_dir",
             return_value=cache_dir,
         ):
             result = clear_model_cache(preset)
@@ -66,7 +66,7 @@ class TestClearModelCache:
         )
 
         with patch(
-            "voicetext.transcription.model_registry.get_model_cache_dir",
+            "wenzi.transcription.model_registry.get_model_cache_dir",
             return_value=cache_dir,
         ):
             result = clear_model_cache(preset)

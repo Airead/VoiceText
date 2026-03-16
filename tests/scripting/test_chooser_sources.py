@@ -1,6 +1,6 @@
 """Tests for chooser data structures and fuzzy matching."""
 
-from voicetext.scripting.sources import (
+from wenzi.scripting.sources import (
     ChooserItem,
     ChooserSource,
     fuzzy_match,

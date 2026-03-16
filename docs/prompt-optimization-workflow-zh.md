@@ -121,7 +121,7 @@ Preview 面板使用 WKWebView 渲染，采用现代 HTML/CSS/JS 界面，自动
 
 ### 阶段 3：编辑模式
 
-1. 用文本编辑器打开 `~/.config/VoiceText/enhance_modes/<mode_id>.md`。
+1. 用文本编辑器打开 `~/.config/WenZi/enhance_modes/<mode_id>.md`。
    或者使用 Settings → AI → 选择模式 → 编辑。
 2. 根据诊断结果进行有针对性的修改。
 3. 重启应用（或重新加载配置）以加载更新后的 prompt。

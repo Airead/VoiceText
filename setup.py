@@ -1,4 +1,4 @@
-"""py2app setup for building VoiceText.app."""
+"""py2app setup for building WenZi.app (闻字)."""
 
 import sys
 
@@ -15,21 +15,21 @@ with open(Path(__file__).parent / "pyproject.toml", "rb") as f:
     _pyproject = tomllib.load(f)
 _version = _pyproject["project"]["version"]
 
-APP = ["src/voicetext/app.py"]
+APP = ["src/wenzi/app.py"]
 DATA_FILES = []
 OPTIONS = {
     "argv_emulation": False,
     "plist": {
-        "CFBundleName": "VoiceText",
-        "CFBundleDisplayName": "VoiceText",
-        "CFBundleIdentifier": "com.voicetext.app",
+        "CFBundleName": "WenZi",
+        "CFBundleDisplayName": "WenZi",
+        "CFBundleIdentifier": "io.github.airead.wenzi",
         "CFBundleVersion": _version,
         "CFBundleShortVersionString": _version,
         "LSUIElement": True,  # Hide from Dock (menubar-only app)
-        "NSMicrophoneUsageDescription": "VoiceText needs microphone access to record speech for transcription.",
-        "NSAppleEventsUsageDescription": "VoiceText needs accessibility access to type transcribed text.",
+        "NSMicrophoneUsageDescription": "WenZi needs microphone access to record speech for transcription.",
+        "NSAppleEventsUsageDescription": "WenZi needs accessibility access to type transcribed text.",
     },
-    "packages": ["voicetext", "funasr_onnx", "librosa", "sounddevice", "soundfile", "numpy"],
+    "packages": ["wenzi", "funasr_onnx", "librosa", "sounddevice", "soundfile", "numpy"],
 }
 
 setup(

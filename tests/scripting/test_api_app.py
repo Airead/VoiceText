@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from voicetext.scripting.api.app import AppAPI
+from wenzi.scripting.api.app import AppAPI
 
 
 class TestAppAPI:
@@ -96,7 +96,7 @@ class TestAppRunning:
 
 
 class TestAppHide:
-    @patch("voicetext.scripting.api.app.AppAPI._find_running_app")
+    @patch("wenzi.scripting.api.app.AppAPI._find_running_app")
     def test_hide_success(self, mock_find):
         mock_app = MagicMock()
         mock_find.return_value = mock_app
@@ -105,13 +105,13 @@ class TestAppHide:
         assert api.hide("Safari") is True
         mock_app.hide.assert_called_once()
 
-    @patch("voicetext.scripting.api.app.AppAPI._find_running_app")
+    @patch("wenzi.scripting.api.app.AppAPI._find_running_app")
     def test_hide_not_found(self, mock_find):
         mock_find.return_value = None
         api = AppAPI()
         assert api.hide("Nonexistent") is False
 
-    @patch("voicetext.scripting.api.app.AppAPI._find_running_app")
+    @patch("wenzi.scripting.api.app.AppAPI._find_running_app")
     def test_hide_exception(self, mock_find):
         mock_app = MagicMock()
         mock_app.hide.side_effect = RuntimeError("boom")
@@ -122,7 +122,7 @@ class TestAppHide:
 
 
 class TestAppQuit:
-    @patch("voicetext.scripting.api.app.AppAPI._find_running_app")
+    @patch("wenzi.scripting.api.app.AppAPI._find_running_app")
     def test_quit_success(self, mock_find):
         mock_app = MagicMock()
         mock_find.return_value = mock_app
@@ -131,13 +131,13 @@ class TestAppQuit:
         assert api.quit("TextEdit") is True
         mock_app.terminate.assert_called_once()
 
-    @patch("voicetext.scripting.api.app.AppAPI._find_running_app")
+    @patch("wenzi.scripting.api.app.AppAPI._find_running_app")
     def test_quit_not_found(self, mock_find):
         mock_find.return_value = None
         api = AppAPI()
         assert api.quit("Nonexistent") is False
 
-    @patch("voicetext.scripting.api.app.AppAPI._find_running_app")
+    @patch("wenzi.scripting.api.app.AppAPI._find_running_app")
     def test_quit_exception(self, mock_find):
         mock_app = MagicMock()
         mock_app.terminate.side_effect = RuntimeError("boom")

@@ -19,15 +19,15 @@ def _mock_overlay_internals():
     mock_cls = MagicMock()
     mock_cls.alloc.return_value.initWithFrame_.return_value = mock_view
     with (
-        patch("voicetext.ui.live_transcription_overlay._is_dark_mode", return_value=False),
-        patch("voicetext.ui.live_transcription_overlay._LiveBgView", mock_cls),
+        patch("wenzi.ui.live_transcription_overlay._is_dark_mode", return_value=False),
+        patch("wenzi.ui.live_transcription_overlay._LiveBgView", mock_cls),
     ):
         yield
 
 
 class TestLiveTranscriptionOverlayInit:
     def test_defaults(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         assert overlay._panel is None
@@ -35,7 +35,7 @@ class TestLiveTranscriptionOverlayInit:
         assert overlay._screen_center_y == 0
 
     def test_show_creates_panel(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
@@ -45,7 +45,7 @@ class TestLiveTranscriptionOverlayInit:
         assert overlay._content_view is not None
 
     def test_show_sets_panel_properties(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
@@ -58,7 +58,7 @@ class TestLiveTranscriptionOverlayInit:
 
     def test_show_uses_clear_panel_background(self):
         from AppKit import NSColor
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
@@ -86,7 +86,7 @@ class TestLiveTranscriptionOverlayText:
         overlay._panel.frame.return_value = panel_frame
 
     def test_update_text(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
@@ -97,14 +97,14 @@ class TestLiveTranscriptionOverlayText:
         overlay._text_field.setStringValue_.assert_called_with("hello world")
 
     def test_update_text_noop_without_show(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         # Should not raise
         overlay.update_text("hello")
 
     def test_update_text_auto_resizes(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
@@ -123,7 +123,7 @@ class TestLiveTranscriptionOverlayText:
 
 class TestLiveTranscriptionOverlayLifecycle:
     def test_hide(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
@@ -137,7 +137,7 @@ class TestLiveTranscriptionOverlayLifecycle:
         assert overlay._content_view is None
 
     def test_close_cleans_up(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
@@ -149,14 +149,14 @@ class TestLiveTranscriptionOverlayLifecycle:
         assert overlay._text_field is None
 
     def test_close_without_show(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         # Should not raise
         overlay.close()
 
     def test_show_after_close(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
@@ -168,7 +168,7 @@ class TestLiveTranscriptionOverlayLifecycle:
 
 class TestLiveTranscriptionOverlayActiveState:
     def test_show_active_by_default(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
@@ -178,7 +178,7 @@ class TestLiveTranscriptionOverlayActiveState:
         overlay._panel.setAlphaValue_.assert_not_called()
 
     def test_show_inactive_sets_low_alpha(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show(active=False)
@@ -189,7 +189,7 @@ class TestLiveTranscriptionOverlayActiveState:
         )
 
     def test_set_active_restores_full_alpha(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show(active=False)
@@ -201,7 +201,7 @@ class TestLiveTranscriptionOverlayActiveState:
         overlay._panel.setAlphaValue_.assert_called_once_with(1.0)
 
     def test_set_active_noop_when_already_active(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
@@ -212,7 +212,7 @@ class TestLiveTranscriptionOverlayActiveState:
         overlay._panel.setAlphaValue_.assert_not_called()
 
     def test_set_active_noop_without_panel(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         # Should not raise
@@ -221,7 +221,7 @@ class TestLiveTranscriptionOverlayActiveState:
 
 class TestLiveTranscriptionOverlayDarkMode:
     def test_content_view_is_bg_view(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
@@ -230,7 +230,7 @@ class TestLiveTranscriptionOverlayDarkMode:
         assert overlay._content_view is not None
 
     def test_text_uses_dynamic_color(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()
@@ -239,7 +239,7 @@ class TestLiveTranscriptionOverlayDarkMode:
         overlay._text_field.setTextColor_.assert_called_once()
 
     def test_text_center_aligned(self):
-        from voicetext.ui.live_transcription_overlay import LiveTranscriptionOverlay
+        from wenzi.ui.live_transcription_overlay import LiveTranscriptionOverlay
 
         overlay = LiveTranscriptionOverlay()
         overlay.show()

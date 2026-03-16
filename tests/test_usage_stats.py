@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from voicetext.usage_stats import UsageStats
+from wenzi.usage_stats import UsageStats
 
 
 @pytest.fixture
@@ -179,13 +179,13 @@ class TestDailyFiles:
 
     def test_daily_file_isolation(self, stats, stats_dir):
         # Record on "day 1"
-        with patch("voicetext.usage_stats.date") as mock_date:
+        with patch("wenzi.usage_stats.date") as mock_date:
             mock_date.today.return_value = date(2026, 1, 1)
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
             stats.record_transcription(mode="direct")
 
         # Record on "day 2"
-        with patch("voicetext.usage_stats.date") as mock_date:
+        with patch("wenzi.usage_stats.date") as mock_date:
             mock_date.today.return_value = date(2026, 1, 2)
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
             stats.record_transcription(mode="preview")

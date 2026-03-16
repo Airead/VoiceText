@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from voicetext.scripting.api.snippets import SnippetsAPI
+from wenzi.scripting.api.snippets import SnippetsAPI
 
 
 class _FakeStore:

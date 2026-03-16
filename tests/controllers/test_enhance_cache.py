@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from voicetext.controllers.enhance_controller import EnhanceCacheEntry
+from wenzi.controllers.enhance_controller import EnhanceCacheEntry
 
 
 # ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ def cache_entry():
 
 
 def _make_app_stub():
-    """Build a minimal stub of VoiceTextApp with caching-related attributes."""
+    """Build a minimal stub of WenZiApp with caching-related attributes."""
     app = MagicMock()
     app._enhance_cache = {}
     app._enhance_mode = "proofread"
@@ -69,7 +69,7 @@ class TestSameModeGuard:
         panel._on_mode_change = callback
 
         # Import the real method and bind it
-        from voicetext.ui.result_window import ResultPreviewPanel
+        from wenzi.ui.result_window import ResultPreviewPanel
 
         ResultPreviewPanel._on_segment_changed(panel, 1)  # index 1 = proofread
 
@@ -83,7 +83,7 @@ class TestSameModeGuard:
         panel._current_mode = "off"
         panel._on_mode_change = callback
 
-        from voicetext.ui.result_window import ResultPreviewPanel
+        from wenzi.ui.result_window import ResultPreviewPanel
 
         ResultPreviewPanel._on_segment_changed(panel, 1)
 
@@ -209,7 +209,7 @@ class TestReplayCachedResult:
         """replay_cached_result should set text view, labels, and buttons."""
         panel = self._make_panel()
 
-        from voicetext.ui.result_window import ResultPreviewPanel
+        from wenzi.ui.result_window import ResultPreviewPanel
 
         ResultPreviewPanel.replay_cached_result(
             panel,
@@ -229,7 +229,7 @@ class TestReplayCachedResult:
         """When final_text is None, display_text should be used for final field."""
         panel = self._make_panel()
 
-        from voicetext.ui.result_window import ResultPreviewPanel
+        from wenzi.ui.result_window import ResultPreviewPanel
 
         ResultPreviewPanel.replay_cached_result(
             panel,
@@ -246,7 +246,7 @@ class TestReplayCachedResult:
         """When user has edited final field, replay should not overwrite it."""
         panel = self._make_panel(user_edited=True)
 
-        from voicetext.ui.result_window import ResultPreviewPanel
+        from wenzi.ui.result_window import ResultPreviewPanel
 
         ResultPreviewPanel.replay_cached_result(
             panel,

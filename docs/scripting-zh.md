@@ -1,6 +1,6 @@
 # 脚本系统
 
-VoiceText 内置了一个基于 Python 的脚本系统，可以用来自动化 macOS 常见操作——通过 Leader 键启动应用、绑定全局快捷键、显示提示、操作剪贴板等。
+闻字 内置了一个基于 Python 的脚本系统，可以用来自动化 macOS 常见操作——通过 Leader 键启动应用、绑定全局快捷键、显示提示、操作剪贴板等。
 
 ## 快速开始
 
@@ -14,7 +14,7 @@ VoiceText 内置了一个基于 Python 的脚本系统，可以用来自动化 m
    }
    ```
 
-2. **创建脚本文件** `~/.config/VoiceText/scripts/init.py`：
+2. **创建脚本文件** `~/.config/WenZi/scripts/init.py`：
 
    ```python
    vt.leader("cmd_r", [
@@ -24,7 +24,7 @@ VoiceText 内置了一个基于 Python 的脚本系统，可以用来自动化 m
    ])
    ```
 
-3. **重启 VoiceText**。按住右 Command 键，屏幕上会显示快捷键面板，再按字母键即可启动对应应用。
+3. **重启闻字**。按住右 Command 键，屏幕上会显示快捷键面板，再按字母键即可启动对应应用。
 
 ## Leader 键
 
@@ -260,12 +260,12 @@ vt.hotkey.bind("ctrl+cmd+n", lambda: vt.execute("open -a Notes"))
 - `vt` 对象作为全局变量直接可用，无需导入
 - 脚本中的错误会被捕获并以浮窗提示显示
 - 脚本在启动时加载一次，修改后需调用 `vt.reload()` 重新加载
-- 脚本路径：`~/.config/VoiceText/scripts/init.py`
+- 脚本路径：`~/.config/WenZi/scripts/init.py`
 - 可通过 `"scripting": {"script_dir": "/path/to/scripts"}` 自定义脚本目录
 
 ## 安全说明
 
-脚本以**未沙箱化的 Python** 运行，拥有与 VoiceText 相同的系统权限。这意味着脚本可以：
+脚本以**未沙箱化的 Python** 运行，拥有与 闻字 相同的系统权限。这意味着脚本可以：
 
 - 读写你的用户账户能访问的任何文件
 - 执行任意 Shell 命令
@@ -281,11 +281,11 @@ vt.hotkey.bind("ctrl+cmd+n", lambda: vt.execute("open -a Notes"))
 
 **脚本没有加载？**
 - 确认 `config.json` 中 `"scripting": {"enabled": true}` 已设置
-- 启用后需要重启 VoiceText
-- 查看日志 `~/Library/Logs/VoiceText/voicetext.log` 排查错误
+- 启用后需要重启闻字
+- 查看日志 `~/Library/Logs/WenZi/wenzi.log` 排查错误
 
 **Leader 键没有响应？**
-- 确保 VoiceText 已获得辅助功能权限（系统设置 → 隐私与安全性 → 辅助功能）
+- 确保 闻字 已获得辅助功能权限（系统设置 → 隐私与安全性 → 辅助功能）
 - 检查触发键名称是否正确（如 `cmd_r` 而非 `right_cmd`）
 
 **提示面板不可见？**
@@ -293,4 +293,4 @@ vt.hotkey.bind("ctrl+cmd+n", lambda: vt.execute("open -a Notes"))
 
 **脚本报错？**
 - 语法错误和异常会记录到日志并以浮窗提示
-- 查看 `~/Library/Logs/VoiceText/voicetext.log` 获取完整错误信息
+- 查看 `~/Library/Logs/WenZi/wenzi.log` 获取完整错误信息

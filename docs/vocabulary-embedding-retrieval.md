@@ -2,7 +2,7 @@
 
 ## Background
 
-VoiceText uses LLM to correct ASR (Automatic Speech Recognition) output. ASR engines frequently misrecognize proper nouns, technical terms, and domain-specific vocabulary — replacing them with phonetically similar but incorrect characters. For example, "Kubernetes" might be transcribed as "库伯尼特斯" or "酷伯", and "Python" as "派森".
+闻字 uses LLM to correct ASR (Automatic Speech Recognition) output. ASR engines frequently misrecognize proper nouns, technical terms, and domain-specific vocabulary — replacing them with phonetically similar but incorrect characters. For example, "Kubernetes" might be transcribed as "库伯尼特斯" or "酷伯", and "Python" as "派森".
 
 A generic LLM has no knowledge of the user's personal vocabulary. Without additional context, it cannot reliably distinguish between a correct transcription and a misrecognized proper noun. This leads to two types of errors:
 
@@ -21,7 +21,7 @@ The system consists of two stages: **vocabulary building** and **real-time retri
 
 ### Stage 1: Vocabulary Building
 
-VoiceText logs every user correction in `conversation_history.jsonl` — entries where the user edited the AI-enhanced text in the preview panel are marked with `user_corrected: true`. The vocabulary builder leverages these records:
+闻字 logs every user correction in `conversation_history.jsonl` — entries where the user edited the AI-enhanced text in the preview panel are marked with `user_corrected: true`. The vocabulary builder leverages these records:
 
 1. Read corrected records from `conversation_history.jsonl` (supports incremental builds via timestamp filtering).
 2. Batch records and send them to an LLM with a structured extraction prompt.
@@ -149,10 +149,10 @@ In `config.json` under `ai_enhance`:
 
 | File | Purpose |
 |---|---|
-| `src/voicetext/enhance/vocabulary_builder.py` | Extracts vocabulary from conversation history corrections via LLM |
-| `src/voicetext/enhance/vocabulary.py` | Embedding index construction and retrieval |
-| `src/voicetext/enhance/auto_vocab_builder.py` | Automatic vocabulary building triggered by correction count |
-| `src/voicetext/enhance/enhancer.py` | Integrates vocabulary context into enhancement prompts |
-| `src/voicetext/ui/vocab_build_window.py` | UI for vocabulary build progress |
-| `src/voicetext/app.py` | Menu items for vocabulary toggle and build trigger |
-| `src/voicetext/config.py` | Default configuration for vocabulary settings |
+| `src/wenzi/enhance/vocabulary_builder.py` | Extracts vocabulary from conversation history corrections via LLM |
+| `src/wenzi/enhance/vocabulary.py` | Embedding index construction and retrieval |
+| `src/wenzi/enhance/auto_vocab_builder.py` | Automatic vocabulary building triggered by correction count |
+| `src/wenzi/enhance/enhancer.py` | Integrates vocabulary context into enhancement prompts |
+| `src/wenzi/ui/vocab_build_window.py` | UI for vocabulary build progress |
+| `src/wenzi/app.py` | Menu items for vocabulary toggle and build trigger |
+| `src/wenzi/config.py` | Default configuration for vocabulary settings |

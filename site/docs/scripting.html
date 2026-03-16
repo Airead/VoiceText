@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scripting — VoiceText</title>
+  <title>Scripting — WenZi</title>
   <link rel="icon" type="image/png" href="../images/icon.png">
   <link rel="stylesheet" href="../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../" class="nav-brand">
-        <img src="../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../">&larr; Back</a></li>
         <li><a href="../zh/docs/scripting.html" class="lang-switch">中文</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -106,7 +106,7 @@
 
     </div>
 
-<p>VoiceText includes a Python-based scripting system that lets you automate macOS tasks — launch apps with leader keys, bind global hotkeys, show alerts, and more.</p>
+<p>闻字 includes a Python-based scripting system that lets you automate macOS tasks — launch apps with leader keys, bind global hotkeys, show alerts, and more.</p>
 <h2 id="quick-start"><a href="#quick-start" class="heading-anchor">Quick Start</a></h2>
 <ol>
 <li><strong>Enable scripting</strong> in Settings → General → Scripting, or set it directly in <code>config.json</code>:</li>
@@ -118,7 +118,7 @@
      }
    }</code></p>
 <ol start="2">
-<li><strong>Create your script</strong> at <code>~/.config/VoiceText/scripts/init.py</code>:</li>
+<li><strong>Create your script</strong> at <code>~/.config/WenZi/scripts/init.py</code>:</li>
 </ol>
 <p><code>python
    vt.leader("cmd_r", [
@@ -127,7 +127,7 @@
        {"key": "t", "app": "iTerm"},
    ])</code></p>
 <ol start="3">
-<li><strong>Restart VoiceText</strong>. Hold right Command, see the mapping panel, press a letter key to launch the app.</li>
+<li><strong>Restart 闻字</strong>. Hold right Command, see the mapping panel, press a letter key to launch the app.</li>
 </ol>
 <h2 id="leader-keys"><a href="#leader-keys" class="heading-anchor">Leader Keys</a></h2>
 <p>Leader keys let you hold a trigger key (like right Command) and then press a second key to perform an action. A floating panel shows available mappings while the trigger key is held.</p>
@@ -340,11 +340,11 @@ vt.hotkey.bind(&quot;ctrl+cmd+n&quot;, lambda: vt.execute(&quot;open -a Notes&qu
 <li>The <code>vt</code> object is available as a global variable — no import needed</li>
 <li>Errors in scripts are caught and displayed as alerts</li>
 <li>Scripts are loaded once at startup; use <code>vt.reload()</code> to re-read changes</li>
-<li>Script path: <code>~/.config/VoiceText/scripts/init.py</code></li>
+<li>Script path: <code>~/.config/WenZi/scripts/init.py</code></li>
 <li>Custom script directory can be set via <code>"scripting": {"script_dir": "/path/to/scripts"}</code> in config</li>
 </ul>
 <h2 id="security"><a href="#security" class="heading-anchor">Security</a></h2>
-<p>Scripts run as <strong>unsandboxed Python</strong> with the same permissions as VoiceText itself. This means a script can:</p>
+<p>Scripts run as <strong>unsandboxed Python</strong> with the same permissions as 闻字 itself. This means a script can:</p>
 <ul>
 <li>Read and write any file your user account can access</li>
 <li>Execute arbitrary shell commands</li>
@@ -357,16 +357,16 @@ vt.hotkey.bind(&quot;ctrl+cmd+n&quot;, lambda: vt.execute(&quot;open -a Notes&qu
 <h2 id="troubleshooting"><a href="#troubleshooting" class="heading-anchor">Troubleshooting</a></h2>
 <p><strong>Scripts not loading?</strong>
 - Check that <code>"scripting": {"enabled": true}</code> is set in <code>config.json</code>
-- Restart VoiceText after enabling
-- Check logs at <code>~/Library/Logs/VoiceText/voicetext.log</code> for errors</p>
+- Restart 闻字 after enabling
+- Check logs at <code>~/Library/Logs/WenZi/wenzi.log</code> for errors</p>
 <p><strong>Leader key not responding?</strong>
-- Ensure VoiceText has Accessibility permission (System Settings → Privacy &amp; Security → Accessibility)
+- Ensure 闻字 has Accessibility permission (System Settings → Privacy &amp; Security → Accessibility)
 - Verify the trigger key name is correct (e.g. <code>cmd_r</code> not <code>right_cmd</code>)</p>
 <p><strong>Alert panel not visible?</strong>
 - The panel requires Accessibility permission to display over other apps</p>
 <p><strong>Script errors?</strong>
 - Syntax errors and exceptions are logged and shown as alerts
-- Check <code>~/Library/Logs/VoiceText/voicetext.log</code> for stack traces</p>
+- Check <code>~/Library/Logs/WenZi/wenzi.log</code> for stack traces</p>
 
     <div class="doc-nav">
       <a href="conversation-history-enhancement.html" class="doc-nav-card">

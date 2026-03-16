@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI 增强模式 — VoiceText</title>
+  <title>AI 增强模式 — WenZi</title>
   <link rel="icon" type="image/png" href="../../images/icon.png">
   <link rel="stylesheet" href="../../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../../" class="nav-brand">
-        <img src="../../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../../">&larr; 返回</a></li>
         <li><a href="../../docs/enhance-modes.html" class="lang-switch">English</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -90,12 +90,12 @@
 
     </div>
 
-<p>VoiceText 使用 AI 增强模式对转录文本进行后处理。每个模式定义为一个独立的 Markdown 文件，存储在 <code>~/.config/VoiceText/enhance_modes/</code> 目录中。你可以随意添加、编辑或删除模式，无需修改任何代码。</p>
+<p>闻字 使用 AI 增强模式对转录文本进行后处理。每个模式定义为一个独立的 Markdown 文件，存储在 <code>~/.config/WenZi/enhance_modes/</code> 目录中。你可以随意添加、编辑或删除模式，无需修改任何代码。</p>
 <h2 id="_1"><a href="#_1" class="heading-anchor">工作原理</a></h2>
 <pre><code>语音 -&gt; ASR 转录 -&gt; 增强模式 (LLM) -&gt; 最终文本
 </code></pre>
 <ol>
-<li>启动时，VoiceText 会确保内置模式文件存在于模式目录中。缺失的内置文件会自动重新创建；已有文件不会被覆盖。</li>
+<li>启动时，闻字 会确保内置模式文件存在于模式目录中。缺失的内置文件会自动重新创建；已有文件不会被覆盖。</li>
 <li>目录中所有 <code>.md</code> 文件会被加载并显示在 <strong>AI Enhance</strong> 菜单中。</li>
 <li>当增强模式处于激活状态时，转录文本会被发送到已配置的 LLM，模式的提示词作为系统消息。</li>
 </ol>
@@ -165,7 +165,7 @@ steps: proofread, translate_en
 <p><strong>注意：</strong> 链式模式文件的提示词正文不会被发送给 LLM——每个步骤使用其自身模式的提示词。正文仅用于文档说明。</p>
 </blockquote>
 <h3 id="_4"><a href="#_4" class="heading-anchor">链式模式示例</a></h3>
-<pre><code class="language-bash">cat &gt; ~/.config/VoiceText/enhance_modes/translate_en_plus.md &lt;&lt; 'EOF'
+<pre><code class="language-bash">cat &gt; ~/.config/WenZi/enhance_modes/translate_en_plus.md &lt;&lt; 'EOF'
 ---
 label: Translate EN+ (纠错→翻译)
 order: 25
@@ -229,7 +229,7 @@ EOF
 </ol>
 <h3 id="b"><a href="#b" class="heading-anchor">方式 B：手动创建文件</a></h3>
 <p>在模式目录中创建新的 <code>.md</code> 文件：</p>
-<pre><code class="language-bash">cat &gt; ~/.config/VoiceText/enhance_modes/summarize.md &lt;&lt; 'EOF'
+<pre><code class="language-bash">cat &gt; ~/.config/WenZi/enhance_modes/summarize.md &lt;&lt; 'EOF'
 ---
 label: Summarize
 order: 55
@@ -242,7 +242,7 @@ EOF
 </code></pre>
 <p>重启应用以加载新模式。</p>
 <h3 id="_7"><a href="#_7" class="heading-anchor">示例：正式邮件模式</a></h3>
-<pre><code class="language-bash">cat &gt; ~/.config/VoiceText/enhance_modes/formal_email.md &lt;&lt; 'EOF'
+<pre><code class="language-bash">cat &gt; ~/.config/WenZi/enhance_modes/formal_email.md &lt;&lt; 'EOF'
 ---
 label: Formal Email
 order: 60
@@ -255,7 +255,7 @@ Output only the email text without any explanation.
 EOF
 </code></pre>
 <h3 id="_8"><a href="#_8" class="heading-anchor">示例：翻译为日文</a></h3>
-<pre><code class="language-bash">cat &gt; ~/.config/VoiceText/enhance_modes/translate_ja.md &lt;&lt; 'EOF'
+<pre><code class="language-bash">cat &gt; ~/.config/WenZi/enhance_modes/translate_ja.md &lt;&lt; 'EOF'
 ---
 label: Translate to Japanese
 order: 70
@@ -269,17 +269,17 @@ EOF
 <h2 id="_9"><a href="#_9" class="heading-anchor">编辑现有模式</a></h2>
 <p>使用任意文本编辑器直接打开文件：</p>
 <pre><code class="language-bash"># 使用你偏好的编辑器
-open -e ~/.config/VoiceText/enhance_modes/proofread.md
+open -e ~/.config/WenZi/enhance_modes/proofread.md
 # 或者
-vim ~/.config/VoiceText/enhance_modes/proofread.md
+vim ~/.config/WenZi/enhance_modes/proofread.md
 </code></pre>
 <p>更改在重启应用后生效。</p>
 <blockquote>
-<p>内置模式文件可以自由编辑。VoiceText 不会覆盖已存在的文件。</p>
+<p>内置模式文件可以自由编辑。闻字 不会覆盖已存在的文件。</p>
 </blockquote>
 <h2 id="_10"><a href="#_10" class="heading-anchor">删除模式</a></h2>
 <p>删除对应的 <code>.md</code> 文件并重启：</p>
-<pre><code class="language-bash">rm ~/.config/VoiceText/enhance_modes/summarize.md
+<pre><code class="language-bash">rm ~/.config/WenZi/enhance_modes/summarize.md
 </code></pre>
 <p><strong>注意：</strong> 如果删除内置模式文件（例如 <code>proofread.md</code>），它会在下次启动时以默认内容重新创建。要永久禁用内置模式，请将其提示词替换为直通指令：</p>
 <pre><code class="language-markdown">---
@@ -292,7 +292,7 @@ Output the user's input exactly as-is, without any changes.
 <ul>
 <li><strong>排序</strong>：使用有间隔的 <code>order</code> 值（10, 20, 30...），这样可以在现有模式之间插入新模式而无需重新编号。</li>
 <li><strong>提示词质量</strong>：在提示词中要具体明确。告诉 LLM 该做什么以及不该做什么。始终以"仅输出处理后的文本，不要附加任何解释"结尾，以避免不必要的说明文字。</li>
-<li><strong>配置兼容性</strong>：<code>~/.config/VoiceText/config.json</code> 中的 <code>mode</code> 字段存储模式 ID（文件名）。如果模式文件被删除但配置仍引用它，应用会回退到第一个可用的模式。</li>
+<li><strong>配置兼容性</strong>：<code>~/.config/WenZi/config.json</code> 中的 <code>mode</code> 字段存储模式 ID（文件名）。如果模式文件被删除但配置仍引用它，应用会回退到第一个可用的模式。</li>
 <li><strong>非 <code>.md</code> 文件会被忽略</strong>：你可以安全地在模式目录中保留笔记（<code>.txt</code>）或备份（<code>.bak</code>）。</li>
 </ul>
 <p>更多灵感请参见 <a href="enhance-mode-examples.md">增强模式示例</a> —— 一组即用型模板，涵盖写作、翻译、开发工具等场景。</p>

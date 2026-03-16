@@ -1,10 +1,10 @@
-"""Tests for voicetext.ui_helpers focus management utilities."""
+"""Tests for wenzi.ui_helpers focus management utilities."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from voicetext.ui_helpers import reactivate_app
+from wenzi.ui_helpers import reactivate_app
 
 
 class TestGetFrontmostApp:
@@ -18,7 +18,7 @@ class TestGetFrontmostApp:
         with patch.dict("sys.modules", {"AppKit": MagicMock(NSWorkspace=mock_ws)}):
             # Need to re-import since the function does `from AppKit import NSWorkspace`
             import importlib
-            import voicetext.ui_helpers as mod
+            import wenzi.ui_helpers as mod
 
             importlib.reload(mod)
             result = mod.get_frontmost_app()
@@ -30,7 +30,7 @@ class TestGetFrontmostApp:
         mock_appkit.NSWorkspace.sharedWorkspace.side_effect = Exception("fail")
         with patch.dict("sys.modules", {"AppKit": mock_appkit}):
             import importlib
-            import voicetext.ui_helpers as mod
+            import wenzi.ui_helpers as mod
 
             importlib.reload(mod)
             result = mod.get_frontmost_app()

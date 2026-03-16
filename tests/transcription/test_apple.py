@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from voicetext.transcription.base import BaseTranscriber
-from voicetext.transcription.apple import (
+from wenzi.transcription.base import BaseTranscriber
+from wenzi.transcription.apple import (
     AppleSpeechTranscriber,
     SIRI_SETTINGS_URL,
     _LANG_TO_LOCALE,
@@ -190,7 +190,7 @@ class TestCheckSiriAvailable:
         self.mock_recognizer.recognitionTaskWithRequest_resultHandler_ = MagicMock(
             return_value=MagicMock()
         )
-        from voicetext.transcription.apple import check_siri_available
+        from wenzi.transcription.apple import check_siri_available
 
         ok, err = check_siri_available(language="zh", on_device=True)
         assert ok is True
@@ -213,7 +213,7 @@ class TestCheckSiriAvailable:
             _start_recognition
         )
 
-        from voicetext.transcription.apple import check_siri_available
+        from wenzi.transcription.apple import check_siri_available
 
         ok, err = check_siri_available(language="zh", on_device=True)
         assert ok is False
@@ -233,7 +233,7 @@ class TestCheckSiriAvailable:
             _start_recognition
         )
 
-        from voicetext.transcription.apple import check_siri_available
+        from wenzi.transcription.apple import check_siri_available
 
         ok, err = check_siri_available(language="zh", on_device=True)
         assert ok is True
@@ -248,7 +248,7 @@ class TestCheckSiriAvailable:
             _fake_request_auth
         )
 
-        from voicetext.transcription.apple import check_siri_available
+        from wenzi.transcription.apple import check_siri_available
 
         ok, err = check_siri_available(language="zh", on_device=True)
         assert ok is True  # not a Siri issue
@@ -258,7 +258,7 @@ class TestCheckSiriAvailable:
         self.mock_recognizer.recognitionTaskWithRequest_resultHandler_ = MagicMock(
             return_value=MagicMock()
         )
-        from voicetext.transcription.apple import check_siri_available
+        from wenzi.transcription.apple import check_siri_available
 
         ok, err = check_siri_available(language=None, on_device=True)
         assert ok is True
@@ -269,7 +269,7 @@ class TestCheckSiriAvailable:
             None
         )
 
-        from voicetext.transcription.apple import check_siri_available
+        from wenzi.transcription.apple import check_siri_available
 
         ok, err = check_siri_available(language="zh", on_device=True)
         assert ok is True

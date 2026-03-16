@@ -2,8 +2,8 @@
 
 from unittest.mock import patch, MagicMock
 
-from voicetext.scripting.registry import LeaderMapping, ScriptingRegistry
-from voicetext.scripting.api.hotkey import HotkeyAPI
+from wenzi.scripting.registry import LeaderMapping, ScriptingRegistry
+from wenzi.scripting.api.hotkey import HotkeyAPI
 
 
 class TestHotkeyAPI:
@@ -23,7 +23,7 @@ class TestHotkeyAPI:
         assert len(reg.hotkeys) == 1
         assert reg.hotkeys[0].hotkey_str == "ctrl+cmd+v"
 
-    @patch("voicetext.scripting.api.hotkey.AppHelper", create=True)
+    @patch("wenzi.scripting.api.hotkey.AppHelper", create=True)
     def test_leader_press_activates(self, mock_helper):
         _, api = self._make_api()
         result = api._on_press("cmd_r")
@@ -32,7 +32,7 @@ class TestHotkeyAPI:
         assert api._active_leader.trigger_key == "cmd_r"
 
     @patch.object(HotkeyAPI, "_execute_mapping")
-    @patch("voicetext.scripting.api.hotkey.AppHelper", create=True)
+    @patch("wenzi.scripting.api.hotkey.AppHelper", create=True)
     def test_leader_subkey_executes(self, mock_helper, mock_exec):
         _, api = self._make_api()
         api._on_press("cmd_r")
@@ -41,7 +41,7 @@ class TestHotkeyAPI:
         assert api._leader_triggered is True
 
     @patch.object(HotkeyAPI, "_execute_mapping")
-    @patch("voicetext.scripting.api.hotkey.AppHelper", create=True)
+    @patch("wenzi.scripting.api.hotkey.AppHelper", create=True)
     def test_leader_release_deactivates(self, mock_helper, mock_exec):
         _, api = self._make_api()
         api._on_press("cmd_r")
@@ -49,7 +49,7 @@ class TestHotkeyAPI:
         api._on_release("cmd_r")
         assert api._active_leader is None
 
-    @patch("voicetext.scripting.api.hotkey.AppHelper", create=True)
+    @patch("wenzi.scripting.api.hotkey.AppHelper", create=True)
     def test_leader_tap_without_subkey(self, mock_helper):
         _, api = self._make_api()
         api._on_press("cmd_r")
@@ -57,14 +57,14 @@ class TestHotkeyAPI:
         assert api._active_leader is None
         assert api._leader_triggered is False
 
-    @patch("voicetext.scripting.api.hotkey.AppHelper", create=True)
+    @patch("wenzi.scripting.api.hotkey.AppHelper", create=True)
     def test_non_leader_key_ignored(self, mock_helper):
         _, api = self._make_api()
         result = api._on_press("shift")
         assert result is False
 
     @patch.object(HotkeyAPI, "_execute_mapping")
-    @patch("voicetext.scripting.api.hotkey.AppHelper", create=True)
+    @patch("wenzi.scripting.api.hotkey.AppHelper", create=True)
     def test_unmatched_subkey_still_swallowed(self, mock_helper, mock_exec):
         _, api = self._make_api()
         api._on_press("cmd_r")
@@ -88,7 +88,7 @@ class TestHotkeyAPI:
         api._execute_mapping(mapping)
         assert result == [1]
 
-    @patch("voicetext.scripting.api.execute.subprocess")
+    @patch("wenzi.scripting.api.execute.subprocess")
     def test_execute_mapping_exec(self, mock_sp):
         mock_result = MagicMock()
         mock_result.returncode = 0

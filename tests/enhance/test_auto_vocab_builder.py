@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from voicetext.enhance.auto_vocab_builder import AutoVocabBuilder
+from wenzi.enhance.auto_vocab_builder import AutoVocabBuilder
 
 
 @pytest.fixture
@@ -115,7 +115,7 @@ class TestBuildingFlag:
 
 
 class TestBuildExecution:
-    @patch("voicetext.enhance.auto_vocab_builder.send_notification")
+    @patch("wenzi.enhance.auto_vocab_builder.send_notification")
     def test_build_success_with_new_entries(self, mock_notify, config):
         """Test that a successful build reloads index and sends notification."""
         async def fake_build(**kwargs):
@@ -132,7 +132,7 @@ class TestBuildExecution:
         builder._building = True
 
         with patch(
-            "voicetext.enhance.vocabulary_builder.VocabularyBuilder",
+            "wenzi.enhance.vocabulary_builder.VocabularyBuilder",
             return_value=mock_builder,
         ):
             builder._build()
@@ -141,7 +141,7 @@ class TestBuildExecution:
         mock_notify.assert_called_once()
         assert builder._building is False
 
-    @patch("voicetext.enhance.auto_vocab_builder.send_notification")
+    @patch("wenzi.enhance.auto_vocab_builder.send_notification")
     def test_build_success_no_new_entries(self, mock_notify, config):
         """Test that no notification is sent when there are no new entries."""
         async def fake_build(**kwargs):
@@ -154,7 +154,7 @@ class TestBuildExecution:
         builder._building = True
 
         with patch(
-            "voicetext.enhance.vocabulary_builder.VocabularyBuilder",
+            "wenzi.enhance.vocabulary_builder.VocabularyBuilder",
             return_value=mock_builder,
         ):
             builder._build()
@@ -168,7 +168,7 @@ class TestBuildExecution:
         builder._building = True
 
         with patch(
-            "voicetext.enhance.vocabulary_builder.VocabularyBuilder",
+            "wenzi.enhance.vocabulary_builder.VocabularyBuilder",
             side_effect=Exception("LLM unavailable"),
         ):
             builder._build()
@@ -185,7 +185,7 @@ class TestSetEnhancer:
 
 
 class TestOnBuildDoneCallback:
-    @patch("voicetext.enhance.auto_vocab_builder.send_notification")
+    @patch("wenzi.enhance.auto_vocab_builder.send_notification")
     def test_on_build_done_called(self, mock_notify, config):
         """Test that on_build_done callback is invoked after successful build."""
         async def fake_build(**kwargs):
@@ -199,7 +199,7 @@ class TestOnBuildDoneCallback:
         builder._building = True
 
         with patch(
-            "voicetext.enhance.vocabulary_builder.VocabularyBuilder",
+            "wenzi.enhance.vocabulary_builder.VocabularyBuilder",
             return_value=mock_builder,
         ):
             builder._build()
@@ -213,7 +213,7 @@ class TestOnBuildDoneCallback:
         builder._building = True
 
         with patch(
-            "voicetext.enhance.vocabulary_builder.VocabularyBuilder",
+            "wenzi.enhance.vocabulary_builder.VocabularyBuilder",
             side_effect=Exception("fail"),
         ):
             builder._build()

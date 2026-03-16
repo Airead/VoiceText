@@ -1,4 +1,4 @@
-"""Shared test fixtures for VoiceText test suite."""
+"""Shared test fixtures for WenZi test suite."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import pytest
 def _no_real_clipboard_polling():
     """Prevent ClipboardMonitor from polling the real system clipboard."""
     with patch(
-        "voicetext.scripting.clipboard_monitor.ClipboardMonitor._check_clipboard",
+        "wenzi.scripting.clipboard_monitor.ClipboardMonitor._check_clipboard",
     ):
         yield
 
@@ -26,7 +26,7 @@ def _no_real_clipboard_polling():
 def _no_real_snippet_tap():
     """Prevent SnippetExpander from creating a real Quartz CGEventTap."""
     with patch(
-        "voicetext.scripting.snippet_expander.SnippetExpander.start",
+        "wenzi.scripting.snippet_expander.SnippetExpander.start",
     ):
         yield
 
@@ -93,7 +93,7 @@ def mock_panel_close_delegate(monkeypatch, module, attr_name="_PanelCloseDelegat
 
     Usage in per-file fixture:
         from tests.conftest import mock_panel_close_delegate
-        import voicetext.ui.settings_window as _sw
+        import wenzi.ui.settings_window as _sw
         _sw._PanelCloseDelegate = None
         mock_panel_close_delegate(monkeypatch, _sw)
     """

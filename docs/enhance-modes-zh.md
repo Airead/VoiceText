@@ -1,6 +1,6 @@
 # AI 增强模式指南
 
-VoiceText 使用 AI 增强模式对转录文本进行后处理。每个模式定义为一个独立的 Markdown 文件，存储在 `~/.config/VoiceText/enhance_modes/` 目录中。你可以随意添加、编辑或删除模式，无需修改任何代码。
+闻字 使用 AI 增强模式对转录文本进行后处理。每个模式定义为一个独立的 Markdown 文件，存储在 `~/.config/WenZi/enhance_modes/` 目录中。你可以随意添加、编辑或删除模式，无需修改任何代码。
 
 ## 目录
 
@@ -19,7 +19,7 @@ VoiceText 使用 AI 增强模式对转录文本进行后处理。每个模式定
 语音 -> ASR 转录 -> 增强模式 (LLM) -> 最终文本
 ```
 
-1. 启动时，VoiceText 会确保内置模式文件存在于模式目录中。缺失的内置文件会自动重新创建；已有文件不会被覆盖。
+1. 启动时，闻字 会确保内置模式文件存在于模式目录中。缺失的内置文件会自动重新创建；已有文件不会被覆盖。
 2. 目录中所有 `.md` 文件会被加载并显示在 **AI Enhance** 菜单中。
 3. 当增强模式处于激活状态时，转录文本会被发送到已配置的 LLM，模式的提示词作为系统消息。
 
@@ -77,7 +77,7 @@ steps: proofread, translate_en
 ### 链式模式示例
 
 ```bash
-cat > ~/.config/VoiceText/enhance_modes/translate_en_plus.md << 'EOF'
+cat > ~/.config/WenZi/enhance_modes/translate_en_plus.md << 'EOF'
 ---
 label: Translate EN+ (纠错→翻译)
 order: 25
@@ -114,7 +114,7 @@ EOF
 在模式目录中创建新的 `.md` 文件：
 
 ```bash
-cat > ~/.config/VoiceText/enhance_modes/summarize.md << 'EOF'
+cat > ~/.config/WenZi/enhance_modes/summarize.md << 'EOF'
 ---
 label: Summarize
 order: 55
@@ -131,7 +131,7 @@ EOF
 ### 示例：正式邮件模式
 
 ```bash
-cat > ~/.config/VoiceText/enhance_modes/formal_email.md << 'EOF'
+cat > ~/.config/WenZi/enhance_modes/formal_email.md << 'EOF'
 ---
 label: Formal Email
 order: 60
@@ -147,7 +147,7 @@ EOF
 ### 示例：翻译为日文
 
 ```bash
-cat > ~/.config/VoiceText/enhance_modes/translate_ja.md << 'EOF'
+cat > ~/.config/WenZi/enhance_modes/translate_ja.md << 'EOF'
 ---
 label: Translate to Japanese
 order: 70
@@ -165,21 +165,21 @@ EOF
 
 ```bash
 # 使用你偏好的编辑器
-open -e ~/.config/VoiceText/enhance_modes/proofread.md
+open -e ~/.config/WenZi/enhance_modes/proofread.md
 # 或者
-vim ~/.config/VoiceText/enhance_modes/proofread.md
+vim ~/.config/WenZi/enhance_modes/proofread.md
 ```
 
 更改在重启应用后生效。
 
-> 内置模式文件可以自由编辑。VoiceText 不会覆盖已存在的文件。
+> 内置模式文件可以自由编辑。闻字 不会覆盖已存在的文件。
 
 ## 删除模式
 
 删除对应的 `.md` 文件并重启：
 
 ```bash
-rm ~/.config/VoiceText/enhance_modes/summarize.md
+rm ~/.config/WenZi/enhance_modes/summarize.md
 ```
 
 **注意：** 如果删除内置模式文件（例如 `proofread.md`），它会在下次启动时以默认内容重新创建。要永久禁用内置模式，请将其提示词替换为直通指令：
@@ -196,7 +196,7 @@ Output the user's input exactly as-is, without any changes.
 
 - **排序**：使用有间隔的 `order` 值（10, 20, 30...），这样可以在现有模式之间插入新模式而无需重新编号。
 - **提示词质量**：在提示词中要具体明确。告诉 LLM 该做什么以及不该做什么。始终以"仅输出处理后的文本，不要附加任何解释"结尾，以避免不必要的说明文字。
-- **配置兼容性**：`~/.config/VoiceText/config.json` 中的 `mode` 字段存储模式 ID（文件名）。如果模式文件被删除但配置仍引用它，应用会回退到第一个可用的模式。
+- **配置兼容性**：`~/.config/WenZi/config.json` 中的 `mode` 字段存储模式 ID（文件名）。如果模式文件被删除但配置仍引用它，应用会回退到第一个可用的模式。
 - **非 `.md` 文件会被忽略**：你可以安全地在模式目录中保留笔记（`.txt`）或备份（`.bak`）。
 
 更多灵感请参见 [增强模式示例](enhance-mode-examples.md) —— 一组即用型模板，涵盖写作、翻译、开发工具等场景。

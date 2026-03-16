@@ -29,7 +29,7 @@ def mock_appkit(mock_appkit_modules, monkeypatch):
     mock_webkit = MagicMock()
     monkeypatch.setitem(sys.modules, "WebKit", mock_webkit)
 
-    import voicetext.ui.result_window_web as _rww
+    import wenzi.ui.result_window_web as _rww
 
     _rww._PanelCloseDelegate = None
     mock_panel_close_delegate(monkeypatch, _rww)
@@ -66,7 +66,7 @@ def panel_factory():
     """Factory that returns a ready-to-test web ResultPreviewPanel."""
 
     def _factory():
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
 
@@ -165,7 +165,7 @@ class TestShowBasic:
     """Test show() initializes state correctly."""
 
     def test_show_stores_callbacks(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         on_confirm = MagicMock()
@@ -183,7 +183,7 @@ class TestShowBasic:
         assert panel._asr_text == "hello"
 
     def test_show_stores_modes(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         modes = [("off", "Off"), ("proofread", "纠错")]
@@ -201,7 +201,7 @@ class TestShowBasic:
         assert panel._current_mode == "proofread"
 
     def test_show_stores_model_lists(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
 
@@ -226,7 +226,7 @@ class TestConfirmCancel:
     """Test confirm and cancel via JS messages."""
 
     def test_confirm_calls_callback_with_text(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         confirmed = []
@@ -247,7 +247,7 @@ class TestConfirmCancel:
         assert confirmed == ["final text"]
 
     def test_confirm_with_copy_to_clipboard(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         clipboard_flags = []
@@ -268,7 +268,7 @@ class TestConfirmCancel:
         assert clipboard_flags == [True]
 
     def test_confirm_with_user_edit_sends_correction_info(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         results = []
@@ -294,7 +294,7 @@ class TestConfirmCancel:
         }
 
     def test_cancel_calls_callback(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         cancelled = []
@@ -314,7 +314,7 @@ class TestModeChange:
     """Test mode switching via JS messages."""
 
     def test_mode_change_triggers_callback(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         mode_changes = []
@@ -334,7 +334,7 @@ class TestModeChange:
         assert mode_changes == ["proofread"]
 
     def test_same_mode_does_not_trigger_callback(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         mode_changes = []
@@ -358,7 +358,7 @@ class TestModelChange:
     """Test STT/LLM model switching via JS messages."""
 
     def test_stt_model_change(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         changes = []
@@ -376,7 +376,7 @@ class TestModelChange:
         assert changes == [1]
 
     def test_llm_model_change(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         changes = []
@@ -398,7 +398,7 @@ class TestToggleCallbacks:
     """Test punc and thinking toggle callbacks."""
 
     def test_punc_toggle(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         toggles = []
@@ -416,7 +416,7 @@ class TestToggleCallbacks:
         assert panel._punc_enabled is False
 
     def test_thinking_toggle(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         toggles = []
@@ -438,7 +438,7 @@ class TestEnhanceStreaming:
     """Test streaming enhancement text updates."""
 
     def test_append_enhance_text_evals_js(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         panel.show(
@@ -456,7 +456,7 @@ class TestEnhanceStreaming:
         assert any("appendEnhanceText" in c for c in calls)
 
     def test_append_thinking_text_accumulates(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         panel.show(
@@ -470,7 +470,7 @@ class TestEnhanceStreaming:
         assert panel._thinking_text == "think1 think2"
 
     def test_clear_enhance_text(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         panel.show(
@@ -487,7 +487,7 @@ class TestEnhanceStreaming:
         assert any("clearEnhanceText" in c for c in calls)
 
     def test_stale_request_discarded(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         panel.show(
@@ -509,7 +509,7 @@ class TestSetEnhanceComplete:
     """Test set_enhance_complete."""
 
     def test_complete_with_usage(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         panel.show(
@@ -530,7 +530,7 @@ class TestSetEnhanceComplete:
         assert any("setEnhanceComplete" in c for c in calls)
 
     def test_complete_enables_thinking_button_when_thinking_text_exists(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         panel.show(
@@ -555,7 +555,7 @@ class TestReplayCachedResult:
     """Test replay_cached_result."""
 
     def test_replay_sets_state(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         panel.show(
@@ -584,7 +584,7 @@ class TestSetEnhanceOff:
     """Test set_enhance_off."""
 
     def test_off_calls_js(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         panel.show(
@@ -606,7 +606,7 @@ class TestSetAsrResult:
     """Test ASR result update."""
 
     def test_asr_result_updates_state(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         panel.show(
@@ -620,7 +620,7 @@ class TestSetAsrResult:
         assert panel._asr_info == "model info"
 
     def test_stale_asr_result_discarded(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         panel.show(
@@ -640,7 +640,7 @@ class TestProperties:
     """Test properties and visibility."""
 
     def test_is_visible(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = ResultPreviewPanel()
         assert panel.is_visible is False
@@ -650,14 +650,14 @@ class TestProperties:
         assert panel.is_visible is True
 
     def test_enhance_request_id_property(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = ResultPreviewPanel()
         panel.enhance_request_id = 42
         assert panel.enhance_request_id == 42
 
     def test_asr_request_id_increments_on_loading(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         panel.show(
@@ -674,7 +674,7 @@ class TestClose:
     """Test panel close."""
 
     def test_close_clears_state(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         panel.show(
@@ -690,7 +690,7 @@ class TestClose:
         assert panel._on_cancel is None
 
     def test_close_without_show_is_noop(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = ResultPreviewPanel()
         panel.close()  # Should not raise
@@ -700,24 +700,24 @@ class TestHtmlTemplate:
     """Test HTML template generation."""
 
     def test_config_placeholder_replaced(self):
-        from voicetext.ui.result_window_web import _HTML_TEMPLATE
+        from wenzi.ui.result_window_web import _HTML_TEMPLATE
 
         assert "__CONFIG__" in _HTML_TEMPLATE
 
     def test_html_has_dark_mode_support(self):
-        from voicetext.ui.result_window_web import _HTML_TEMPLATE
+        from wenzi.ui.result_window_web import _HTML_TEMPLATE
 
         assert "prefers-color-scheme: dark" in _HTML_TEMPLATE
 
     def test_html_has_key_ui_elements(self):
-        from voicetext.ui.result_window_web import _HTML_TEMPLATE
+        from wenzi.ui.result_window_web import _HTML_TEMPLATE
 
         for element_id in ("asr-text", "enhance-text", "final-text",
                            "mode-segment", "confirm-btn", "cancel-btn"):
             assert element_id in _HTML_TEMPLATE
 
     def test_html_has_keyboard_shortcuts(self):
-        from voicetext.ui.result_window_web import _HTML_TEMPLATE
+        from wenzi.ui.result_window_web import _HTML_TEMPLATE
 
         assert "Escape" in _HTML_TEMPLATE
         assert "metaKey" in _HTML_TEMPLATE
@@ -727,21 +727,21 @@ class TestEnhanceLabelText:
     """Test _enhance_label_text helper."""
 
     def test_with_llm_models_returns_suffix_only(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = ResultPreviewPanel()
         panel._llm_models = ["gpt-4"]
         assert panel._enhance_label_text("Tokens: 100") == "Tokens: 100"
 
     def test_without_llm_models_includes_ai_prefix(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = ResultPreviewPanel()
         panel._enhance_info = "openai/gpt-4"
         assert panel._enhance_label_text("ok") == "AI (openai/gpt-4)  ok"
 
     def test_empty_suffix(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = ResultPreviewPanel()
         assert panel._enhance_label_text() == "AI"
@@ -751,17 +751,17 @@ class TestFormatTokenSuffix:
     """Test _format_token_suffix helper."""
 
     def test_none_usage(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         assert ResultPreviewPanel._format_token_suffix(None) == ""
 
     def test_empty_usage(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         assert ResultPreviewPanel._format_token_suffix({}) == ""
 
     def test_valid_usage(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         result = ResultPreviewPanel._format_token_suffix({
             "total_tokens": 1000,
@@ -773,7 +773,7 @@ class TestFormatTokenSuffix:
         assert "\u2193400" in result
 
     def test_with_cache_tokens(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         result = ResultPreviewPanel._format_token_suffix({
             "total_tokens": 1000,
@@ -786,7 +786,7 @@ class TestFormatTokenSuffix:
         assert "\u2193400" in result
 
     def test_with_zero_cache_tokens(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         result = ResultPreviewPanel._format_token_suffix({
             "total_tokens": 1000,
@@ -802,7 +802,7 @@ class TestBrowseHistoryAndTranslate:
     """Test history and translate JS actions."""
 
     def test_browse_history(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         history_called = []
@@ -816,7 +816,7 @@ class TestBrowseHistoryAndTranslate:
         assert history_called == [2]
 
     def test_google_translate(self):
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())
         translate_called = []
@@ -847,7 +847,7 @@ class TestJsCallQueue:
 
     def test_eval_js_queued_before_page_load(self):
         """JS calls made before page load should be queued, not executed."""
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = ResultPreviewPanel()
         panel._build_panel = MagicMock()
@@ -870,7 +870,7 @@ class TestJsCallQueue:
 
     def test_pending_js_flushed_on_page_load(self):
         """Queued JS calls should be flushed when page finishes loading."""
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = ResultPreviewPanel()
         panel._build_panel = MagicMock()
@@ -901,7 +901,7 @@ class TestJsCallQueue:
 
     def test_eval_js_direct_after_page_load(self):
         """JS calls after page load should execute immediately."""
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = _build_panel(ResultPreviewPanel())  # _page_loaded = True
         panel.show(
@@ -917,7 +917,7 @@ class TestJsCallQueue:
 
     def test_close_clears_pending_js(self):
         """Closing the panel should discard any pending JS calls."""
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = ResultPreviewPanel()
         panel._build_panel = MagicMock()
@@ -940,7 +940,7 @@ class TestJsCallQueue:
 
     def test_flush_order_preserved(self):
         """Queued JS calls must be flushed in the order they were added."""
-        from voicetext.ui.result_window_web import ResultPreviewPanel
+        from wenzi.ui.result_window_web import ResultPreviewPanel
 
         panel = ResultPreviewPanel()
         panel._build_panel = MagicMock()

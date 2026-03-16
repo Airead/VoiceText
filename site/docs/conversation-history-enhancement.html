@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Conversation History Enhancement — VoiceText</title>
+  <title>Conversation History Enhancement — WenZi</title>
   <link rel="icon" type="image/png" href="../images/icon.png">
   <link rel="stylesheet" href="../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../" class="nav-brand">
-        <img src="../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../">&larr; Back</a></li>
         <li><a href="../zh/docs/conversation-history-enhancement.html" class="lang-switch">中文</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -94,7 +94,7 @@
     </div>
 
 <h2 id="background"><a href="#background" class="heading-anchor">Background</a></h2>
-<p>VoiceText processes each voice input session independently — the AI enhancement step sees only the current ASR text and has no knowledge of what the user said before. This stateless approach works for isolated sentences but falls short when:</p>
+<p>闻字 processes each voice input session independently — the AI enhancement step sees only the current ASR text and has no knowledge of what the user said before. This stateless approach works for isolated sentences but falls short when:</p>
 <ol>
 <li><strong>Recurring proper nouns</strong> — The user mentions "萍萍" in one sentence, but ASR transcribes it as "平平". Without prior context, the LLM has no basis to prefer one over the other. If the user already confirmed "萍萍" in a previous turn, that signal is lost.</li>
 <li><strong>Topic continuity</strong> — Conversations naturally build on prior context. When the user says "她说今天很开心", the LLM cannot resolve "她" without knowing who was mentioned earlier.</li>
@@ -110,7 +110,7 @@
 </ul>
 <h2 id="how-it-works"><a href="#how-it-works" class="heading-anchor">How It Works</a></h2>
 <h3 id="recording"><a href="#recording" class="heading-anchor">Recording</a></h3>
-<p>Every voice input session is recorded to <code>~/.config/VoiceText/conversation_history.jsonl</code>, regardless of mode:</p>
+<p>Every voice input session is recorded to <code>~/.config/WenZi/conversation_history.jsonl</code>, regardless of mode:</p>
 <pre><code class="language-json">{
     &quot;timestamp&quot;: &quot;2026-03-12T10:30:00+00:00&quot;,
     &quot;asr_text&quot;: &quot;果果今天在公园里遇到了平平。&quot;,
@@ -229,7 +229,7 @@
 </ol>
 <h3 id="monthly-archives"><a href="#monthly-archives" class="heading-anchor">Monthly Archives</a></h3>
 <p>Rotated records are grouped by the month in their <code>timestamp</code> field and appended to per-month archive files:</p>
-<pre><code>~/.config/VoiceText/
+<pre><code>~/.config/WenZi/
 ├── conversation_history.jsonl                  # Active file (up to 20,000 records)
 └── conversation_history_archives/
     ├── 2025-11.jsonl
@@ -349,27 +349,27 @@
 </thead>
 <tbody>
 <tr>
-<td><code>src/voicetext/enhance/conversation_history.py</code></td>
+<td><code>src/wenzi/enhance/conversation_history.py</code></td>
 <td>JSONL recording, reading, caching, rotation, archiving, and prompt formatting</td>
 </tr>
 <tr>
-<td><code>src/voicetext/enhance/enhancer.py</code></td>
+<td><code>src/wenzi/enhance/enhancer.py</code></td>
 <td>Integrates history context into enhancement prompts</td>
 </tr>
 <tr>
-<td><code>src/voicetext/ui/history_browser_window_web.py</code></td>
+<td><code>src/wenzi/ui/history_browser_window_web.py</code></td>
 <td>Web-based History Browser with pagination and archive toggle</td>
 </tr>
 <tr>
-<td><code>src/voicetext/usage_stats.py</code></td>
+<td><code>src/wenzi/usage_stats.py</code></td>
 <td>Aggregates <code>audio_duration</code> via <code>record_recording_duration()</code></td>
 </tr>
 <tr>
-<td><code>src/voicetext/app.py</code></td>
+<td><code>src/wenzi/app.py</code></td>
 <td>Records sessions in both output paths; menu toggle</td>
 </tr>
 <tr>
-<td><code>src/voicetext/config.py</code></td>
+<td><code>src/wenzi/config.py</code></td>
 <td>Default configuration for conversation history</td>
 </tr>
 </tbody>

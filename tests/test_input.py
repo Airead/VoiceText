@@ -3,28 +3,28 @@
 from unittest.mock import patch, MagicMock, call
 
 
-from voicetext.input import type_text
+from wenzi.input import type_text
 
 
 class TestTypeText:
     def test_empty_text_does_nothing(self):
-        with patch("voicetext.input._type_via_clipboard") as mock_clip:
+        with patch("wenzi.input._type_via_clipboard") as mock_clip:
             type_text("")
             mock_clip.assert_not_called()
 
-    @patch("voicetext.input._type_via_clipboard", return_value=True)
+    @patch("wenzi.input._type_via_clipboard", return_value=True)
     def test_auto_tries_clipboard_first(self, mock_clip):
         type_text("hello", method="auto")
         mock_clip.assert_called_once_with("hello")
 
-    @patch("voicetext.input._type_via_clipboard", return_value=False)
-    @patch("voicetext.input._type_via_applescript", return_value=True)
+    @patch("wenzi.input._type_via_clipboard", return_value=False)
+    @patch("wenzi.input._type_via_applescript", return_value=True)
     def test_auto_falls_back_to_applescript(self, mock_apple, mock_clip):
         type_text("hello", method="auto")
         mock_clip.assert_called_once()
         mock_apple.assert_called_once()
 
-    @patch("voicetext.input._type_via_clipboard", return_value=True)
+    @patch("wenzi.input._type_via_clipboard", return_value=True)
     def test_append_newline(self, mock_clip):
         type_text("hello", append_newline=True)
         mock_clip.assert_called_once_with("hello\n")
@@ -33,10 +33,10 @@ class TestTypeText:
 class TestPasteboardHelpers:
     """Tests for NSPasteboard-based clipboard helpers."""
 
-    @patch("voicetext.input.NSString")
-    @patch("voicetext.input.NSPasteboard")
+    @patch("wenzi.input.NSString")
+    @patch("wenzi.input.NSPasteboard")
     def test_set_pasteboard_concealed_sets_markers(self, mock_pb_cls, mock_nsstr):
-        from voicetext.input import _set_pasteboard_concealed
+        from wenzi.input import _set_pasteboard_concealed
 
         mock_pb = MagicMock()
         mock_pb_cls.generalPasteboard.return_value = mock_pb
@@ -54,9 +54,9 @@ class TestPasteboardHelpers:
         assert calls[1] == call("", "org.nspasteboard.ConcealedType")
         assert calls[2] == call("", "com.nspasteboard.TransientType")
 
-    @patch("voicetext.input.NSPasteboard")
+    @patch("wenzi.input.NSPasteboard")
     def test_get_pasteboard_string(self, mock_pb_cls):
-        from voicetext.input import _get_pasteboard_string
+        from wenzi.input import _get_pasteboard_string
 
         mock_pb = MagicMock()
         mock_pb_cls.generalPasteboard.return_value = mock_pb
@@ -67,10 +67,10 @@ class TestPasteboardHelpers:
         assert result == "existing text"
         mock_pb.stringForType_.assert_called_once()
 
-    @patch("voicetext.input.NSString")
-    @patch("voicetext.input.NSPasteboard")
+    @patch("wenzi.input.NSString")
+    @patch("wenzi.input.NSPasteboard")
     def test_set_pasteboard_string_no_markers(self, mock_pb_cls, mock_nsstr):
-        from voicetext.input import _set_pasteboard_string
+        from wenzi.input import _set_pasteboard_string
 
         mock_pb = MagicMock()
         mock_pb_cls.generalPasteboard.return_value = mock_pb
@@ -85,10 +85,10 @@ class TestPasteboardHelpers:
             "restored", "public.utf8-plain-text"
         )
 
-    @patch("voicetext.input.NSString")
-    @patch("voicetext.input.NSPasteboard")
+    @patch("wenzi.input.NSString")
+    @patch("wenzi.input.NSPasteboard")
     def test_concealed_write_failure_returns_false(self, mock_pb_cls, mock_nsstr):
-        from voicetext.input import _set_pasteboard_concealed
+        from wenzi.input import _set_pasteboard_concealed
 
         mock_pb = MagicMock()
         mock_pb_cls.generalPasteboard.return_value = mock_pb
@@ -99,15 +99,15 @@ class TestPasteboardHelpers:
 
         assert result is False
 
-    @patch("voicetext.input.time")
-    @patch("voicetext.input.threading")
-    @patch("voicetext.input.subprocess")
-    @patch("voicetext.input._set_pasteboard_concealed", return_value=True)
-    @patch("voicetext.input._get_pasteboard_string", return_value="old content")
+    @patch("wenzi.input.time")
+    @patch("wenzi.input.threading")
+    @patch("wenzi.input.subprocess")
+    @patch("wenzi.input._set_pasteboard_concealed", return_value=True)
+    @patch("wenzi.input._get_pasteboard_string", return_value="old content")
     def test_clipboard_restore_after_paste(
         self, mock_get, mock_set_concealed, mock_subprocess, mock_threading, mock_time
     ):
-        from voicetext.input import _type_via_clipboard
+        from wenzi.input import _type_via_clipboard
 
         mock_subprocess.run.return_value = MagicMock(returncode=0)
 
@@ -124,10 +124,10 @@ class TestPasteboardHelpers:
 class TestAppleScriptSafety:
     """Tests for AppleScript command injection prevention."""
 
-    @patch("voicetext.input.subprocess")
+    @patch("wenzi.input.subprocess")
     def test_applescript_uses_stdin(self, mock_subprocess):
         """AppleScript should pass script via stdin, not -e argument."""
-        from voicetext.input import _type_via_applescript
+        from wenzi.input import _type_via_applescript
 
         mock_subprocess.run.return_value = MagicMock(returncode=0)
 
@@ -140,10 +140,10 @@ class TestAppleScriptSafety:
         # Command should be just ["osascript"] without -e
         assert args[0] == ["osascript"]
 
-    @patch("voicetext.input.subprocess")
+    @patch("wenzi.input.subprocess")
     def test_applescript_special_chars(self, mock_subprocess):
         """Text with special characters should be safely passed."""
-        from voicetext.input import _type_via_applescript
+        from wenzi.input import _type_via_applescript
 
         mock_subprocess.run.return_value = MagicMock(returncode=0)
 

@@ -121,7 +121,7 @@ Use the controls to narrow down the issue:
 
 ### Phase 3: Edit the Mode
 
-1. Open `~/.config/VoiceText/enhance_modes/<mode_id>.md` in a text editor.
+1. Open `~/.config/WenZi/enhance_modes/<mode_id>.md` in a text editor.
    Or use Settings → AI → select mode → edit.
 2. Make targeted changes based on your diagnosis.
 3. Restart the app (or reload config) to load the updated prompt.

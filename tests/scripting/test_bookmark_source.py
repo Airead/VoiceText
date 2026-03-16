@@ -3,7 +3,7 @@
 import json
 import os
 
-from voicetext.scripting.sources.bookmark_source import (
+from wenzi.scripting.sources.bookmark_source import (
     Bookmark,
     BookmarkSource,
     _collect_chromium_nodes,

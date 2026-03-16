@@ -1,5 +1,5 @@
 [project]
-name = "voicetext"
+name = "wenzi"
 version = "0.0.6"
 description = "macOS menubar app: hold hotkey to record, release to transcribe and type"
 requires-python = ">=3.13"
@@ -31,14 +31,14 @@ dependencies = [
 # forces the resolver to accept numpy 1.26.4 for both.
 
 [project.scripts]
-voicetext = "voicetext.app:main"
+wenzi = "wenzi.app:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/voicetext"]
+packages = ["src/wenzi"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

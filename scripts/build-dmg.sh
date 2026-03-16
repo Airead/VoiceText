@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build VoiceText.app with PyInstaller, re-sign, and package as DMG.
+# Build WenZi.app with PyInstaller, re-sign, and package as DMG.
 # Usage: ./scripts/build-dmg.sh [version]
 # Example: ./scripts/build-dmg.sh 0.1.0
 set -euo pipefail
@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 DIST_DIR="$PROJECT_DIR/dist"
-APP_PATH="$DIST_DIR/VoiceText.app"
+APP_PATH="$DIST_DIR/WenZi.app"
 # Resolve signing identity: env var > auto-detect fingerprint > ad-hoc
 if [ -n "${CODESIGN_IDENTITY:-}" ]; then
     SIGN_IDENTITY="$CODESIGN_IDENTITY"
@@ -52,11 +52,11 @@ if [ "$VERSION" != "$PYPROJECT_VERSION" ]; then
     exit 1
 fi
 
-DMG_PATH="$DIST_DIR/VoiceText-${VERSION}-arm64.dmg"
+DMG_PATH="$DIST_DIR/WenZi-${VERSION}-arm64.dmg"
 
 cd "$PROJECT_DIR"
 
-echo "==> Building VoiceText v${VERSION}..."
+echo "==> Building WenZi v${VERSION}..."
 
 echo "==> Injecting build info..."
 uv run python scripts/inject_build_info.py
@@ -66,7 +66,7 @@ rm -rf build dist
 find "$PROJECT_DIR/src" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
 echo "==> Running PyInstaller..."
-uv run pyinstaller VoiceText.spec --clean --noconfirm
+uv run pyinstaller WenZi.spec --clean --noconfirm
 
 if [ "$SIGN_MODE" = "identity" ]; then
     echo "==> Re-signing app bundle (identity: $SIGN_IDENTITY)..."
@@ -83,7 +83,7 @@ echo "==> Creating DMG..."
 DMG_DIR=$(mktemp -d)
 cp -R "$APP_PATH" "$DMG_DIR/"
 ln -s /Applications "$DMG_DIR/Applications"
-hdiutil create -volname "VoiceText" \
+hdiutil create -volname "WenZi" \
     -srcfolder "$DMG_DIR" \
     -ov -format UDZO \
     "$DMG_PATH"

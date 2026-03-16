@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from voicetext.statusbar import (
+from wenzi.statusbar import (
     Response,
     StatusBarApp,
     StatusMenuItem,
@@ -224,8 +224,8 @@ class TestResponse:
 
 
 class TestSendNotification:
-    @patch("voicetext.statusbar.NSUserNotificationCenter")
-    @patch("voicetext.statusbar.NSUserNotification")
+    @patch("wenzi.statusbar.NSUserNotificationCenter")
+    @patch("wenzi.statusbar.NSUserNotification")
     def test_send_notification(self, mock_notif_cls, mock_center_cls):
         mock_notif = MagicMock()
         mock_notif_cls.alloc.return_value.init.return_value = mock_notif
@@ -242,7 +242,7 @@ class TestSendNotification:
     def test_send_notification_graceful_failure(self):
         """Should not raise even when notification center is unavailable."""
         with patch(
-            "voicetext.statusbar.NSUserNotification",
+            "wenzi.statusbar.NSUserNotification",
             side_effect=Exception("unavailable"),
         ):
             send_notification("T", "S", "M")  # should not raise
@@ -254,7 +254,7 @@ class TestSendNotification:
 
 
 class TestQuitApplication:
-    @patch("voicetext.statusbar.NSApplication")
+    @patch("wenzi.statusbar.NSApplication")
     def test_quit(self, mock_nsapp_cls):
         mock_nsapp = MagicMock()
         mock_nsapp_cls.sharedApplication.return_value = mock_nsapp

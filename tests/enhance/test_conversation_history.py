@@ -7,7 +7,7 @@ import os
 
 import pytest
 
-from voicetext.enhance.conversation_history import ConversationHistory
+from wenzi.enhance.conversation_history import ConversationHistory
 
 
 @pytest.fixture
@@ -947,25 +947,25 @@ class TestGetCorrections:
 
 class TestIsCorrected:
     def test_explicit_true(self):
-        from voicetext.enhance.conversation_history import ConversationHistory
+        from wenzi.enhance.conversation_history import ConversationHistory
         assert ConversationHistory._is_corrected({"user_corrected": True}) is True
 
     def test_explicit_false(self):
-        from voicetext.enhance.conversation_history import ConversationHistory
+        from wenzi.enhance.conversation_history import ConversationHistory
         assert ConversationHistory._is_corrected({"user_corrected": False}) is False
 
     def test_inferred_corrected(self):
-        from voicetext.enhance.conversation_history import ConversationHistory
+        from wenzi.enhance.conversation_history import ConversationHistory
         record = {"enhanced_text": "enhanced", "final_text": "different"}
         assert ConversationHistory._is_corrected(record) is True
 
     def test_inferred_not_corrected(self):
-        from voicetext.enhance.conversation_history import ConversationHistory
+        from wenzi.enhance.conversation_history import ConversationHistory
         record = {"enhanced_text": "same", "final_text": "same"}
         assert ConversationHistory._is_corrected(record) is False
 
     def test_inferred_no_enhance(self):
-        from voicetext.enhance.conversation_history import ConversationHistory
+        from wenzi.enhance.conversation_history import ConversationHistory
         record = {"enhanced_text": None, "final_text": "text"}
         assert ConversationHistory._is_corrected(record) is False
 

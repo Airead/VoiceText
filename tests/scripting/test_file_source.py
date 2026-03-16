@@ -2,7 +2,7 @@
 
 from unittest.mock import patch, MagicMock
 
-from voicetext.scripting.sources.file_source import (
+from wenzi.scripting.sources.file_source import (
     FileSource,
     _file_type_label,
     _mdfind,

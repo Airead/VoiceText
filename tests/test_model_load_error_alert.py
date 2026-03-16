@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 
 class TestShowModelLoadErrorAlert:
-    """Tests for VoiceTextApp._show_model_load_error_alert."""
+    """Tests for WenZiApp._show_model_load_error_alert."""
 
     def _make_app(self, preset_id="funasr-paraformer"):
         """Build a minimal mock app with the method under test."""
@@ -16,18 +16,18 @@ class TestShowModelLoadErrorAlert:
         app._config_degraded = False
 
         # Bind the real methods
-        from voicetext.app import VoiceTextApp
+        from wenzi.app import WenZiApp
 
         app._show_model_load_error_alert = (
-            VoiceTextApp._show_model_load_error_alert.__get__(app)
+            WenZiApp._show_model_load_error_alert.__get__(app)
         )
         app._clear_cache_and_reinitialize = (
-            VoiceTextApp._clear_cache_and_reinitialize.__get__(app)
+            WenZiApp._clear_cache_and_reinitialize.__get__(app)
         )
         return app
 
-    @patch("voicetext.app.restore_accessory")
-    @patch("voicetext.app.topmost_alert", return_value=0)
+    @patch("wenzi.app.restore_accessory")
+    @patch("wenzi.app.topmost_alert", return_value=0)
     def test_shows_alert_with_clear_cache_option_for_local_model(
         self, mock_alert, mock_restore
     ):
@@ -39,8 +39,8 @@ class TestShowModelLoadErrorAlert:
         assert "Clear Cache & Retry" in str(call_kwargs)
         mock_restore.assert_called_once()
 
-    @patch("voicetext.app.restore_accessory")
-    @patch("voicetext.app.topmost_alert", return_value=0)
+    @patch("wenzi.app.restore_accessory")
+    @patch("wenzi.app.topmost_alert", return_value=0)
     def test_shows_alert_without_clear_cache_for_apple(
         self, mock_alert, mock_restore
     ):
@@ -53,8 +53,8 @@ class TestShowModelLoadErrorAlert:
         assert "Clear Cache & Retry" not in str(call_kwargs)
         mock_restore.assert_called_once()
 
-    @patch("voicetext.app.restore_accessory")
-    @patch("voicetext.app.topmost_alert", return_value=0)
+    @patch("wenzi.app.restore_accessory")
+    @patch("wenzi.app.topmost_alert", return_value=0)
     def test_shows_generic_alert_when_no_preset(
         self, mock_alert, mock_restore
     ):
@@ -65,8 +65,8 @@ class TestShowModelLoadErrorAlert:
         call_kwargs = mock_alert.call_args
         assert "Clear Cache & Retry" not in str(call_kwargs)
 
-    @patch("voicetext.app.restore_accessory")
-    @patch("voicetext.app.topmost_alert", return_value=1)
+    @patch("wenzi.app.restore_accessory")
+    @patch("wenzi.app.topmost_alert", return_value=1)
     def test_clear_cache_retry_triggered_on_ok(
         self, mock_alert, mock_restore
     ):
@@ -77,8 +77,8 @@ class TestShowModelLoadErrorAlert:
 
         mock_reinit.assert_called_once()
 
-    @patch("voicetext.app.restore_accessory")
-    @patch("voicetext.app.topmost_alert", return_value=1)
+    @patch("wenzi.app.restore_accessory")
+    @patch("wenzi.app.topmost_alert", return_value=1)
     def test_clear_cache_option_for_mlx_whisper(
         self, mock_alert, mock_restore
     ):
@@ -89,8 +89,8 @@ class TestShowModelLoadErrorAlert:
         call_kwargs = mock_alert.call_args
         assert "Clear Cache & Retry" in str(call_kwargs)
 
-    @patch("voicetext.app.restore_accessory")
-    @patch("voicetext.app.topmost_alert", return_value=0)
+    @patch("wenzi.app.restore_accessory")
+    @patch("wenzi.app.topmost_alert", return_value=0)
     def test_error_message_truncated(self, mock_alert, mock_restore):
         app = self._make_app("funasr-paraformer")
         long_error = "x" * 500
@@ -107,15 +107,15 @@ class TestShowModelLoadErrorAlert:
 class TestModelControllerSwitchErrorAlert:
     """Tests for ModelController._do_switch error alert."""
 
-    @patch("voicetext.controllers.model_controller.restore_accessory")
-    @patch("voicetext.controllers.model_controller.topmost_alert", return_value=0)
-    @patch("voicetext.controllers.model_controller.is_model_cached", return_value=True)
-    @patch("voicetext.controllers.model_controller.is_backend_available", return_value=True)
+    @patch("wenzi.controllers.model_controller.restore_accessory")
+    @patch("wenzi.controllers.model_controller.topmost_alert", return_value=0)
+    @patch("wenzi.controllers.model_controller.is_model_cached", return_value=True)
+    @patch("wenzi.controllers.model_controller.is_backend_available", return_value=True)
     def test_switch_failure_shows_alert(
         self, mock_available, mock_cached, mock_alert, mock_restore
     ):
         """Model switch failure should show topmost_alert."""
-        from voicetext.controllers.model_controller import ModelController
+        from wenzi.controllers.model_controller import ModelController
         app = MagicMock()
         app._busy = False
         app._current_preset_id = "funasr-paraformer"
@@ -127,7 +127,7 @@ class TestModelControllerSwitchErrorAlert:
         ctrl = ModelController.__new__(ModelController)
         ctrl._app = app
 
-        from voicetext.transcription.model_registry import PRESET_BY_ID
+        from wenzi.transcription.model_registry import PRESET_BY_ID
 
         # Simulate the error path directly
         preset = PRESET_BY_ID["funasr-paraformer"]

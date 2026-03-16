@@ -1,14 +1,14 @@
 # 配置说明
 
-默认配置文件路径：`~/.config/VoiceText/config.json`。只需包含你想修改的字段，其余字段将使用默认值。
+默认配置文件路径：`~/.config/WenZi/config.json`。只需包含你想修改的字段，其余字段将使用默认值。
 
 ## 配置目录解析
 
 配置目录按以下优先级解析：
 
-1. **命令行参数** -- 将目录路径作为第一个位置参数传入：`voicetext /path/to/config-dir`
-2. **NSUserDefaults** -- 通过设置界面保存的自定义目录（存储在 `com.voicetext.app` / `config_dir` 下）
-3. **默认路径** -- `~/.config/VoiceText/`
+1. **命令行参数** -- 将目录路径作为第一个位置参数传入：`wenzi /path/to/config-dir`
+2. **NSUserDefaults** -- 通过设置界面保存的自定义目录（存储在 `io.github.airead.wenzi` / `config_dir` 下）
+3. **默认路径** -- `~/.config/WenZi/`
 
 配置文件始终是解析后目录中的 `config.json`。
 

@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from voicetext.transcription.punctuation import PunctuationRestorer
+from wenzi.transcription.punctuation import PunctuationRestorer
 
 
 class TestPunctuationRestorer:

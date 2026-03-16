@@ -2,8 +2,8 @@
 
 from unittest.mock import patch
 
-from voicetext.scripting.sources import ChooserItem, ChooserSource, ModifierAction
-from voicetext.scripting.api.chooser import (
+from wenzi.scripting.sources import ChooserItem, ChooserSource, ModifierAction
+from wenzi.scripting.api.chooser import (
     ChooserAPI,
     _dict_to_chooser_item,
     _parse_modifiers,

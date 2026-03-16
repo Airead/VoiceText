@@ -5,7 +5,7 @@ from pathlib import Path
 
 from unittest.mock import patch
 
-from voicetext.transcription.model_registry import (
+from wenzi.transcription.model_registry import (
     PRESET_BY_ID,
     PRESETS,
     find_fallback_preset,
@@ -138,9 +138,9 @@ class TestGetModelSize:
         assert size is None or isinstance(size, int)
 
     def test_uncached_model_returns_none(self):
-        from voicetext.transcription.model_registry import ModelPreset
+        from wenzi.transcription.model_registry import ModelPreset
 
-        # Use a backend that falls through to the default voicetext cache path
+        # Use a backend that falls through to the default wenzi cache path
         fake_preset = ModelPreset(
             id="nonexistent-model-xyz",
             display_name="Fake",
@@ -175,7 +175,7 @@ class TestFindFallbackPreset:
 
     def test_returns_none_when_nothing_available(self):
         with patch(
-            "voicetext.transcription.model_registry.is_backend_available",
+            "wenzi.transcription.model_registry.is_backend_available",
             return_value=False,
         ):
             assert find_fallback_preset() is None
@@ -189,11 +189,11 @@ class TestFindFallbackPreset:
 
         with (
             patch(
-                "voicetext.transcription.model_registry.is_backend_available",
+                "wenzi.transcription.model_registry.is_backend_available",
                 side_effect=_available,
             ),
             patch(
-                "voicetext.transcription.model_registry.is_model_cached",
+                "wenzi.transcription.model_registry.is_model_cached",
                 side_effect=_cached,
             ),
         ):
@@ -207,11 +207,11 @@ class TestFindFallbackPreset:
 
         with (
             patch(
-                "voicetext.transcription.model_registry.is_backend_available",
+                "wenzi.transcription.model_registry.is_backend_available",
                 side_effect=_available,
             ),
             patch(
-                "voicetext.transcription.model_registry.is_model_cached",
+                "wenzi.transcription.model_registry.is_model_cached",
                 return_value=False,
             ),
         ):

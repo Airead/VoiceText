@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>提供商与模型指南 — VoiceText</title>
+  <title>提供商与模型指南 — WenZi</title>
   <link rel="icon" type="image/png" href="../../images/icon.png">
   <link rel="stylesheet" href="../../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../../" class="nav-brand">
-        <img src="../../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../../">&larr; 返回</a></li>
         <li><a href="../../docs/provider-model-guide.html" class="lang-switch">English</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -102,9 +102,9 @@
 
     </div>
 
-<p>本指南说明如何在 VoiceText 中配置 ASR（语音识别）模型和 AI 增强服务商。涵盖 GUI（设置面板）和配置文件两种方式。</p>
+<p>本指南说明如何在 闻字 中配置 ASR（语音识别）模型和 AI 增强服务商。涵盖 GUI（设置面板）和配置文件两种方式。</p>
 <h2 id="asr"><a href="#asr" class="heading-anchor">ASR 模型选择</a></h2>
-<p>VoiceText 支持五种 ASR 后端：</p>
+<p>闻字 支持五种 ASR 后端：</p>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -149,9 +149,9 @@
 </table></div>
 <h3 id="gui-asr"><a href="#gui-asr" class="heading-anchor">通过 GUI 配置 ASR</a></h3>
 <p>打开 <strong>Settings...</strong> → <strong>STT</strong> 标签页。所有可用的本地和远程 ASR 模型以单选按钮形式列出。选择其中一个即可切换——当前激活的模型会高亮显示。</p>
-<p>如果所选的 MLX-Whisper 模型尚未下载，VoiceText 会在首次使用时自动下载（菜单栏图标显示 <code>DL X%</code> 下载进度）。已配置服务商的远程 ASR 模型也会显示在此标签页中。</p>
+<p>如果所选的 MLX-Whisper 模型尚未下载，闻字 会在首次使用时自动下载（菜单栏图标显示 <code>DL X%</code> 下载进度）。已配置服务商的远程 ASR 模型也会显示在此标签页中。</p>
 <h3 id="asr_1"><a href="#asr_1" class="heading-anchor">通过配置文件配置 ASR</a></h3>
-<p>编辑 <code>~/.config/VoiceText/config.json</code>：</p>
+<p>编辑 <code>~/.config/WenZi/config.json</code>：</p>
 <pre><code class="language-json">{
   &quot;asr&quot;: {
     &quot;backend&quot;: &quot;mlx-whisper&quot;,
@@ -193,7 +193,7 @@
 </tr>
 </tbody>
 </table></div>
-<p>编辑后需重启 VoiceText 使更改生效。</p>
+<p>编辑后需重启 闻字 使更改生效。</p>
 <h3 id="asr_2"><a href="#asr_2" class="heading-anchor">可用 ASR 模型</a></h3>
 <div class="table-wrapper"><table>
 <thead>
@@ -254,7 +254,7 @@
 </blockquote>
 <hr />
 <h2 id="asr_3"><a href="#asr_3" class="heading-anchor">远程 ASR 服务商</a></h2>
-<p>除本地 ASR 后端外，VoiceText 还支持通过 OpenAI 兼容的音频转录 API（例如 Groq、OpenAI）进行远程 ASR。远程服务商的配置与 LLM 服务商分开管理。</p>
+<p>除本地 ASR 后端外，闻字 还支持通过 OpenAI 兼容的音频转录 API（例如 Groq、OpenAI）进行远程 ASR。远程服务商的配置与 LLM 服务商分开管理。</p>
 <h3 id="gui-asr_1"><a href="#gui-asr_1" class="heading-anchor">通过 GUI 配置远程 ASR</a></h3>
 <ol>
 <li>
@@ -271,14 +271,14 @@
      whisper-large-v3</code></p>
 <ol start="3">
 <li>
-<p>点击 <strong>Verify</strong> — VoiceText 会发送一段短暂的静音音频片段来测试连接。</p>
+<p>点击 <strong>Verify</strong> — 闻字 会发送一段短暂的静音音频片段来测试连接。</p>
 </li>
 <li>
 <p>验证通过后，点击 <strong>Save</strong>。新模型将出现在 <strong>STT</strong> 标签页中。</p>
 </li>
 </ol>
 <h3 id="asr_4"><a href="#asr_4" class="heading-anchor">通过配置文件配置远程 ASR</a></h3>
-<p>编辑 <code>~/.config/VoiceText/config.json</code>，在 <code>asr</code> 下添加条目：</p>
+<p>编辑 <code>~/.config/WenZi/config.json</code>，在 <code>asr</code> 下添加条目：</p>
 <pre><code class="language-json">{
   &quot;asr&quot;: {
     &quot;default_provider&quot;: &quot;groq&quot;,
@@ -293,7 +293,7 @@
   }
 }
 </code></pre>
-<p>设置 <code>default_provider</code> 和 <code>default_model</code> 后，VoiceText 启动时将使用远程 ASR 模型。将两者都设为 <code>null</code> 可切换回本地后端。</p>
+<p>设置 <code>default_provider</code> 和 <code>default_model</code> 后，闻字 启动时将使用远程 ASR 模型。将两者都设为 <code>null</code> 可切换回本地后端。</p>
 <h3 id="asr_5"><a href="#asr_5" class="heading-anchor">远程 ASR 示例</a></h3>
 <p><strong>Groq</strong></p>
 <pre><code class="language-json">&quot;groq&quot;: {
@@ -338,14 +338,14 @@
    - <strong>extra_body</strong>（可选）：随每个请求一起发送的额外 JSON 参数</p>
 </li>
 <li>
-<p>点击 <strong>Verify</strong> — VoiceText 会使用列表中的第一个模型测试连接。</p>
+<p>点击 <strong>Verify</strong> — 闻字 会使用列表中的第一个模型测试连接。</p>
 </li>
 <li>
 <p>验证通过后，点击 <strong>Save</strong> 添加服务商。</p>
 </li>
 </ol>
 <h3 id="_1"><a href="#_1" class="heading-anchor">通过配置文件配置服务商</a></h3>
-<p>编辑 <code>~/.config/VoiceText/config.json</code>，在 <code>ai_enhance.providers</code> 下添加条目：</p>
+<p>编辑 <code>~/.config/WenZi/config.json</code>，在 <code>ai_enhance.providers</code> 下添加条目：</p>
 <pre><code class="language-json">{
   &quot;ai_enhance&quot;: {
     &quot;default_provider&quot;: &quot;openai&quot;,
@@ -392,7 +392,7 @@
 </tr>
 </tbody>
 </table></div>
-<p>编辑后需重启 VoiceText 使更改生效。</p>
+<p>编辑后需重启 闻字 使更改生效。</p>
 <h3 id="_2"><a href="#_2" class="heading-anchor">服务商示例</a></h3>
 <p><strong>Ollama（本地）</strong></p>
 <pre><code class="language-json">&quot;ollama&quot;: {

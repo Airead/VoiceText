@@ -68,7 +68,7 @@ to handle ⌘C, ⌘V, ⌘A. Without it, these shortcuts are silently swallowed.
 `_build_panel()` to inject a minimal Edit menu with Cut/Copy/Paste/Select All items.
 
 ```python
-from voicetext.ui.result_window import _ensure_edit_menu
+from wenzi.ui.result_window import _ensure_edit_menu
 _ensure_edit_menu()
 ```
 

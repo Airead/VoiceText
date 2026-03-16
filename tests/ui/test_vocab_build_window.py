@@ -12,7 +12,7 @@ from tests.conftest import mock_panel_close_delegate
 @pytest.fixture(autouse=True)
 def _mock_appkit(mock_appkit_modules, monkeypatch):
     """Mock AppKit and Foundation modules for headless testing."""
-    import voicetext.ui.vocab_build_window as _vbw
+    import wenzi.ui.vocab_build_window as _vbw
 
     mock_panel_close_delegate(monkeypatch, _vbw)
     return mock_appkit_modules
@@ -20,7 +20,7 @@ def _mock_appkit(mock_appkit_modules, monkeypatch):
 
 class TestVocabBuildProgressPanel:
     def _make_panel(self):
-        from voicetext.ui.vocab_build_window import VocabBuildProgressPanel
+        from wenzi.ui.vocab_build_window import VocabBuildProgressPanel
 
         return VocabBuildProgressPanel()
 

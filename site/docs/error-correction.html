@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Why Error Correction Is So Powerful — VoiceText</title>
+  <title>Why Error Correction Is So Powerful — WenZi</title>
   <link rel="icon" type="image/png" href="../images/icon.png">
   <link rel="stylesheet" href="../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../" class="nav-brand">
-        <img src="../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../">&larr; Back</a></li>
         <li><a href="../zh/docs/error-correction.html" class="lang-switch">中文</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -86,7 +86,7 @@
 
     </div>
 
-<p>VoiceText doesn't just transcribe — it builds a multi-layered correction system that gets smarter every time you use it.</p>
+<p>闻字 doesn't just transcribe — it builds a multi-layered correction system that gets smarter every time you use it.</p>
 <h2 id="the-problem"><a href="#the-problem" class="heading-anchor">The Problem</a></h2>
 <p>Every speech-to-text engine makes mistakes. Even the best ASR models produce errors — especially with:</p>
 <ul>
@@ -96,9 +96,9 @@
 <li><strong>Punctuation and formatting</strong> — ASR engines output raw text with little or no punctuation</li>
 <li><strong>Context loss</strong> — Each transcription is independent — the engine doesn't know what you said 30 seconds ago</li>
 </ul>
-<p>Most voice input tools stop at the ASR output and leave you to manually fix these errors. <strong>VoiceText takes a fundamentally different approach</strong> — it layers five independent correction strategies to catch what any single strategy would miss.</p>
+<p>Most voice input tools stop at the ASR output and leave you to manually fix these errors. <strong>闻字 takes a fundamentally different approach</strong> — it layers five independent correction strategies to catch what any single strategy would miss.</p>
 <h2 id="five-layers-of-correction"><a href="#five-layers-of-correction" class="heading-anchor">Five Layers of Correction</a></h2>
-<p>Instead of relying on a single technique, VoiceText stacks multiple correction layers. Each layer catches errors that the previous layers missed:</p>
+<p>Instead of relying on a single technique, 闻字 stacks multiple correction layers. Each layer catches errors that the previous layers missed:</p>
 <pre><code>  Voice Input
       |
       v
@@ -124,7 +124,7 @@
 </code></pre>
 <p>Layers 2 and 3 work by enriching the LLM's system prompt with relevant context. Layer 4 adds human oversight. Layer 5 closes the loop by feeding your corrections back into Layers 2 and 3. The result is a system that <strong>improves with every use</strong>.</p>
 <h2 id="layer-1-ai-enhancement"><a href="#layer-1-ai-enhancement" class="heading-anchor">Layer 1: AI Enhancement</a></h2>
-<p>When you enable an enhancement mode (like the built-in <strong>Proofread</strong> mode), VoiceText sends your ASR output to an LLM with a carefully crafted system prompt. The LLM acts as an intelligent post-processor:</p>
+<p>When you enable an enhancement mode (like the built-in <strong>Proofread</strong> mode), 闻字 sends your ASR output to an LLM with a carefully crafted system prompt. The LLM acts as an intelligent post-processor:</p>
 <ul>
 <li><strong>Fixes homophones and near-homophones</strong> by understanding context</li>
 <li><strong>Adds punctuation</strong> that ASR engines typically omit</li>
@@ -141,9 +141,9 @@
 <p>Enhancement modes are fully customizable Markdown files. You can create modes for translation, formatting, code generation, or any other text transformation. See <a href="enhance-modes.md">AI Enhancement Modes</a> for details.</p>
 </blockquote>
 <h2 id="layer-2-vocabulary-retrieval"><a href="#layer-2-vocabulary-retrieval" class="heading-anchor">Layer 2: Vocabulary Retrieval</a></h2>
-<p>Generic LLMs don't know your colleague's name, your company's product names, or the technical terms you use daily. VoiceText solves this with an <strong>embedding-based personal vocabulary system</strong>:</p>
+<p>Generic LLMs don't know your colleague's name, your company's product names, or the technical terms you use daily. 闻字 solves this with an <strong>embedding-based personal vocabulary system</strong>:</p>
 <ol>
-<li><strong>Build</strong> — VoiceText extracts proper nouns and technical terms from your correction history using an LLM. Each term includes its correct form, category, and common ASR misrecognitions.</li>
+<li><strong>Build</strong> — 闻字 extracts proper nouns and technical terms from your correction history using an LLM. Each term includes its correct form, category, and common ASR misrecognitions.</li>
 <li><strong>Index</strong> — Terms are embedded into a vector space using a multilingual model (<code>paraphrase-multilingual-MiniLM-L12-v2</code>), creating a semantic search index. Runs 100% locally.</li>
 <li><strong>Retrieve</strong> — When you speak, your ASR text is embedded and matched against the index. Only the top-K most relevant terms are injected into the LLM's system prompt.</li>
 </ol>
@@ -158,7 +158,7 @@
 <p><strong>Key insight:</strong> The vocabulary system is essentially a lightweight, local RAG (Retrieval-Augmented Generation) pipeline — purpose-built for voice input correction.</p>
 </blockquote>
 <h2 id="layer-3-conversation-history"><a href="#layer-3-conversation-history" class="heading-anchor">Layer 3: Conversation History</a></h2>
-<p>Real conversations have continuity. When you say "she was happy today", the word "she" only makes sense in the context of a previous sentence. VoiceText addresses this by injecting your <strong>recent confirmed outputs</strong> into the LLM's prompt.</p>
+<p>Real conversations have continuity. When you say "she was happy today", the word "she" only makes sense in the context of a previous sentence. 闻字 addresses this by injecting your <strong>recent confirmed outputs</strong> into the LLM's prompt.</p>
 <p>The core insight: <strong>your confirmed output is the highest-quality signal for what you actually mean.</strong> Unlike raw ASR text (which has errors) or AI output (which may over-correct), the final confirmed text represents your true intent.</p>
 <h3 id="what-gets-injected"><a href="#what-gets-injected" class="heading-anchor">What Gets Injected</a></h3>
 <p>Only sessions where you used the Preview panel and confirmed the result are included. This is a deliberate quality decision — a smaller set of verified data beats a larger set of unverified data.</p>
@@ -176,7 +176,7 @@
 <li><strong>Style adaptation</strong> — The LLM observes your writing patterns and matches your tone and formatting preferences.</li>
 </ul>
 <h2 id="layer-4-preview-panel"><a href="#layer-4-preview-panel" class="heading-anchor">Layer 4: Preview Panel</a></h2>
-<p>The Preview panel is VoiceText's <strong>human-in-the-loop</strong> interface. Before text is typed into your active application, you can review and refine it:</p>
+<p>The Preview panel is 闻字.s <strong>human-in-the-loop</strong> interface. Before text is typed into your active application, you can review and refine it:</p>
 <ul>
 <li><strong>Compare</strong> the raw ASR output with the AI-enhanced result side by side</li>
 <li><strong>Edit</strong> the final text directly in an editable field</li>
@@ -188,7 +188,7 @@
 <p>The Preview panel also serves as a <strong>prompt tuning workbench</strong>. You can test different prompts, compare models, and systematically improve enhancement quality. See <a href="prompt-optimization-workflow.md">Prompt Optimization Workflow</a> for the full process.</p>
 </blockquote>
 <h2 id="layer-5-self-improving-loop"><a href="#layer-5-self-improving-loop" class="heading-anchor">Layer 5: Self-Improving Loop</a></h2>
-<p>This is what ties everything together. VoiceText creates a <strong>virtuous cycle</strong> where every correction you make improves future corrections:</p>
+<p>This is what ties everything together. 闻字 creates a <strong>virtuous cycle</strong> where every correction you make improves future corrections:</p>
 <pre><code>  You speak  ──►  ASR  ──►  AI + Vocab + History  ──►  Preview Panel
                                                             |
           ┌─────────────────────────────────────────────────┘
@@ -203,13 +203,13 @@
 </code></pre>
 <ol>
 <li><strong>You correct</strong> an error in the Preview panel (e.g., "cereal" → "Ciriel")</li>
-<li><strong>VoiceText records</strong> the ASR text, AI output, and your final confirmed text</li>
+<li><strong>闻字 records</strong> the ASR text, AI output, and your final confirmed text</li>
 <li><strong>Conversation history</strong> uses this immediately — the next input already benefits from your correction</li>
 <li><strong>Vocabulary builder</strong> periodically extracts new terms from your correction history and rebuilds the embedding index</li>
 <li><strong>Future inputs</strong> get better enhancement because the LLM now has both recent context and a personal vocabulary</li>
 </ol>
 <blockquote>
-<p><strong>The more you use VoiceText, the better it gets.</strong> Your corrections aren't just fixing the current text — they're teaching the system your vocabulary, your preferences, and your common topics. Over time, you'll find yourself making fewer and fewer corrections.</p>
+<p><strong>The more you use 闻字, the better it gets.</strong> Your corrections aren't just fixing the current text — they're teaching the system your vocabulary, your preferences, and your common topics. Over time, you'll find yourself making fewer and fewer corrections.</p>
 </blockquote>
 <h2 id="full-example-all-layers-in-action"><a href="#full-example-all-layers-in-action" class="heading-anchor">Full Example: All Layers in Action</a></h2>
 <p>Let's trace a real scenario through all five layers:</p>
@@ -236,14 +236,14 @@ This session is logged. Next time you mention "Ciriel" or "Kubernetes", the syst
 <li><strong>Basic Voice Input</strong> — Transcribes speech and types it directly. No correction, no context, no learning. You fix every error manually.</li>
 <li><strong>Cloud Voice Assistants</strong> — Good accuracy for general speech, but no customization for your vocabulary. No correction loop. Privacy concerns with always-on cloud processing.</li>
 </ul>
-<p>VoiceText is different because it combines <strong>local-first processing</strong> (your data stays on your machine) with <strong>intelligent, layered correction</strong> that adapts to you:</p>
+<p>闻字 is different because it combines <strong>local-first processing</strong> (your data stays on your machine) with <strong>intelligent, layered correction</strong> that adapts to you:</p>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
 <th>Capability</th>
 <th>Basic Tools</th>
 <th>Cloud Assistants</th>
-<th>VoiceText</th>
+<th>闻字</th>
 </tr>
 </thead>
 <tbody>

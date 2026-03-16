@@ -1,4 +1,4 @@
-# VoiceText
+# 闻字 (WenZi)
 
 A macOS menubar speech-to-text application. Hold a hotkey to record, release to transcribe and automatically type the result into the active application.
 
@@ -19,42 +19,42 @@ A macOS menubar speech-to-text application. Hold a hotkey to record, release to 
 
 ### Option 1: Download Release (Recommended)
 
-Download the latest `VoiceText.app` from the [Releases](https://github.com/Airead/VoiceText/releases) page, drag it to `/Applications`, and double-click to launch.
+Download the latest `WenZi.app` from the [Releases](https://github.com/Airead/WenZi/releases) page, drag it to `/Applications`, and double-click to launch.
 
-> **First launch note:** Since VoiceText is not signed with an Apple Developer certificate, macOS will block the first launch. Go to **System Settings → Privacy & Security**, scroll down to find the VoiceText blocked message, and click **Open Anyway**.
+> **First launch note:** Since 闻字 is not signed with an Apple Developer certificate, macOS will block the first launch. Go to **System Settings → Privacy & Security**, scroll down to find the 闻字 blocked message, and click **Open Anyway**.
 
 ### Option 2: Build from Source
 
 If you prefer to build the app yourself, the project provides build scripts:
 
 ```bash
-git clone https://github.com/Airead/VoiceText
-cd VoiceText
+git clone https://github.com/Airead/WenZi
+cd WenZi
 uv sync
 
-# Build VoiceText.app only
+# Build WenZi.app only
 ./scripts/build.sh
 
-# Or build VoiceText.app + DMG installer
+# Or build WenZi.app + DMG installer
 ./scripts/build-dmg.sh
 ```
 
-The built `VoiceText.app` will be in the `dist/` directory. The DMG build also produces a `VoiceText-<version>-arm64.dmg` with an Applications shortcut for drag-and-drop installation.
+The built `WenZi.app` will be in the `dist/` directory. The DMG build also produces a `WenZi-<version>-arm64.dmg` with an Applications shortcut for drag-and-drop installation.
 
 ### Option 3: Run from Source (Development)
 
 If you want to modify the code or debug, run directly from the terminal:
 
 ```bash
-git clone https://github.com/Airead/VoiceText
-cd VoiceText
+git clone https://github.com/Airead/WenZi
+cd WenZi
 uv sync
 
 # Run
-uv run python -m voicetext
+uv run python -m wenzi
 
 # Run with a custom config file
-uv run python -m voicetext path/to/config.json
+uv run python -m wenzi path/to/config.json
 ```
 
 ### Requirements
@@ -131,7 +131,7 @@ Click the menubar icon to access:
 ├── ─────────────────────
 ├── View Logs...             Open log viewer
 ├── Usage Stats              View usage statistics
-├── About VoiceText          Version info
+├── About 闻字          Version info
 └── Quit
 ```
 
@@ -208,7 +208,7 @@ Providers can be added, removed, and verified from the **Settings** panel (LLM t
 
 ### Vocabulary Retrieval
 
-VoiceText can build a personal vocabulary index from your correction history to improve recognition of proper nouns, technical terms, and domain-specific words. When enabled, relevant vocabulary entries are retrieved via embedding similarity and injected into the LLM prompt as context.
+闻字 can build a personal vocabulary index from your correction history to improve recognition of proper nouns, technical terms, and domain-specific words. When enabled, relevant vocabulary entries are retrieved via embedding similarity and injected into the LLM prompt as context.
 
 The vocabulary supports both automatic and manual building:
 
@@ -222,7 +222,7 @@ See [docs/vocabulary-embedding-retrieval.md](docs/vocabulary-embedding-retrieval
 
 ### Conversation History
 
-VoiceText can inject recent conversation history into the AI enhancement prompt, enabling the LLM to understand the current topic and resolve recurring entities consistently. For example, if the user confirmed "萍萍" in a previous turn, subsequent ASR errors like "平平" can be correctly resolved.
+闻字 can inject recent conversation history into the AI enhancement prompt, enabling the LLM to understand the current topic and resolve recurring entities consistently. For example, if the user confirmed "萍萍" in a previous turn, subsequent ASR errors like "平平" can be correctly resolved.
 
 - **Toggle**: Enable/disable in the Settings panel (AI tab)
 - Only preview-confirmed records (where the user reviewed and approved the output) are injected — ensuring data quality
@@ -253,7 +253,7 @@ Statistics are stored with both cumulative totals and per-day breakdowns.
 
 ## Scripting
 
-VoiceText includes a Python-based scripting system for custom automation. Enable it in Settings → General → **Scripting**, then create scripts at `~/.config/VoiceText/scripts/init.py`.
+闻字 includes a Python-based scripting system for custom automation. Enable it in Settings → General → **Scripting**, then create scripts at `~/.config/WenZi/scripts/init.py`.
 
 The scripting API (`vt` namespace) provides:
 
@@ -268,7 +268,7 @@ See [docs/scripting.md](docs/scripting.md) for the full API reference and exampl
 
 ## Configuration
 
-Default config path: `~/.config/VoiceText/config.json`. Pass a JSON config file as a command-line argument to override. Only the fields you want to change are needed; everything else uses defaults.
+Default config path: `~/.config/WenZi/config.json`. Pass a JSON config file as a command-line argument to override. Only the fields you want to change are needed; everything else uses defaults.
 
 The config directory can be changed via Settings → General → **Config Directory** (stored in macOS `NSUserDefaults` so it persists independently of the config file itself). Use the **Reset** button to revert to the default location.
 
@@ -282,12 +282,12 @@ uv run pytest
 
 ## Logging
 
-Logs are saved to `~/Library/Logs/VoiceText/voicetext.log` with rotation (5 MB per file, 3 backups). View logs in-app via menubar → **View Logs...**.
+Logs are saved to `~/Library/Logs/WenZi/wenzi.log` with rotation (5 MB per file, 3 backups). View logs in-app via menubar → **View Logs...**.
 
 ## Project Structure
 
 ```
-src/voicetext/
+src/wenzi/
 ├── app.py                       # Menubar application with enhancement caching
 ├── config.py                    # Configuration loading and defaults
 ├── hotkey.py                    # Global hotkey listener (Quartz)

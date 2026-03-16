@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from voicetext.controllers.config_controller import ConfigController
+from wenzi.controllers.config_controller import ConfigController
 
 
 @pytest.fixture
@@ -63,27 +63,27 @@ def ctrl(mock_app):
 
 
 class TestOnEnhanceEditConfig:
-    @patch("voicetext.controllers.config_controller.subprocess.Popen")
+    @patch("wenzi.controllers.config_controller.subprocess.Popen")
     def test_opens_config_file(self, mock_popen, ctrl, mock_app):
         ctrl.on_enhance_edit_config(None)
         mock_popen.assert_called_once()
         args = mock_popen.call_args[0][0]
         assert args[0] == "open"
 
-    @patch("voicetext.controllers.config_controller.subprocess.Popen", side_effect=Exception("fail"))
+    @patch("wenzi.controllers.config_controller.subprocess.Popen", side_effect=Exception("fail"))
     def test_handles_error(self, mock_popen, ctrl):
         # Should not raise
         ctrl.on_enhance_edit_config(None)
 
 
 class TestLogLevelChange:
-    @patch("voicetext.controllers.config_controller.save_config")
+    @patch("wenzi.controllers.config_controller.save_config")
     def test_changes_level(self, mock_save, ctrl, mock_app):
         ctrl.on_log_level_change("DEBUG")
         assert mock_app._config["logging"]["level"] == "DEBUG"
         mock_save.assert_called_once()
 
-    @patch("voicetext.controllers.config_controller.save_config")
+    @patch("wenzi.controllers.config_controller.save_config")
     def test_invalid_level_defaults_to_info(self, mock_save, ctrl, mock_app):
         ctrl.on_log_level_change("NONEXISTENT")
         # getattr fallback is logging.INFO
@@ -114,7 +114,7 @@ class TestDebugToggles:
 
 
 class TestBuildConfigInfo:
-    @patch("voicetext.controllers.config_controller.PRESET_BY_ID", {"funasr-zh": MagicMock(display_name="FunASR 中文")})
+    @patch("wenzi.controllers.config_controller.PRESET_BY_ID", {"funasr-zh": MagicMock(display_name="FunASR 中文")})
     def test_basic_fields(self, ctrl, mock_app):
         info = ctrl.build_config_info()
         assert "FunASR" in info
@@ -122,13 +122,13 @@ class TestBuildConfigInfo:
         assert "openai" in info
         assert "gpt-4o" in info
 
-    @patch("voicetext.controllers.config_controller.PRESET_BY_ID", {})
+    @patch("wenzi.controllers.config_controller.PRESET_BY_ID", {})
     def test_remote_asr(self, ctrl, mock_app):
         mock_app._current_remote_asr = ("groq", "whisper-v3")
         info = ctrl.build_config_info()
         assert "groq / whisper-v3 (remote)" in info
 
-    @patch("voicetext.controllers.config_controller.PRESET_BY_ID", {})
+    @patch("wenzi.controllers.config_controller.PRESET_BY_ID", {})
     def test_no_enhancer(self, ctrl, mock_app):
         mock_app._enhancer = None
         info = ctrl.build_config_info()
@@ -136,8 +136,8 @@ class TestBuildConfigInfo:
 
 
 class TestOnReloadConfig:
-    @patch("voicetext.controllers.config_controller.send_notification")
-    @patch("voicetext.controllers.config_controller.load_config")
+    @patch("wenzi.controllers.config_controller.send_notification")
+    @patch("wenzi.controllers.config_controller.load_config")
     def test_reload_success(self, mock_load, mock_notify, ctrl, mock_app):
         mock_load.return_value = ({
             "output": {"method": "clipboard", "append_newline": True, "preview": False},
@@ -165,8 +165,8 @@ class TestOnReloadConfig:
         assert mock_app._append_newline is True
         mock_notify.assert_called()
 
-    @patch("voicetext.controllers.config_controller.send_notification")
-    @patch("voicetext.controllers.config_controller.load_config", side_effect=Exception("bad config"))
+    @patch("wenzi.controllers.config_controller.send_notification")
+    @patch("wenzi.controllers.config_controller.load_config", side_effect=Exception("bad config"))
     def test_reload_failure(self, mock_load, mock_notify, ctrl):
         ctrl.on_reload_config(None)
         mock_notify.assert_called_once()
@@ -175,7 +175,7 @@ class TestOnReloadConfig:
 
 class TestOnBrowseHistory:
     def test_creates_browser_and_shows(self, ctrl, mock_app):
-        with patch("voicetext.ui.history_browser_window_web.HistoryBrowserPanel") as mock_cls:
+        with patch("wenzi.ui.history_browser_window_web.HistoryBrowserPanel") as mock_cls:
             mock_panel = MagicMock()
             mock_cls.return_value = mock_panel
 

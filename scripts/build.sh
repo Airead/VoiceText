@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Build VoiceText.app with PyInstaller and re-sign for macOS.
+# Build WenZi.app with PyInstaller and re-sign for macOS.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 DIST_DIR="$PROJECT_DIR/dist"
-APP_PATH="$DIST_DIR/VoiceText.app"
+APP_PATH="$DIST_DIR/WenZi.app"
 # Resolve signing identity: env var > auto-detect fingerprint > ad-hoc
 if [ -n "${CODESIGN_IDENTITY:-}" ]; then
     SIGN_IDENTITY="$CODESIGN_IDENTITY"
@@ -28,7 +28,7 @@ rm -rf build dist
 find "$PROJECT_DIR/src" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
 echo "==> Running PyInstaller..."
-uv run pyinstaller VoiceText.spec --clean --noconfirm
+uv run pyinstaller WenZi.spec --clean --noconfirm
 
 if [ "$SIGN_MODE" = "identity" ]; then
     echo "==> Re-signing app bundle (identity: $SIGN_IDENTITY)..."

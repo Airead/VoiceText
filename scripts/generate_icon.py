@@ -1,4 +1,4 @@
-"""Generate a macOS-style app icon for VoiceText.
+"""Generate a macOS-style app icon for WenZi.
 
 Creates a clean 1024x1024 icon with a microphone on the left
 and text lines on the right, clearly separated.
@@ -128,7 +128,7 @@ def draw_arrow(draw: ImageDraw.Draw, cx: int, cy: int, s: float):
 
 
 def generate_icon(output_path: str = "icon.png", size: int = 1024):
-    """Generate the VoiceText app icon."""
+    """Generate the WenZi app icon."""
     # Gradient background
     base = Image.new("RGB", (size, size))
     draw_gradient(base, (50, 130, 255), (130, 70, 220))

@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from voicetext.controllers.enhance_controller import EnhanceController, EnhanceCacheEntry
-from voicetext.lru_cache import LRUCache
+from wenzi.controllers.enhance_controller import EnhanceController, EnhanceCacheEntry
+from wenzi.lru_cache import LRUCache
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,178 @@
+# -*- mode: python ; coding: utf-8 -*-
+"""PyInstaller spec for WenZi.app (闻字)"""
+
+import os
+import sys
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
+
+from PyInstaller.utils.hooks import collect_all, collect_dynamic_libs
+
+# Read version from pyproject.toml (single source of truth)
+_spec_dir = os.path.dirname(os.path.abspath(SPEC))
+with open(os.path.join(_spec_dir, 'pyproject.toml'), 'rb') as _f:
+    _pyproject = tomllib.load(_f)
+_version = _pyproject['project']['version']
+
+block_cipher = None
+
+# Collect mlx native extensions (.so, .dylib, .metallib) and data files
+mlx_datas, mlx_binaries, mlx_hiddenimports = collect_all('mlx')
+mlx_whisper_datas, mlx_whisper_binaries, mlx_whisper_hiddenimports = collect_all('mlx_whisper')
+fastembed_datas, fastembed_binaries, fastembed_hiddenimports = collect_all('fastembed')
+
+a = Analysis(
+    ['src/wenzi/__main__.py'],
+    pathex=['src'],
+    binaries=mlx_binaries + mlx_whisper_binaries + fastembed_binaries,
+    datas=mlx_datas + mlx_whisper_datas + fastembed_datas,
+    hiddenimports=mlx_hiddenimports + mlx_whisper_hiddenimports + fastembed_hiddenimports + [
+        # wenzi core
+        'wenzi',
+        'wenzi.app',
+        'wenzi.config',
+        'wenzi.hotkey',
+        'wenzi.input',
+        'wenzi.statusbar',
+        'wenzi.usage_stats',
+        'wenzi.lru_cache',
+        'wenzi.ui_helpers',
+        # wenzi.audio
+        'wenzi.audio',
+        'wenzi.audio.recorder',
+        'wenzi.audio.recording_indicator',
+        'wenzi.audio.sound_manager',
+        # wenzi.transcription
+        'wenzi.transcription',
+        'wenzi.transcription.base',
+        'wenzi.transcription.funasr',
+        'wenzi.transcription.mlx',
+        'wenzi.transcription.apple',
+        'wenzi.transcription.sherpa',
+        'wenzi.transcription.whisper_api',
+        'wenzi.transcription.model_registry',
+        'wenzi.transcription.punctuation',
+        # wenzi.enhance
+        'wenzi.enhance',
+        'wenzi.enhance.enhancer',
+        'wenzi.enhance.vocabulary',
+        'wenzi.enhance.vocabulary_builder',
+        'wenzi.enhance.auto_vocab_builder',
+        'wenzi.enhance.conversation_history',
+        'wenzi.enhance.preview_history',
+        'wenzi.enhance.mode_loader',
+        # wenzi.ui
+        'wenzi.ui',
+        'wenzi.ui.result_window',
+        'wenzi.ui.result_window_web',
+        'wenzi.ui.settings_window',
+        'wenzi.ui.log_viewer_window',
+        'wenzi.ui.history_browser_window',
+        'wenzi.ui.history_browser_window_web',
+        'wenzi.ui.live_transcription_overlay',
+        'wenzi.ui.streaming_overlay',
+        'wenzi.ui.stats_panel',
+        'wenzi.ui.translate_webview',
+        'wenzi.ui.vocab_build_window',
+        # wenzi.controllers
+        'wenzi.controllers',
+        'wenzi.controllers.recording_controller',
+        'wenzi.controllers.model_controller',
+        'wenzi.controllers.enhance_controller',
+        'wenzi.controllers.enhance_mode_controller',
+        'wenzi.controllers.config_controller',
+        'wenzi.controllers.settings_controller',
+        'wenzi.controllers.preview_controller',
+        'wenzi.controllers.menu_builder',
+        # wenzi.scripting
+        'wenzi.scripting',
+        'wenzi.scripting.engine',
+        'wenzi.scripting.registry',
+        'wenzi.scripting.api',
+        'wenzi.scripting.ui',
+        # third-party
+        'sounddevice',
+        'soundfile',
+        'numpy',
+        'librosa',
+        'funasr_onnx',
+        'funasr_onnx.paraformer_bin',
+        'funasr_onnx.vad_bin',
+        'funasr_onnx.punc_bin',
+        'funasr_onnx.utils.utils',
+        'funasr_onnx.utils.frontend',
+        'jieba',
+        'pynput',
+        'pynput.keyboard',
+        'pynput.keyboard._darwin',
+        'onnxruntime',
+        'sentencepiece',
+        'tiktoken',
+        'huggingface_hub',
+        'sherpa_onnx',
+        # PyObjC frameworks
+        'ApplicationServices',
+        'CoreFoundation',
+        'Quartz',
+        'AppKit',
+        'Speech',
+        'WebKit',
+        'AVFoundation',
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='WenZi',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=False,
+    target_arch=None,
+    codesign_identity=os.environ.get('CODESIGN_IDENTITY', ''),
+    entitlements_file=None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    name='WenZi',
+)
+
+app = BUNDLE(
+    coll,
+    name='WenZi.app',
+    icon=os.path.join(_spec_dir, 'resources', 'icon.icns'),
+    bundle_identifier='io.github.airead.wenzi',
+    codesign_identity=os.environ.get('CODESIGN_IDENTITY', ''),
+    info_plist={
+        'CFBundleName': 'WenZi',
+        'CFBundleDisplayName': 'WenZi',
+        'CFBundleVersion': _version,
+        'CFBundleShortVersionString': _version,
+        'LSUIElement': True,
+        'NSMicrophoneUsageDescription': 'WenZi needs microphone access to record speech for transcription.',
+        'NSAppleEventsUsageDescription': 'WenZi needs accessibility access to type transcribed text.',
+    },
+)

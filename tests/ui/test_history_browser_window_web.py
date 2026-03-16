@@ -17,7 +17,7 @@ def mock_appkit(mock_appkit_modules, monkeypatch):
     mock_webkit = MagicMock()
     monkeypatch.setitem(sys.modules, "WebKit", mock_webkit)
 
-    import voicetext.ui.history_browser_window_web as _hbw
+    import wenzi.ui.history_browser_window_web as _hbw
 
     _hbw._HistoryBrowserWebCloseDelegate = None
     _hbw._HistoryBrowserWebNavigationDelegate = None
@@ -58,7 +58,7 @@ def _get_js_calls(panel):
 
 class TestInit:
     def test_defaults(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         assert panel._panel is None
@@ -71,7 +71,7 @@ class TestInit:
         assert panel._active_tags == set()
 
     def test_close_without_show_is_noop(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel.close()  # Should not raise
@@ -79,7 +79,7 @@ class TestInit:
 
 class TestShow:
     def test_show_stores_callback(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         history = MagicMock()
@@ -94,7 +94,7 @@ class TestShow:
 
 class TestClose:
     def test_close_clears_state(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         history = MagicMock()
@@ -116,25 +116,25 @@ class TestClose:
 
 class TestTimeRangeCutoff:
     def test_all_returns_none(self):
-        from voicetext.ui.history_browser_window_web import _time_range_cutoff
+        from wenzi.ui.history_browser_window_web import _time_range_cutoff
 
         assert _time_range_cutoff("all") is None
 
     def test_7d_returns_iso_string(self):
-        from voicetext.ui.history_browser_window_web import _time_range_cutoff
+        from wenzi.ui.history_browser_window_web import _time_range_cutoff
 
         result = _time_range_cutoff("7d")
         assert result is not None
         assert "T" in result  # ISO format
 
     def test_30d_returns_iso_string(self):
-        from voicetext.ui.history_browser_window_web import _time_range_cutoff
+        from wenzi.ui.history_browser_window_web import _time_range_cutoff
 
         result = _time_range_cutoff("30d")
         assert result is not None
 
     def test_today_returns_iso_string(self):
-        from voicetext.ui.history_browser_window_web import _time_range_cutoff
+        from wenzi.ui.history_browser_window_web import _time_range_cutoff
 
         result = _time_range_cutoff("today")
         assert result is not None
@@ -149,7 +149,7 @@ class TestTimeRangeCutoff:
 
 class TestApplyFilters:
     def test_no_filters(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._time_range = "all"
@@ -162,7 +162,7 @@ class TestApplyFilters:
         assert len(panel._filtered_records) == 2
 
     def test_time_range_filter(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._time_range = "7d"
@@ -177,7 +177,7 @@ class TestApplyFilters:
         assert panel._filtered_records[0]["final_text"] == "future"
 
     def test_tag_filter_mode(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._time_range = "all"
@@ -193,7 +193,7 @@ class TestApplyFilters:
         assert all(r["enhance_mode"] == "proofread" for r in panel._filtered_records)
 
     def test_tag_filter_corrected(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._time_range = "all"
@@ -209,7 +209,7 @@ class TestApplyFilters:
 
     def test_tag_filter_or_logic(self):
         """Multiple active tags use OR: match any."""
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._time_range = "all"
@@ -225,7 +225,7 @@ class TestApplyFilters:
 
     def test_tag_filter_model(self):
         """Model names can be used as tags to filter."""
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._time_range = "all"
@@ -241,7 +241,7 @@ class TestApplyFilters:
         assert panel._filtered_records[0]["stt_model"] == "whisper"
 
     def test_tag_filter_llm_model(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._time_range = "all"
@@ -256,7 +256,7 @@ class TestApplyFilters:
         assert panel._filtered_records[0]["llm_model"] == "gpt-4"
 
     def test_combined_time_and_tag(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._time_range = "7d"
@@ -280,7 +280,7 @@ class TestApplyFilters:
 
 class TestJsMessages:
     def test_search_with_time_range(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         history = MagicMock()
@@ -295,7 +295,7 @@ class TestJsMessages:
         history.search.assert_called_once_with("hello", include_archived=False)
 
     def test_toggle_tags(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         panel._time_range = "all"
@@ -311,7 +311,7 @@ class TestJsMessages:
         assert panel._selected_index == -1
 
     def test_clear_filters(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         history = MagicMock()
@@ -330,7 +330,7 @@ class TestJsMessages:
         assert any("resetFilters" in c for c in calls)
 
     def test_select_row(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         record = {"timestamp": "t1", "enhance_mode": "proofread", "asr_text": "hi", "final_text": "hello"}
@@ -343,7 +343,7 @@ class TestJsMessages:
         assert any("showDetail" in c for c in calls)
 
     def test_select_row_out_of_range(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         panel._filtered_records = []
@@ -355,7 +355,7 @@ class TestJsMessages:
         assert any("clearDetail" in c for c in calls)
 
     def test_save(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         history = MagicMock()
@@ -373,7 +373,7 @@ class TestJsMessages:
         on_save.assert_called_once_with("t1", "new")
 
     def test_save_no_selection(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         history = MagicMock()
@@ -385,7 +385,7 @@ class TestJsMessages:
         history.update_final_text.assert_not_called()
 
     def test_save_failed(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         history = MagicMock()
@@ -402,7 +402,7 @@ class TestJsMessages:
         on_save.assert_not_called()
 
     def test_delete(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         history = MagicMock()
@@ -422,7 +422,7 @@ class TestJsMessages:
         assert panel._selected_index == -1
 
     def test_delete_no_selection(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         history = MagicMock()
@@ -434,7 +434,7 @@ class TestJsMessages:
         history.delete_record.assert_not_called()
 
     def test_delete_failed(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         history = MagicMock()
@@ -451,7 +451,7 @@ class TestJsMessages:
         assert len(panel._filtered_records) == 1
 
     def test_close_message(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         panel._handle_js_message({"type": "close"})
@@ -466,7 +466,7 @@ class TestJsMessages:
 
 class TestJsCallQueue:
     def test_eval_js_queued_before_page_load(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._webview = MagicMock()
@@ -478,7 +478,7 @@ class TestJsCallQueue:
         assert len(panel._pending_js) == 1
 
     def test_pending_js_flushed_on_page_load(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._webview = MagicMock()
@@ -497,7 +497,7 @@ class TestJsCallQueue:
         assert "setTagOptions" in combined
 
     def test_eval_js_direct_after_page_load(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._webview = MagicMock()
@@ -509,7 +509,7 @@ class TestJsCallQueue:
         assert len(panel._pending_js) == 0
 
     def test_close_clears_pending_js(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         panel._page_loaded = False
@@ -523,7 +523,7 @@ class TestJsCallQueue:
         assert len(panel._pending_js) == 0
 
     def test_flush_order_preserved(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._webview = MagicMock()
@@ -546,7 +546,7 @@ class TestJsCallQueue:
 
 class TestPushData:
     def test_push_records_includes_corrected_flag_and_total(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         panel._all_records = [
@@ -565,7 +565,7 @@ class TestPushData:
         assert ",2,0,1,1)" in call
 
     def test_push_tag_options(self):
-        from voicetext.ui.history_browser_window_web import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window_web import HistoryBrowserPanel
 
         panel = _build_panel(HistoryBrowserPanel())
         panel._time_range = "all"
@@ -613,12 +613,12 @@ class TestPushData:
 
 class TestHtmlTemplate:
     def test_has_dark_mode_support(self):
-        from voicetext.ui.history_browser_window_web import _HTML_TEMPLATE
+        from wenzi.ui.history_browser_window_web import _HTML_TEMPLATE
 
         assert "prefers-color-scheme: dark" in _HTML_TEMPLATE
 
     def test_has_key_ui_elements(self):
-        from voicetext.ui.history_browser_window_web import _HTML_TEMPLATE
+        from wenzi.ui.history_browser_window_web import _HTML_TEMPLATE
 
         for elem_id in ("search", "time-range", "clear-btn",
                          "tag-row", "stats-line", "table-body",
@@ -626,19 +626,19 @@ class TestHtmlTemplate:
             assert elem_id in _HTML_TEMPLATE
 
     def test_has_tag_filter_row(self):
-        from voicetext.ui.history_browser_window_web import _HTML_TEMPLATE
+        from wenzi.ui.history_browser_window_web import _HTML_TEMPLATE
 
         assert "tag-pill" in _HTML_TEMPLATE
         assert "tag-row" in _HTML_TEMPLATE
 
     def test_has_keyboard_shortcuts(self):
-        from voicetext.ui.history_browser_window_web import _HTML_TEMPLATE
+        from wenzi.ui.history_browser_window_web import _HTML_TEMPLATE
 
         assert "Escape" in _HTML_TEMPLATE
         assert "metaKey" in _HTML_TEMPLATE
 
     def test_has_table_columns(self):
-        from voicetext.ui.history_browser_window_web import _HTML_TEMPLATE
+        from wenzi.ui.history_browser_window_web import _HTML_TEMPLATE
 
         for col in ("col-time", "col-mode", "col-content", "col-tags"):
             assert col in _HTML_TEMPLATE
@@ -646,16 +646,16 @@ class TestHtmlTemplate:
 
 class TestFormatTimestamp:
     def test_full_iso(self):
-        from voicetext.ui.history_browser_window_web import _format_timestamp
+        from wenzi.ui.history_browser_window_web import _format_timestamp
 
         assert _format_timestamp("2026-03-13T14:30:00+00:00") == "2026-03-13 14:30"
 
     def test_short(self):
-        from voicetext.ui.history_browser_window_web import _format_timestamp
+        from wenzi.ui.history_browser_window_web import _format_timestamp
 
         assert _format_timestamp("2026-01-01T09:05:00") == "2026-01-01 09:05"
 
     def test_empty(self):
-        from voicetext.ui.history_browser_window_web import _format_timestamp
+        from wenzi.ui.history_browser_window_web import _format_timestamp
 
         assert _format_timestamp("") == ""

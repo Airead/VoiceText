@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from voicetext.scripting.engine import ScriptEngine
+from wenzi.scripting.engine import ScriptEngine
 
 
 class TestScriptEngine:
@@ -11,15 +11,15 @@ class TestScriptEngine:
         assert engine.vt is not None
         assert engine.vt._reload_callback is not None
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_load_nonexistent_dir(self, mock_stop, mock_start):
         engine = ScriptEngine(script_dir="/tmp/nonexistent_vt_scripts")
         engine.start()
         engine.stop()
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_load_script(self, mock_stop, mock_start, tmp_path):
         script_dir = tmp_path / "scripts"
         script_dir.mkdir()
@@ -36,8 +36,8 @@ class TestScriptEngine:
 
         engine.stop()
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_load_script_with_error(self, mock_stop, mock_start, tmp_path):
         script_dir = tmp_path / "scripts"
         script_dir.mkdir()
@@ -46,13 +46,13 @@ class TestScriptEngine:
 
         engine = ScriptEngine(script_dir=str(script_dir))
         # Should not raise, error is caught
-        with patch("voicetext.scripting.engine.logger") as mock_logger:
+        with patch("wenzi.scripting.engine.logger") as mock_logger:
             engine.start()
             mock_logger.error.assert_called()
         engine.stop()
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_reload(self, mock_stop, mock_start, tmp_path):
         script_dir = tmp_path / "scripts"
         script_dir.mkdir()
@@ -75,8 +75,8 @@ class TestScriptEngine:
 
         engine.stop()
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_chooser_disabled_skips_sources_and_hotkeys(self, mock_stop, mock_start):
         """When chooser.enabled is False, no sources are registered and no hotkeys bound."""
         config = {
@@ -102,8 +102,8 @@ class TestScriptEngine:
 
         engine.stop()
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_chooser_enabled_registers_sources(self, mock_stop, mock_start):
         """When chooser.enabled is True (default), sources are registered normally."""
         config = {
@@ -130,8 +130,8 @@ class TestScriptEngine:
 
         engine.stop()
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_enable_clipboard_at_runtime(self, mock_stop, mock_start):
         """enable_clipboard() starts monitor and registers source."""
         config = {
@@ -166,8 +166,8 @@ class TestScriptEngine:
 
         engine.stop()
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_disable_clipboard_at_runtime(self, mock_stop, mock_start):
         """disable_clipboard() stops monitor and unregisters source."""
         config = {
@@ -202,8 +202,8 @@ class TestScriptEngine:
 
         engine.stop()
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_disable_chooser_at_runtime(self, mock_stop, mock_start):
         """disable_chooser() clears all sources, monitors, and hotkeys."""
         config = {
@@ -235,8 +235,8 @@ class TestScriptEngine:
 
         engine.stop()
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_enable_chooser_at_runtime(self, mock_stop, mock_start):
         """enable_chooser() re-registers sources after disable."""
         config = {
@@ -268,8 +268,8 @@ class TestScriptEngine:
 
         engine.stop()
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_enable_disable_source_at_runtime(self, mock_stop, mock_start):
         """enable_source / disable_source toggle individual sources."""
         config = {
@@ -301,8 +301,8 @@ class TestScriptEngine:
 
         engine.stop()
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_rebind_chooser_hotkey(self, mock_stop, mock_start):
         """rebind_chooser_hotkey unbinds old and binds new hotkey."""
         config = {
@@ -328,8 +328,8 @@ class TestScriptEngine:
 
         engine.stop()
 
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.start")
-    @patch("voicetext.scripting.api.hotkey.HotkeyAPI.stop")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
     def test_set_usage_learning_at_runtime(self, mock_stop, mock_start):
         """set_usage_learning toggles the tracker on the panel."""
         config = {
@@ -362,6 +362,6 @@ class TestScriptEngine:
 
     def test_vt_module_singleton(self):
         engine = ScriptEngine(script_dir="/tmp/vt_test_scripts")
-        import voicetext.scripting.api as api_mod
+        import wenzi.scripting.api as api_mod
 
         assert api_mod.vt is engine.vt

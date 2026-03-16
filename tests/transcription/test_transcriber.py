@@ -2,8 +2,8 @@
 
 import pytest
 
-from voicetext.transcription.base import BaseTranscriber, create_transcriber
-from voicetext.transcription.funasr import FunASRTranscriber
+from wenzi.transcription.base import BaseTranscriber, create_transcriber
+from wenzi.transcription.funasr import FunASRTranscriber
 
 
 class TestVadHasSpeech:
@@ -48,7 +48,7 @@ class TestCreateTranscriber:
             pytest.skip("mlx-whisper not installed")
 
     def test_create_apple_speech_backend(self):
-        from voicetext.transcription.apple import AppleSpeechTranscriber
+        from wenzi.transcription.apple import AppleSpeechTranscriber
 
         t = create_transcriber(backend="apple", model="on-device")
         assert isinstance(t, AppleSpeechTranscriber)
@@ -56,14 +56,14 @@ class TestCreateTranscriber:
         assert t._on_device is True
 
     def test_create_apple_speech_server(self):
-        from voicetext.transcription.apple import AppleSpeechTranscriber
+        from wenzi.transcription.apple import AppleSpeechTranscriber
 
         t = create_transcriber(backend="apple", model="server")
         assert isinstance(t, AppleSpeechTranscriber)
         assert t._on_device is False
 
     def test_create_apple_speech_alias(self):
-        from voicetext.transcription.apple import AppleSpeechTranscriber
+        from wenzi.transcription.apple import AppleSpeechTranscriber
 
         t = create_transcriber(backend="apple")
         assert isinstance(t, AppleSpeechTranscriber)
@@ -80,7 +80,7 @@ class TestModelDisplayName:
 
     def test_mlx_display_name_default(self):
         try:
-            from voicetext.transcription.mlx import MLXWhisperTranscriber
+            from wenzi.transcription.mlx import MLXWhisperTranscriber
         except ImportError:
             pytest.skip("mlx-whisper not installed")
 
@@ -89,7 +89,7 @@ class TestModelDisplayName:
 
     def test_mlx_display_name_custom(self):
         try:
-            from voicetext.transcription.mlx import MLXWhisperTranscriber
+            from wenzi.transcription.mlx import MLXWhisperTranscriber
         except ImportError:
             pytest.skip("mlx-whisper not installed")
 
@@ -98,7 +98,7 @@ class TestModelDisplayName:
 
     def test_mlx_display_name_no_slash(self):
         try:
-            from voicetext.transcription.mlx import MLXWhisperTranscriber
+            from wenzi.transcription.mlx import MLXWhisperTranscriber
         except ImportError:
             pytest.skip("mlx-whisper not installed")
 
@@ -106,7 +106,7 @@ class TestModelDisplayName:
         assert t.model_display_name == "custom-model"
 
     def test_whisper_api_display_name(self):
-        from voicetext.transcription.whisper_api import WhisperAPITranscriber
+        from wenzi.transcription.whisper_api import WhisperAPITranscriber
 
         t = WhisperAPITranscriber(
             base_url="https://api.example.com",
@@ -188,7 +188,7 @@ class TestSkipPunc:
 
     def test_mlx_skip_punc_attribute(self):
         try:
-            from voicetext.transcription.mlx import MLXWhisperTranscriber
+            from wenzi.transcription.mlx import MLXWhisperTranscriber
         except ImportError:
             pytest.skip("mlx-whisper not installed")
 
@@ -242,7 +242,7 @@ class TestCleanup:
 
     def test_mlx_cleanup(self):
         try:
-            from voicetext.transcription.mlx import MLXWhisperTranscriber
+            from wenzi.transcription.mlx import MLXWhisperTranscriber
         except ImportError:
             pytest.skip("mlx-whisper not installed")
 

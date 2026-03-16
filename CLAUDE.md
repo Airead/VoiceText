@@ -1,11 +1,11 @@
-# VoiceText - Claude Code Instructions
+# 闻字 (WenZi) - Claude Code Instructions
 
 ## Project Structure
 
 Source code is organized into subpackages by responsibility:
 
 ```
-src/voicetext/
+src/wenzi/
 ├── app.py, config.py, statusbar.py, ...   # Root-level core modules
 ├── audio/           # Recording, sound feedback, recording indicator
 ├── transcription/   # ASR backends (FunASR, MLX Whisper, Apple Speech, Whisper API)
@@ -18,7 +18,7 @@ Tests mirror this structure under `tests/`.
 
 When adding new modules, place them in the appropriate subpackage. Subpackage `__init__.py` files re-export public APIs — update them when adding new public classes/functions.
 
-Cross-package imports from controllers/ui should use absolute paths (`from voicetext.config import ...`), not relative imports to parent package.
+Cross-package imports from controllers/ui should use absolute paths (`from wenzi.config import ...`), not relative imports to parent package.
 
 ## UI Dialogs
 
@@ -102,7 +102,7 @@ All UI must support macOS dark mode. Follow these rules when writing UI code:
 
 ## Usage Statistics
 
-When adding new user-facing behaviors or interactions, always add corresponding tracking to `UsageStats` (`src/voicetext/usage_stats.py`):
+When adding new user-facing behaviors or interactions, always add corresponding tracking to `UsageStats` (`src/wenzi/usage_stats.py`):
 
 1. Add counter(s) to `_empty_totals()`
 2. Add a `record_*()` method in `UsageStats`
@@ -129,7 +129,7 @@ Do NOT use Claude Code's built-in `EnterWorktree`. All worktrees are managed by 
 
 ```bash
 uv run ruff check              # Lint — must have 0 errors
-uv run pytest tests/ -v --cov=voicetext  # Tests — must all pass
+uv run pytest tests/ -v --cov=wenzi  # Tests — must all pass
 ```
 
 If either check fails, fix all errors first, commit the fixes, then re-run until both are clean. Do not create a PR with known failures — GitHub Actions branch protection requires CI to be green before merging.

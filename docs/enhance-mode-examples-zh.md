@@ -1,6 +1,6 @@
 # 增强模式示例
 
-一组即用型增强模式模板。将任意示例复制到 `~/.config/VoiceText/enhance_modes/` 目录下，保存为 `.md` 文件，然后重启应用即可使用。
+一组即用型增强模式模板。将任意示例复制到 `~/.config/WenZi/enhance_modes/` 目录下，保存为 `.md` 文件，然后重启应用即可使用。
 
 关于文件格式和模式工作原理，请参阅 [enhance-modes.md](enhance-modes.md)。
 

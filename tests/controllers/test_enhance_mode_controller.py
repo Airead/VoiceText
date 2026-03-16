@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from voicetext.controllers.enhance_mode_controller import EnhanceModeController
+from wenzi.controllers.enhance_mode_controller import EnhanceModeController
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def mock_app():
     app._auto_vocab_builder._enabled = True
     app._auto_vocab_builder.is_building.return_value = False
     app._preview_enabled = True
-    app._current_status = "VT"
+    app._current_status = "WZ"
     return app
 
 
@@ -49,7 +49,7 @@ def ctrl(mock_app):
 
 
 class TestOnEnhanceModeSelect:
-    @patch("voicetext.controllers.enhance_mode_controller.save_config")
+    @patch("wenzi.controllers.enhance_mode_controller.save_config")
     def test_selects_mode(self, mock_save, ctrl, mock_app):
         sender = MagicMock()
         sender._enhance_mode = "translate"
@@ -62,9 +62,9 @@ class TestOnEnhanceModeSelect:
         assert mock_app._enhance_menu_items["proofread"].state == 0
         mock_save.assert_called_once()
 
-    @patch("voicetext.controllers.enhance_mode_controller.save_config")
+    @patch("wenzi.controllers.enhance_mode_controller.save_config")
     def test_selects_off(self, mock_save, ctrl, mock_app):
-        from voicetext.enhance.enhancer import MODE_OFF
+        from wenzi.enhance.enhancer import MODE_OFF
 
         sender = MagicMock()
         sender._enhance_mode = MODE_OFF
@@ -76,7 +76,7 @@ class TestOnEnhanceModeSelect:
 
 
 class TestOnEnhanceThinkingToggle:
-    @patch("voicetext.controllers.enhance_mode_controller.save_config")
+    @patch("wenzi.controllers.enhance_mode_controller.save_config")
     def test_toggle_on(self, mock_save, ctrl, mock_app):
         sender = MagicMock()
         mock_app._enhancer.thinking = False
@@ -87,7 +87,7 @@ class TestOnEnhanceThinkingToggle:
         assert sender.state == 1
         mock_save.assert_called_once()
 
-    @patch("voicetext.controllers.enhance_mode_controller.save_config")
+    @patch("wenzi.controllers.enhance_mode_controller.save_config")
     def test_toggle_off(self, mock_save, ctrl, mock_app):
         sender = MagicMock()
         mock_app._enhancer.thinking = True
@@ -105,7 +105,7 @@ class TestOnEnhanceThinkingToggle:
 
 
 class TestVocabToggle:
-    @patch("voicetext.controllers.enhance_mode_controller.save_config")
+    @patch("wenzi.controllers.enhance_mode_controller.save_config")
     def test_toggle_on(self, mock_save, ctrl, mock_app):
         sender = MagicMock()
         mock_app._enhancer.vocab_enabled = False
@@ -123,7 +123,7 @@ class TestVocabToggle:
 
 
 class TestAutoBuildToggle:
-    @patch("voicetext.controllers.enhance_mode_controller.save_config")
+    @patch("wenzi.controllers.enhance_mode_controller.save_config")
     def test_toggle_off(self, mock_save, ctrl, mock_app):
         sender = MagicMock()
         mock_app._auto_vocab_builder._enabled = True
@@ -136,7 +136,7 @@ class TestAutoBuildToggle:
 
 
 class TestHistoryToggle:
-    @patch("voicetext.controllers.enhance_mode_controller.save_config")
+    @patch("wenzi.controllers.enhance_mode_controller.save_config")
     def test_toggle_on(self, mock_save, ctrl, mock_app):
         sender = MagicMock()
         mock_app._enhancer.history_enabled = False
@@ -154,17 +154,17 @@ class TestHistoryToggle:
 
 
 class TestUpdateVocabTitle:
-    @patch("voicetext.controllers.enhance_mode_controller.get_vocab_entry_count", return_value=42)
+    @patch("wenzi.controllers.enhance_mode_controller.get_vocab_entry_count", return_value=42)
     def test_with_entries(self, mock_count, ctrl, mock_app):
         ctrl.update_vocab_title()
         assert mock_app._enhance_vocab_item.title == "Vocabulary (42)"
 
-    @patch("voicetext.controllers.enhance_mode_controller.get_vocab_entry_count", return_value=0)
+    @patch("wenzi.controllers.enhance_mode_controller.get_vocab_entry_count", return_value=0)
     def test_no_entries(self, mock_count, ctrl, mock_app):
         ctrl.update_vocab_title()
         assert mock_app._enhance_vocab_item.title == "Vocabulary"
 
-    @patch("voicetext.controllers.enhance_mode_controller.get_vocab_entry_count", return_value=0)
+    @patch("wenzi.controllers.enhance_mode_controller.get_vocab_entry_count", return_value=0)
     def test_uses_vocab_index_count(self, mock_count, ctrl, mock_app):
         mock_app._enhancer.vocab_index = MagicMock()
         mock_app._enhancer.vocab_index.entry_count = 15
@@ -174,7 +174,7 @@ class TestUpdateVocabTitle:
 
 
 class TestPreviewToggle:
-    @patch("voicetext.controllers.enhance_mode_controller.save_config")
+    @patch("wenzi.controllers.enhance_mode_controller.save_config")
     def test_toggle_off(self, mock_save, ctrl, mock_app):
         sender = MagicMock()
         mock_app._preview_enabled = True
@@ -185,7 +185,7 @@ class TestPreviewToggle:
         assert sender.state == 0
         mock_save.assert_called_once()
 
-    @patch("voicetext.controllers.enhance_mode_controller.save_config")
+    @patch("wenzi.controllers.enhance_mode_controller.save_config")
     def test_toggle_on(self, mock_save, ctrl, mock_app):
         sender = MagicMock()
         mock_app._preview_enabled = False
@@ -199,13 +199,13 @@ class TestPreviewToggle:
 class TestOnVocabBuild:
     def test_no_enhancer_shows_alert(self, ctrl, mock_app):
         mock_app._enhancer = None
-        with patch("voicetext.controllers.enhance_mode_controller.topmost_alert") as mock_alert:
+        with patch("wenzi.controllers.enhance_mode_controller.topmost_alert") as mock_alert:
             ctrl.on_vocab_build(None)
             mock_alert.assert_called_once()
 
     def test_building_shows_alert(self, ctrl, mock_app):
         mock_app._auto_vocab_builder.is_building.return_value = True
-        with patch("voicetext.controllers.enhance_mode_controller.topmost_alert") as mock_alert:
+        with patch("wenzi.controllers.enhance_mode_controller.topmost_alert") as mock_alert:
             ctrl.on_vocab_build(None)
             mock_alert.assert_called_once()
 

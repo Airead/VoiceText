@@ -5,7 +5,7 @@ import os
 
 from unittest.mock import MagicMock, patch
 
-from voicetext.scripting.clipboard_monitor import (
+from wenzi.scripting.clipboard_monitor import (
     ClipboardEntry,
     ClipboardMonitor,
     _ClipboardDB,
@@ -363,7 +363,7 @@ class TestClipboardMonitor:
         )
         # Mock NSPasteboard to avoid actual clipboard access
         with patch(
-            "voicetext.scripting.clipboard_monitor.ClipboardMonitor._check_clipboard"
+            "wenzi.scripting.clipboard_monitor.ClipboardMonitor._check_clipboard"
         ):
             monitor.start()
             assert monitor._thread is not None
@@ -648,13 +648,13 @@ class TestImageEntries:
 
     def test_min_image_dim_constant(self):
         """Minimum image dimension should be at least 2 to filter tracking pixels."""
-        from voicetext.scripting.clipboard_monitor import _MIN_IMAGE_DIM
+        from wenzi.scripting.clipboard_monitor import _MIN_IMAGE_DIM
 
         assert _MIN_IMAGE_DIM >= 2
 
     def test_image_dir_property_default(self):
         """image_dir property returns default when no custom dir is set."""
-        from voicetext.scripting.clipboard_monitor import _DEFAULT_IMAGE_DIR
+        from wenzi.scripting.clipboard_monitor import _DEFAULT_IMAGE_DIR
 
         monitor = ClipboardMonitor(max_days=7)
         assert monitor.image_dir == _DEFAULT_IMAGE_DIR

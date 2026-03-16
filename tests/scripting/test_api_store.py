@@ -4,7 +4,7 @@ import json
 import os
 import threading
 
-from voicetext.scripting.api.store import StoreAPI
+from wenzi.scripting.api.store import StoreAPI
 
 
 class TestStoreAPI:

@@ -7,9 +7,9 @@ pure-Python logic: source registration, search dispatch, item execution.
 import json
 from unittest.mock import MagicMock, patch
 
-from voicetext.scripting.sources import ChooserItem, ChooserSource, ModifierAction
-from voicetext.scripting.sources.usage_tracker import UsageTracker
-from voicetext.scripting.ui.chooser_panel import ChooserPanel
+from wenzi.scripting.sources import ChooserItem, ChooserSource, ModifierAction
+from wenzi.scripting.sources.usage_tracker import UsageTracker
+from wenzi.scripting.ui.chooser_panel import ChooserPanel
 
 
 def _make_panel():

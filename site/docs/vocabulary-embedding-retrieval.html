@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vocabulary & Embedding Retrieval — VoiceText</title>
+  <title>Vocabulary & Embedding Retrieval — WenZi</title>
   <link rel="icon" type="image/png" href="../images/icon.png">
   <link rel="stylesheet" href="../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../" class="nav-brand">
-        <img src="../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../">&larr; Back</a></li>
         <li><a href="../zh/docs/vocabulary-embedding-retrieval.html" class="lang-switch">中文</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -86,7 +86,7 @@
     </div>
 
 <h2 id="background"><a href="#background" class="heading-anchor">Background</a></h2>
-<p>VoiceText uses LLM to correct ASR (Automatic Speech Recognition) output. ASR engines frequently misrecognize proper nouns, technical terms, and domain-specific vocabulary — replacing them with phonetically similar but incorrect characters. For example, "Kubernetes" might be transcribed as "库伯尼特斯" or "酷伯", and "Python" as "派森".</p>
+<p>闻字 uses LLM to correct ASR (Automatic Speech Recognition) output. ASR engines frequently misrecognize proper nouns, technical terms, and domain-specific vocabulary — replacing them with phonetically similar but incorrect characters. For example, "Kubernetes" might be transcribed as "库伯尼特斯" or "酷伯", and "Python" as "派森".</p>
 <p>A generic LLM has no knowledge of the user's personal vocabulary. Without additional context, it cannot reliably distinguish between a correct transcription and a misrecognized proper noun. This leads to two types of errors:</p>
 <ol>
 <li><strong>Missed corrections</strong> — the LLM leaves ASR errors in place because it doesn't recognize the intended term.</li>
@@ -98,7 +98,7 @@
 <h2 id="how-it-works"><a href="#how-it-works" class="heading-anchor">How It Works</a></h2>
 <p>The system consists of two stages: <strong>vocabulary building</strong> and <strong>real-time retrieval</strong>.</p>
 <h3 id="stage-1-vocabulary-building"><a href="#stage-1-vocabulary-building" class="heading-anchor">Stage 1: Vocabulary Building</a></h3>
-<p>VoiceText logs every user correction in <code>conversation_history.jsonl</code> — entries where the user edited the AI-enhanced text in the preview panel are marked with <code>user_corrected: true</code>. The vocabulary builder leverages these records:</p>
+<p>闻字 logs every user correction in <code>conversation_history.jsonl</code> — entries where the user edited the AI-enhanced text in the preview panel are marked with <code>user_corrected: true</code>. The vocabulary builder leverages these records:</p>
 <ol>
 <li>Read corrected records from <code>conversation_history.jsonl</code> (supports incremental builds via timestamp filtering).</li>
 <li>Batch records and send them to an LLM with a structured extraction prompt.</li>
@@ -276,31 +276,31 @@
 </thead>
 <tbody>
 <tr>
-<td><code>src/voicetext/enhance/vocabulary_builder.py</code></td>
+<td><code>src/wenzi/enhance/vocabulary_builder.py</code></td>
 <td>Extracts vocabulary from conversation history corrections via LLM</td>
 </tr>
 <tr>
-<td><code>src/voicetext/enhance/vocabulary.py</code></td>
+<td><code>src/wenzi/enhance/vocabulary.py</code></td>
 <td>Embedding index construction and retrieval</td>
 </tr>
 <tr>
-<td><code>src/voicetext/enhance/auto_vocab_builder.py</code></td>
+<td><code>src/wenzi/enhance/auto_vocab_builder.py</code></td>
 <td>Automatic vocabulary building triggered by correction count</td>
 </tr>
 <tr>
-<td><code>src/voicetext/enhance/enhancer.py</code></td>
+<td><code>src/wenzi/enhance/enhancer.py</code></td>
 <td>Integrates vocabulary context into enhancement prompts</td>
 </tr>
 <tr>
-<td><code>src/voicetext/ui/vocab_build_window.py</code></td>
+<td><code>src/wenzi/ui/vocab_build_window.py</code></td>
 <td>UI for vocabulary build progress</td>
 </tr>
 <tr>
-<td><code>src/voicetext/app.py</code></td>
+<td><code>src/wenzi/app.py</code></td>
 <td>Menu items for vocabulary toggle and build trigger</td>
 </tr>
 <tr>
-<td><code>src/voicetext/config.py</code></td>
+<td><code>src/wenzi/config.py</code></td>
 <td>Default configuration for vocabulary settings</td>
 </tr>
 </tbody>

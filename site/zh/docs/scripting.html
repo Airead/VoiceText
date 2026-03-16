@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>脚本系统 — VoiceText</title>
+  <title>脚本系统 — WenZi</title>
   <link rel="icon" type="image/png" href="../../images/icon.png">
   <link rel="stylesheet" href="../../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../../" class="nav-brand">
-        <img src="../../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../../">&larr; 返回</a></li>
         <li><a href="../../docs/scripting.html" class="lang-switch">English</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -106,7 +106,7 @@
 
     </div>
 
-<p>VoiceText 内置了一个基于 Python 的脚本系统，可以用来自动化 macOS 常见操作——通过 Leader 键启动应用、绑定全局快捷键、显示提示、操作剪贴板等。</p>
+<p>闻字 内置了一个基于 Python 的脚本系统，可以用来自动化 macOS 常见操作——通过 Leader 键启动应用、绑定全局快捷键、显示提示、操作剪贴板等。</p>
 <h2 id="_1"><a href="#_1" class="heading-anchor">快速开始</a></h2>
 <ol>
 <li><strong>启用脚本系统</strong>：在 设置 → 通用 → Scripting 中打开开关，或者直接编辑 <code>config.json</code>：</li>
@@ -118,7 +118,7 @@
      }
    }</code></p>
 <ol start="2">
-<li><strong>创建脚本文件</strong> <code>~/.config/VoiceText/scripts/init.py</code>：</li>
+<li><strong>创建脚本文件</strong> <code>~/.config/WenZi/scripts/init.py</code>：</li>
 </ol>
 <p><code>python
    vt.leader("cmd_r", [
@@ -127,7 +127,7 @@
        {"key": "t", "app": "iTerm"},
    ])</code></p>
 <ol start="3">
-<li><strong>重启 VoiceText</strong>。按住右 Command 键，屏幕上会显示快捷键面板，再按字母键即可启动对应应用。</li>
+<li><strong>重启闻字</strong>。按住右 Command 键，屏幕上会显示快捷键面板，再按字母键即可启动对应应用。</li>
 </ol>
 <h2 id="leader"><a href="#leader" class="heading-anchor">Leader 键</a></h2>
 <p>Leader 键的使用方式：按住一个触发键（如右 Command），屏幕上会浮现可用映射列表，然后按第二个键执行对应操作。松开触发键后面板自动消失。</p>
@@ -340,11 +340,11 @@ vt.hotkey.bind(&quot;ctrl+cmd+n&quot;, lambda: vt.execute(&quot;open -a Notes&qu
 <li><code>vt</code> 对象作为全局变量直接可用，无需导入</li>
 <li>脚本中的错误会被捕获并以浮窗提示显示</li>
 <li>脚本在启动时加载一次，修改后需调用 <code>vt.reload()</code> 重新加载</li>
-<li>脚本路径：<code>~/.config/VoiceText/scripts/init.py</code></li>
+<li>脚本路径：<code>~/.config/WenZi/scripts/init.py</code></li>
 <li>可通过 <code>"scripting": {"script_dir": "/path/to/scripts"}</code> 自定义脚本目录</li>
 </ul>
 <h2 id="_10"><a href="#_10" class="heading-anchor">安全说明</a></h2>
-<p>脚本以<strong>未沙箱化的 Python</strong> 运行，拥有与 VoiceText 相同的系统权限。这意味着脚本可以：</p>
+<p>脚本以<strong>未沙箱化的 Python</strong> 运行，拥有与 闻字 相同的系统权限。这意味着脚本可以：</p>
 <ul>
 <li>读写你的用户账户能访问的任何文件</li>
 <li>执行任意 Shell 命令</li>
@@ -357,16 +357,16 @@ vt.hotkey.bind(&quot;ctrl+cmd+n&quot;, lambda: vt.execute(&quot;open -a Notes&qu
 <h2 id="_11"><a href="#_11" class="heading-anchor">常见问题</a></h2>
 <p><strong>脚本没有加载？</strong>
 - 确认 <code>config.json</code> 中 <code>"scripting": {"enabled": true}</code> 已设置
-- 启用后需要重启 VoiceText
-- 查看日志 <code>~/Library/Logs/VoiceText/voicetext.log</code> 排查错误</p>
+- 启用后需要重启闻字
+- 查看日志 <code>~/Library/Logs/WenZi/wenzi.log</code> 排查错误</p>
 <p><strong>Leader 键没有响应？</strong>
-- 确保 VoiceText 已获得辅助功能权限（系统设置 → 隐私与安全性 → 辅助功能）
+- 确保 闻字 已获得辅助功能权限（系统设置 → 隐私与安全性 → 辅助功能）
 - 检查触发键名称是否正确（如 <code>cmd_r</code> 而非 <code>right_cmd</code>）</p>
 <p><strong>提示面板不可见？</strong>
 - 面板需要辅助功能权限才能显示在其他应用之上</p>
 <p><strong>脚本报错？</strong>
 - 语法错误和异常会记录到日志并以浮窗提示
-- 查看 <code>~/Library/Logs/VoiceText/voicetext.log</code> 获取完整错误信息</p>
+- 查看 <code>~/Library/Logs/WenZi/wenzi.log</code> 获取完整错误信息</p>
 
     <div class="doc-nav">
       <a href="conversation-history-enhancement.html" class="doc-nav-card">

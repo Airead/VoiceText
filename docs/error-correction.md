@@ -1,18 +1,18 @@
 # Why Error Correction Is So Powerful
 
-VoiceText doesn't just transcribe — it builds a multi-layered correction system that gets smarter every time you use it.
+闻字 doesn't just transcribe — it builds a multi-layered correction system that gets smarter every time you use it.
 
 ## Table of Contents
 
 - [The Problem](#the-problem) — Why raw ASR output isn't good enough
-- [Five Layers of Correction](#five-layers-of-correction) — How VoiceText stacks multiple strategies
+- [Five Layers of Correction](#five-layers-of-correction) — How 闻字 stacks multiple strategies
 - [Layer 1: AI Enhancement](#layer-1-ai-enhancement) — LLM-powered proofreading and formatting
 - [Layer 2: Vocabulary Retrieval](#layer-2-vocabulary-retrieval) — Embedding-based personal dictionary
 - [Layer 3: Conversation History](#layer-3-conversation-history) — Learning from your confirmed corrections
 - [Layer 4: Preview Panel](#layer-4-preview-panel) — Human-in-the-loop review
 - [Layer 5: Self-Improving Loop](#layer-5-self-improving-loop) — Every correction makes the system better
 - [Full Example: All Layers in Action](#full-example-all-layers-in-action) — See all five layers in action
-- [Compared to Other Tools](#compared-to-other-tools) — What makes VoiceText different
+- [Compared to Other Tools](#compared-to-other-tools) — What makes 闻字 different
 
 ## The Problem
 
@@ -24,11 +24,11 @@ Every speech-to-text engine makes mistakes. Even the best ASR models produce err
 - **Punctuation and formatting** — ASR engines output raw text with little or no punctuation
 - **Context loss** — Each transcription is independent — the engine doesn't know what you said 30 seconds ago
 
-Most voice input tools stop at the ASR output and leave you to manually fix these errors. **VoiceText takes a fundamentally different approach** — it layers five independent correction strategies to catch what any single strategy would miss.
+Most voice input tools stop at the ASR output and leave you to manually fix these errors. **闻字 takes a fundamentally different approach** — it layers five independent correction strategies to catch what any single strategy would miss.
 
 ## Five Layers of Correction
 
-Instead of relying on a single technique, VoiceText stacks multiple correction layers. Each layer catches errors that the previous layers missed:
+Instead of relying on a single technique, 闻字 stacks multiple correction layers. Each layer catches errors that the previous layers missed:
 
 ```
   Voice Input
@@ -59,7 +59,7 @@ Layers 2 and 3 work by enriching the LLM's system prompt with relevant context. 
 
 ## Layer 1: AI Enhancement
 
-When you enable an enhancement mode (like the built-in **Proofread** mode), VoiceText sends your ASR output to an LLM with a carefully crafted system prompt. The LLM acts as an intelligent post-processor:
+When you enable an enhancement mode (like the built-in **Proofread** mode), 闻字 sends your ASR output to an LLM with a carefully crafted system prompt. The LLM acts as an intelligent post-processor:
 
 - **Fixes homophones and near-homophones** by understanding context
 - **Adds punctuation** that ASR engines typically omit
@@ -77,9 +77,9 @@ The key advantage: the LLM understands *meaning*, not just sound. It can disting
 
 ## Layer 2: Vocabulary Retrieval
 
-Generic LLMs don't know your colleague's name, your company's product names, or the technical terms you use daily. VoiceText solves this with an **embedding-based personal vocabulary system**:
+Generic LLMs don't know your colleague's name, your company's product names, or the technical terms you use daily. 闻字 solves this with an **embedding-based personal vocabulary system**:
 
-1. **Build** — VoiceText extracts proper nouns and technical terms from your correction history using an LLM. Each term includes its correct form, category, and common ASR misrecognitions.
+1. **Build** — 闻字 extracts proper nouns and technical terms from your correction history using an LLM. Each term includes its correct form, category, and common ASR misrecognitions.
 2. **Index** — Terms are embedded into a vector space using a multilingual model (`paraphrase-multilingual-MiniLM-L12-v2`), creating a semantic search index. Runs 100% locally.
 3. **Retrieve** — When you speak, your ASR text is embedded and matched against the index. Only the top-K most relevant terms are injected into the LLM's system prompt.
 
@@ -95,7 +95,7 @@ Why embedding retrieval instead of keyword matching? Because ASR errors are **ph
 
 ## Layer 3: Conversation History
 
-Real conversations have continuity. When you say "she was happy today", the word "she" only makes sense in the context of a previous sentence. VoiceText addresses this by injecting your **recent confirmed outputs** into the LLM's prompt.
+Real conversations have continuity. When you say "she was happy today", the word "she" only makes sense in the context of a previous sentence. 闻字 addresses this by injecting your **recent confirmed outputs** into the LLM's prompt.
 
 The core insight: **your confirmed output is the highest-quality signal for what you actually mean.** Unlike raw ASR text (which has errors) or AI output (which may over-correct), the final confirmed text represents your true intent.
 
@@ -122,7 +122,7 @@ The arrow notation shows correction patterns. When the LLM sees that "cereal" wa
 
 ## Layer 4: Preview Panel
 
-The Preview panel is VoiceText's **human-in-the-loop** interface. Before text is typed into your active application, you can review and refine it:
+The Preview panel is 闻字.s **human-in-the-loop** interface. Before text is typed into your active application, you can review and refine it:
 
 - **Compare** the raw ASR output with the AI-enhanced result side by side
 - **Edit** the final text directly in an editable field
@@ -135,7 +135,7 @@ This is more than a convenience feature. Every edit you make in the Preview pane
 
 ## Layer 5: Self-Improving Loop
 
-This is what ties everything together. VoiceText creates a **virtuous cycle** where every correction you make improves future corrections:
+This is what ties everything together. 闻字 creates a **virtuous cycle** where every correction you make improves future corrections:
 
 ```
   You speak  ──►  ASR  ──►  AI + Vocab + History  ──►  Preview Panel
@@ -152,12 +152,12 @@ This is what ties everything together. VoiceText creates a **virtuous cycle** wh
 ```
 
 1. **You correct** an error in the Preview panel (e.g., "cereal" → "Ciriel")
-2. **VoiceText records** the ASR text, AI output, and your final confirmed text
+2. **闻字 records** the ASR text, AI output, and your final confirmed text
 3. **Conversation history** uses this immediately — the next input already benefits from your correction
 4. **Vocabulary builder** periodically extracts new terms from your correction history and rebuilds the embedding index
 5. **Future inputs** get better enhancement because the LLM now has both recent context and a personal vocabulary
 
-> **The more you use VoiceText, the better it gets.** Your corrections aren't just fixing the current text — they're teaching the system your vocabulary, your preferences, and your common topics. Over time, you'll find yourself making fewer and fewer corrections.
+> **The more you use 闻字, the better it gets.** Your corrections aren't just fixing the current text — they're teaching the system your vocabulary, your preferences, and your common topics. Over time, you'll find yourself making fewer and fewer corrections.
 
 ## Full Example: All Layers in Action
 
@@ -194,9 +194,9 @@ Most voice input tools fall into one of two categories:
 - **Basic Voice Input** — Transcribes speech and types it directly. No correction, no context, no learning. You fix every error manually.
 - **Cloud Voice Assistants** — Good accuracy for general speech, but no customization for your vocabulary. No correction loop. Privacy concerns with always-on cloud processing.
 
-VoiceText is different because it combines **local-first processing** (your data stays on your machine) with **intelligent, layered correction** that adapts to you:
+闻字 is different because it combines **local-first processing** (your data stays on your machine) with **intelligent, layered correction** that adapts to you:
 
-| Capability | Basic Tools | Cloud Assistants | VoiceText |
+| Capability | Basic Tools | Cloud Assistants | 闻字 |
 |---|---|---|---|
 | Offline support | Some | No | **Yes (default)** |
 | AI error correction | No | Limited | **Customizable LLM** |

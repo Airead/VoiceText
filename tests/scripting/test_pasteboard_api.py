@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass, field
 from typing import List
 
-from voicetext.scripting.api.pasteboard import PasteboardAPI
+from wenzi.scripting.api.pasteboard import PasteboardAPI
 
 
 @dataclass

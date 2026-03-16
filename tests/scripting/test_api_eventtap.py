@@ -12,7 +12,7 @@ class TestKeystroke:
 
         with patch.dict(sys.modules, {"Quartz": mock_quartz}):
             import importlib
-            import voicetext.scripting.api.eventtap as eventtap_mod
+            import wenzi.scripting.api.eventtap as eventtap_mod
 
             importlib.reload(eventtap_mod)
             eventtap_mod.keystroke("c")
@@ -26,7 +26,7 @@ class TestKeystroke:
 
         with patch.dict(sys.modules, {"Quartz": mock_quartz}):
             import importlib
-            import voicetext.scripting.api.eventtap as eventtap_mod
+            import wenzi.scripting.api.eventtap as eventtap_mod
 
             importlib.reload(eventtap_mod)
             eventtap_mod.keystroke("v", modifiers=["cmd"])

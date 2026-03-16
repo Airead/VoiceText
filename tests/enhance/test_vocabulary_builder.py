@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from voicetext.enhance.vocabulary_builder import BuildCallbacks, VocabularyBuilder
+from wenzi.enhance.vocabulary_builder import BuildCallbacks, VocabularyBuilder
 
 
 def _make_config(**overrides):

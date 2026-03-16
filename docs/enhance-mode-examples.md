@@ -1,6 +1,6 @@
 # Enhancement Mode Examples
 
-A collection of ready-to-use enhancement mode templates. Copy any example into `~/.config/VoiceText/enhance_modes/` as a `.md` file and restart the app.
+A collection of ready-to-use enhancement mode templates. Copy any example into `~/.config/WenZi/enhance_modes/` as a `.md` file and restart the app.
 
 For the file format and how modes work, see [enhance-modes.md](enhance-modes.md).
 

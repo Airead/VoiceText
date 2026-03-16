@@ -9,7 +9,7 @@ import time
 
 sys.path.insert(0, "src")
 
-from voicetext.vocabulary import VocabularyIndex
+from wenzi.vocabulary import VocabularyIndex
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -29,7 +29,7 @@ ok = idx.load()
 t1 = time.time()
 
 if not ok:
-    print("FAIL: Could not load vocabulary. Check ~/.config/VoiceText/vocabulary.json")
+    print("FAIL: Could not load vocabulary. Check ~/.config/WenZi/vocabulary.json")
     sys.exit(1)
 
 print(f"  Loaded in {t1-t0:.2f}s")

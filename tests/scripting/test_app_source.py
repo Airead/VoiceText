@@ -4,7 +4,7 @@ import os
 
 from unittest.mock import patch
 
-from voicetext.scripting.sources.app_source import (
+from wenzi.scripting.sources.app_source import (
     AppSource,
     _APP_DIRS,
     _cache_key,
@@ -54,10 +54,10 @@ class TestIsInternalApp:
         (tmp_path / "loginwindow.app").mkdir()
 
         with patch(
-            "voicetext.scripting.sources.app_source._APP_DIRS",
+            "wenzi.scripting.sources.app_source._APP_DIRS",
             [str(tmp_path)],
         ), patch(
-            "voicetext.scripting.sources.app_source._CORE_SERVICES_DIR",
+            "wenzi.scripting.sources.app_source._CORE_SERVICES_DIR",
             str(tmp_path),
         ):
             apps = _scan_apps()
@@ -79,7 +79,7 @@ class TestScanApps:
         (tmp_path / "readme.txt").touch()
 
         with patch(
-            "voicetext.scripting.sources.app_source._APP_DIRS",
+            "wenzi.scripting.sources.app_source._APP_DIRS",
             [str(tmp_path)],
         ):
             apps = _scan_apps()
@@ -99,7 +99,7 @@ class TestScanApps:
         (dir2 / "Safari.app").mkdir()
 
         with patch(
-            "voicetext.scripting.sources.app_source._APP_DIRS",
+            "wenzi.scripting.sources.app_source._APP_DIRS",
             [str(dir1), str(dir2)],
         ):
             apps = _scan_apps()
@@ -109,7 +109,7 @@ class TestScanApps:
     def test_nonexistent_directory(self):
         """Non-existent directory should not cause errors."""
         with patch(
-            "voicetext.scripting.sources.app_source._APP_DIRS",
+            "wenzi.scripting.sources.app_source._APP_DIRS",
             ["/nonexistent/path"],
         ):
             apps = _scan_apps()
@@ -125,7 +125,7 @@ class TestAppSource:
         (tmp_path / "Terminal.app").mkdir()
 
         with patch(
-            "voicetext.scripting.sources.app_source._APP_DIRS",
+            "wenzi.scripting.sources.app_source._APP_DIRS",
             [str(tmp_path)],
         ):
             src = AppSource()
@@ -135,7 +135,7 @@ class TestAppSource:
     def test_empty_query_returns_empty(self, tmp_path):
         src = self._make_source(tmp_path)
         with patch(
-            "voicetext.scripting.sources.app_source._get_running_app_names",
+            "wenzi.scripting.sources.app_source._get_running_app_names",
             return_value=set(),
         ):
             result = src.search("")
@@ -144,7 +144,7 @@ class TestAppSource:
     def test_substring_match(self, tmp_path):
         src = self._make_source(tmp_path)
         with patch(
-            "voicetext.scripting.sources.app_source._get_running_app_names",
+            "wenzi.scripting.sources.app_source._get_running_app_names",
             return_value=set(),
         ):
             result = src.search("saf")
@@ -154,7 +154,7 @@ class TestAppSource:
     def test_case_insensitive(self, tmp_path):
         src = self._make_source(tmp_path)
         with patch(
-            "voicetext.scripting.sources.app_source._get_running_app_names",
+            "wenzi.scripting.sources.app_source._get_running_app_names",
             return_value=set(),
         ):
             result = src.search("SAFARI")
@@ -163,7 +163,7 @@ class TestAppSource:
     def test_running_apps_first(self, tmp_path):
         src = self._make_source(tmp_path)
         with patch(
-            "voicetext.scripting.sources.app_source._get_running_app_names",
+            "wenzi.scripting.sources.app_source._get_running_app_names",
             return_value={"Terminal"},
         ):
             result = src.search("t")  # Matches Terminal, WeChat
@@ -174,7 +174,7 @@ class TestAppSource:
     def test_running_subtitle(self, tmp_path):
         src = self._make_source(tmp_path)
         with patch(
-            "voicetext.scripting.sources.app_source._get_running_app_names",
+            "wenzi.scripting.sources.app_source._get_running_app_names",
             return_value={"Safari"},
         ):
             result = src.search("saf")
@@ -183,7 +183,7 @@ class TestAppSource:
     def test_non_running_subtitle(self, tmp_path):
         src = self._make_source(tmp_path)
         with patch(
-            "voicetext.scripting.sources.app_source._get_running_app_names",
+            "wenzi.scripting.sources.app_source._get_running_app_names",
             return_value=set(),
         ):
             result = src.search("saf")
@@ -192,7 +192,7 @@ class TestAppSource:
     def test_reveal_path(self, tmp_path):
         src = self._make_source(tmp_path)
         with patch(
-            "voicetext.scripting.sources.app_source._get_running_app_names",
+            "wenzi.scripting.sources.app_source._get_running_app_names",
             return_value=set(),
         ):
             result = src.search("saf")
@@ -201,7 +201,7 @@ class TestAppSource:
     def test_action_callable(self, tmp_path):
         src = self._make_source(tmp_path)
         with patch(
-            "voicetext.scripting.sources.app_source._get_running_app_names",
+            "wenzi.scripting.sources.app_source._get_running_app_names",
             return_value=set(),
         ):
             result = src.search("saf")
@@ -212,12 +212,12 @@ class TestAppSource:
         src = self._make_source(tmp_path)
         (tmp_path / "NewApp.app").mkdir()
         with patch(
-            "voicetext.scripting.sources.app_source._APP_DIRS",
+            "wenzi.scripting.sources.app_source._APP_DIRS",
             [str(tmp_path)],
         ):
             src.rescan()
         with patch(
-            "voicetext.scripting.sources.app_source._get_running_app_names",
+            "wenzi.scripting.sources.app_source._get_running_app_names",
             return_value=set(),
         ):
             result = src.search("new")
@@ -228,17 +228,17 @@ class TestAppSource:
         (tmp_path / "Notes.app").mkdir()
 
         with patch(
-            "voicetext.scripting.sources.app_source._APP_DIRS",
+            "wenzi.scripting.sources.app_source._APP_DIRS",
             [str(tmp_path)],
         ), patch(
-            "voicetext.scripting.sources.app_source._get_display_name",
+            "wenzi.scripting.sources.app_source._get_display_name",
             side_effect=lambda path, fallback: "备忘录" if "Notes" in path else fallback,
         ):
             src = AppSource()
             src._ensure_scanned()
 
         with patch(
-            "voicetext.scripting.sources.app_source._get_running_app_names",
+            "wenzi.scripting.sources.app_source._get_running_app_names",
             return_value=set(),
         ):
             # Search by Chinese display name
@@ -256,17 +256,17 @@ class TestAppSource:
         (tmp_path / "Notes.app").mkdir()
 
         with patch(
-            "voicetext.scripting.sources.app_source._APP_DIRS",
+            "wenzi.scripting.sources.app_source._APP_DIRS",
             [str(tmp_path)],
         ), patch(
-            "voicetext.scripting.sources.app_source._get_display_name",
+            "wenzi.scripting.sources.app_source._get_display_name",
             side_effect=lambda path, fallback: "备忘录" if "Notes" in path else fallback,
         ):
             src = AppSource()
             src._ensure_scanned()
 
         with patch(
-            "voicetext.scripting.sources.app_source._get_running_app_names",
+            "wenzi.scripting.sources.app_source._get_running_app_names",
             return_value={"备忘录"},
         ):
             result = src.search("notes")
@@ -298,7 +298,7 @@ class TestIconDiskCache:
         src = AppSource(icon_cache_dir=cache_dir)
 
         with patch(
-            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            "wenzi.scripting.sources.app_source._get_app_icon_png",
             return_value=self._FAKE_PNG,
         ):
             uri1 = src._get_icon(app_path)
@@ -313,7 +313,7 @@ class TestIconDiskCache:
         # New instance should load from disk without calling AppKit
         src2 = AppSource(icon_cache_dir=cache_dir)
         with patch(
-            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            "wenzi.scripting.sources.app_source._get_app_icon_png",
         ) as mock_extract:
             uri2 = src2._get_icon(app_path)
             mock_extract.assert_not_called()
@@ -332,7 +332,7 @@ class TestIconDiskCache:
         src = AppSource(icon_cache_dir=cache_dir)
 
         with patch(
-            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            "wenzi.scripting.sources.app_source._get_app_icon_png",
             return_value=self._FAKE_PNG,
         ):
             src._get_icon(app_path)
@@ -344,7 +344,7 @@ class TestIconDiskCache:
         new_png = b"\x89PNG\r\n\x1a\nnew_icon"
         src2 = AppSource(icon_cache_dir=cache_dir)
         with patch(
-            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            "wenzi.scripting.sources.app_source._get_app_icon_png",
             return_value=new_png,
         ):
             uri = src2._get_icon(app_path)
@@ -361,7 +361,7 @@ class TestIconDiskCache:
 
         src = AppSource(icon_cache_dir=cache_dir)
         with patch(
-            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            "wenzi.scripting.sources.app_source._get_app_icon_png",
             return_value=self._FAKE_PNG,
         ):
             src._get_icon(app_path)
@@ -378,7 +378,7 @@ class TestIconDiskCache:
 
         src = AppSource(icon_cache_dir=cache_dir)
         with patch(
-            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            "wenzi.scripting.sources.app_source._get_app_icon_png",
             return_value=None,
         ):
             uri = src._get_icon(app_path)
@@ -398,7 +398,7 @@ class TestIconDiskCache:
 
         src = AppSource(icon_cache_dir=cache_dir)
         with patch(
-            "voicetext.scripting.sources.app_source._get_app_icon_png",
+            "wenzi.scripting.sources.app_source._get_app_icon_png",
             return_value=self._FAKE_PNG,
         ):
             uri1 = src._get_icon(app_path)

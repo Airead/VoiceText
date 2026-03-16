@@ -7,16 +7,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from voicetext.enhance.conversation_history import ConversationHistory
-from voicetext.enhance.enhancer import (
+from wenzi.enhance.conversation_history import ConversationHistory
+from wenzi.enhance.enhancer import (
     TextEnhancer,
     build_thinking_body,
     _is_deepseek_reasoning_model,
     _is_openai_reasoning_model,
     create_enhancer,
 )
-from voicetext.enhance.mode_loader import ModeDefinition
-from voicetext.enhance.vocabulary import VocabularyEntry, VocabularyIndex
+from wenzi.enhance.mode_loader import ModeDefinition
+from wenzi.enhance.vocabulary import VocabularyEntry, VocabularyIndex
 
 
 # --- TextEnhancer tests ---
@@ -34,8 +34,8 @@ _TEST_MODES = {
 @pytest.fixture(autouse=True)
 def _patch_mode_loading():
     """Auto-patch mode loading for all enhancer tests."""
-    with patch("voicetext.enhance.enhancer.ensure_default_modes"), \
-         patch("voicetext.enhance.enhancer.load_modes", return_value=dict(_TEST_MODES)):
+    with patch("wenzi.enhance.enhancer.ensure_default_modes"), \
+         patch("wenzi.enhance.enhancer.load_modes", return_value=dict(_TEST_MODES)):
         yield
 
 
@@ -87,46 +87,46 @@ def _make_multi_provider_config(**overrides):
 
 class TestTextEnhancerIsActive:
     def test_active_when_enabled_and_mode_not_off(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
         assert enhancer.is_active is True
 
     def test_inactive_when_disabled(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=False, mode="proofread"))
         assert enhancer.is_active is False
 
     def test_inactive_when_mode_off(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="off"))
         assert enhancer.is_active is False
 
     def test_inactive_when_disabled_and_mode_off(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=False, mode="off"))
         assert enhancer.is_active is False
 
 
 class TestTextEnhancerMode:
     def test_mode_getter(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(mode="format"))
         assert enhancer.mode == "format"
 
     def test_mode_setter(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(mode="proofread"))
         enhancer.mode = "enhance"
         assert enhancer.mode == "enhance"
 
     def test_unknown_mode_falls_back(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(mode="nonexistent"))
         # Should fall back to first available mode
         assert enhancer.mode in _TEST_MODES
 
     def test_available_modes(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         modes = enhancer.available_modes
         assert len(modes) == 5
@@ -139,7 +139,7 @@ class TestTextEnhancerProviderModel:
     """Tests for multi-provider and model switching."""
 
     def test_provider_names(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_multi_provider_config())
             # Simulate providers being initialized
             enhancer._providers = {
@@ -149,7 +149,7 @@ class TestTextEnhancerProviderModel:
         assert set(enhancer.provider_names) == {"ollama", "openai"}
 
     def test_model_names_for_active_provider(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_multi_provider_config())
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b", "llama3:8b"]),
@@ -159,7 +159,7 @@ class TestTextEnhancerProviderModel:
         assert enhancer.model_names == ["qwen2.5:7b", "llama3:8b"]
 
     def test_model_names_after_provider_switch(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_multi_provider_config())
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b", "llama3:8b"]),
@@ -170,7 +170,7 @@ class TestTextEnhancerProviderModel:
         assert enhancer.model_names == ["gpt-4o", "gpt-4o-mini"]
 
     def test_provider_switch_auto_selects_first_model(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_multi_provider_config())
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b", "llama3:8b"]),
@@ -182,7 +182,7 @@ class TestTextEnhancerProviderModel:
         assert enhancer.model_name == "gpt-4o"
 
     def test_provider_switch_keeps_model_if_available(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_multi_provider_config())
             enhancer._providers = {
                 "provider_a": (MagicMock(), ["shared-model", "model-a"]),
@@ -194,7 +194,7 @@ class TestTextEnhancerProviderModel:
         assert enhancer.model_name == "shared-model"
 
     def test_model_setter(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b", "llama3:8b"]),
@@ -204,7 +204,7 @@ class TestTextEnhancerProviderModel:
         assert enhancer.model_name == "llama3:8b"
 
     def test_unknown_provider_ignored(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b"]),
@@ -214,14 +214,14 @@ class TestTextEnhancerProviderModel:
         assert enhancer.provider_name == "ollama"
 
     def test_model_names_empty_when_no_providers(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
             enhancer._providers = {}
             enhancer._active_provider = "missing"
         assert enhancer.model_names == []
 
     def test_providers_with_models(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_multi_provider_config())
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b", "llama3:8b"]),
@@ -234,14 +234,14 @@ class TestTextEnhancerProviderModel:
         }
 
     def test_providers_with_models_empty(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
             enhancer._providers = {}
         assert enhancer.providers_with_models == {}
 
     def test_default_provider_fallback(self):
         """If default_provider is not in providers, fallback to first available."""
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             cfg = _make_config(default_provider="nonexistent")
             enhancer = TextEnhancer(cfg)
             enhancer._providers = {
@@ -257,7 +257,7 @@ class TestTextEnhancerAddRemoveProvider:
     """Tests for adding and removing providers dynamically."""
 
     def test_add_provider_success(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b"]),
@@ -266,7 +266,7 @@ class TestTextEnhancerAddRemoveProvider:
             enhancer._active_model = "qwen2.5:7b"
 
         with patch(
-            "voicetext.enhance.enhancer.TextEnhancer._init_single_provider"
+            "wenzi.enhance.enhancer.TextEnhancer._init_single_provider"
         ) as mock_init:
             def fake_init(name, pcfg):
                 enhancer._providers[name] = (MagicMock(), pcfg["models"])
@@ -280,28 +280,28 @@ class TestTextEnhancerAddRemoveProvider:
         assert "openai" in enhancer.provider_names
 
     def test_add_provider_empty_name_rejected(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
             enhancer._providers = {}
         result = enhancer.add_provider("", "http://localhost", "key", ["model"])
         assert result is False
 
     def test_add_provider_empty_models_rejected(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
             enhancer._providers = {}
         result = enhancer.add_provider("test", "http://localhost", "key", [])
         assert result is False
 
     def test_add_first_provider_auto_selects(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
             enhancer._providers = {}
             enhancer._active_provider = ""
             enhancer._active_model = ""
 
         with patch(
-            "voicetext.enhance.enhancer.TextEnhancer._init_single_provider"
+            "wenzi.enhance.enhancer.TextEnhancer._init_single_provider"
         ) as mock_init:
             def fake_init(name, pcfg):
                 enhancer._providers[name] = (MagicMock(), pcfg["models"])
@@ -315,12 +315,12 @@ class TestTextEnhancerAddRemoveProvider:
         assert enhancer.model_name == "model-a"
 
     def test_add_provider_init_failure(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
             enhancer._providers = {}
 
         with patch(
-            "voicetext.enhance.enhancer.TextEnhancer._init_single_provider"
+            "wenzi.enhance.enhancer.TextEnhancer._init_single_provider"
         ):
             # _init_single_provider does nothing, so provider won't be added
             result = enhancer.add_provider(
@@ -331,7 +331,7 @@ class TestTextEnhancerAddRemoveProvider:
         assert "bad" not in enhancer.provider_names
 
     def test_remove_provider_success(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_multi_provider_config())
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b"]),
@@ -348,7 +348,7 @@ class TestTextEnhancerAddRemoveProvider:
         assert enhancer.model_name == "qwen2.5:7b"
 
     def test_remove_nonexistent_provider(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b"]),
@@ -357,7 +357,7 @@ class TestTextEnhancerAddRemoveProvider:
         assert result is False
 
     def test_remove_inactive_provider(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_multi_provider_config())
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b"]),
@@ -373,7 +373,7 @@ class TestTextEnhancerAddRemoveProvider:
         assert enhancer.model_name == "qwen2.5:7b"
 
     def test_remove_last_provider(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b"]),
@@ -396,7 +396,7 @@ class TestTextEnhancerVerifyProvider:
         return MagicMock(return_value=mock_client)
 
     def test_verify_success(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
 
         with patch("openai.AsyncOpenAI", self._make_mock_openai()):
@@ -408,7 +408,7 @@ class TestTextEnhancerVerifyProvider:
         assert result is None
 
     def test_verify_timeout(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
 
         mock_client = MagicMock()
@@ -425,7 +425,7 @@ class TestTextEnhancerVerifyProvider:
         assert "timed out" in result
 
     def test_verify_connection_error(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
 
         mock_client = MagicMock()
@@ -447,7 +447,7 @@ class TestParseProviderText:
 
     @staticmethod
     def _parse(text):
-        from voicetext.controllers.model_controller import parse_provider_text
+        from wenzi.controllers.model_controller import parse_provider_text
         return parse_provider_text(text)
 
     def test_valid_config(self):
@@ -559,7 +559,7 @@ def _make_mock_client(content="enhanced text", usage=None):
 
 class TestTextEnhancerEnhance:
     def test_returns_original_when_inactive(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=False))
         text, usage = asyncio.run(
             enhancer.enhance("hello")
@@ -568,21 +568,21 @@ class TestTextEnhancerEnhance:
         assert usage is None
 
     def test_returns_original_when_empty_input(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True))
         text, usage = asyncio.run(enhancer.enhance(""))
         assert text == ""
         assert usage is None
 
     def test_returns_original_when_whitespace_input(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True))
         text, usage = asyncio.run(enhancer.enhance("   "))
         assert text == "   "
         assert usage is None
 
     def test_returns_original_when_no_providers(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {}
         text, usage = asyncio.run(
@@ -593,7 +593,7 @@ class TestTextEnhancerEnhance:
 
     def test_successful_enhancement(self):
         mock_client = _make_mock_client("enhanced text")
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -610,7 +610,7 @@ class TestTextEnhancerEnhance:
     def test_successful_enhancement_with_usage(self):
         mock_usage = {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
         mock_client = _make_mock_client("enhanced text", usage=mock_usage)
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -626,7 +626,7 @@ class TestTextEnhancerEnhance:
 
     def test_fallback_on_empty_llm_response(self):
         mock_client = _make_mock_client("")
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -640,7 +640,7 @@ class TestTextEnhancerEnhance:
 
     def test_fallback_on_none_llm_response(self):
         mock_client = _make_mock_client(None)
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -652,9 +652,9 @@ class TestTextEnhancerEnhance:
         )
         assert text == "original text"
 
-    @patch("voicetext.enhance.enhancer.asyncio.wait_for", side_effect=Exception("LLM error"))
+    @patch("wenzi.enhance.enhancer.asyncio.wait_for", side_effect=Exception("LLM error"))
     def test_fallback_on_exception(self, mock_wait_for):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b"], {}),
@@ -668,11 +668,11 @@ class TestTextEnhancerEnhance:
         assert usage is None
 
     @patch(
-        "voicetext.enhance.enhancer.asyncio.wait_for",
+        "wenzi.enhance.enhancer.asyncio.wait_for",
         side_effect=asyncio.TimeoutError(),
     )
     def test_fallback_on_timeout(self, mock_wait_for):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b"], {}),
@@ -691,79 +691,79 @@ class TestTextEnhancerEnhance:
 
 class TestThinkingAndExtraBody:
     def test_thinking_defaults_to_false(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         assert enhancer.thinking is False
 
     def test_thinking_can_be_enabled(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=True))
         assert enhancer.thinking is True
 
     def test_thinking_setter(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         enhancer.thinking = True
         assert enhancer.thinking is True
 
     def test_build_extra_body_thinking_off_qwen(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=False))
             enhancer._active_model = "qwen2.5:7b"
         result = enhancer._build_extra_body({})
         assert result == {"chat_template_kwargs": {"enable_thinking": False}}
 
     def test_build_extra_body_thinking_off_glm(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=False))
             enhancer._active_model = "glm-4-flash"
         result = enhancer._build_extra_body({})
         assert result == {"thinking": {"type": "disabled"}}
 
     def test_build_extra_body_thinking_on_qwen(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=True))
             enhancer._active_model = "qwen2.5:7b"
         result = enhancer._build_extra_body({})
         assert result == {"chat_template_kwargs": {"enable_thinking": True}}
 
     def test_build_extra_body_thinking_on_glm(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=True))
             enhancer._active_model = "glm-4-flash"
         result = enhancer._build_extra_body({})
         assert result == {"thinking": {"type": "enabled"}}
 
     def test_build_extra_body_thinking_on_unknown_model(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=True))
             enhancer._active_model = "llama-3.1:8b"
         result = enhancer._build_extra_body({})
         assert result == {}
 
     def test_build_extra_body_thinking_off_unknown_model(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=False))
             enhancer._active_model = "llama-3.1:8b"
         result = enhancer._build_extra_body({})
         assert result == {}
 
     def test_build_extra_body_thinking_on_openai_reasoning(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=True))
             enhancer._active_model = "o3-mini"
         result = enhancer._build_extra_body({})
         assert result == {"reasoning_effort": "low"}
 
     def test_build_extra_body_thinking_off_openai_reasoning(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=False))
             enhancer._active_model = "o3-mini"
         result = enhancer._build_extra_body({})
         assert result == {}
 
     def test_build_extra_body_provider_overrides(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=False))
             enhancer._active_model = "qwen2.5:7b"
         provider_extra = {"chat_template_kwargs": {"enable_thinking": True}}
@@ -772,7 +772,7 @@ class TestThinkingAndExtraBody:
         assert result["chat_template_kwargs"]["enable_thinking"] is True
 
     def test_build_extra_body_provider_overrides_glm(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=False))
             enhancer._active_model = "glm-4-flash"
         provider_extra = {"thinking": {"type": "enabled"}}
@@ -780,7 +780,7 @@ class TestThinkingAndExtraBody:
         assert result["thinking"]["type"] == "enabled"
 
     def test_build_extra_body_merges_provider_fields(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(thinking=False))
             enhancer._active_model = "qwen2.5:7b"
         provider_extra = {"custom_field": "value"}
@@ -869,7 +869,7 @@ class TestThinkingAndExtraBody:
 
     def test_enhance_passes_extra_body_when_thinking_off(self):
         mock_client = _make_mock_client("enhanced")
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, thinking=False))
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -885,7 +885,7 @@ class TestThinkingAndExtraBody:
 
     def test_enhance_passes_extra_body_when_thinking_off_glm(self):
         mock_client = _make_mock_client("enhanced")
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, thinking=False))
             enhancer._providers = {
                 "zhipu": (mock_client, ["glm-4-flash"], {}),
@@ -901,7 +901,7 @@ class TestThinkingAndExtraBody:
 
     def test_enhance_extra_body_when_thinking_on_qwen(self):
         mock_client = _make_mock_client("enhanced")
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, thinking=True))
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -917,7 +917,7 @@ class TestThinkingAndExtraBody:
 
     def test_enhance_no_extra_body_when_thinking_on_unknown(self):
         mock_client = _make_mock_client("enhanced")
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, thinking=True))
             enhancer._providers = {
                 "ollama": (mock_client, ["llama-3.1:8b"], {}),
@@ -931,7 +931,7 @@ class TestThinkingAndExtraBody:
 
     def test_enhance_no_extra_body_when_thinking_off_unknown(self):
         mock_client = _make_mock_client("enhanced")
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, thinking=False))
             enhancer._providers = {
                 "ollama": (mock_client, ["llama-3.1:8b"], {}),
@@ -956,14 +956,14 @@ class TestCreateEnhancer:
 
     def test_returns_enhancer_when_configured(self):
         config = {"ai_enhance": _make_config(enabled=True)}
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = create_enhancer(config)
         assert enhancer is not None
         assert isinstance(enhancer, TextEnhancer)
 
     def test_returns_enhancer_when_disabled(self):
         config = {"ai_enhance": _make_config(enabled=False)}
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = create_enhancer(config)
         assert enhancer is not None
         assert enhancer.is_active is False
@@ -974,20 +974,20 @@ class TestCreateEnhancer:
 
 class TestVocabularyIntegration:
     def test_vocab_disabled_by_default(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         assert enhancer.vocab_enabled is False
         assert enhancer.vocab_index is None
 
     def test_vocab_enabled_creates_index(self):
         cfg = _make_config(vocabulary={"enabled": True, "top_k": 3})
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(cfg)
         assert enhancer.vocab_enabled is True
         assert enhancer.vocab_index is not None
 
     def test_vocab_toggle(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         assert enhancer.vocab_enabled is False
         enhancer.vocab_enabled = True
@@ -1008,7 +1008,7 @@ class TestVocabularyIntegration:
         )
 
         cfg = _make_config(enabled=True, vocabulary={"enabled": True, "top_k": 5})
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(cfg)
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1028,7 +1028,7 @@ class TestVocabularyIntegration:
         mock_client = _make_mock_client("enhanced text")
 
         cfg = _make_config(enabled=True)
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(cfg)
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1049,7 +1049,7 @@ class TestVocabularyIntegration:
         mock_vocab.retrieve.side_effect = RuntimeError("embedding error")
 
         cfg = _make_config(enabled=True, vocabulary={"enabled": True, "top_k": 5})
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(cfg)
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1071,7 +1071,7 @@ class TestVocabularyIntegration:
         mock_vocab.retrieve.return_value = []
 
         cfg = _make_config(enabled=True, vocabulary={"enabled": True, "top_k": 5})
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(cfg)
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1092,17 +1092,17 @@ class TestVocabularyIntegration:
 
 class TestDebugFlags:
     def test_debug_print_prompt_defaults_false(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         assert enhancer.debug_print_prompt is False
 
     def test_debug_print_request_body_defaults_false(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         assert enhancer.debug_print_request_body is False
 
     def test_debug_print_prompt_toggle(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         enhancer.debug_print_prompt = True
         assert enhancer.debug_print_prompt is True
@@ -1110,7 +1110,7 @@ class TestDebugFlags:
         assert enhancer.debug_print_prompt is False
 
     def test_debug_print_request_body_toggle(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         enhancer.debug_print_request_body = True
         assert enhancer.debug_print_request_body is True
@@ -1119,7 +1119,7 @@ class TestDebugFlags:
 
     def test_enhance_logs_prompt_when_enabled(self):
         mock_client = _make_mock_client("enhanced")
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1128,7 +1128,7 @@ class TestDebugFlags:
             enhancer._active_model = "qwen2.5:7b"
             enhancer.debug_print_prompt = True
 
-        with patch("voicetext.enhance.enhancer.logger") as mock_logger:
+        with patch("wenzi.enhance.enhancer.logger") as mock_logger:
             asyncio.run(
                 enhancer.enhance("test input")
             )
@@ -1139,7 +1139,7 @@ class TestDebugFlags:
 
     def test_enhance_logs_request_body_when_enabled(self):
         mock_client = _make_mock_client("enhanced")
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1148,7 +1148,7 @@ class TestDebugFlags:
             enhancer._active_model = "qwen2.5:7b"
             enhancer.debug_print_request_body = True
 
-        with patch("voicetext.enhance.enhancer.logger") as mock_logger:
+        with patch("wenzi.enhance.enhancer.logger") as mock_logger:
             asyncio.run(
                 enhancer.enhance("test input")
             )
@@ -1158,7 +1158,7 @@ class TestDebugFlags:
 
     def test_enhance_no_debug_logs_when_disabled(self):
         mock_client = _make_mock_client("enhanced")
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1166,7 +1166,7 @@ class TestDebugFlags:
             enhancer._active_provider = "ollama"
             enhancer._active_model = "qwen2.5:7b"
 
-        with patch("voicetext.enhance.enhancer.logger") as mock_logger:
+        with patch("wenzi.enhance.enhancer.logger") as mock_logger:
             asyncio.run(
                 enhancer.enhance("test input")
             )
@@ -1180,25 +1180,25 @@ class TestDebugFlags:
 
 class TestConversationHistoryIntegration:
     def test_history_disabled_by_default(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         assert enhancer.history_enabled is False
 
     def test_history_enabled_from_config(self):
         cfg = _make_config(conversation_history={"enabled": True, "max_entries": 5})
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(cfg)
         assert enhancer.history_enabled is True
 
     def test_history_toggle(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         assert enhancer.history_enabled is False
         enhancer.history_enabled = True
         assert enhancer.history_enabled is True
 
     def test_conversation_history_property(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         assert isinstance(enhancer.conversation_history, ConversationHistory)
 
@@ -1217,7 +1217,7 @@ class TestConversationHistoryIntegration:
             enabled=True,
             conversation_history={"enabled": True, "max_entries": 10},
         )
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(cfg)
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1236,7 +1236,7 @@ class TestConversationHistoryIntegration:
         mock_client = _make_mock_client("enhanced text")
 
         cfg = _make_config(enabled=True)
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(cfg)
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1259,7 +1259,7 @@ class TestConversationHistoryIntegration:
             enabled=True,
             conversation_history={"enabled": True, "max_entries": 10},
         )
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(cfg)
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1282,7 +1282,7 @@ class TestConversationHistoryIntegration:
             enabled=True,
             conversation_history={"enabled": True, "max_entries": 10},
         )
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(cfg)
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1302,13 +1302,13 @@ class TestLastSystemPrompt:
     """Test last_system_prompt property."""
 
     def test_last_system_prompt_empty_by_default(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         assert enhancer.last_system_prompt == ""
 
     def test_last_system_prompt_set_after_enhance(self):
         mock_client = _make_mock_client("enhanced text")
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1328,7 +1328,7 @@ class TestLastSystemPrompt:
         mock_vocab.retrieve.return_value = entries
         mock_vocab.format_for_prompt.return_value = "# Vocabulary\n- API: Application Programming Interface"
 
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(
                 enabled=True, mode="proofread",
                 vocabulary={"enabled": True, "top_k": 5},
@@ -1380,7 +1380,7 @@ def _make_mock_stream_client(chunks, usage=None):
 
 class TestTextEnhancerEnhanceStream:
     def test_returns_original_when_inactive(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=False))
 
         results = []
@@ -1393,7 +1393,7 @@ class TestTextEnhancerEnhanceStream:
         assert results[0] == ("hello", None, False)
 
     def test_returns_original_when_empty(self):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b"], {}),
@@ -1414,7 +1414,7 @@ class TestTextEnhancerEnhanceStream:
             ["enhanced", " ", "text"],
             usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
         )
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1439,7 +1439,7 @@ class TestTextEnhancerEnhanceStream:
 
     def test_fallback_on_empty_stream(self):
         mock_client = _make_mock_stream_client([], usage=None)
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (mock_client, ["qwen2.5:7b"], {}),
@@ -1457,9 +1457,9 @@ class TestTextEnhancerEnhanceStream:
         text_chunks = [r[0] for r in results if r[0]]
         assert "".join(text_chunks) == "original text"
 
-    @patch("voicetext.enhance.enhancer.asyncio.wait_for", side_effect=Exception("stream error"))
+    @patch("wenzi.enhance.enhancer.asyncio.wait_for", side_effect=Exception("stream error"))
     def test_fallback_on_exception(self, mock_wait_for):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(enabled=True, mode="proofread"))
             enhancer._providers = {
                 "ollama": (MagicMock(), ["qwen2.5:7b"], {}),
@@ -1475,9 +1475,9 @@ class TestTextEnhancerEnhanceStream:
         assert len(results) == 1
         assert "(error:" in results[0][0]
 
-    @patch("voicetext.enhance.enhancer.asyncio.wait_for", side_effect=asyncio.TimeoutError)
+    @patch("wenzi.enhance.enhancer.asyncio.wait_for", side_effect=asyncio.TimeoutError)
     def test_fallback_on_timeout(self, mock_wait_for):
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(
                 enabled=True, mode="proofread", max_retries=0,
             ))
@@ -1503,7 +1503,7 @@ class TestConnectionTimeoutRetry:
 
     def test_connection_timeout_config(self):
         """Verify connection_timeout and max_retries are read from config."""
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(
                 connection_timeout=5, max_retries=3,
             ))
@@ -1512,7 +1512,7 @@ class TestConnectionTimeoutRetry:
 
     def test_connection_timeout_defaults(self):
         """Verify defaults when config keys are absent."""
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config())
         assert enhancer._connection_timeout == 10
         assert enhancer._max_retries == 2
@@ -1536,7 +1536,7 @@ class TestConnectionTimeoutRetry:
         mock_client = MagicMock()
         mock_client.chat.completions.create = AsyncMock(side_effect=_create_side_effect)
 
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(
                 enabled=True, mode="proofread",
                 connection_timeout=1, max_retries=2,
@@ -1571,7 +1571,7 @@ class TestConnectionTimeoutRetry:
             side_effect=asyncio.TimeoutError(),
         )
 
-        with patch("voicetext.enhance.enhancer.TextEnhancer._init_providers"):
+        with patch("wenzi.enhance.enhancer.TextEnhancer._init_providers"):
             enhancer = TextEnhancer(_make_config(
                 enabled=True, mode="proofread",
                 connection_timeout=1, max_retries=2,

@@ -3,7 +3,7 @@
 import os
 from unittest.mock import MagicMock, patch
 
-from voicetext.audio.sound_manager import SoundManager, ensure_start_sound
+from wenzi.audio.sound_manager import SoundManager, ensure_start_sound
 
 
 class TestSoundManagerInit:
@@ -26,19 +26,19 @@ class TestSoundManagerEnabled:
 
 
 class TestSoundManagerPlay:
-    @patch("voicetext.audio.sound_manager.SoundManager._play_on_main_thread")
+    @patch("wenzi.audio.sound_manager.SoundManager._play_on_main_thread")
     def test_play_when_disabled_does_nothing(self, mock_play):
         sm = SoundManager(enabled=False)
         sm.play("start")
         mock_play.assert_not_called()
 
-    @patch("voicetext.audio.sound_manager.SoundManager._play_on_main_thread")
+    @patch("wenzi.audio.sound_manager.SoundManager._play_on_main_thread")
     def test_play_stop_event_does_nothing(self, mock_play):
         sm = SoundManager(enabled=True)
         sm.play("stop")
         mock_play.assert_not_called()
 
-    @patch("voicetext.audio.sound_manager.SoundManager._play_on_main_thread")
+    @patch("wenzi.audio.sound_manager.SoundManager._play_on_main_thread")
     def test_play_unknown_event_does_nothing(self, mock_play):
         sm = SoundManager(enabled=True)
         sm.play("unknown_event")
@@ -119,7 +119,7 @@ class TestSoundManagerPlay:
 class TestEnsureStartSound:
     def test_generates_wav_in_sounds_dir(self, tmp_path, monkeypatch):
         sounds_dir = str(tmp_path / "sounds")
-        monkeypatch.setattr("voicetext.audio.sound_manager.SOUNDS_DIR", sounds_dir)
+        monkeypatch.setattr("wenzi.audio.sound_manager.SOUNDS_DIR", sounds_dir)
         path = ensure_start_sound()
         assert os.path.exists(path)
         assert path.endswith("recording_start.wav")
@@ -127,7 +127,7 @@ class TestEnsureStartSound:
 
     def test_does_not_regenerate_if_exists(self, tmp_path, monkeypatch):
         sounds_dir = str(tmp_path / "sounds")
-        monkeypatch.setattr("voicetext.audio.sound_manager.SOUNDS_DIR", sounds_dir)
+        monkeypatch.setattr("wenzi.audio.sound_manager.SOUNDS_DIR", sounds_dir)
         path1 = ensure_start_sound()
         mtime1 = os.path.getmtime(path1)
         path2 = ensure_start_sound()
@@ -137,7 +137,7 @@ class TestEnsureStartSound:
 
     def test_user_can_replace_sound(self, tmp_path, monkeypatch):
         sounds_dir = str(tmp_path / "sounds")
-        monkeypatch.setattr("voicetext.audio.sound_manager.SOUNDS_DIR", sounds_dir)
+        monkeypatch.setattr("wenzi.audio.sound_manager.SOUNDS_DIR", sounds_dir)
         # Generate default first
         path = ensure_start_sound()
         # User replaces with custom file
@@ -151,7 +151,7 @@ class TestEnsureStartSound:
 
     def test_fallback_when_blow_missing(self, tmp_path, monkeypatch):
         sounds_dir = str(tmp_path / "sounds")
-        monkeypatch.setattr("voicetext.audio.sound_manager.SOUNDS_DIR", sounds_dir)
+        monkeypatch.setattr("wenzi.audio.sound_manager.SOUNDS_DIR", sounds_dir)
 
         original_exists = os.path.exists
 

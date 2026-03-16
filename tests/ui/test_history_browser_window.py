@@ -11,7 +11,7 @@ pytestmark = pytest.mark.usefixtures("mock_appkit_modules")
 
 class TestHistoryBrowserPanel:
     def test_init(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         assert panel._panel is None
@@ -20,13 +20,13 @@ class TestHistoryBrowserPanel:
         assert panel._selected_index == -1
 
     def test_number_of_rows_empty(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         assert panel.numberOfRowsInTableView_(None) == 0
 
     def test_number_of_rows_with_data(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._filtered_records = [
@@ -36,7 +36,7 @@ class TestHistoryBrowserPanel:
         assert panel.numberOfRowsInTableView_(None) == 2
 
     def test_table_view_object_value_time_full_format(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._filtered_records = [
@@ -49,7 +49,7 @@ class TestHistoryBrowserPanel:
         assert result == "2026-03-13 14:30"
 
     def test_table_view_object_value_mode(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._filtered_records = [
@@ -62,7 +62,7 @@ class TestHistoryBrowserPanel:
         assert result == "proofread"
 
     def test_table_view_object_value_preview_truncated(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         long_text = "a" * 100
@@ -75,7 +75,7 @@ class TestHistoryBrowserPanel:
         assert len(result) == 80
 
     def test_table_view_object_value_out_of_range(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._filtered_records = []
@@ -85,14 +85,14 @@ class TestHistoryBrowserPanel:
         assert result == ""
 
     def test_close_without_panel(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         # Should not raise
         panel.close()
 
     def test_save_clicked_no_selection(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._selected_index = -1
@@ -100,7 +100,7 @@ class TestHistoryBrowserPanel:
         panel.saveClicked_(None)
 
     def test_mode_filter(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel, _MODE_ALL
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel, _MODE_ALL
 
         panel = HistoryBrowserPanel()
         panel._all_records = [
@@ -126,7 +126,7 @@ class TestHistoryBrowserPanel:
         assert len(panel._filtered_records) == 1
 
     def test_model_filter(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel, _MODEL_ALL
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel, _MODEL_ALL
 
         panel = HistoryBrowserPanel()
         panel._all_records = [
@@ -160,7 +160,7 @@ class TestHistoryBrowserPanel:
         assert len(panel._filtered_records) == 0
 
     def test_combined_mode_and_model_filter(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._all_records = [
@@ -179,7 +179,7 @@ class TestHistoryBrowserPanel:
         assert panel._filtered_records[0]["timestamp"] == "t1"
 
     def test_corrected_only_filter(self):
-        from voicetext.ui.history_browser_window import HistoryBrowserPanel
+        from wenzi.ui.history_browser_window import HistoryBrowserPanel
 
         panel = HistoryBrowserPanel()
         panel._all_records = [
@@ -202,7 +202,7 @@ class TestHistoryBrowserPanel:
         assert panel._filtered_records[1]["timestamp"] == "t3"
 
     def test_format_timestamp(self):
-        from voicetext.ui.history_browser_window import _format_timestamp
+        from wenzi.ui.history_browser_window import _format_timestamp
 
         assert _format_timestamp("2026-03-13T14:30:00+00:00") == "2026-03-13 14:30"
         assert _format_timestamp("2026-01-01T09:05:00") == "2026-01-01 09:05"

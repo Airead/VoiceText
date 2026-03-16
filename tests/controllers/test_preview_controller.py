@@ -7,12 +7,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from voicetext.controllers.preview_controller import PreviewController
+from wenzi.controllers.preview_controller import PreviewController
 
 
 @pytest.fixture
 def mock_app():
-    """Create a mock VoiceTextApp for PreviewController."""
+    """Create a mock WenZiApp for PreviewController."""
     app = MagicMock()
     app._enhance_mode = "proofread"
     app._enhance_controller = MagicMock()
@@ -37,7 +37,7 @@ def ctrl(mock_app):
 class TestEnhanceModeDebounce:
     """Tests for debounced enhancement on mode switch."""
 
-    @patch("voicetext.controllers.preview_controller.save_config")
+    @patch("wenzi.controllers.preview_controller.save_config")
     def test_single_switch_fires_after_debounce(self, mock_save, ctrl, mock_app):
         """A single mode switch should fire enhancement after debounce delay."""
         # Use a very short debounce for testing
@@ -55,7 +55,7 @@ class TestEnhanceModeDebounce:
 
         mock_app._enhance_controller.run.assert_called_once()
 
-    @patch("voicetext.controllers.preview_controller.save_config")
+    @patch("wenzi.controllers.preview_controller.save_config")
     def test_rapid_switches_fire_only_once(self, mock_save, ctrl, mock_app):
         """Rapid mode switches should only fire one enhancement request."""
         ctrl._ENHANCE_DEBOUNCE_SECONDS = 0.05
@@ -75,7 +75,7 @@ class TestEnhanceModeDebounce:
         # Only one call should have fired (for the last mode)
         mock_app._enhance_controller.run.assert_called_once()
 
-    @patch("voicetext.controllers.preview_controller.save_config")
+    @patch("wenzi.controllers.preview_controller.save_config")
     def test_switch_to_off_cancels_immediately(self, mock_save, ctrl, mock_app):
         """Switching to Off should cancel immediately without debounce."""
         ctrl._ENHANCE_DEBOUNCE_SECONDS = 0.05
@@ -86,7 +86,7 @@ class TestEnhanceModeDebounce:
         # No debounce timer should be active
         assert ctrl._enhance_debounce_timer is None
 
-    @patch("voicetext.controllers.preview_controller.save_config")
+    @patch("wenzi.controllers.preview_controller.save_config")
     def test_switch_off_cancels_pending_debounce(self, mock_save, ctrl, mock_app):
         """Switching to Off should cancel any pending debounce timer."""
         ctrl._ENHANCE_DEBOUNCE_SECONDS = 0.05
@@ -101,7 +101,7 @@ class TestEnhanceModeDebounce:
         time.sleep(0.3)
         mock_app._enhance_controller.run.assert_not_called()
 
-    @patch("voicetext.controllers.preview_controller.save_config")
+    @patch("wenzi.controllers.preview_controller.save_config")
     def test_cached_result_replays_immediately(self, mock_save, ctrl, mock_app):
         """If cache hit, replay immediately without debounce."""
         cached = MagicMock()
@@ -115,7 +115,7 @@ class TestEnhanceModeDebounce:
         # No enhancement run needed
         mock_app._enhance_controller.run.assert_not_called()
 
-    @patch("voicetext.controllers.preview_controller.save_config")
+    @patch("wenzi.controllers.preview_controller.save_config")
     def test_config_saved_immediately(self, mock_save, ctrl, mock_app):
         """Config should be saved immediately, not debounced."""
         ctrl._ENHANCE_DEBOUNCE_SECONDS = 0.05
@@ -125,7 +125,7 @@ class TestEnhanceModeDebounce:
         mock_save.assert_called_once()
         assert mock_app._config["ai_enhance"]["mode"] == "translate"
 
-    @patch("voicetext.controllers.preview_controller.save_config")
+    @patch("wenzi.controllers.preview_controller.save_config")
     def test_stale_timer_does_not_fire(self, mock_save, ctrl, mock_app):
         """A stale debounce timer should not fire if request_id changed."""
         ctrl._ENHANCE_DEBOUNCE_SECONDS = 0.05

@@ -8,7 +8,7 @@ from pathlib import Path
 
 def main() -> None:
     project_dir = Path(__file__).resolve().parent.parent
-    build_info_path = project_dir / "src" / "voicetext" / "_build_info.py"
+    build_info_path = project_dir / "src" / "wenzi" / "_build_info.py"
 
     try:
         git_hash = (

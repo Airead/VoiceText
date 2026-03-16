@@ -1,6 +1,6 @@
 """Tests for translate_webview URL generation."""
 
-from voicetext.ui.translate_webview import build_google_translate_url
+from wenzi.ui.translate_webview import build_google_translate_url
 
 
 class TestBuildGoogleTranslateUrl:

@@ -32,9 +32,9 @@ def mock_appkit(monkeypatch):
 class TestClipboardPublicFunctions:
     """Test public clipboard read/write functions in input.py."""
 
-    @patch("voicetext.input.NSPasteboard")
+    @patch("wenzi.input.NSPasteboard")
     def test_get_clipboard_text(self, mock_pb_cls):
-        from voicetext.input import get_clipboard_text
+        from wenzi.input import get_clipboard_text
 
         mock_pb = MagicMock()
         mock_pb_cls.generalPasteboard.return_value = mock_pb
@@ -43,9 +43,9 @@ class TestClipboardPublicFunctions:
         result = get_clipboard_text()
         assert result == "hello clipboard"
 
-    @patch("voicetext.input.NSPasteboard")
+    @patch("wenzi.input.NSPasteboard")
     def test_get_clipboard_text_empty(self, mock_pb_cls):
-        from voicetext.input import get_clipboard_text
+        from wenzi.input import get_clipboard_text
 
         mock_pb = MagicMock()
         mock_pb_cls.generalPasteboard.return_value = mock_pb
@@ -54,10 +54,10 @@ class TestClipboardPublicFunctions:
         result = get_clipboard_text()
         assert result is None
 
-    @patch("voicetext.input.NSString")
-    @patch("voicetext.input.NSPasteboard")
+    @patch("wenzi.input.NSString")
+    @patch("wenzi.input.NSPasteboard")
     def test_set_clipboard_text(self, mock_pb_cls, mock_nsstr):
-        from voicetext.input import set_clipboard_text
+        from wenzi.input import set_clipboard_text
 
         mock_pb = MagicMock()
         mock_pb_cls.generalPasteboard.return_value = mock_pb
@@ -69,10 +69,10 @@ class TestClipboardPublicFunctions:
         # Should set string without concealed markers
         assert mock_pb.setString_forType_.call_count == 1
 
-    @patch("voicetext.input.NSPasteboardTypeString", "public.utf8-plain-text")
-    @patch("voicetext.input.NSPasteboard")
+    @patch("wenzi.input.NSPasteboardTypeString", "public.utf8-plain-text")
+    @patch("wenzi.input.NSPasteboard")
     def test_has_clipboard_text_true(self, mock_pb_cls):
-        from voicetext.input import has_clipboard_text
+        from wenzi.input import has_clipboard_text
 
         mock_pb = MagicMock()
         mock_pb_cls.generalPasteboard.return_value = mock_pb
@@ -80,10 +80,10 @@ class TestClipboardPublicFunctions:
 
         assert has_clipboard_text() is True
 
-    @patch("voicetext.input.NSPasteboardTypeString", "public.utf8-plain-text")
-    @patch("voicetext.input.NSPasteboard")
+    @patch("wenzi.input.NSPasteboardTypeString", "public.utf8-plain-text")
+    @patch("wenzi.input.NSPasteboard")
     def test_has_clipboard_text_false_for_image(self, mock_pb_cls):
-        from voicetext.input import has_clipboard_text
+        from wenzi.input import has_clipboard_text
 
         mock_pb = MagicMock()
         mock_pb_cls.generalPasteboard.return_value = mock_pb
@@ -95,12 +95,12 @@ class TestClipboardPublicFunctions:
 class TestCopySelectionToClipboard:
     """Test copy_selection_to_clipboard() function."""
 
-    @patch("voicetext.input._has_text_selection", return_value=True)
-    @patch("voicetext.input.time.sleep")
-    @patch("voicetext.input._send_cmd_c")
-    @patch("voicetext.input.get_clipboard_text")
+    @patch("wenzi.input._has_text_selection", return_value=True)
+    @patch("wenzi.input.time.sleep")
+    @patch("wenzi.input._send_cmd_c")
+    @patch("wenzi.input.get_clipboard_text")
     def test_selection_copied_successfully(self, mock_get, mock_send, mock_sleep, _):
-        from voicetext.input import copy_selection_to_clipboard
+        from wenzi.input import copy_selection_to_clipboard
 
         # Clipboard changes after Cmd+C
         mock_get.side_effect = ["old text", "new selected text"]
@@ -114,20 +114,20 @@ class TestCopySelectionToClipboard:
         mock_sleep.assert_any_call(0.05)
         mock_sleep.assert_any_call(0.15)
 
-    @patch("voicetext.input._has_text_selection", return_value=False)
+    @patch("wenzi.input._has_text_selection", return_value=False)
     def test_no_selection_skips_cmd_c(self, _):
-        from voicetext.input import copy_selection_to_clipboard
+        from wenzi.input import copy_selection_to_clipboard
 
         result = copy_selection_to_clipboard()
 
         assert result is False
 
-    @patch("voicetext.input._has_text_selection", return_value=True)
-    @patch("voicetext.input.time.sleep")
-    @patch("voicetext.input._send_cmd_c")
-    @patch("voicetext.input.get_clipboard_text")
+    @patch("wenzi.input._has_text_selection", return_value=True)
+    @patch("wenzi.input.time.sleep")
+    @patch("wenzi.input._send_cmd_c")
+    @patch("wenzi.input.get_clipboard_text")
     def test_clipboard_unchanged_returns_false(self, mock_get, mock_send, mock_sleep, _):
-        from voicetext.input import copy_selection_to_clipboard
+        from wenzi.input import copy_selection_to_clipboard
 
         # Clipboard stays the same (nothing selected per clipboard check)
         mock_get.side_effect = ["same text", "same text"]
@@ -136,12 +136,12 @@ class TestCopySelectionToClipboard:
 
         assert result is False
 
-    @patch("voicetext.input._has_text_selection", return_value=True)
-    @patch("voicetext.input.time.sleep")
-    @patch("voicetext.input._send_cmd_c")
-    @patch("voicetext.input.get_clipboard_text")
+    @patch("wenzi.input._has_text_selection", return_value=True)
+    @patch("wenzi.input.time.sleep")
+    @patch("wenzi.input._send_cmd_c")
+    @patch("wenzi.input.get_clipboard_text")
     def test_send_cmd_c_failure_returns_false(self, mock_get, mock_send, mock_sleep, _):
-        from voicetext.input import copy_selection_to_clipboard
+        from wenzi.input import copy_selection_to_clipboard
 
         mock_get.return_value = "old text"
         mock_send.side_effect = OSError("failed")
@@ -161,7 +161,7 @@ class TestClipboardEnhanceValidation:
 
     def _make_app_and_ctrl(self):
         """Create a minimal mock app and a real PreviewController."""
-        from voicetext.controllers.preview_controller import PreviewController
+        from wenzi.controllers.preview_controller import PreviewController
 
         app = MagicMock(spec=[])
         app._busy = False
@@ -169,10 +169,10 @@ class TestClipboardEnhanceValidation:
         return app, ctrl
 
     def test_non_text_clipboard_shows_alert(self):
-        with patch("voicetext.controllers.preview_controller.copy_selection_to_clipboard"), \
-             patch("voicetext.controllers.preview_controller.has_clipboard_text", return_value=False), \
-             patch("voicetext.controllers.preview_controller.topmost_alert") as mock_alert, \
-             patch("voicetext.controllers.preview_controller.restore_accessory") as mock_restore:
+        with patch("wenzi.controllers.preview_controller.copy_selection_to_clipboard"), \
+             patch("wenzi.controllers.preview_controller.has_clipboard_text", return_value=False), \
+             patch("wenzi.controllers.preview_controller.topmost_alert") as mock_alert, \
+             patch("wenzi.controllers.preview_controller.restore_accessory") as mock_restore:
             app, ctrl = self._make_app_and_ctrl()
 
             mock_helper = MagicMock()
@@ -188,11 +188,11 @@ class TestClipboardEnhanceValidation:
             mock_restore.assert_called_once()
 
     def test_empty_text_clipboard_shows_alert(self):
-        with patch("voicetext.controllers.preview_controller.copy_selection_to_clipboard"), \
-             patch("voicetext.controllers.preview_controller.has_clipboard_text", return_value=True), \
-             patch("voicetext.controllers.preview_controller.get_clipboard_text", return_value=""), \
-             patch("voicetext.controllers.preview_controller.topmost_alert") as mock_alert, \
-             patch("voicetext.controllers.preview_controller.restore_accessory") as mock_restore:
+        with patch("wenzi.controllers.preview_controller.copy_selection_to_clipboard"), \
+             patch("wenzi.controllers.preview_controller.has_clipboard_text", return_value=True), \
+             patch("wenzi.controllers.preview_controller.get_clipboard_text", return_value=""), \
+             patch("wenzi.controllers.preview_controller.topmost_alert") as mock_alert, \
+             patch("wenzi.controllers.preview_controller.restore_accessory") as mock_restore:
             app, ctrl = self._make_app_and_ctrl()
 
             mock_helper = MagicMock()
@@ -208,11 +208,11 @@ class TestClipboardEnhanceValidation:
             mock_restore.assert_called_once()
 
     def test_long_text_shows_alert_and_aborts(self):
-        with patch("voicetext.controllers.preview_controller.copy_selection_to_clipboard"), \
-             patch("voicetext.controllers.preview_controller.has_clipboard_text", return_value=True), \
-             patch("voicetext.controllers.preview_controller.get_clipboard_text", return_value="x" * 2001), \
-             patch("voicetext.controllers.preview_controller.topmost_alert") as mock_alert, \
-             patch("voicetext.controllers.preview_controller.restore_accessory") as mock_restore:
+        with patch("wenzi.controllers.preview_controller.copy_selection_to_clipboard"), \
+             patch("wenzi.controllers.preview_controller.has_clipboard_text", return_value=True), \
+             patch("wenzi.controllers.preview_controller.get_clipboard_text", return_value="x" * 2001), \
+             patch("wenzi.controllers.preview_controller.topmost_alert") as mock_alert, \
+             patch("wenzi.controllers.preview_controller.restore_accessory") as mock_restore:
             app, ctrl = self._make_app_and_ctrl()
 
             mock_helper = MagicMock()
@@ -229,9 +229,9 @@ class TestClipboardEnhanceValidation:
             assert not app._busy
 
     def test_normal_text_proceeds_without_alert(self):
-        with patch("voicetext.controllers.preview_controller.copy_selection_to_clipboard"), \
-             patch("voicetext.controllers.preview_controller.has_clipboard_text", return_value=True), \
-             patch("voicetext.controllers.preview_controller.get_clipboard_text", return_value="short text"):
+        with patch("wenzi.controllers.preview_controller.copy_selection_to_clipboard"), \
+             patch("wenzi.controllers.preview_controller.has_clipboard_text", return_value=True), \
+             patch("wenzi.controllers.preview_controller.get_clipboard_text", return_value="short text"):
             app, ctrl = self._make_app_and_ctrl()
             app._set_status = MagicMock()
             ctrl._do_clipboard_with_preview = MagicMock()
@@ -260,7 +260,7 @@ class TestClipboardEnhanceValidation:
 
     def test_dispatches_to_worker_thread(self):
         """Verify on_clipboard_enhance starts a worker thread."""
-        from voicetext.controllers.preview_controller import PreviewController
+        from wenzi.controllers.preview_controller import PreviewController
 
         app = MagicMock()
         ctrl = PreviewController(app)
@@ -276,7 +276,7 @@ class TestPreviewPanelClipboardSource:
     """Test Preview panel behavior with source='clipboard'."""
 
     def _setup_panel(self):
-        from voicetext.ui.result_window import ResultPreviewPanel
+        from wenzi.ui.result_window import ResultPreviewPanel
 
         panel = ResultPreviewPanel()
         panel._build_panel = MagicMock()
@@ -329,14 +329,14 @@ class TestClipboardEnhanceConfig:
     """Test clipboard_enhance config defaults."""
 
     def test_default_config_has_clipboard_enhance(self):
-        from voicetext.config import DEFAULT_CONFIG
+        from wenzi.config import DEFAULT_CONFIG
 
         assert "clipboard_enhance" in DEFAULT_CONFIG
         assert DEFAULT_CONFIG["clipboard_enhance"]["hotkey"] == "ctrl+cmd+v"
         assert "output" not in DEFAULT_CONFIG["clipboard_enhance"]
 
     def test_config_merge_preserves_clipboard_enhance(self):
-        from voicetext.config import _merge_dict, DEFAULT_CONFIG
+        from wenzi.config import _merge_dict, DEFAULT_CONFIG
 
         overrides = {
             "clipboard_enhance": {

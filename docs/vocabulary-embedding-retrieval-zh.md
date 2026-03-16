@@ -2,7 +2,7 @@
 
 ## 背景
 
-VoiceText 使用 LLM 对 ASR（自动语音识别）的输出进行纠错。ASR 引擎经常会将专有名词、技术术语和领域特定词汇识别错误——将其替换为发音相似但不正确的字符。例如，"Kubernetes" 可能被转录为"库伯尼特斯"或"酷伯"，"Python" 可能被转录为"派森"。
+闻字 使用 LLM 对 ASR（自动语音识别）的输出进行纠错。ASR 引擎经常会将专有名词、技术术语和领域特定词汇识别错误——将其替换为发音相似但不正确的字符。例如，"Kubernetes" 可能被转录为"库伯尼特斯"或"酷伯"，"Python" 可能被转录为"派森"。
 
 通用 LLM 并不了解用户的个人词库。如果没有额外的上下文信息，它无法可靠地区分正确的转录和被误识别的专有名词。这会导致两类错误：
 
@@ -21,7 +21,7 @@ VoiceText 使用 LLM 对 ASR（自动语音识别）的输出进行纠错。ASR 
 
 ### 阶段一：词库构建
 
-VoiceText 在 `conversation_history.jsonl` 中记录用户的每次修改——当用户在预览面板中编辑了 AI 增强后的文本时，对应的记录会被标记为 `user_corrected: true`。词库构建器利用这些记录：
+闻字 在 `conversation_history.jsonl` 中记录用户的每次修改——当用户在预览面板中编辑了 AI 增强后的文本时，对应的记录会被标记为 `user_corrected: true`。词库构建器利用这些记录：
 
 1. 从 `conversation_history.jsonl` 中读取已修改的记录（支持通过时间戳过滤进行增量构建）。
 2. 将记录分批发送给 LLM，附带结构化提取提示词。
@@ -149,10 +149,10 @@ conversation_history.jsonl (user_corrected entries)
 
 | 文件 | 用途 |
 |---|---|
-| `src/voicetext/enhance/vocabulary_builder.py` | 通过 LLM 从对话历史修改记录中提取词库 |
-| `src/voicetext/enhance/vocabulary.py` | 嵌入索引的构建与检索 |
-| `src/voicetext/enhance/auto_vocab_builder.py` | 基于修改计数触发的自动词库构建 |
-| `src/voicetext/enhance/enhancer.py` | 将词库上下文集成到增强提示词中 |
-| `src/voicetext/ui/vocab_build_window.py` | 词库构建进度的 UI 界面 |
-| `src/voicetext/app.py` | 词库开关和构建触发的菜单项 |
-| `src/voicetext/config.py` | 词库设置的默认配置 |
+| `src/wenzi/enhance/vocabulary_builder.py` | 通过 LLM 从对话历史修改记录中提取词库 |
+| `src/wenzi/enhance/vocabulary.py` | 嵌入索引的构建与检索 |
+| `src/wenzi/enhance/auto_vocab_builder.py` | 基于修改计数触发的自动词库构建 |
+| `src/wenzi/enhance/enhancer.py` | 将词库上下文集成到增强提示词中 |
+| `src/wenzi/ui/vocab_build_window.py` | 词库构建进度的 UI 界面 |
+| `src/wenzi/app.py` | 词库开关和构建触发的菜单项 |
+| `src/wenzi/config.py` | 词库设置的默认配置 |

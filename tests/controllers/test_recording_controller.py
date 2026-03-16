@@ -7,12 +7,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from voicetext.controllers.recording_controller import RecordingController
+from wenzi.controllers.recording_controller import RecordingController
 
 
 @pytest.fixture
 def mock_app():
-    """Create a mock VoiceTextApp with all attributes used by RecordingController."""
+    """Create a mock WenZiApp with all attributes used by RecordingController."""
     app = MagicMock()
     app._busy = False
     app._config_degraded = False
@@ -81,7 +81,7 @@ class TestOnHotkeyRelease:
     def test_empty_audio_resets(self, ctrl, mock_app):
         mock_app._recorder.stop.return_value = None
         ctrl.on_hotkey_release()
-        mock_app._set_status.assert_called_with("VT")
+        mock_app._set_status.assert_called_with("WZ")
 
     def test_timeout_returns(self, ctrl, mock_app):
         mock_app._recording_started = threading.Event()  # Not set
@@ -119,7 +119,7 @@ class TestRecordingIndicator:
 
 
 class TestFeedbackToggles:
-    @patch("voicetext.controllers.recording_controller.save_config")
+    @patch("wenzi.controllers.recording_controller.save_config")
     def test_sound_toggle(self, mock_save, ctrl, mock_app):
         sender = MagicMock()
         ctrl.on_sound_feedback_toggle(sender)
@@ -128,7 +128,7 @@ class TestFeedbackToggles:
         assert sender.state == 0
         mock_save.assert_called_once()
 
-    @patch("voicetext.controllers.recording_controller.save_config")
+    @patch("wenzi.controllers.recording_controller.save_config")
     def test_visual_toggle(self, mock_save, ctrl, mock_app):
         sender = MagicMock()
         ctrl.on_visual_indicator_toggle(sender)
@@ -162,7 +162,7 @@ class TestStreamingIntegration:
         assert ctrl._streaming_active is False
         mock_app._transcriber.start_streaming.assert_not_called()
 
-    @patch("voicetext.controllers.recording_controller.type_text")
+    @patch("wenzi.controllers.recording_controller.type_text")
     @patch("PyObjCTools.AppHelper")
     def test_streaming_release_calls_stop_streaming(self, mock_apphelper, mock_type_text, ctrl, mock_app):
         import time
@@ -306,7 +306,7 @@ class TestOnCancelRecording:
 
         mock_app._recorder.stop.assert_called_once()
         mock_app._recording_indicator.hide.assert_called_once()
-        mock_app._set_status.assert_called_with("VT")
+        mock_app._set_status.assert_called_with("WZ")
         assert mock_app._busy is False
 
     @patch("PyObjCTools.AppHelper")
@@ -334,7 +334,7 @@ class TestOnCancelRecording:
 
 
 class TestDoTranscribeDirect:
-    @patch("voicetext.controllers.recording_controller.type_text")
+    @patch("wenzi.controllers.recording_controller.type_text")
     @patch("PyObjCTools.AppHelper")
     def test_no_enhance(self, mock_apphelper, mock_type_text, ctrl, mock_app):
         mock_apphelper.callAfter = lambda fn, *a, **kw: fn(*a, **kw)
@@ -349,7 +349,7 @@ class TestDoTranscribeDirect:
         mock_app._usage_stats.record_confirm.assert_called_once()
         mock_app._conversation_history.log.assert_called_once()
 
-    @patch("voicetext.controllers.recording_controller.type_text")
+    @patch("wenzi.controllers.recording_controller.type_text")
     @patch("PyObjCTools.AppHelper")
     def test_no_enhance_overlay_already_shown(
         self, mock_apphelper, mock_type_text, ctrl, mock_app
@@ -365,7 +365,7 @@ class TestDoTranscribeDirect:
         mock_app._streaming_overlay.close_with_delay.assert_called_once()
         mock_type_text.assert_called_once()
 
-    @patch("voicetext.controllers.recording_controller.type_text")
+    @patch("wenzi.controllers.recording_controller.type_text")
     @patch("PyObjCTools.AppHelper")
     def test_enhance_overlay_already_shown(
         self, mock_apphelper, mock_type_text, ctrl, mock_app
@@ -385,7 +385,7 @@ class TestDoTranscribeDirect:
         # Should NOT call animate_out (overlay already visible)
         mock_app._recording_indicator.animate_out.assert_not_called()
 
-    @patch("voicetext.controllers.recording_controller.type_text")
+    @patch("wenzi.controllers.recording_controller.type_text")
     @patch("PyObjCTools.AppHelper")
     def test_enhance_cancelled(self, mock_apphelper, mock_type_text, ctrl, mock_app):
         """When enhancement is cancelled, original text should not be typed."""
@@ -415,7 +415,7 @@ class TestDoTranscribeDirect:
 
 
 class TestDirectModeEscCancel:
-    @patch("voicetext.controllers.recording_controller.type_text")
+    @patch("wenzi.controllers.recording_controller.type_text")
     @patch("PyObjCTools.AppHelper")
     def test_esc_before_transcribe_skips_transcription(
         self, mock_apphelper, mock_type_text, ctrl, mock_app
@@ -440,7 +440,7 @@ class TestDirectModeEscCancel:
         # Text should be typed (cancel not set at this level)
         mock_type_text.assert_called_once()
 
-    @patch("voicetext.controllers.recording_controller.type_text")
+    @patch("wenzi.controllers.recording_controller.type_text")
     @patch("PyObjCTools.AppHelper")
     def test_enhance_cancel_calls_cancel_stream(
         self, mock_apphelper, mock_type_text, ctrl, mock_app

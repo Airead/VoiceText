@@ -6,12 +6,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from voicetext.controllers.settings_controller import SettingsController
+from wenzi.controllers.settings_controller import SettingsController
 
 
 @pytest.fixture
 def mock_app():
-    """Create a mock VoiceTextApp with all attributes used by SettingsController."""
+    """Create a mock WenZiApp with all attributes used by SettingsController."""
     app = MagicMock()
     app._config = {
         "hotkeys": {"fn": True, "ctrl": False},
@@ -88,7 +88,7 @@ def ctrl(mock_app):
 
 
 class TestHotkeyToggle:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_enable_hotkey(self, mock_save, ctrl, mock_app):
         ctrl.hotkey_toggle("ctrl", True)
 
@@ -97,14 +97,14 @@ class TestHotkeyToggle:
         mock_app._hotkey_listener.enable_key.assert_called_with("ctrl")
         mock_app._hotkey_menu_items["ctrl"].state == 1
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_disable_hotkey(self, mock_save, ctrl, mock_app):
         ctrl.hotkey_toggle("fn", False)
 
         assert mock_app._config["hotkeys"]["fn"] is False
         mock_app._hotkey_listener.disable_key.assert_called_with("fn")
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_no_listener(self, mock_save, ctrl, mock_app):
         mock_app._hotkey_listener = None
         ctrl.hotkey_toggle("fn", True)  # Should not raise
@@ -112,7 +112,7 @@ class TestHotkeyToggle:
 
 
 class TestRestartKeySelect:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_set_restart_key(self, mock_save, ctrl, mock_app):
         ctrl.restart_key_select("space")
 
@@ -120,7 +120,7 @@ class TestRestartKeySelect:
         mock_save.assert_called_once()
         mock_app._hotkey_listener.set_restart_key.assert_called_with("space")
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_no_listener(self, mock_save, ctrl, mock_app):
         mock_app._hotkey_listener = None
         ctrl.restart_key_select("ctrl")  # Should not raise
@@ -128,7 +128,7 @@ class TestRestartKeySelect:
 
 
 class TestCancelKeySelect:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_set_cancel_key(self, mock_save, ctrl, mock_app):
         ctrl.cancel_key_select("esc")
 
@@ -136,7 +136,7 @@ class TestCancelKeySelect:
         mock_save.assert_called_once()
         mock_app._hotkey_listener.set_cancel_key.assert_called_with("esc")
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_no_listener(self, mock_save, ctrl, mock_app):
         mock_app._hotkey_listener = None
         ctrl.cancel_key_select("cmd")  # Should not raise
@@ -144,7 +144,7 @@ class TestCancelKeySelect:
 
 
 class TestSoundToggle:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_toggle_sound(self, mock_save, ctrl, mock_app):
         ctrl.sound_toggle(False)
 
@@ -155,7 +155,7 @@ class TestSoundToggle:
 
 
 class TestVisualToggle:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_toggle_visual(self, mock_save, ctrl, mock_app):
         ctrl.visual_toggle(False)
 
@@ -165,7 +165,7 @@ class TestVisualToggle:
 
 
 class TestPreviewToggle:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_toggle_preview(self, mock_save, ctrl, mock_app):
         ctrl.preview_toggle(False)
 
@@ -176,7 +176,7 @@ class TestPreviewToggle:
 
 
 class TestPreviewTypeToggle:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_toggle_to_native(self, mock_save, ctrl, mock_app):
         ctrl.preview_type_toggle(False)
 
@@ -184,7 +184,7 @@ class TestPreviewTypeToggle:
         assert mock_app._config["output"]["preview_type"] == "native"
         mock_save.assert_called_once()
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_toggle_to_web(self, mock_save, ctrl, mock_app):
         mock_app._preview_type = "native"
         ctrl.preview_type_toggle(True)
@@ -193,7 +193,7 @@ class TestPreviewTypeToggle:
         assert mock_app._config["output"]["preview_type"] == "web"
         mock_save.assert_called_once()
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_same_type_noop(self, mock_save, ctrl, mock_app):
         mock_app._preview_type = "web"
         ctrl.preview_type_toggle(True)
@@ -202,7 +202,7 @@ class TestPreviewTypeToggle:
 
 
 class TestSttSelect:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_same_preset_noop(self, mock_save, ctrl, mock_app):
         """Selecting the already-active preset should be a no-op."""
         ctrl.stt_select("funasr-zh")
@@ -210,8 +210,8 @@ class TestSttSelect:
 
     def test_busy_shows_alert(self, ctrl, mock_app):
         mock_app._busy = True
-        with patch("voicetext.controllers.settings_controller.topmost_alert") as mock_alert:
-            with patch("voicetext.controllers.settings_controller.restore_accessory"):
+        with patch("wenzi.controllers.settings_controller.topmost_alert") as mock_alert:
+            with patch("wenzi.controllers.settings_controller.restore_accessory"):
                 ctrl.stt_select("mlx-whisper-large-v3-turbo")
         mock_alert.assert_called_once()
 
@@ -229,14 +229,14 @@ class TestSttRemoteSelect:
 
     def test_busy_shows_alert(self, ctrl, mock_app):
         mock_app._busy = True
-        with patch("voicetext.controllers.settings_controller.topmost_alert") as mock_alert:
-            with patch("voicetext.controllers.settings_controller.restore_accessory"):
+        with patch("wenzi.controllers.settings_controller.topmost_alert") as mock_alert:
+            with patch("wenzi.controllers.settings_controller.restore_accessory"):
                 ctrl.stt_remote_select("groq", "whisper-v3")
         mock_alert.assert_called_once()
 
 
 class TestLlmSelect:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_select_new_model(self, mock_save, ctrl, mock_app):
         mock_app._llm_model_menu_items = {
             ("openai", "gpt-4o"): MagicMock(),
@@ -248,7 +248,7 @@ class TestLlmSelect:
         assert mock_app._enhancer.model_name == "gpt-4o-mini"
         mock_save.assert_called_once()
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_same_model_noop(self, mock_save, ctrl, mock_app):
         ctrl.llm_select("openai", "gpt-4o")
         mock_save.assert_not_called()
@@ -259,7 +259,7 @@ class TestLlmSelect:
 
 
 class TestEnhanceModeSelect:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_select_mode(self, mock_save, ctrl, mock_app):
         ctrl.enhance_mode_select("translate")
 
@@ -268,7 +268,7 @@ class TestEnhanceModeSelect:
         mock_app._enhancer.mode = "translate"
         mock_save.assert_called_once()
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_select_off(self, mock_save, ctrl, mock_app):
         ctrl.enhance_mode_select("off")
 
@@ -278,7 +278,7 @@ class TestEnhanceModeSelect:
 
 
 class TestThinkingToggle:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_enable_thinking(self, mock_save, ctrl, mock_app):
         ctrl.thinking_toggle(True)
 
@@ -292,7 +292,7 @@ class TestThinkingToggle:
 
 
 class TestVocabToggle:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_enable_vocab(self, mock_save, ctrl, mock_app):
         ctrl.vocab_toggle(True)
 
@@ -306,7 +306,7 @@ class TestVocabToggle:
 
 
 class TestAutoBuildToggle:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_toggle_auto_build(self, mock_save, ctrl, mock_app):
         ctrl.auto_build_toggle(False)
 
@@ -316,7 +316,7 @@ class TestAutoBuildToggle:
 
 
 class TestHistoryToggle:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_enable_history(self, mock_save, ctrl, mock_app):
         ctrl.history_toggle(True)
 
@@ -364,14 +364,14 @@ class TestLlmRemoveProvider:
 
 
 class TestTabChange:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_persist_tab(self, mock_save, ctrl, mock_app):
         ctrl.tab_change("stt")
 
         assert mock_app._config["ui"]["settings_last_tab"] == "stt"
         mock_save.assert_called_once()
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_creates_ui_section_if_missing(self, mock_save, ctrl, mock_app):
         mock_app._config.pop("ui", None)
         ctrl.tab_change("ai")
@@ -382,9 +382,9 @@ class TestTabChange:
 
 class TestOnOpenSettings:
     def test_shows_panel_with_state_and_callbacks(self, ctrl, mock_app):
-        with patch("voicetext.enhance.vocabulary.get_vocab_entry_count", return_value=5):
-            with patch("voicetext.controllers.settings_controller.PRESETS", []):
-                with patch("voicetext.controllers.settings_controller.build_remote_asr_models", return_value=[]):
+        with patch("wenzi.enhance.vocabulary.get_vocab_entry_count", return_value=5):
+            with patch("wenzi.controllers.settings_controller.PRESETS", []):
+                with patch("wenzi.controllers.settings_controller.build_remote_asr_models", return_value=[]):
                     ctrl.on_open_settings(None)
 
         mock_app._settings_panel.show.assert_called_once()
@@ -409,14 +409,14 @@ class TestOnOpenSettings:
 
 
 class TestHotkeyModeSelect:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_set_mode(self, mock_save, ctrl, mock_app):
         ctrl.hotkey_mode_select("fn", "translate_en")
 
         assert mock_app._config["hotkeys"]["fn"] == {"mode": "translate_en"}
         mock_save.assert_called_once()
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_clear_mode_to_system_default(self, mock_save, ctrl, mock_app):
         mock_app._config["hotkeys"]["fn"] = {"mode": "translate_en"}
         ctrl.hotkey_mode_select("fn", None)
@@ -426,7 +426,7 @@ class TestHotkeyModeSelect:
 
 
 class TestHotkeyDelete:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_delete_hotkey(self, mock_save, ctrl, mock_app):
         mock_app._config["hotkeys"]["ctrl"] = True
         ctrl.hotkey_delete("ctrl")
@@ -435,14 +435,14 @@ class TestHotkeyDelete:
         mock_save.assert_called_once()
         mock_app._hotkey_listener.disable_key.assert_called_with("ctrl")
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_cannot_delete_fn(self, mock_save, ctrl, mock_app):
         ctrl.hotkey_delete("fn")
 
         assert "fn" in mock_app._config["hotkeys"]
         mock_save.assert_not_called()
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_delete_removes_menu_item(self, mock_save, ctrl, mock_app):
         menu = MagicMock()
         item = MagicMock()
@@ -456,7 +456,7 @@ class TestHotkeyDelete:
 
 
 class TestHotkeyToggleWithMode:
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_enable_preserves_dict_config(self, mock_save, ctrl, mock_app):
         """When enabling a hotkey that has dict config, preserve it."""
         mock_app._config["hotkeys"]["ctrl"] = {"mode": "translate_en"}
@@ -464,7 +464,7 @@ class TestHotkeyToggleWithMode:
         ctrl.hotkey_toggle("ctrl", False)
         assert mock_app._config["hotkeys"]["ctrl"] is False
 
-    @patch("voicetext.controllers.settings_controller.save_config")
+    @patch("wenzi.controllers.settings_controller.save_config")
     def test_enable_sets_true_for_bool(self, mock_save, ctrl, mock_app):
         """When enabling a hotkey with bool config, set True."""
         mock_app._config["hotkeys"]["ctrl"] = False

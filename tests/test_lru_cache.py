@@ -2,7 +2,7 @@
 
 import pytest
 
-from voicetext.lru_cache import LRUCache
+from wenzi.lru_cache import LRUCache
 
 
 class TestLRUCacheBasic:

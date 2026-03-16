@@ -1,14 +1,14 @@
 # Configuration
 
-Default config path: `~/.config/VoiceText/config.json`. Only the fields you want to change are needed; everything else uses defaults.
+Default config path: `~/.config/WenZi/config.json`. Only the fields you want to change are needed; everything else uses defaults.
 
 ## Config Directory Resolution
 
 The config directory is resolved with the following priority:
 
-1. **CLI argument** -- pass a directory path as the first positional argument: `voicetext /path/to/config-dir`
-2. **NSUserDefaults** -- a custom directory saved via the Settings UI (stored under `com.voicetext.app` / `config_dir`)
-3. **Default** -- `~/.config/VoiceText/`
+1. **CLI argument** -- pass a directory path as the first positional argument: `wenzi /path/to/config-dir`
+2. **NSUserDefaults** -- a custom directory saved via the Settings UI (stored under `io.github.airead.wenzi` / `config_dir`)
+3. **Default** -- `~/.config/WenZi/`
 
 The config file is always `config.json` inside the resolved directory.
 

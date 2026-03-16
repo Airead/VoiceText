@@ -5,7 +5,7 @@ import threading
 import pytest
 from unittest.mock import MagicMock
 
-from voicetext.hotkey import (
+from wenzi.hotkey import (
     _is_fn_key,
     _name_to_vk,
     _parse_hotkey_for_quartz,

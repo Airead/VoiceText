@@ -1,6 +1,6 @@
 # AI Enhancement Modes Guide
 
-VoiceText uses AI enhancement modes to post-process transcribed text. Each mode is defined as an independent Markdown file stored in `~/.config/VoiceText/enhance_modes/`. You can add, edit, or remove modes without modifying any code.
+闻字 uses AI enhancement modes to post-process transcribed text. Each mode is defined as an independent Markdown file stored in `~/.config/WenZi/enhance_modes/`. You can add, edit, or remove modes without modifying any code.
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ VoiceText uses AI enhancement modes to post-process transcribed text. Each mode 
 Speech -> ASR transcription -> Enhancement mode (LLM) -> Final text
 ```
 
-1. On startup, VoiceText ensures the built-in mode files exist in the modes directory. Missing built-in files are recreated automatically; existing files are never overwritten.
+1. On startup, 闻字 ensures the built-in mode files exist in the modes directory. Missing built-in files are recreated automatically; existing files are never overwritten.
 2. All `.md` files in the directory are loaded and appear in the **AI Enhance** menu.
 3. When an enhancement mode is active, the transcribed text is sent to the configured LLM with the mode's prompt as the system message.
 
@@ -77,7 +77,7 @@ This mode first proofreads the text, then translates it to English.
 ### Chain Mode Example
 
 ```bash
-cat > ~/.config/VoiceText/enhance_modes/translate_en_plus.md << 'EOF'
+cat > ~/.config/WenZi/enhance_modes/translate_en_plus.md << 'EOF'
 ---
 label: Translate EN+ (纠错→翻译)
 order: 25
@@ -114,7 +114,7 @@ These 4 modes are created automatically on first launch:
 Create a new `.md` file in the modes directory:
 
 ```bash
-cat > ~/.config/VoiceText/enhance_modes/summarize.md << 'EOF'
+cat > ~/.config/WenZi/enhance_modes/summarize.md << 'EOF'
 ---
 label: Summarize
 order: 55
@@ -131,7 +131,7 @@ Restart the app to load the new mode.
 ### Example: Formal Email Mode
 
 ```bash
-cat > ~/.config/VoiceText/enhance_modes/formal_email.md << 'EOF'
+cat > ~/.config/WenZi/enhance_modes/formal_email.md << 'EOF'
 ---
 label: Formal Email
 order: 60
@@ -147,7 +147,7 @@ EOF
 ### Example: Translate to Japanese
 
 ```bash
-cat > ~/.config/VoiceText/enhance_modes/translate_ja.md << 'EOF'
+cat > ~/.config/WenZi/enhance_modes/translate_ja.md << 'EOF'
 ---
 label: Translate to Japanese
 order: 70
@@ -165,21 +165,21 @@ Open the file directly with any text editor:
 
 ```bash
 # Edit with your preferred editor
-open -e ~/.config/VoiceText/enhance_modes/proofread.md
+open -e ~/.config/WenZi/enhance_modes/proofread.md
 # or
-vim ~/.config/VoiceText/enhance_modes/proofread.md
+vim ~/.config/WenZi/enhance_modes/proofread.md
 ```
 
 Changes take effect after restarting the app.
 
-> Built-in mode files can be freely edited. VoiceText will not overwrite a file that already exists.
+> Built-in mode files can be freely edited. 闻字 will not overwrite a file that already exists.
 
 ## Remove a Mode
 
 Delete the corresponding `.md` file and restart:
 
 ```bash
-rm ~/.config/VoiceText/enhance_modes/summarize.md
+rm ~/.config/WenZi/enhance_modes/summarize.md
 ```
 
 **Note:** If you delete a built-in mode file (e.g., `proofread.md`), it will be recreated on the next startup with default content. To permanently disable a built-in mode, replace its prompt with a passthrough instruction instead:
@@ -196,7 +196,7 @@ Output the user's input exactly as-is, without any changes.
 
 - **Ordering**: Use `order` values with gaps (10, 20, 30...) so you can insert new modes between existing ones without renumbering.
 - **Prompt quality**: Be specific in your prompts. Tell the LLM exactly what to do and what NOT to do. Always end with "Output only the processed text without any explanation" to avoid unwanted commentary.
-- **Config compatibility**: The `mode` field in `~/.config/VoiceText/config.json` stores the mode ID (filename). If a mode file is removed but the config still references it, the app falls back to the first available mode.
+- **Config compatibility**: The `mode` field in `~/.config/WenZi/config.json` stores the mode ID (filename). If a mode file is removed but the config still references it, the app falls back to the first available mode.
 - **Non-`.md` files are ignored**: You can safely keep notes (`.txt`) or backups (`.bak`) in the modes directory.
 
 For more inspiration, see [Enhancement Mode Examples](enhance-mode-examples.md) — a collection of ready-to-use templates covering writing, translation, developer tools, and more.

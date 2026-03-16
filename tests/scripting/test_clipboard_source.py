@@ -3,8 +3,8 @@
 import time
 from unittest.mock import MagicMock, patch
 
-from voicetext.scripting.clipboard_monitor import ClipboardEntry, ClipboardMonitor
-from voicetext.scripting.sources.clipboard_source import (
+from wenzi.scripting.clipboard_monitor import ClipboardEntry, ClipboardMonitor
+from wenzi.scripting.sources.clipboard_source import (
     ClipboardSource,
     _format_file_size,
     _format_time_ago,

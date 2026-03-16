@@ -2,7 +2,7 @@
 
 ## Background
 
-VoiceText processes each voice input session independently — the AI enhancement step sees only the current ASR text and has no knowledge of what the user said before. This stateless approach works for isolated sentences but falls short when:
+闻字 processes each voice input session independently — the AI enhancement step sees only the current ASR text and has no knowledge of what the user said before. This stateless approach works for isolated sentences but falls short when:
 
 1. **Recurring proper nouns** — The user mentions "萍萍" in one sentence, but ASR transcribes it as "平平". Without prior context, the LLM has no basis to prefer one over the other. If the user already confirmed "萍萍" in a previous turn, that signal is lost.
 2. **Topic continuity** — Conversations naturally build on prior context. When the user says "她说今天很开心", the LLM cannot resolve "她" without knowing who was mentioned earlier.
@@ -22,7 +22,7 @@ Unlike raw ASR text (which contains errors) or AI-enhanced text (which may over-
 
 ### Recording
 
-Every voice input session is recorded to `~/.config/VoiceText/conversation_history.jsonl`, regardless of mode:
+Every voice input session is recorded to `~/.config/WenZi/conversation_history.jsonl`, regardless of mode:
 
 ```json
 {
@@ -114,7 +114,7 @@ The main history file (`conversation_history.jsonl`) is kept bounded by an autom
 Rotated records are grouped by the month in their `timestamp` field and appended to per-month archive files:
 
 ```
-~/.config/VoiceText/
+~/.config/WenZi/
 ├── conversation_history.jsonl                  # Active file (up to 20,000 records)
 └── conversation_history_archives/
     ├── 2025-11.jsonl
@@ -211,9 +211,9 @@ The toggle is also available in the **Settings** panel (AI tab).
 
 | File | Purpose |
 |---|---|
-| `src/voicetext/enhance/conversation_history.py` | JSONL recording, reading, caching, rotation, archiving, and prompt formatting |
-| `src/voicetext/enhance/enhancer.py` | Integrates history context into enhancement prompts |
-| `src/voicetext/ui/history_browser_window_web.py` | Web-based History Browser with pagination and archive toggle |
-| `src/voicetext/usage_stats.py` | Aggregates `audio_duration` via `record_recording_duration()` |
-| `src/voicetext/app.py` | Records sessions in both output paths; menu toggle |
-| `src/voicetext/config.py` | Default configuration for conversation history |
+| `src/wenzi/enhance/conversation_history.py` | JSONL recording, reading, caching, rotation, archiving, and prompt formatting |
+| `src/wenzi/enhance/enhancer.py` | Integrates history context into enhancement prompts |
+| `src/wenzi/ui/history_browser_window_web.py` | Web-based History Browser with pagination and archive toggle |
+| `src/wenzi/usage_stats.py` | Aggregates `audio_duration` via `record_recording_duration()` |
+| `src/wenzi/app.py` | Records sessions in both output paths; menu toggle |
+| `src/wenzi/config.py` | Default configuration for conversation history |

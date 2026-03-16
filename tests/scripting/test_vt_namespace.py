@@ -2,8 +2,8 @@
 
 from unittest.mock import patch
 
-from voicetext.scripting.registry import ScriptingRegistry
-from voicetext.scripting.api import _VTNamespace
+from wenzi.scripting.registry import ScriptingRegistry
+from wenzi.scripting.api import _VTNamespace
 
 
 class TestVTNamespace:
@@ -62,14 +62,14 @@ class TestVTNamespace:
         vt.reload()
         assert called == [1]
 
-    @patch("voicetext.statusbar.send_notification")
+    @patch("wenzi.statusbar.send_notification")
     def test_notify(self, mock_send):
         reg = ScriptingRegistry()
         vt = _VTNamespace(reg)
         vt.notify("Test", "msg")
         mock_send.assert_called_once_with("Test", "", "msg")
 
-    @patch("voicetext.scripting.api.execute._run")
+    @patch("wenzi.scripting.api.execute._run")
     def test_execute_returns_dict(self, mock_run):
         mock_run.return_value = {"stdout": "ok", "stderr": "", "returncode": 0}
         reg = ScriptingRegistry()
@@ -77,7 +77,7 @@ class TestVTNamespace:
         result = vt.execute("echo hi", background=False)
         assert result == {"stdout": "ok", "stderr": "", "returncode": 0}
 
-    @patch("voicetext.scripting.api.execute._run")
+    @patch("wenzi.scripting.api.execute._run")
     def test_execute_passes_timeout(self, mock_run):
         mock_run.return_value = {"stdout": "", "stderr": "", "returncode": 0}
         reg = ScriptingRegistry()
@@ -106,21 +106,21 @@ class TestVTNamespace:
 
         assert handler in reg._event_listeners["transcription_done"]
 
-    @patch("voicetext.input.type_text")
+    @patch("wenzi.input.type_text")
     def test_type_text_auto(self, mock_type):
         reg = ScriptingRegistry()
         vt = _VTNamespace(reg)
         vt.type_text("hello")
         mock_type.assert_called_once_with("hello", method="auto")
 
-    @patch("voicetext.input.type_text")
+    @patch("wenzi.input.type_text")
     def test_type_text_paste_method(self, mock_type):
         reg = ScriptingRegistry()
         vt = _VTNamespace(reg)
         vt.type_text("hello", method="paste")
         mock_type.assert_called_once_with("hello", method="clipboard")
 
-    @patch("voicetext.input.type_text")
+    @patch("wenzi.input.type_text")
     def test_type_text_key_method(self, mock_type):
         reg = ScriptingRegistry()
         vt = _VTNamespace(reg)
@@ -128,7 +128,7 @@ class TestVTNamespace:
         mock_type.assert_called_once_with("hello", method="applescript")
 
     def test_store_is_store_api(self):
-        from voicetext.scripting.api.store import StoreAPI
+        from wenzi.scripting.api.store import StoreAPI
         reg = ScriptingRegistry()
         vt = _VTNamespace(reg)
         assert isinstance(vt.store, StoreAPI)

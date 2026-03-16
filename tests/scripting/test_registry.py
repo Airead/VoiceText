@@ -2,7 +2,7 @@
 
 import threading
 
-from voicetext.scripting.registry import (
+from wenzi.scripting.registry import (
     LeaderMapping,
     ScriptingRegistry,
 )

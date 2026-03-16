@@ -6,7 +6,7 @@ import os
 from unittest.mock import MagicMock
 
 
-from voicetext.controllers.model_controller import (
+from wenzi.controllers.model_controller import (
     _get_dir_size,
     migrate_asr_config,
     parse_asr_provider_text,
@@ -449,10 +449,10 @@ class TestAsrProviderDraft:
 
     def test_draft_stored_in_same_dir_as_config(self, tmp_path):
         """Draft file lives in the same directory as the config file."""
-        config_path = str(tmp_path / "VoiceText" / "config.json")
+        config_path = str(tmp_path / "WenZi" / "config.json")
         ctrl = _make_controller(config_path)
         draft_path = ctrl._get_asr_provider_draft_path()
-        expected_dir = str(tmp_path / "VoiceText")
+        expected_dir = str(tmp_path / "WenZi")
         assert os.path.dirname(draft_path) == expected_dir
         assert os.path.basename(draft_path) == ModelController._ASR_PROVIDER_DRAFT_FILENAME
 
@@ -496,10 +496,10 @@ class TestLlmProviderDraft:
 
     def test_draft_stored_in_same_dir_as_config(self, tmp_path):
         """Draft file lives in the same directory as the config file."""
-        config_path = str(tmp_path / "VoiceText" / "config.json")
+        config_path = str(tmp_path / "WenZi" / "config.json")
         ctrl = _make_controller(config_path)
         draft_path = ctrl._get_provider_draft_path()
-        expected_dir = str(tmp_path / "VoiceText")
+        expected_dir = str(tmp_path / "WenZi")
         assert os.path.dirname(draft_path) == expected_dir
         assert os.path.basename(draft_path) == ModelController._PROVIDER_DRAFT_FILENAME
 

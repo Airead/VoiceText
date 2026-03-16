@@ -7,7 +7,7 @@ import tempfile
 from unittest.mock import MagicMock, patch
 
 
-from voicetext.config import (
+from wenzi.config import (
     DEFAULT_CONFIG,
     DEFAULT_CONFIG_DIR,
     ConfigError,
@@ -465,26 +465,26 @@ class TestResolveConfigDir:
         result = resolve_config_dir("~/custom")
         assert result == os.path.expanduser("~/custom")
 
-    @patch("voicetext.config._read_user_defaults_config_dir")
+    @patch("wenzi.config._read_user_defaults_config_dir")
     def test_user_defaults_used_when_no_argument(self, mock_read):
         mock_read.return_value = "/from/defaults"
         result = resolve_config_dir(None)
         assert result == "/from/defaults"
         mock_read.assert_called_once()
 
-    @patch("voicetext.config._read_user_defaults_config_dir")
+    @patch("wenzi.config._read_user_defaults_config_dir")
     def test_user_defaults_tilde_expanded(self, mock_read):
         mock_read.return_value = "~/from/defaults"
         result = resolve_config_dir(None)
         assert result == os.path.expanduser("~/from/defaults")
 
-    @patch("voicetext.config._read_user_defaults_config_dir")
+    @patch("wenzi.config._read_user_defaults_config_dir")
     def test_falls_back_to_default_when_no_preference(self, mock_read):
         mock_read.return_value = None
         result = resolve_config_dir(None)
         assert result == os.path.expanduser(DEFAULT_CONFIG_DIR)
 
-    @patch("voicetext.config._read_user_defaults_config_dir")
+    @patch("wenzi.config._read_user_defaults_config_dir")
     def test_explicit_argument_overrides_user_defaults(self, mock_read):
         mock_read.return_value = "/from/defaults"
         result = resolve_config_dir("/explicit")
@@ -502,7 +502,7 @@ class TestConfigDirPreference:
         with patch.dict("sys.modules", {"Foundation": MagicMock(NSUserDefaults=mock_cls)}):
             # Re-import to pick up the patched Foundation
             import importlib
-            import voicetext.config as cfg_mod
+            import wenzi.config as cfg_mod
             importlib.reload(cfg_mod)
             cfg_mod.save_config_dir_preference("/new/path")
             mock_defaults.setObject_forKey_.assert_called_once_with(
@@ -518,7 +518,7 @@ class TestConfigDirPreference:
         mock_cls.alloc.return_value.initWithSuiteName_.return_value = mock_defaults
         with patch.dict("sys.modules", {"Foundation": MagicMock(NSUserDefaults=mock_cls)}):
             import importlib
-            import voicetext.config as cfg_mod
+            import wenzi.config as cfg_mod
             importlib.reload(cfg_mod)
             cfg_mod.reset_config_dir_preference()
             mock_defaults.removeObjectForKey_.assert_called_once_with("config_dir")
@@ -533,7 +533,7 @@ class TestConfigDirPreference:
         mock_cls.alloc.return_value.initWithSuiteName_.return_value = mock_defaults
         with patch.dict("sys.modules", {"Foundation": MagicMock(NSUserDefaults=mock_cls)}):
             import importlib
-            import voicetext.config as cfg_mod
+            import wenzi.config as cfg_mod
             importlib.reload(cfg_mod)
             result = cfg_mod._read_user_defaults_config_dir()
             assert result is None
@@ -547,7 +547,7 @@ class TestConfigDirPreference:
         mock_cls.alloc.return_value.initWithSuiteName_.return_value = mock_defaults
         with patch.dict("sys.modules", {"Foundation": MagicMock(NSUserDefaults=mock_cls)}):
             import importlib
-            import voicetext.config as cfg_mod
+            import wenzi.config as cfg_mod
             importlib.reload(cfg_mod)
             result = cfg_mod._read_user_defaults_config_dir()
             assert result == "/custom/config"

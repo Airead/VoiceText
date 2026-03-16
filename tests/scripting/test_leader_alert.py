@@ -2,20 +2,20 @@
 
 from unittest.mock import patch
 
-from voicetext.scripting.registry import LeaderMapping
+from wenzi.scripting.registry import LeaderMapping
 
 
 class TestLeaderAlertPanel:
-    @patch("voicetext.scripting.ui.leader_alert.NSPanel", create=True)
-    @patch("voicetext.scripting.ui.leader_alert.NSScreen", create=True)
-    @patch("voicetext.scripting.ui.leader_alert.NSTextField", create=True)
-    @patch("voicetext.scripting.ui.leader_alert.NSFont", create=True)
-    @patch("voicetext.scripting.ui.leader_alert.NSColor", create=True)
-    @patch("voicetext.scripting.ui.leader_alert.NSMakeRect", create=True)
-    @patch("voicetext.scripting.ui.leader_alert.NSBackingStoreBuffered", 2, create=True)
-    @patch("voicetext.scripting.ui.leader_alert.NSStatusWindowLevel", 25, create=True)
+    @patch("wenzi.scripting.ui.leader_alert.NSPanel", create=True)
+    @patch("wenzi.scripting.ui.leader_alert.NSScreen", create=True)
+    @patch("wenzi.scripting.ui.leader_alert.NSTextField", create=True)
+    @patch("wenzi.scripting.ui.leader_alert.NSFont", create=True)
+    @patch("wenzi.scripting.ui.leader_alert.NSColor", create=True)
+    @patch("wenzi.scripting.ui.leader_alert.NSMakeRect", create=True)
+    @patch("wenzi.scripting.ui.leader_alert.NSBackingStoreBuffered", 2, create=True)
+    @patch("wenzi.scripting.ui.leader_alert.NSStatusWindowLevel", 25, create=True)
     def test_show_and_close(self, *mocks):
-        from voicetext.scripting.ui.leader_alert import LeaderAlertPanel
+        from wenzi.scripting.ui.leader_alert import LeaderAlertPanel
 
         panel = LeaderAlertPanel()
         assert not panel.is_visible
@@ -33,7 +33,7 @@ class TestLeaderAlertPanel:
             pass  # Expected without real AppKit
 
     def test_close_when_not_visible(self):
-        from voicetext.scripting.ui.leader_alert import LeaderAlertPanel
+        from wenzi.scripting.ui.leader_alert import LeaderAlertPanel
 
         panel = LeaderAlertPanel()
         panel.close()  # Should not raise

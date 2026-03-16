@@ -36,7 +36,7 @@ def _mock_apple_frameworks(monkeypatch):
 
 def _make_transcriber():
     """Create an AppleSpeechTranscriber with mocked initialization."""
-    from voicetext.transcription.apple import AppleSpeechTranscriber
+    from wenzi.transcription.apple import AppleSpeechTranscriber
 
     t = AppleSpeechTranscriber(language="zh", on_device=True)
     t._initialized = True
@@ -97,7 +97,7 @@ class TestAppleSpeechStreaming:
         assert result == "hello world"
 
     def test_stop_streaming_timeout_returns_empty(self):
-        from voicetext.transcription import apple
+        from wenzi.transcription import apple
 
         original_timeout = apple.STREAMING_FINAL_TIMEOUT
 
@@ -258,7 +258,7 @@ class TestAppleSpeechStreaming:
 
     def test_timeout_fallback_to_accumulated(self):
         """When final result times out, stop_streaming returns accumulated text."""
-        from voicetext.transcription import apple
+        from wenzi.transcription import apple
 
         original_timeout = apple.STREAMING_FINAL_TIMEOUT
 
@@ -370,7 +370,7 @@ class TestAppleSpeechStreaming:
 
     def test_implicit_reset_timeout_fallback_includes_best_partial(self):
         """Timeout fallback returns accumulated + current best partial."""
-        from voicetext.transcription import apple
+        from wenzi.transcription import apple
 
         original_timeout = apple.STREAMING_FINAL_TIMEOUT
 

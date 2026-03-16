@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from voicetext.enhance.vocabulary import VocabularyEntry, VocabularyIndex, get_vocab_entry_count
+from wenzi.enhance.vocabulary import VocabularyEntry, VocabularyIndex, get_vocab_entry_count
 
 
 # --- VocabularyEntry tests ---
@@ -88,7 +88,7 @@ class TestVocabularyIndexLoad:
 
         mock_model.embed = fake_embed
 
-        with patch("voicetext.enhance.vocabulary.VocabularyIndex._lazy_load_model") as mock_load:
+        with patch("wenzi.enhance.vocabulary.VocabularyIndex._lazy_load_model") as mock_load:
             def set_model(self=None):
                 idx._model = mock_model
 

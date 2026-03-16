@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from voicetext.transcription.mlx import MLXWhisperTranscriber, DEFAULT_MODEL
+from wenzi.transcription.mlx import MLXWhisperTranscriber, DEFAULT_MODEL
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ class TestInitialize:
 
         with patch.dict("sys.modules", {
             "mlx_whisper": mock_mlx,
-            "voicetext.transcription.punctuation": mock_punc_module,
+            "wenzi.transcription.punctuation": mock_punc_module,
         }), patch.object(t, "_warmup"):
             t.initialize()
 
@@ -249,7 +249,7 @@ class TestCleanup:
         prev_mlx_core = sys.modules.pop("mlx.core", None)
         try:
             with patch.dict("sys.modules", {"mlx": None, "mlx.core": None}, clear=False), \
-                 patch("voicetext.transcription.mlx.gc.collect") as mock_gc:
+                 patch("wenzi.transcription.mlx.gc.collect") as mock_gc:
                 t.cleanup()
         finally:
             if prev_mlx is not None:

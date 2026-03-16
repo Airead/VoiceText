@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from voicetext.controllers.config_controller import ConfigController
-from voicetext.controllers.menu_builder import MenuBuilder
-from voicetext.enhance.enhancer import MODE_OFF
+from wenzi.controllers.config_controller import ConfigController
+from wenzi.controllers.menu_builder import MenuBuilder
+from wenzi.enhance.enhancer import MODE_OFF
 
 
 def _make_mock_app():
-    """Create a minimal mock of VoiceTextApp for testing _build_config_info."""
+    """Create a minimal mock of WenZiApp for testing _build_config_info."""
     app = MagicMock(spec=[])
     app._current_remote_asr = None
     app._current_preset_id = "funasr-zh"
@@ -40,7 +40,7 @@ def _get_info(app):
     """Call build_config_info via ConfigController with PRESET_BY_ID patched."""
     ctrl = ConfigController(app)
     preset_map = {"funasr-zh": MagicMock(display_name="FunASR 中文")}
-    with patch("voicetext.controllers.config_controller.PRESET_BY_ID", preset_map):
+    with patch("wenzi.controllers.config_controller.PRESET_BY_ID", preset_map):
         return ctrl.build_config_info()
 
 
@@ -70,7 +70,7 @@ class TestBuildConfigInfo:
         info = _get_info(app)
 
         assert "None" not in info
-        assert ".config/VoiceText/config.json" in info
+        assert ".config/WenZi/config.json" in info
 
     def test_no_enhancer(self):
         app = _make_mock_app()
@@ -107,7 +107,7 @@ class TestBuildConfigInfo:
         app._current_preset_id = "unknown-preset"
 
         ctrl = ConfigController(app)
-        with patch("voicetext.controllers.config_controller.PRESET_BY_ID", {}):
+        with patch("wenzi.controllers.config_controller.PRESET_BY_ID", {}):
             info = ctrl.build_config_info()
 
         assert "unknown-preset" in info

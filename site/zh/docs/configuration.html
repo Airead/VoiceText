@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>配置参考 — VoiceText</title>
+  <title>配置参考 — WenZi</title>
   <link rel="icon" type="image/png" href="../../images/icon.png">
   <link rel="stylesheet" href="../../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../../" class="nav-brand">
-        <img src="../../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../../">&larr; 返回</a></li>
         <li><a href="../../docs/configuration.html" class="lang-switch">English</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -91,13 +91,13 @@
 
     </div>
 
-<p>默认配置文件路径：<code>~/.config/VoiceText/config.json</code>。只需包含你想修改的字段，其余字段将使用默认值。</p>
+<p>默认配置文件路径：<code>~/.config/WenZi/config.json</code>。只需包含你想修改的字段，其余字段将使用默认值。</p>
 <h2 id="_1"><a href="#_1" class="heading-anchor">配置目录解析</a></h2>
 <p>配置目录按以下优先级解析：</p>
 <ol>
-<li><strong>命令行参数</strong> -- 将目录路径作为第一个位置参数传入：<code>voicetext /path/to/config-dir</code></li>
-<li><strong>NSUserDefaults</strong> -- 通过设置界面保存的自定义目录（存储在 <code>com.voicetext.app</code> / <code>config_dir</code> 下）</li>
-<li><strong>默认路径</strong> -- <code>~/.config/VoiceText/</code></li>
+<li><strong>命令行参数</strong> -- 将目录路径作为第一个位置参数传入：<code>wenzi /path/to/config-dir</code></li>
+<li><strong>NSUserDefaults</strong> -- 通过设置界面保存的自定义目录（存储在 <code>io.github.airead.wenzi</code> / <code>config_dir</code> 下）</li>
+<li><strong>默认路径</strong> -- <code>~/.config/WenZi/</code></li>
 </ol>
 <p>配置文件始终是解析后目录中的 <code>config.json</code>。</p>
 <h2 id="_2"><a href="#_2" class="heading-anchor">完整默认配置</a></h2>

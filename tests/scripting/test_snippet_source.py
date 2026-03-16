@@ -4,7 +4,7 @@ import json
 import os
 import tempfile
 
-from voicetext.scripting.sources.snippet_source import (
+from wenzi.scripting.sources.snippet_source import (
     SnippetSource,
     SnippetStore,
     _expand_placeholders,

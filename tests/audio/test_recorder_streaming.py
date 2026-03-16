@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
-from voicetext.audio.recorder import Recorder
+from wenzi.audio.recorder import Recorder
 
 
 class TestAudioChunkCallback:

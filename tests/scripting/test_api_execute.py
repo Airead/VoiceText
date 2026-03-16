@@ -3,11 +3,11 @@
 import threading
 from unittest.mock import patch, MagicMock
 
-from voicetext.scripting.api.execute import execute, _run
+from wenzi.scripting.api.execute import execute, _run
 
 
 class TestRun:
-    @patch("voicetext.scripting.api.execute.subprocess")
+    @patch("wenzi.scripting.api.execute.subprocess")
     def test_run_success(self, mock_sp):
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -18,7 +18,7 @@ class TestRun:
         result = _run("echo hello")
         assert result == {"stdout": "hello\n", "stderr": "", "returncode": 0}
 
-    @patch("voicetext.scripting.api.execute.subprocess")
+    @patch("wenzi.scripting.api.execute.subprocess")
     def test_run_failure(self, mock_sp):
         mock_result = MagicMock()
         mock_result.returncode = 1
@@ -30,7 +30,7 @@ class TestRun:
         assert result["returncode"] == 1
         assert result["stderr"] == "error\n"
 
-    @patch("voicetext.scripting.api.execute.subprocess")
+    @patch("wenzi.scripting.api.execute.subprocess")
     def test_run_timeout(self, mock_sp):
         import subprocess
 
@@ -40,7 +40,7 @@ class TestRun:
         assert result["returncode"] == -1
         assert result["stderr"] == "timeout"
 
-    @patch("voicetext.scripting.api.execute.subprocess")
+    @patch("wenzi.scripting.api.execute.subprocess")
     def test_run_exception(self, mock_sp):
         import subprocess
         mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -49,7 +49,7 @@ class TestRun:
         assert result["returncode"] == -1
         assert "no such file" in result["stderr"]
 
-    @patch("voicetext.scripting.api.execute.subprocess")
+    @patch("wenzi.scripting.api.execute.subprocess")
     def test_run_custom_timeout(self, mock_sp):
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -63,7 +63,7 @@ class TestRun:
 
 
 class TestExecute:
-    @patch("voicetext.scripting.api.execute._run")
+    @patch("wenzi.scripting.api.execute._run")
     def test_execute_background(self, mock_run):
         done = threading.Event()
 
@@ -77,19 +77,19 @@ class TestExecute:
         done.wait(timeout=2.0)
         mock_run.assert_called_once_with("echo hi", timeout=30)
 
-    @patch("voicetext.scripting.api.execute._run")
+    @patch("wenzi.scripting.api.execute._run")
     def test_execute_foreground(self, mock_run):
         mock_run.return_value = {"stdout": "output", "stderr": "", "returncode": 0}
         result = execute("echo hi", background=False)
         assert result == {"stdout": "output", "stderr": "", "returncode": 0}
 
-    @patch("voicetext.scripting.api.execute._run")
+    @patch("wenzi.scripting.api.execute._run")
     def test_execute_foreground_with_timeout(self, mock_run):
         mock_run.return_value = {"stdout": "", "stderr": "", "returncode": 0}
         execute("cmd", background=False, timeout=60)
         mock_run.assert_called_once_with("cmd", timeout=60)
 
-    @patch("voicetext.scripting.api.execute._run")
+    @patch("wenzi.scripting.api.execute._run")
     def test_execute_background_on_done(self, mock_run):
         done = threading.Event()
         results = []
@@ -105,7 +105,7 @@ class TestExecute:
         assert len(results) == 1
         assert results[0]["stdout"] == "ok"
 
-    @patch("voicetext.scripting.api.execute._run")
+    @patch("wenzi.scripting.api.execute._run")
     def test_execute_background_on_done_error_handled(self, mock_run):
         """on_done callback errors should not propagate."""
         done = threading.Event()

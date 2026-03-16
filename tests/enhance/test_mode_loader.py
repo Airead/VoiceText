@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 
 
-from voicetext.enhance.mode_loader import (
+from wenzi.enhance.mode_loader import (
     _BUILTIN_MODES,
     ensure_default_modes,
     load_modes,
@@ -169,7 +169,7 @@ class TestLoadModes:
             "---\nlabel: Mid\norder: 50\n---\nPrompt\n", encoding="utf-8"
         )
         modes = load_modes(str(tmp_path))
-        from voicetext.enhance.mode_loader import get_sorted_modes
+        from wenzi.enhance.mode_loader import get_sorted_modes
 
         sorted_list = get_sorted_modes(modes)
         assert sorted_list[0][0] == "a_first"
@@ -259,7 +259,7 @@ class TestAddModeTemplate:
     """Verify the add-mode template used in the UI is parseable."""
 
     def test_template_is_parseable(self, tmp_path):
-        from voicetext.controllers.enhance_mode_controller import EnhanceModeController
+        from wenzi.controllers.enhance_mode_controller import EnhanceModeController
 
         template = EnhanceModeController._ADD_MODE_TEMPLATE
         f = tmp_path / "template.md"

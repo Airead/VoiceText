@@ -256,7 +256,7 @@ def _html_template(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{title} — VoiceText</title>
+  <title>{title} — WenZi</title>
   <link rel="icon" type="image/png" href="{prefix}images/icon.png">
   <link rel="stylesheet" href="{prefix}css/style.css">
   <style>
@@ -268,13 +268,13 @@ def _html_template(
   <header class="site-header">
     <nav class="nav container">
       <a href="{prefix}" class="nav-brand">
-        <img src="{prefix}images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="{prefix}images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="{prefix}">{back_label}</a></li>
         <li><a href="{lang_switch_href}" class="lang-switch">{"中文" if lang == "en" else "English"}</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">{github_label}</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">{github_label}</a></li>
       </ul>
     </nav>
   </header>

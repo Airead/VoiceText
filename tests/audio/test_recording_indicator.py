@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from voicetext.audio.recording_indicator import RecordingIndicatorPanel, RecordingIndicatorView
+from wenzi.audio.recording_indicator import RecordingIndicatorPanel, RecordingIndicatorView
 
 
 class TestRecordingIndicatorView:
@@ -302,7 +302,7 @@ class TestRecordingIndicatorPanel:
         mock_animation_context.currentContext.return_value = mock_ctx
 
         with patch(
-            "voicetext.audio.recording_indicator.RecordingIndicatorPanel.animate_out",
+            "wenzi.audio.recording_indicator.RecordingIndicatorPanel.animate_out",
             wraps=panel.animate_out,
         ):
             # Just verify the timer gets invalidated

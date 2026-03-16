@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from voicetext.enhance.preview_history import PreviewHistoryStore, PreviewRecord
+from wenzi.enhance.preview_history import PreviewHistoryStore, PreviewRecord
 
 
 def _make_record(**overrides) -> PreviewRecord:

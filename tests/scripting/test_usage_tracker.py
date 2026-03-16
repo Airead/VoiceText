@@ -3,7 +3,7 @@
 import os
 import tempfile
 
-from voicetext.scripting.sources.usage_tracker import UsageTracker
+from wenzi.scripting.sources.usage_tracker import UsageTracker
 
 
 class TestUsageTracker:

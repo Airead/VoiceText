@@ -1,5 +1,5 @@
 /* ============================================================
-   VoiceText — GitHub Pages Script
+   WenZi — GitHub Pages Script
    Scroll-fade animation + GitHub Release version fetch
    ============================================================ */
 
@@ -22,7 +22,7 @@
   document.querySelectorAll(".fade-in").forEach((el) => observer.observe(el));
 
   // ---------- Fetch latest release from GitHub API ----------
-  const REPO = "Airead/VoiceText";
+  const REPO = "Airead/WenZi";
   const versionBadge = document.getElementById("version-badge");
   const downloadBtn = document.getElementById("download-btn");
 

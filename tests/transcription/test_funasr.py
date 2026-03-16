@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from voicetext.transcription.funasr import FunASRTranscriber
+from wenzi.transcription.funasr import FunASRTranscriber
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ class TestInitialize:
                 target(name, func)
                 return MagicMock(join=lambda timeout=None: None)
 
-            with patch("voicetext.transcription.funasr.threading.Thread") as mock_thread:
+            with patch("wenzi.transcription.funasr.threading.Thread") as mock_thread:
                 # Make threads run the function immediately
                 instances = []
 
@@ -156,7 +156,7 @@ class TestCleanup:
     def test_cleanup_calls_gc_collect(self):
         t = FunASRTranscriber()
         t._initialized = True
-        with patch("voicetext.transcription.funasr.gc.collect") as mock_gc:
+        with patch("wenzi.transcription.funasr.gc.collect") as mock_gc:
             t.cleanup()
         mock_gc.assert_called_once()
 
@@ -247,7 +247,7 @@ class TestTranscribe:
         t._asr_model = MagicMock(return_value=[{"text": "x"}])
         t._transcription_count = 9  # next call is #10
 
-        with patch("voicetext.transcription.funasr.gc.collect") as mock_gc:
+        with patch("wenzi.transcription.funasr.gc.collect") as mock_gc:
             t.transcribe(_make_wav())
 
         assert t._transcription_count == 10
@@ -259,7 +259,7 @@ class TestTranscribe:
         t._asr_model = MagicMock(return_value=[{"text": "x"}])
         t._transcription_count = 0
 
-        with patch("voicetext.transcription.funasr.gc.collect") as mock_gc:
+        with patch("wenzi.transcription.funasr.gc.collect") as mock_gc:
             t.transcribe(_make_wav())
 
         assert t._transcription_count == 1
@@ -274,7 +274,7 @@ class TestTranscribe:
         __import__("tempfile").NamedTemporaryFile
 
         with pytest.raises(RuntimeError, match="asr error"):
-            with patch("voicetext.transcription.funasr.os.unlink"):
+            with patch("wenzi.transcription.funasr.os.unlink"):
                 t.transcribe(_make_wav())
             # unlink should still be called
             # (we verify via the finally block in source)
@@ -285,7 +285,7 @@ class TestTranscribe:
         t._initialized = True
         t._asr_model = MagicMock(return_value=[{"text": "ok"}])
 
-        with patch("voicetext.transcription.funasr.os.unlink", side_effect=OSError("no file")):
+        with patch("wenzi.transcription.funasr.os.unlink", side_effect=OSError("no file")):
             result = t.transcribe(_make_wav())
         assert result == "ok"
 
@@ -397,7 +397,7 @@ class TestGetModelDir:
         """Falls back to snapshot_download when no local cache exists."""
         t = FunASRTranscriber()
         with patch("pathlib.Path.home", return_value=tmp_path), \
-             patch("voicetext.transcription.funasr.FunASRTranscriber._get_model_dir",
+             patch("wenzi.transcription.funasr.FunASRTranscriber._get_model_dir",
                    wraps=t._get_model_dir):
 
             mock_download = MagicMock(return_value="/some/downloaded/path")
@@ -410,7 +410,7 @@ class TestGetModelDir:
             }):
                 # Just verify it reaches the download branch without crashing
                 # by patching snapshot_download at the import point
-                with patch("voicetext.transcription.funasr.FunASRTranscriber._get_model_dir",
+                with patch("wenzi.transcription.funasr.FunASRTranscriber._get_model_dir",
                            return_value="/downloaded"):
                     result = t._get_model_dir.__func__(t, "iic/missing-model") \
                         if False else "/downloaded"
@@ -474,7 +474,7 @@ class TestLoaders:
         """_load_punc_restorer returns True and stores a restorer when import succeeds."""
         t = FunASRTranscriber()
 
-        # Build a fake voicetext.transcription.punctuation module
+        # Build a fake wenzi.transcription.punctuation module
         mock_punc_instance = MagicMock()
         mock_punc_instance.initialize.return_value = None
         mock_punc_module = MagicMock()
@@ -482,15 +482,15 @@ class TestLoaders:
 
         # Inject the fake module so the relative import inside _load_punc_restorer resolves it
         import sys
-        real_module = sys.modules.get("voicetext.transcription.punctuation")
-        sys.modules["voicetext.transcription.punctuation"] = mock_punc_module
+        real_module = sys.modules.get("wenzi.transcription.punctuation")
+        sys.modules["wenzi.transcription.punctuation"] = mock_punc_module
         try:
             result = t._load_punc_restorer()
         finally:
             if real_module is None:
-                sys.modules.pop("voicetext.transcription.punctuation", None)
+                sys.modules.pop("wenzi.transcription.punctuation", None)
             else:
-                sys.modules["voicetext.transcription.punctuation"] = real_module
+                sys.modules["wenzi.transcription.punctuation"] = real_module
 
         assert result is True
         assert t._punc_restorer is mock_punc_instance
@@ -498,7 +498,7 @@ class TestLoaders:
 
     def test_load_punc_restorer_failure(self):
         t = FunASRTranscriber()
-        with patch.dict("sys.modules", {"voicetext.transcription.punctuation": None}):
+        with patch.dict("sys.modules", {"wenzi.transcription.punctuation": None}):
             result = t._load_punc_restorer()
         assert result is False
 

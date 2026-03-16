@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Configuration Reference — VoiceText</title>
+  <title>Configuration Reference — WenZi</title>
   <link rel="icon" type="image/png" href="../images/icon.png">
   <link rel="stylesheet" href="../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../" class="nav-brand">
-        <img src="../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../">&larr; Back</a></li>
         <li><a href="../zh/docs/configuration.html" class="lang-switch">中文</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -91,13 +91,13 @@
 
     </div>
 
-<p>Default config path: <code>~/.config/VoiceText/config.json</code>. Only the fields you want to change are needed; everything else uses defaults.</p>
+<p>Default config path: <code>~/.config/WenZi/config.json</code>. Only the fields you want to change are needed; everything else uses defaults.</p>
 <h2 id="config-directory-resolution"><a href="#config-directory-resolution" class="heading-anchor">Config Directory Resolution</a></h2>
 <p>The config directory is resolved with the following priority:</p>
 <ol>
-<li><strong>CLI argument</strong> -- pass a directory path as the first positional argument: <code>voicetext /path/to/config-dir</code></li>
-<li><strong>NSUserDefaults</strong> -- a custom directory saved via the Settings UI (stored under <code>com.voicetext.app</code> / <code>config_dir</code>)</li>
-<li><strong>Default</strong> -- <code>~/.config/VoiceText/</code></li>
+<li><strong>CLI argument</strong> -- pass a directory path as the first positional argument: <code>wenzi /path/to/config-dir</code></li>
+<li><strong>NSUserDefaults</strong> -- a custom directory saved via the Settings UI (stored under <code>io.github.airead.wenzi</code> / <code>config_dir</code>)</li>
+<li><strong>Default</strong> -- <code>~/.config/WenZi/</code></li>
 </ol>
 <p>The config file is always <code>config.json</code> inside the resolved directory.</p>
 <h2 id="full-default-configuration"><a href="#full-default-configuration" class="heading-anchor">Full Default Configuration</a></h2>

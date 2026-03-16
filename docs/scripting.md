@@ -1,6 +1,6 @@
 # Scripting
 
-VoiceText includes a Python-based scripting system that lets you automate macOS tasks — launch apps with leader keys, bind global hotkeys, show alerts, and more.
+闻字 includes a Python-based scripting system that lets you automate macOS tasks — launch apps with leader keys, bind global hotkeys, show alerts, and more.
 
 ## Quick Start
 
@@ -14,7 +14,7 @@ VoiceText includes a Python-based scripting system that lets you automate macOS 
    }
    ```
 
-2. **Create your script** at `~/.config/VoiceText/scripts/init.py`:
+2. **Create your script** at `~/.config/WenZi/scripts/init.py`:
 
    ```python
    vt.leader("cmd_r", [
@@ -24,7 +24,7 @@ VoiceText includes a Python-based scripting system that lets you automate macOS 
    ])
    ```
 
-3. **Restart VoiceText**. Hold right Command, see the mapping panel, press a letter key to launch the app.
+3. **Restart 闻字**. Hold right Command, see the mapping panel, press a letter key to launch the app.
 
 ## Leader Keys
 
@@ -260,12 +260,12 @@ vt.hotkey.bind("ctrl+cmd+n", lambda: vt.execute("open -a Notes"))
 - The `vt` object is available as a global variable — no import needed
 - Errors in scripts are caught and displayed as alerts
 - Scripts are loaded once at startup; use `vt.reload()` to re-read changes
-- Script path: `~/.config/VoiceText/scripts/init.py`
+- Script path: `~/.config/WenZi/scripts/init.py`
 - Custom script directory can be set via `"scripting": {"script_dir": "/path/to/scripts"}` in config
 
 ## Security
 
-Scripts run as **unsandboxed Python** with the same permissions as VoiceText itself. This means a script can:
+Scripts run as **unsandboxed Python** with the same permissions as 闻字 itself. This means a script can:
 
 - Read and write any file your user account can access
 - Execute arbitrary shell commands
@@ -281,11 +281,11 @@ Scripting is disabled by default for this reason.
 
 **Scripts not loading?**
 - Check that `"scripting": {"enabled": true}` is set in `config.json`
-- Restart VoiceText after enabling
-- Check logs at `~/Library/Logs/VoiceText/voicetext.log` for errors
+- Restart 闻字 after enabling
+- Check logs at `~/Library/Logs/WenZi/wenzi.log` for errors
 
 **Leader key not responding?**
-- Ensure VoiceText has Accessibility permission (System Settings → Privacy & Security → Accessibility)
+- Ensure 闻字 has Accessibility permission (System Settings → Privacy & Security → Accessibility)
 - Verify the trigger key name is correct (e.g. `cmd_r` not `right_cmd`)
 
 **Alert panel not visible?**
@@ -293,4 +293,4 @@ Scripting is disabled by default for this reason.
 
 **Script errors?**
 - Syntax errors and exceptions are logged and shown as alerts
-- Check `~/Library/Logs/VoiceText/voicetext.log` for stack traces
+- Check `~/Library/Logs/WenZi/wenzi.log` for stack traces

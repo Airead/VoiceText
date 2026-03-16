@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from voicetext.controllers.recording_controller import RecordingController
+from wenzi.controllers.recording_controller import RecordingController
 
 
 def _make_controller():
@@ -57,7 +57,7 @@ class TestRecordingStartEvent:
 
 
 class TestRecordingStopEvent:
-    @patch("voicetext.controllers.recording_controller.threading")
+    @patch("wenzi.controllers.recording_controller.threading")
     def test_recording_stop_fired_on_hotkey_release(self, mock_threading):
         ctrl, app = _make_controller()
         fire_event = MagicMock()
@@ -84,7 +84,7 @@ class TestTranscriptionDoneEvent:
         app._append_newline = False
         app._output_method = "auto"
 
-        with patch("voicetext.controllers.recording_controller.type_text"):
+        with patch("wenzi.controllers.recording_controller.type_text"):
             ctrl.do_transcribe_direct("hello world", use_enhance=False)
 
         fire_event.assert_any_call(
@@ -102,7 +102,7 @@ class TestOutputTextEvent:
         app._append_newline = False
         app._output_method = "auto"
 
-        with patch("voicetext.controllers.recording_controller.type_text"):
+        with patch("wenzi.controllers.recording_controller.type_text"):
             ctrl.do_transcribe_direct("hello world", use_enhance=False)
 
         fire_event.assert_any_call(

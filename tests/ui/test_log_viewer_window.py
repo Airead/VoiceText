@@ -12,7 +12,7 @@ from tests.conftest import mock_panel_close_delegate
 @pytest.fixture(autouse=True)
 def _mock_appkit(mock_appkit_modules, monkeypatch):
     """Mock AppKit and Foundation modules for headless testing."""
-    import voicetext.ui.log_viewer_window as _lvw
+    import wenzi.ui.log_viewer_window as _lvw
 
     mock_panel_close_delegate(monkeypatch, _lvw)
     return mock_appkit_modules
@@ -22,7 +22,7 @@ class TestParseLogLines:
     """Tests for parse_log_lines (pure logic, no AppKit needed)."""
 
     def test_parse_single_info_line(self):
-        from voicetext.ui.log_viewer_window import parse_log_lines
+        from wenzi.ui.log_viewer_window import parse_log_lines
 
         lines = ["2026-03-13 10:00:01,123 [app] INFO: Started"]
         entries = parse_log_lines(lines)
@@ -31,7 +31,7 @@ class TestParseLogLines:
         assert "Started" in entries[0][1]
 
     def test_parse_multiple_levels(self):
-        from voicetext.ui.log_viewer_window import parse_log_lines
+        from wenzi.ui.log_viewer_window import parse_log_lines
 
         lines = [
             "2026-03-13 10:00:01,123 [app] INFO: First",
@@ -45,7 +45,7 @@ class TestParseLogLines:
         assert entries[2][0] == "ERROR"
 
     def test_parse_multiline_traceback(self):
-        from voicetext.ui.log_viewer_window import parse_log_lines
+        from wenzi.ui.log_viewer_window import parse_log_lines
 
         lines = [
             "2026-03-13 10:00:01,123 [app] ERROR: Something failed",
@@ -60,12 +60,12 @@ class TestParseLogLines:
         assert "ValueError" in entries[0][1]
 
     def test_parse_empty_input(self):
-        from voicetext.ui.log_viewer_window import parse_log_lines
+        from wenzi.ui.log_viewer_window import parse_log_lines
 
         assert parse_log_lines([]) == []
 
     def test_continuation_inherits_previous_level(self):
-        from voicetext.ui.log_viewer_window import parse_log_lines
+        from wenzi.ui.log_viewer_window import parse_log_lines
 
         lines = [
             "2026-03-13 10:00:01,123 [app] WARNING: Watch out",
@@ -80,7 +80,7 @@ class TestParseLogLines:
         assert entries[1][0] == "INFO"
 
     def test_parse_debug_level(self):
-        from voicetext.ui.log_viewer_window import parse_log_lines
+        from wenzi.ui.log_viewer_window import parse_log_lines
 
         lines = ["2026-03-13 10:00:01,123 [mod] DEBUG: Verbose output"]
         entries = parse_log_lines(lines)
@@ -92,7 +92,7 @@ class TestFilterEntries:
     """Tests for filter_entries (pure logic)."""
 
     def _make_entries(self):
-        from voicetext.ui.log_viewer_window import parse_log_lines
+        from wenzi.ui.log_viewer_window import parse_log_lines
 
         lines = [
             "2026-03-13 10:00:01,123 [app] DEBUG: debug msg",
@@ -103,7 +103,7 @@ class TestFilterEntries:
         return parse_log_lines(lines)
 
     def test_filter_by_single_level(self):
-        from voicetext.ui.log_viewer_window import filter_entries
+        from wenzi.ui.log_viewer_window import filter_entries
 
         entries = self._make_entries()
         result = filter_entries(entries, frozenset({"ERROR"}), "")
@@ -111,28 +111,28 @@ class TestFilterEntries:
         assert result[0][0] == "ERROR"
 
     def test_filter_by_multiple_levels(self):
-        from voicetext.ui.log_viewer_window import filter_entries
+        from wenzi.ui.log_viewer_window import filter_entries
 
         entries = self._make_entries()
         result = filter_entries(entries, frozenset({"INFO", "WARNING"}), "")
         assert len(result) == 2
 
     def test_filter_all_levels(self):
-        from voicetext.ui.log_viewer_window import filter_entries, _ALL_LEVELS
+        from wenzi.ui.log_viewer_window import filter_entries, _ALL_LEVELS
 
         entries = self._make_entries()
         result = filter_entries(entries, _ALL_LEVELS, "")
         assert len(result) == 4
 
     def test_filter_no_levels(self):
-        from voicetext.ui.log_viewer_window import filter_entries
+        from wenzi.ui.log_viewer_window import filter_entries
 
         entries = self._make_entries()
         result = filter_entries(entries, frozenset(), "")
         assert len(result) == 0
 
     def test_search_filter_case_insensitive(self):
-        from voicetext.ui.log_viewer_window import filter_entries, _ALL_LEVELS
+        from wenzi.ui.log_viewer_window import filter_entries, _ALL_LEVELS
 
         entries = self._make_entries()
         result = filter_entries(entries, _ALL_LEVELS, "WARNING")
@@ -140,14 +140,14 @@ class TestFilterEntries:
         assert result[0][0] == "WARNING"
 
     def test_search_filter_partial_match(self):
-        from voicetext.ui.log_viewer_window import filter_entries, _ALL_LEVELS
+        from wenzi.ui.log_viewer_window import filter_entries, _ALL_LEVELS
 
         entries = self._make_entries()
         result = filter_entries(entries, _ALL_LEVELS, "msg")
         assert len(result) == 4
 
     def test_combined_level_and_search_filter(self):
-        from voicetext.ui.log_viewer_window import filter_entries
+        from wenzi.ui.log_viewer_window import filter_entries
 
         entries = self._make_entries()
         result = filter_entries(entries, frozenset({"INFO", "ERROR"}), "error")
@@ -155,7 +155,7 @@ class TestFilterEntries:
         assert result[0][0] == "ERROR"
 
     def test_search_no_match(self):
-        from voicetext.ui.log_viewer_window import filter_entries, _ALL_LEVELS
+        from wenzi.ui.log_viewer_window import filter_entries, _ALL_LEVELS
 
         entries = self._make_entries()
         result = filter_entries(entries, _ALL_LEVELS, "nonexistent")
@@ -166,7 +166,7 @@ class TestLogViewerPanel:
     """Tests for LogViewerPanel (with mocked AppKit)."""
 
     def _make_panel(self, tmp_path, **kwargs):
-        from voicetext.ui.log_viewer_window import LogViewerPanel
+        from wenzi.ui.log_viewer_window import LogViewerPanel
 
         log_file = tmp_path / "test.log"
         return LogViewerPanel(log_file, **kwargs), log_file
@@ -277,7 +277,7 @@ class TestLogViewerToolbarActions:
     """Tests for the new toolbar action handlers."""
 
     def _make_panel(self, tmp_path, **kwargs):
-        from voicetext.ui.log_viewer_window import LogViewerPanel
+        from wenzi.ui.log_viewer_window import LogViewerPanel
 
         log_file = tmp_path / "test.log"
         log_file.write_text("")
@@ -285,7 +285,7 @@ class TestLogViewerToolbarActions:
 
     def test_console_clicked_opens_console_app(self, tmp_path):
         panel, log_file = self._make_panel(tmp_path)
-        with patch("voicetext.ui.log_viewer_window.subprocess") as mock_sub:
+        with patch("wenzi.ui.log_viewer_window.subprocess") as mock_sub:
             panel.consoleClicked_(None)
             mock_sub.Popen.assert_called_once_with(
                 ["open", "-a", "Console", str(log_file)]
@@ -293,7 +293,7 @@ class TestLogViewerToolbarActions:
 
     def test_finder_clicked_reveals_in_finder(self, tmp_path):
         panel, log_file = self._make_panel(tmp_path)
-        with patch("voicetext.ui.log_viewer_window.subprocess") as mock_sub:
+        with patch("wenzi.ui.log_viewer_window.subprocess") as mock_sub:
             panel.finderClicked_(None)
             mock_sub.Popen.assert_called_once_with(
                 ["open", "-R", str(log_file)]
@@ -301,7 +301,7 @@ class TestLogViewerToolbarActions:
 
     def test_copy_path_clicked_copies_to_clipboard(self, tmp_path):
         panel, log_file = self._make_panel(tmp_path)
-        with patch("voicetext.ui.log_viewer_window.subprocess") as mock_sub:
+        with patch("wenzi.ui.log_viewer_window.subprocess") as mock_sub:
             panel.copyPathClicked_(None)
             mock_sub.run.assert_called_once_with(
                 ["pbcopy"], input=str(log_file).encode(), check=True

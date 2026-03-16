@@ -20,7 +20,7 @@ def _mock_sherpa(monkeypatch):
 
 class TestSherpaModels:
     def test_model_definitions(self):
-        from voicetext.transcription.sherpa import SHERPA_MODELS
+        from wenzi.transcription.sherpa import SHERPA_MODELS
 
         assert "zipformer-zh" in SHERPA_MODELS
         assert "paraformer-zh" in SHERPA_MODELS
@@ -32,20 +32,20 @@ class TestSherpaModels:
             assert "type" in info
 
     def test_cache_root(self):
-        from voicetext.transcription.sherpa import _get_model_cache_root
+        from wenzi.transcription.sherpa import _get_model_cache_root
 
         root = _get_model_cache_root()
         assert "sherpa-onnx-models" in str(root)
 
     def test_get_model_dir(self):
-        from voicetext.transcription.sherpa import _get_model_dir
+        from wenzi.transcription.sherpa import _get_model_dir
 
         path = _get_model_dir("zipformer-zh")
         assert isinstance(path, Path)
         assert "sherpa-onnx-models" in str(path)
 
     def test_get_model_dir_unknown_raises(self):
-        from voicetext.transcription.sherpa import _get_model_dir
+        from wenzi.transcription.sherpa import _get_model_dir
 
         with pytest.raises(ValueError, match="Unknown sherpa model"):
             _get_model_dir("nonexistent")
@@ -53,7 +53,7 @@ class TestSherpaModels:
 
 class TestSherpaTranscriberInit:
     def test_default_properties(self):
-        from voicetext.transcription.sherpa import SherpaOnnxTranscriber
+        from wenzi.transcription.sherpa import SherpaOnnxTranscriber
 
         t = SherpaOnnxTranscriber()
         assert t._model_id == "zipformer-zh"
@@ -62,13 +62,13 @@ class TestSherpaTranscriberInit:
         assert t.skip_punc is True
 
     def test_display_name_known(self):
-        from voicetext.transcription.sherpa import SherpaOnnxTranscriber
+        from wenzi.transcription.sherpa import SherpaOnnxTranscriber
 
         t = SherpaOnnxTranscriber(model="zipformer-zh")
         assert "Zipformer" in t.model_display_name
 
     def test_display_name_unknown(self):
-        from voicetext.transcription.sherpa import SherpaOnnxTranscriber
+        from wenzi.transcription.sherpa import SherpaOnnxTranscriber
 
         t = SherpaOnnxTranscriber(model="custom-model")
         assert "custom-model" in t.model_display_name
@@ -76,7 +76,7 @@ class TestSherpaTranscriberInit:
 
 class TestSherpaStreaming:
     def _make_transcriber(self, _mock_sherpa):
-        from voicetext.transcription.sherpa import SherpaOnnxTranscriber
+        from wenzi.transcription.sherpa import SherpaOnnxTranscriber
 
         t = SherpaOnnxTranscriber(model="zipformer-zh")
         # Mock initialized state
@@ -162,22 +162,22 @@ class TestSherpaStreaming:
 
 class TestSherpaFactory:
     def test_create_sherpa_backend(self):
-        from voicetext.transcription.base import create_transcriber
-        from voicetext.transcription.sherpa import SherpaOnnxTranscriber
+        from wenzi.transcription.base import create_transcriber
+        from wenzi.transcription.sherpa import SherpaOnnxTranscriber
 
         t = create_transcriber(backend="sherpa")
         assert isinstance(t, SherpaOnnxTranscriber)
         assert t._model_id == "zipformer-zh"
 
     def test_create_sherpa_onnx_alias(self):
-        from voicetext.transcription.base import create_transcriber
-        from voicetext.transcription.sherpa import SherpaOnnxTranscriber
+        from wenzi.transcription.base import create_transcriber
+        from wenzi.transcription.sherpa import SherpaOnnxTranscriber
 
         t = create_transcriber(backend="sherpa-onnx")
         assert isinstance(t, SherpaOnnxTranscriber)
 
     def test_create_sherpa_with_model(self):
-        from voicetext.transcription.base import create_transcriber
+        from wenzi.transcription.base import create_transcriber
 
         t = create_transcriber(backend="sherpa", model="paraformer-zh")
         assert t._model_id == "paraformer-zh"
