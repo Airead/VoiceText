@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>User Guide — VoiceText</title>
+  <title>User Guide — WenZi</title>
   <link rel="icon" type="image/png" href="../images/icon.png">
   <link rel="stylesheet" href="../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../" class="nav-brand">
-        <img src="../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../">&larr; Back</a></li>
         <li><a href="../zh/docs/user-guide.html" class="lang-switch">中文</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -154,28 +154,28 @@
 
 <p>A progressive guide from first launch to advanced usage. Follow the levels in order — each builds on the previous one.</p>
 <h2 id="level-1-getting-started"><a href="#level-1-getting-started" class="heading-anchor">Level 1: Getting Started</a></h2>
-<p><strong>Goal:</strong> Install VoiceText and transcribe your first sentence.</p>
+<p><strong>Goal:</strong> Install 闻字 and transcribe your first sentence.</p>
 <h3 id="install"><a href="#install" class="heading-anchor">Install</a></h3>
 <p><strong>Option A — Download Release (easiest):</strong></p>
 <ol>
-<li>Download <code>VoiceText.app</code> from the <a href="https://github.com/Airead/VoiceText/releases">Releases</a> page.</li>
+<li>Download <code>WenZi.app</code> from the <a href="https://github.com/Airead/WenZi/releases">Releases</a> page.</li>
 <li>Drag it to <code>/Applications</code>.</li>
 <li>Double-click to launch.</li>
 </ol>
 <blockquote>
-<p><strong>First launch:</strong> macOS blocks unsigned apps. Go to <strong>System Settings → Privacy &amp; Security</strong>, find the VoiceText blocked message, and click <strong>Open Anyway</strong>.</p>
+<p><strong>First launch:</strong> macOS blocks unsigned apps. Go to <strong>System Settings → Privacy &amp; Security</strong>, find the 闻字 blocked message, and click <strong>Open Anyway</strong>.</p>
 </blockquote>
 <p><strong>Option B — Build from Source:</strong></p>
-<pre><code class="language-bash">git clone https://github.com/Airead/VoiceText
-cd VoiceText
+<pre><code class="language-bash">git clone https://github.com/Airead/WenZi
+cd WenZi
 uv sync
-./scripts/build.sh        # builds VoiceText.app in dist/
+./scripts/build.sh        # builds WenZi.app in dist/
 </code></pre>
 <p><strong>Option C — Run from Source (for developers):</strong></p>
-<pre><code class="language-bash">git clone https://github.com/Airead/VoiceText
-cd VoiceText
+<pre><code class="language-bash">git clone https://github.com/Airead/WenZi
+cd WenZi
 uv sync
-uv run python -m voicetext
+uv run python -m wenzi
 </code></pre>
 <h3 id="grant-permissions"><a href="#grant-permissions" class="heading-anchor">Grant Permissions</a></h3>
 <p>On first launch, macOS will ask for:</p>
@@ -203,20 +203,20 @@ uv run python -m voicetext
 </table></div>
 <p>Grant all requested permissions in <strong>System Settings → Privacy &amp; Security</strong>.</p>
 <h3 id="first-launch-ready-immediately"><a href="#first-launch-ready-immediately" class="heading-anchor">First Launch: Ready Immediately</a></h3>
-<p>The default ASR backend is <strong>Apple On-Device Speech</strong> — it uses the built-in macOS speech recognizer, so <strong>no model download is needed</strong>. VoiceText is ready to transcribe right after granting permissions.</p>
+<p>The default ASR backend is <strong>Apple On-Device Speech</strong> — it uses the built-in macOS speech recognizer, so <strong>no model download is needed</strong>. 闻字 is ready to transcribe right after granting permissions.</p>
 <blockquote>
-<p><strong>Note:</strong> If you later switch to FunASR or MLX-Whisper in Settings, VoiceText will need to download a model (~75 MB to ~1.6 GB depending on the model). During download:</p>
+<p><strong>Note:</strong> If you later switch to FunASR or MLX-Whisper in Settings, 闻字 will need to download a model (~75 MB to ~1.6 GB depending on the model). During download:</p>
 <ul>
 <li>The menubar icon changes to a <strong>download icon</strong> (⬇) with a percentage like <code>DL 45%</code></li>
 <li><strong>Please wait for the download to complete</strong> before trying to transcribe</li>
 <li>Click menubar → <strong>View Logs...</strong> to open the built-in log viewer and monitor download progress in real time</li>
 <li>Once loading finishes, the icon changes back to a <strong>microphone icon</strong> (🎙) and the status shows "Ready"</li>
 </ul>
-<p><strong>Tip:</strong> If a download fails or is interrupted, delete the cache directory (<code>~/.cache/modelscope/</code> for FunASR, <code>~/.cache/huggingface/</code> for MLX-Whisper) and restart VoiceText to retry.</p>
+<p><strong>Tip:</strong> If a download fails or is interrupted, delete the cache directory (<code>~/.cache/modelscope/</code> for FunASR, <code>~/.cache/huggingface/</code> for MLX-Whisper) and restart 闻字 to retry.</p>
 </blockquote>
 <h3 id="your-first-transcription"><a href="#your-first-transcription" class="heading-anchor">Your First Transcription</a></h3>
 <ol>
-<li>Look for the <strong>microphone icon</strong> (🎙) in the menubar — that means VoiceText is ready.</li>
+<li>Look for the <strong>microphone icon</strong> (🎙) in the menubar — that means 闻字 is ready.</li>
 <li>Open any text input (Notes, browser, editor, terminal…).</li>
 <li><strong>Hold</strong> the <code>fn</code> key and speak.</li>
 <li><strong>Release</strong> <code>fn</code> — the transcribed text appears.</li>
@@ -279,7 +279,7 @@ uv run python -m voicetext
 <h2 id="level-2-daily-use-basics"><a href="#level-2-daily-use-basics" class="heading-anchor">Level 2: Daily Use Basics</a></h2>
 <p><strong>Goal:</strong> Understand the two output modes and basic menubar controls.</p>
 <h3 id="preview-mode-vs-direct-mode"><a href="#preview-mode-vs-direct-mode" class="heading-anchor">Preview Mode vs Direct Mode</a></h3>
-<p>VoiceText has two ways to deliver results:</p>
+<p>闻字 has two ways to deliver results:</p>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -321,7 +321,7 @@ uv run python -m voicetext
 ├── ─────────────────────
 ├── View Logs...             Open log viewer
 ├── Usage Stats              View usage statistics
-├── About VoiceText          Version info
+├── About 闻字          Version info
 └── Quit
 </code></pre>
 <p>All model selection, AI enhancement configuration, and hotkey management are done through the <strong>Settings</strong> panel — not the menubar menu directly.</p>
@@ -424,7 +424,7 @@ uv run python -m voicetext
 <p><strong>Option A — Local with Ollama (free, private):</strong></p>
 <ol>
 <li>Install <a href="https://ollama.ai">Ollama</a> and run <code>ollama pull qwen2.5:7b</code></li>
-<li>That's it — VoiceText's default config points to Ollama</li>
+<li>That's it — 闻字.s default config points to Ollama</li>
 </ol>
 <p><strong>Option B — Cloud API (e.g., DeepSeek, OpenAI):</strong></p>
 <ol>
@@ -487,10 +487,10 @@ uv run python -m voicetext
 <li>…and so on for custom modes</li>
 </ul>
 <h3 id="result-caching"><a href="#result-caching" class="heading-anchor">Result Caching</a></h3>
-<p>When you switch modes in the preview panel, VoiceText <strong>caches</strong> completed results. Switching back to a previously used mode shows the cached result instantly (marked <code>[cached]</code>) — no API call needed.</p>
+<p>When you switch modes in the preview panel, 闻字 <strong>caches</strong> completed results. Switching back to a previously used mode shows the cached result instantly (marked <code>[cached]</code>) — no API call needed.</p>
 <p>The cache is cleared when new audio is recorded.</p>
 <h3 id="preview-history"><a href="#preview-history" class="heading-anchor">Preview History</a></h3>
-<p>VoiceText keeps an <strong>in-memory history</strong> of your last 10 preview results (cleared on app restart). This lets you go back to a previous transcription without re-recording.</p>
+<p>闻字 keeps an <strong>in-memory history</strong> of your last 10 preview results (cleared on app restart). This lets you go back to a previous transcription without re-recording.</p>
 <ul>
 <li><strong>History dropdown:</strong> Click the clock icon in the preview panel's toolbar to open a dropdown showing recent previews. Select one to reload it into the panel.</li>
 <li><strong>Quick recall:</strong> Press <code>fn+Z</code> at any time (even outside the preview panel) to cancel any active recording and instantly open the most recent preview result.</li>
@@ -542,12 +542,12 @@ uv run python -m voicetext
 </table></div>
 <hr />
 <h2 id="level-6-direct-mode-streaming"><a href="#level-6-direct-mode-streaming" class="heading-anchor">Level 6: Direct Mode &amp; Streaming</a></h2>
-<p><strong>Goal:</strong> Use VoiceText for fast, hands-free input with real-time AI feedback.</p>
+<p><strong>Goal:</strong> Use 闻字 for fast, hands-free input with real-time AI feedback.</p>
 <h3 id="enable-direct-mode"><a href="#enable-direct-mode" class="heading-anchor">Enable Direct Mode</a></h3>
 <p>Turn off Preview: <strong>Settings...</strong> → General tab → uncheck <strong>Preview</strong>.</p>
 <p>Now when you release the hotkey, text is typed directly into the active app — no panel, no confirmation needed.</p>
 <h3 id="real-time-streaming-stt"><a href="#real-time-streaming-stt" class="heading-anchor">Real-Time Streaming STT</a></h3>
-<p>When using an ASR backend that supports streaming (currently Apple Speech), VoiceText shows a <strong>live transcription overlay</strong> during recording. Partial text appears in real-time as you speak, giving you instant feedback before you even release the hotkey.</p>
+<p>When using an ASR backend that supports streaming (currently Apple Speech), 闻字 shows a <strong>live transcription overlay</strong> during recording. Partial text appears in real-time as you speak, giving you instant feedback before you even release the hotkey.</p>
 <p>This works in both Preview and Direct modes. In Direct mode, it is especially useful because you can see the transcription forming and decide whether to keep or cancel it.</p>
 <h3 id="ai-streaming-overlay"><a href="#ai-streaming-overlay" class="heading-anchor">AI Streaming Overlay</a></h3>
 <p>In direct mode, after recording ends, a <strong>streaming overlay</strong> appears showing the processing pipeline:</p>
@@ -574,7 +574,7 @@ uv run python -m voicetext
 <ol>
 <li><strong>Select</strong> text in any application.</li>
 <li>Press <code>Ctrl+Cmd+V</code> (default hotkey).</li>
-<li>VoiceText copies the selection, sends it to the LLM with the current enhancement mode, and outputs the result.</li>
+<li>闻字 copies the selection, sends it to the LLM with the current enhancement mode, and outputs the result.</li>
 </ol>
 <p>You can also trigger it from the menubar: click <strong>Enhance Clipboard</strong>.</p>
 <h3 id="use-cases"><a href="#use-cases" class="heading-anchor">Use Cases</a></h3>
@@ -589,7 +589,7 @@ uv run python -m voicetext
 <li><strong>Preview off:</strong> Result replaces via clipboard</li>
 </ul>
 <h3 id="customize-the-hotkey"><a href="#customize-the-hotkey" class="heading-anchor">Customize the Hotkey</a></h3>
-<p>Edit <code>~/.config/VoiceText/config.json</code>:</p>
+<p>Edit <code>~/.config/WenZi/config.json</code>:</p>
 <pre><code class="language-json">{
   &quot;clipboard_enhance&quot;: {
     &quot;hotkey&quot;: &quot;ctrl+cmd+v&quot;
@@ -607,7 +607,7 @@ uv run python -m voicetext
 <li>Edit the template, click <strong>Save</strong>, enter a mode ID.</li>
 </ol>
 <p><strong>Via file (flexible):</strong></p>
-<p>Create a <code>.md</code> file in <code>~/.config/VoiceText/enhance_modes/</code>:</p>
+<p>Create a <code>.md</code> file in <code>~/.config/WenZi/enhance_modes/</code>:</p>
 <pre><code class="language-markdown">---
 label: Formal Email
 order: 60
@@ -663,14 +663,14 @@ models:
 <p>See <a href="provider-model-guide.md">Provider &amp; Model Setup Guide</a> for detailed examples covering Ollama, OpenAI, DeepSeek, Groq, OpenRouter, Qwen, and more.</p>
 <hr />
 <h2 id="level-10-vocabulary-conversation-history"><a href="#level-10-vocabulary-conversation-history" class="heading-anchor">Level 10: Vocabulary &amp; Conversation History</a></h2>
-<p><strong>Goal:</strong> Teach VoiceText your personal terms and maintain topic context across turns.</p>
+<p><strong>Goal:</strong> Teach 闻字 your personal terms and maintain topic context across turns.</p>
 <h3 id="vocabulary-retrieval"><a href="#vocabulary-retrieval" class="heading-anchor">Vocabulary Retrieval</a></h3>
 <p><strong>Problem:</strong> ASR often misrecognizes proper nouns, technical terms, and names (e.g., "萍萍" → "平平").</p>
-<p><strong>Solution:</strong> VoiceText builds a personal vocabulary from your correction history and uses it to improve future results.</p>
+<p><strong>Solution:</strong> 闻字 builds a personal vocabulary from your correction history and uses it to improve future results.</p>
 <h4 id="how-to-build-vocabulary"><a href="#how-to-build-vocabulary" class="heading-anchor">How to Build Vocabulary</a></h4>
 <ol>
 <li><strong>Use Preview mode with AI enhancement</strong> — edit the result when the AI gets a term wrong.</li>
-<li>Each edit is logged to <code>~/.config/VoiceText/conversation_history.jsonl</code> with a <code>user_corrected</code> flag.</li>
+<li>Each edit is logged to <code>~/.config/WenZi/conversation_history.jsonl</code> with a <code>user_corrected</code> flag.</li>
 <li><strong>Auto build</strong> (default): After every 10 corrections, vocabulary is rebuilt automatically in the background.</li>
 <li><strong>Manual build:</strong> Settings → <strong>AI</strong> tab → <strong>Build Vocabulary...</strong></li>
 </ol>
@@ -679,7 +679,7 @@ models:
 <p>When enabled, relevant vocabulary entries are retrieved via embedding similarity and injected into the LLM prompt, helping it correct domain-specific terms.</p>
 <h3 id="conversation-history"><a href="#conversation-history" class="heading-anchor">Conversation History</a></h3>
 <p><strong>Problem:</strong> Each transcription is independent — the LLM doesn't know what you just said.</p>
-<p><strong>Solution:</strong> VoiceText injects recent confirmed outputs into the AI prompt, so the LLM understands the current topic.</p>
+<p><strong>Solution:</strong> 闻字 injects recent confirmed outputs into the AI prompt, so the LLM understands the current topic.</p>
 <h4 id="enable"><a href="#enable" class="heading-anchor">Enable</a></h4>
 <p>Settings → <strong>AI</strong> tab → toggle <strong>Conversation History</strong>.</p>
 <h4 id="how-it-works_1"><a href="#how-it-works_1" class="heading-anchor">How It Works</a></h4>
@@ -699,7 +699,7 @@ models:
 <li><strong>Archived records</strong> — check the "Archived" toggle to include records from monthly archives</li>
 </ul>
 <h4 id="auto-rotation-and-archiving"><a href="#auto-rotation-and-archiving" class="heading-anchor">Auto-Rotation and Archiving</a></h4>
-<p>When conversation history exceeds <strong>20,000 records</strong>, VoiceText automatically archives older records into monthly files under <code>~/.config/VoiceText/conversation_history_archives/YYYY-MM.jsonl</code>. The main history file keeps the most recent 20,000 records for fast access, while archived records remain searchable through the history browser.</p>
+<p>When conversation history exceeds <strong>20,000 records</strong>, 闻字 automatically archives older records into monthly files under <code>~/.config/WenZi/conversation_history_archives/YYYY-MM.jsonl</code>. The main history file keeps the most recent 20,000 records for fast access, while archived records remain searchable through the history browser.</p>
 <p>See <a href="vocabulary-embedding-retrieval.md">Vocabulary Embedding Retrieval</a> and <a href="conversation-history-enhancement.md">Conversation History Enhancement</a> for technical details.</p>
 <hr />
 <h2 id="level-11-fine-tuning-troubleshooting"><a href="#level-11-fine-tuning-troubleshooting" class="heading-anchor">Level 11: Fine-Tuning &amp; Troubleshooting</a></h2>
@@ -734,11 +734,11 @@ models:
 </table></div>
 <p>The Settings panel <strong>remembers the last active tab</strong> across sessions. At the bottom, toolbar buttons provide quick access to <strong>Show Config</strong>, <strong>Edit Config</strong>, and <strong>Reload Config</strong>.</p>
 <h4 id="custom-config-directory"><a href="#custom-config-directory" class="heading-anchor">Custom Config Directory</a></h4>
-<p>In the General tab, you can set a <strong>custom config directory</strong> to store VoiceText configuration files in a location of your choice (e.g., a synced folder). After changing the directory, VoiceText will prompt you to restart for the change to take effect.</p>
+<p>In the General tab, you can set a <strong>custom config directory</strong> to store 闻字 configuration files in a location of your choice (e.g., a synced folder). After changing the directory, 闻字 will prompt you to restart for the change to take effect.</p>
 <h4 id="scripting-toggle"><a href="#scripting-toggle" class="heading-anchor">Scripting Toggle</a></h4>
-<p>The General tab includes a <strong>Scripting</strong> toggle to enable or disable the scripting/plugin system. When enabled, VoiceText loads and executes Lua scripts from the configured script directory. See the <a href="scripting.md">Scripting Documentation</a> for details on writing plugins.</p>
+<p>The General tab includes a <strong>Scripting</strong> toggle to enable or disable the scripting/plugin system. When enabled, 闻字 loads and executes Lua scripts from the configured script directory. See the <a href="scripting.md">Scripting Documentation</a> for details on writing plugins.</p>
 <h3 id="hotkey-configuration"><a href="#hotkey-configuration" class="heading-anchor">Hotkey Configuration</a></h3>
-<p>VoiceText supports flexible hotkey configuration. The recording hotkey is configured in the <strong>Settings</strong> panel (General tab), while the clipboard enhance hotkey is set in the config file.</p>
+<p>闻字 supports flexible hotkey configuration. The recording hotkey is configured in the <strong>Settings</strong> panel (General tab), while the clipboard enhance hotkey is set in the config file.</p>
 <h4 id="hotkey-format"><a href="#hotkey-format" class="heading-anchor">Hotkey Format</a></h4>
 <p>Hotkeys use the format <code>modifier+modifier+key</code>, where:</p>
 <ul>
@@ -807,12 +807,12 @@ models:
 </code></pre>
 <p>Multiple recording hotkeys can be enabled simultaneously by adding entries to the <code>hotkeys</code> map with <code>true</code> values. Set to <code>false</code> to disable a hotkey without removing it.</p>
 <h3 id="configuration-file"><a href="#configuration-file" class="heading-anchor">Configuration File</a></h3>
-<p>Default location: <code>~/.config/VoiceText/config.json</code></p>
+<p>Default location: <code>~/.config/WenZi/config.json</code></p>
 <p>The config directory can be changed to a custom path via Settings → General → Config Directory (stored in macOS preferences, survives config file changes).</p>
 <p>You only need to include fields you want to change — everything else uses defaults. After editing, click <strong>Reload Config</strong> in the Settings toolbar to apply without restarting.</p>
 <p>See <a href="configuration.md">Configuration Reference</a> for all options.</p>
 <h3 id="logging"><a href="#logging" class="heading-anchor">Logging</a></h3>
-<p>Logs are saved to <code>~/Library/Logs/VoiceText/voicetext.log</code> (5 MB rotation, 3 backups).</p>
+<p>Logs are saved to <code>~/Library/Logs/WenZi/wenzi.log</code> (5 MB rotation, 3 backups).</p>
 <p><strong>View logs (recommended):</strong> Menubar → <strong>View Logs...</strong> opens the built-in log viewer — the easiest way to check logs, monitor model download/loading progress, and diagnose issues in real time.</p>
 <p>Log files are also available on disk at the path above if you prefer an external editor.</p>
 <h3 id="usage-statistics"><a href="#usage-statistics" class="heading-anchor">Usage Statistics</a></h3>
@@ -926,13 +926,13 @@ models:
 </blockquote>
 <hr />
 <h2 id="whats-next"><a href="#whats-next" class="heading-anchor">What's Next?</a></h2>
-<p>You now know everything VoiceText offers. Here are some ideas to get the most out of it:</p>
+<p>You now know everything 闻字 offers. Here are some ideas to get the most out of it:</p>
 <ul>
 <li><strong>Create modes for your workflow</strong> — meeting notes, code review comments, Slack messages</li>
 <li><strong>Build chain modes</strong> — proofread → translate, or summarize → format</li>
 <li><strong>Accumulate vocabulary</strong> — the more you correct, the smarter it gets</li>
 <li><strong>Try different models</strong> — compare Groq's speed vs local Ollama's privacy vs OpenAI's accuracy</li>
-<li><strong>Write scripts</strong> — extend VoiceText with Lua plugins for custom hotkey actions (see <a href="scripting.md">Scripting Documentation</a>)</li>
+<li><strong>Write scripts</strong> — extend 闻字 with Lua plugins for custom hotkey actions (see <a href="scripting.md">Scripting Documentation</a>)</li>
 <li><strong>Browse <a href="enhance-mode-examples.md">Enhancement Mode Examples</a></strong> for inspiration</li>
 </ul>
 <p>For technical details on any feature, see the <a href="../README.md#documentation">documentation index</a>.</p>

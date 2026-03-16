@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>词汇表与向量检索 — VoiceText</title>
+  <title>词汇表与向量检索 — WenZi</title>
   <link rel="icon" type="image/png" href="../../images/icon.png">
   <link rel="stylesheet" href="../../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../../" class="nav-brand">
-        <img src="../../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../../">&larr; 返回</a></li>
         <li><a href="../../docs/vocabulary-embedding-retrieval.html" class="lang-switch">English</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -86,7 +86,7 @@
     </div>
 
 <h2 id="_1"><a href="#_1" class="heading-anchor">背景</a></h2>
-<p>VoiceText 使用 LLM 对 ASR（自动语音识别）的输出进行纠错。ASR 引擎经常会将专有名词、技术术语和领域特定词汇识别错误——将其替换为发音相似但不正确的字符。例如，"Kubernetes" 可能被转录为"库伯尼特斯"或"酷伯"，"Python" 可能被转录为"派森"。</p>
+<p>闻字 使用 LLM 对 ASR（自动语音识别）的输出进行纠错。ASR 引擎经常会将专有名词、技术术语和领域特定词汇识别错误——将其替换为发音相似但不正确的字符。例如，"Kubernetes" 可能被转录为"库伯尼特斯"或"酷伯"，"Python" 可能被转录为"派森"。</p>
 <p>通用 LLM 并不了解用户的个人词库。如果没有额外的上下文信息，它无法可靠地区分正确的转录和被误识别的专有名词。这会导致两类错误：</p>
 <ol>
 <li><strong>漏纠</strong> — LLM 没有纠正 ASR 错误，因为它无法识别用户实际想表达的术语。</li>
@@ -98,7 +98,7 @@
 <h2 id="_3"><a href="#_3" class="heading-anchor">工作原理</a></h2>
 <p>系统由两个阶段组成：<strong>词库构建</strong>和<strong>实时检索</strong>。</p>
 <h3 id="_4"><a href="#_4" class="heading-anchor">阶段一：词库构建</a></h3>
-<p>VoiceText 在 <code>conversation_history.jsonl</code> 中记录用户的每次修改——当用户在预览面板中编辑了 AI 增强后的文本时，对应的记录会被标记为 <code>user_corrected: true</code>。词库构建器利用这些记录：</p>
+<p>闻字 在 <code>conversation_history.jsonl</code> 中记录用户的每次修改——当用户在预览面板中编辑了 AI 增强后的文本时，对应的记录会被标记为 <code>user_corrected: true</code>。词库构建器利用这些记录：</p>
 <ol>
 <li>从 <code>conversation_history.jsonl</code> 中读取已修改的记录（支持通过时间戳过滤进行增量构建）。</li>
 <li>将记录分批发送给 LLM，附带结构化提取提示词。</li>
@@ -276,31 +276,31 @@
 </thead>
 <tbody>
 <tr>
-<td><code>src/voicetext/enhance/vocabulary_builder.py</code></td>
+<td><code>src/wenzi/enhance/vocabulary_builder.py</code></td>
 <td>通过 LLM 从对话历史修改记录中提取词库</td>
 </tr>
 <tr>
-<td><code>src/voicetext/enhance/vocabulary.py</code></td>
+<td><code>src/wenzi/enhance/vocabulary.py</code></td>
 <td>嵌入索引的构建与检索</td>
 </tr>
 <tr>
-<td><code>src/voicetext/enhance/auto_vocab_builder.py</code></td>
+<td><code>src/wenzi/enhance/auto_vocab_builder.py</code></td>
 <td>基于修改计数触发的自动词库构建</td>
 </tr>
 <tr>
-<td><code>src/voicetext/enhance/enhancer.py</code></td>
+<td><code>src/wenzi/enhance/enhancer.py</code></td>
 <td>将词库上下文集成到增强提示词中</td>
 </tr>
 <tr>
-<td><code>src/voicetext/ui/vocab_build_window.py</code></td>
+<td><code>src/wenzi/ui/vocab_build_window.py</code></td>
 <td>词库构建进度的 UI 界面</td>
 </tr>
 <tr>
-<td><code>src/voicetext/app.py</code></td>
+<td><code>src/wenzi/app.py</code></td>
 <td>词库开关和构建触发的菜单项</td>
 </tr>
 <tr>
-<td><code>src/voicetext/config.py</code></td>
+<td><code>src/wenzi/config.py</code></td>
 <td>词库设置的默认配置</td>
 </tr>
 </tbody>

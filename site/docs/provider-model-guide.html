@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Provider & Model Guide — VoiceText</title>
+  <title>Provider & Model Guide — WenZi</title>
   <link rel="icon" type="image/png" href="../images/icon.png">
   <link rel="stylesheet" href="../css/style.css">
   <style>
@@ -49,13 +49,13 @@
   <header class="site-header">
     <nav class="nav container">
       <a href="../" class="nav-brand">
-        <img src="../images/icon.png" alt="VoiceText icon">
-        VoiceText
+        <img src="../images/icon.png" alt="WenZi icon">
+        WenZi
       </a>
       <ul class="nav-links">
         <li><a href="../">&larr; Back</a></li>
         <li><a href="../zh/docs/provider-model-guide.html" class="lang-switch">中文</a></li>
-        <li><a href="https://github.com/Airead/VoiceText" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/Airead/WenZi" target="_blank">GitHub</a></li>
       </ul>
     </nav>
   </header>
@@ -102,9 +102,9 @@
 
     </div>
 
-<p>This guide explains how to configure ASR (speech recognition) models and AI enhancement providers in VoiceText. Both GUI (Settings panel) and config file approaches are covered.</p>
+<p>This guide explains how to configure ASR (speech recognition) models and AI enhancement providers in 闻字. Both GUI (Settings panel) and config file approaches are covered.</p>
 <h2 id="asr-model-selection"><a href="#asr-model-selection" class="heading-anchor">ASR Model Selection</a></h2>
-<p>VoiceText supports five ASR backends:</p>
+<p>闻字 supports five ASR backends:</p>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -149,9 +149,9 @@
 </table></div>
 <h3 id="asr-via-gui"><a href="#asr-via-gui" class="heading-anchor">ASR Via GUI</a></h3>
 <p>Open <strong>Settings...</strong> → <strong>STT</strong> tab. All available local and remote ASR models are listed as radio buttons. Select one to switch — the active model is highlighted.</p>
-<p>If the selected MLX-Whisper model hasn't been downloaded yet, VoiceText will download it automatically on first use (the menubar icon shows <code>DL X%</code> progress). Remote ASR models from configured providers also appear in this tab.</p>
+<p>If the selected MLX-Whisper model hasn't been downloaded yet, 闻字 will download it automatically on first use (the menubar icon shows <code>DL X%</code> progress). Remote ASR models from configured providers also appear in this tab.</p>
 <h3 id="asr-via-config-file"><a href="#asr-via-config-file" class="heading-anchor">ASR Via Config File</a></h3>
-<p>Edit <code>~/.config/VoiceText/config.json</code>:</p>
+<p>Edit <code>~/.config/WenZi/config.json</code>:</p>
 <pre><code class="language-json">{
   &quot;asr&quot;: {
     &quot;backend&quot;: &quot;mlx-whisper&quot;,
@@ -193,7 +193,7 @@
 </tr>
 </tbody>
 </table></div>
-<p>After editing, restart VoiceText for changes to take effect.</p>
+<p>After editing, restart 闻字 for changes to take effect.</p>
 <h3 id="available-asr-models"><a href="#available-asr-models" class="heading-anchor">Available ASR Models</a></h3>
 <div class="table-wrapper"><table>
 <thead>
@@ -254,7 +254,7 @@
 </blockquote>
 <hr />
 <h2 id="remote-asr-providers"><a href="#remote-asr-providers" class="heading-anchor">Remote ASR Providers</a></h2>
-<p>In addition to local ASR backends, VoiceText supports remote ASR via OpenAI-compatible audio transcription APIs (e.g. Groq, OpenAI). Remote providers are configured separately from LLM providers.</p>
+<p>In addition to local ASR backends, 闻字 supports remote ASR via OpenAI-compatible audio transcription APIs (e.g. Groq, OpenAI). Remote providers are configured separately from LLM providers.</p>
 <h3 id="remote-asr-via-gui"><a href="#remote-asr-via-gui" class="heading-anchor">Remote ASR Via GUI</a></h3>
 <ol>
 <li>
@@ -271,14 +271,14 @@
      whisper-large-v3</code></p>
 <ol start="3">
 <li>
-<p>Click <strong>Verify</strong> — VoiceText will test the connection by sending a short silent audio clip.</p>
+<p>Click <strong>Verify</strong> — 闻字 will test the connection by sending a short silent audio clip.</p>
 </li>
 <li>
 <p>If verification passes, click <strong>Save</strong>. The new models appear in the <strong>STT</strong> tab.</p>
 </li>
 </ol>
 <h3 id="remote-asr-via-config-file"><a href="#remote-asr-via-config-file" class="heading-anchor">Remote ASR Via Config File</a></h3>
-<p>Edit <code>~/.config/VoiceText/config.json</code> and add entries under <code>asr</code>:</p>
+<p>Edit <code>~/.config/WenZi/config.json</code> and add entries under <code>asr</code>:</p>
 <pre><code class="language-json">{
   &quot;asr&quot;: {
     &quot;default_provider&quot;: &quot;groq&quot;,
@@ -293,7 +293,7 @@
   }
 }
 </code></pre>
-<p>When <code>default_provider</code> and <code>default_model</code> are set, VoiceText starts with the remote ASR model. Set both to <code>null</code> to use a local backend.</p>
+<p>When <code>default_provider</code> and <code>default_model</code> are set, 闻字 starts with the remote ASR model. Set both to <code>null</code> to use a local backend.</p>
 <h3 id="remote-asr-examples"><a href="#remote-asr-examples" class="heading-anchor">Remote ASR Examples</a></h3>
 <p><strong>Groq</strong></p>
 <pre><code class="language-json">&quot;groq&quot;: {
@@ -338,14 +338,14 @@
    - <strong>extra_body</strong> (optional): Additional JSON parameters sent with every request</p>
 </li>
 <li>
-<p>Click <strong>Verify</strong> — VoiceText will test the connection using the first model in your list.</p>
+<p>Click <strong>Verify</strong> — 闻字 will test the connection using the first model in your list.</p>
 </li>
 <li>
 <p>If verification passes, click <strong>Save</strong> to add the provider.</p>
 </li>
 </ol>
 <h3 id="provider-via-config-file"><a href="#provider-via-config-file" class="heading-anchor">Provider Via Config File</a></h3>
-<p>Edit <code>~/.config/VoiceText/config.json</code> and add entries under <code>ai_enhance.providers</code>:</p>
+<p>Edit <code>~/.config/WenZi/config.json</code> and add entries under <code>ai_enhance.providers</code>:</p>
 <pre><code class="language-json">{
   &quot;ai_enhance&quot;: {
     &quot;default_provider&quot;: &quot;openai&quot;,
@@ -392,7 +392,7 @@
 </tr>
 </tbody>
 </table></div>
-<p>After editing, restart VoiceText for changes to take effect.</p>
+<p>After editing, restart 闻字 for changes to take effect.</p>
 <h3 id="provider-examples"><a href="#provider-examples" class="heading-anchor">Provider Examples</a></h3>
 <p><strong>Ollama (local)</strong></p>
 <pre><code class="language-json">&quot;ollama&quot;: {
