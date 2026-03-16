@@ -580,9 +580,8 @@ class ChooserPanel:
 
         # Apply custom placeholder (overrides prefix hints default)
         if self._pending_placeholder is not None:
-            import json as _json
             self._eval_js(
-                f"setPlaceholder({_json.dumps(self._pending_placeholder)})"
+                f"setPlaceholder({json.dumps(self._pending_placeholder)})"
             )
             self._pending_placeholder = None
 

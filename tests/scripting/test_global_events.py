@@ -71,7 +71,7 @@ class TestRecordingStopEvent:
         ctrl._streaming_active = False
 
         ctrl.on_hotkey_release()
-        fire_event.assert_any_call("recording_stop")
+        fire_event.assert_any_call("recording_stop", audio_duration=0.0)
 
 
 class TestTranscriptionDoneEvent:

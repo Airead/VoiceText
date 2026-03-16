@@ -59,12 +59,15 @@ class StoreAPI:
 
     def delete(self, key: str) -> None:
         """Remove *key* from the store."""
+        removed = False
         with self._lock:
             self._ensure_loaded()
             if key in self._data:
                 del self._data[key]
                 self._dirty = True
-        self._schedule_flush()
+                removed = True
+        if removed:
+            self._schedule_flush()
 
     def keys(self) -> List[str]:
         """Return all keys in the store."""
@@ -82,9 +85,11 @@ class StoreAPI:
 
     def flush_sync(self) -> None:
         """Immediately flush pending data to disk."""
-        if self._flush_timer is not None:
-            self._flush_timer.cancel()
+        with self._lock:
+            timer = self._flush_timer
             self._flush_timer = None
+        if timer is not None:
+            timer.cancel()
         self._flush()
 
     def _schedule_flush(self) -> None:

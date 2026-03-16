@@ -354,7 +354,6 @@ class RecordingController:
         app._recorder.clear_on_audio_chunk()
 
         wav_data = app._recorder.stop()
-        self._fire_scripting_event("recording_stop")
 
         # Record audio duration for usage statistics
         audio_duration = 0.0
@@ -366,6 +365,8 @@ class RecordingController:
             except Exception as e:
                 logger.error("Failed to record recording duration: %s", e)
         app._last_audio_duration = audio_duration
+
+        self._fire_scripting_event("recording_stop", audio_duration=audio_duration)
 
         if streaming_active:
             # Streaming path: get final text from the streaming session
