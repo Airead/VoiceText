@@ -8,9 +8,7 @@ character counts for all models including MiniMax (inline <think> tags).
 from __future__ import annotations
 
 import threading
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from wenzi.controllers.enhance_controller import EnhanceController
 

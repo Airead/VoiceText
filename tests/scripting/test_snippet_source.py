@@ -74,14 +74,14 @@ class TestParseFrontmatter:
     def test_auto_expand_false(self):
         text = '---\nkeyword: "@@email"\nauto_expand: false\n---\ncontent'
         meta, body = _parse_frontmatter(text)
-        assert meta["auto_expand"] == "false"
+        assert meta["auto_expand"] is False
         assert meta["keyword"] == "@@email"
         assert body == "content"
 
     def test_auto_expand_true(self):
         text = '---\nkeyword: "@@email"\nauto_expand: true\n---\ncontent'
         meta, body = _parse_frontmatter(text)
-        assert meta["auto_expand"] == "true"
+        assert meta["auto_expand"] is True
 
 
 class TestFormatSnippetFile:
@@ -124,7 +124,7 @@ class TestFormatSnippetFile:
         text = _format_snippet_file("@@e", "body", auto_expand=False)
         meta, body = _parse_frontmatter(text)
         assert meta["keyword"] == "@@e"
-        assert meta["auto_expand"] == "false"
+        assert meta["auto_expand"] is False
         assert body == "body"
 
 

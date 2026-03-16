@@ -275,7 +275,7 @@ class SnippetStore:
 
                 meta, body = _parse_frontmatter(text)
                 base_name = os.path.splitext(fname)[0]
-                auto_expand = meta.get("auto_expand", "true").lower() != "false"
+                auto_expand = str(meta.get("auto_expand", True)).lower() != "false"
 
                 # Multi-snippet: frontmatter contains a "snippets" list
                 snippets_list = meta.get("snippets")
