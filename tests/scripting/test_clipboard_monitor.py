@@ -9,8 +9,25 @@ from wenzi.scripting.clipboard_monitor import (
     ClipboardEntry,
     ClipboardMonitor,
     _ClipboardDB,
+    _mask_text,
     _migrate_json_to_db,
 )
+
+
+class TestMaskText:
+    def test_short_text_fully_masked(self):
+        assert _mask_text("ab") == "**"
+        assert _mask_text("abcd") == "****"
+
+    def test_empty_string(self):
+        assert _mask_text("") == ""
+
+    def test_normal_text_shows_first_and_last_two(self):
+        assert _mask_text("hello") == "he..lo"
+        assert _mask_text("password123") == "pa..23"
+
+    def test_five_chars(self):
+        assert _mask_text("abcde") == "ab..de"
 
 
 class TestClipboardEntry:

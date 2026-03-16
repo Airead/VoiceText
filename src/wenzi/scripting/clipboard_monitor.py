@@ -37,6 +37,13 @@ _CONCEALED_TYPES = frozenset({
 })
 
 _MAX_TEXT_LENGTH = 10_240  # 10 KB
+
+
+def _mask_text(text: str) -> str:
+    """Mask text for logging, showing only first 2 and last 2 characters."""
+    if len(text) <= 4:
+        return "*" * len(text)
+    return f"{text[:2]}..{text[-2:]}"
 _MIN_IMAGE_DIM = 4  # ignore images smaller than 4×4 (tracking pixels, mock artifacts)
 
 _DEFAULT_IMAGE_DIR = os.path.expanduser("~/.config/WenZi/clipboard_images")
@@ -676,7 +683,7 @@ class ClipboardMonitor:
 
         if removed:
             self._cleanup_image_files(removed)
-        logger.debug("Clipboard entry added: %s...", text[:40])
+        logger.debug("Clipboard entry added: %s (%d chars)", _mask_text(text), len(text))
 
     def _trim_expired_locked(self) -> List[str]:
         """Remove entries older than max_days. Must be called with _lock held.
