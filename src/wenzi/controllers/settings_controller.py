@@ -428,7 +428,7 @@ class SettingsController:
                 app._set_status("VT")
                 logger.info("Switched to model: %s (from settings)", preset.display_name)
                 try:
-                    send_notification("闻字", "Model switched",
+                    send_notification("WenZi", "Model switched",
                                       f"Now using: {preset.display_name}")
                 except Exception:
                     logger.debug("Notification unavailable, skipping")

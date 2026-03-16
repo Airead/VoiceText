@@ -167,12 +167,12 @@ app = BUNDLE(
     bundle_identifier='io.github.airead.wenzi',
     codesign_identity=os.environ.get('CODESIGN_IDENTITY', ''),
     info_plist={
-        'CFBundleName': '闻字',
-        'CFBundleDisplayName': '闻字',
+        'CFBundleName': 'WenZi',
+        'CFBundleDisplayName': 'WenZi',
         'CFBundleVersion': _version,
         'CFBundleShortVersionString': _version,
         'LSUIElement': True,
-        'NSMicrophoneUsageDescription': '闻字 needs microphone access to record speech for transcription.',
-        'NSAppleEventsUsageDescription': '闻字 needs accessibility access to type transcribed text.',
+        'NSMicrophoneUsageDescription': 'WenZi needs microphone access to record speech for transcription.',
+        'NSAppleEventsUsageDescription': 'WenZi needs accessibility access to type transcribed text.',
     },
 )

@@ -310,7 +310,7 @@ models:
 
         if app._busy:
             send_notification(
-                "闻字",
+                "WenZi",
                 "Cannot switch model",
                 "Please wait for current operation to finish.",
             )
@@ -398,7 +398,7 @@ models:
                 logger.info("Switched to model: %s", preset.display_name)
                 try:
                     send_notification(
-                        "闻字",
+                        "WenZi",
                         "Model switched",
                         f"Now using: {preset.display_name}",
                     )
@@ -637,7 +637,7 @@ models:
 
         if app._busy:
             send_notification(
-                "闻字",
+                "WenZi",
                 "Cannot switch model",
                 "Please wait for current operation to finish.",
             )
@@ -675,7 +675,7 @@ models:
                 logger.info("Switched to remote ASR: %s", rm.display_name)
                 try:
                     send_notification(
-                        "闻字",
+                        "WenZi",
                         "Model switched",
                         f"Now using: {rm.display_name}",
                     )
@@ -687,7 +687,7 @@ models:
                 app._set_status("Error")
                 try:
                     send_notification(
-                        "闻字",
+                        "WenZi",
                         "Model switch failed",
                         str(e)[:100],
                     )
@@ -831,7 +831,7 @@ models:
             app._menu_builder.build_model_menu()
 
             send_notification(
-                "闻字", "ASR Provider added", f"{name} ({', '.join(models)})"
+                "WenZi", "ASR Provider added", f"{name} ({', '.join(models)})"
             )
             logger.info("Added ASR provider: %s", name)
             return
@@ -878,7 +878,7 @@ models:
             app._menu_builder.build_model_menu()
             app._menu_builder.update_model_checkmarks()
 
-            send_notification("闻字", "ASR Provider removed", pname)
+            send_notification("WenZi", "ASR Provider removed", pname)
             logger.info("Removed ASR provider: %s", pname)
         except Exception as e:
             logger.error("Remove ASR provider failed: %s", e, exc_info=True)
@@ -1017,7 +1017,7 @@ models:
             app._menu_builder.build_llm_model_menu()
 
             send_notification(
-                "闻字", "Provider added", f"{name} ({', '.join(models)})"
+                "WenZi", "Provider added", f"{name} ({', '.join(models)})"
             )
             logger.info("Added AI provider: %s", name)
             return
@@ -1052,7 +1052,7 @@ models:
 
             app._menu_builder.build_llm_model_menu()
 
-            send_notification("闻字", "Provider removed", pname)
+            send_notification("WenZi", "Provider removed", pname)
             logger.info("Removed AI provider: %s", pname)
         except Exception as e:
             logger.error("Remove provider failed: %s", e, exc_info=True)

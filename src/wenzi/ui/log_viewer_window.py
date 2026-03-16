@@ -93,7 +93,7 @@ class LogViewerPanel:
 
     Layout (720x560):
         +--------------------------------------------------------------+
-        | 闻字 Logs                                          [x]  |
+        | WenZi Logs                                          [x]  |
         | [Search...___________________] [DEBUG|INFO|WARN|ERR]         |
         | +----------------------------------------------------------+ |
         | | log content...                                           | |
@@ -230,7 +230,7 @@ class LogViewerPanel:
             False,
         )
         panel.setMinSize_(NSMakeSize(600, 400))
-        panel.setTitle_("闻字 Logs")
+        panel.setTitle_("WenZi Logs")
         panel.setLevel_(NSStatusWindowLevel)
         panel.setFloatingPanel_(True)
         panel.setHidesOnDeactivate_(False)

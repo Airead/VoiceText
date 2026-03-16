@@ -331,7 +331,7 @@ Output only the processed text without any explanation."""
                 )
                 progress_panel.update_status(f"{status}: {msg}")
                 try:
-                    send_notification("闻字", f"Vocabulary {status}", msg)
+                    send_notification("WenZi", f"Vocabulary {status}", msg)
                 except Exception:
                     logger.debug("Notification center unavailable, skipping notification")
             except Exception as e:
@@ -339,7 +339,7 @@ Output only the processed text without any explanation."""
                 progress_panel.update_status(f"Failed: {e}")
                 try:
                     send_notification(
-                        "闻字", "Vocabulary Build Failed", str(e)
+                        "WenZi", "Vocabulary Build Failed", str(e)
                     )
                 except Exception:
                     logger.debug("Notification center unavailable, skipping notification")

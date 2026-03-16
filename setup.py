@@ -20,14 +20,14 @@ DATA_FILES = []
 OPTIONS = {
     "argv_emulation": False,
     "plist": {
-        "CFBundleName": "闻字",
-        "CFBundleDisplayName": "闻字",
+        "CFBundleName": "WenZi",
+        "CFBundleDisplayName": "WenZi",
         "CFBundleIdentifier": "io.github.airead.wenzi",
         "CFBundleVersion": _version,
         "CFBundleShortVersionString": _version,
         "LSUIElement": True,  # Hide from Dock (menubar-only app)
-        "NSMicrophoneUsageDescription": "闻字 needs microphone access to record speech for transcription.",
-        "NSAppleEventsUsageDescription": "闻字 needs accessibility access to type transcribed text.",
+        "NSMicrophoneUsageDescription": "WenZi needs microphone access to record speech for transcription.",
+        "NSAppleEventsUsageDescription": "WenZi needs accessibility access to type transcribed text.",
     },
     "packages": ["wenzi", "funasr_onnx", "librosa", "sounddevice", "soundfile", "numpy"],
 }

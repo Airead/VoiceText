@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 MODE_OFF = "off"
 
-DEFAULT_MODES_DIR = os.path.join("~", ".config", "闻字", "enhance_modes")
+DEFAULT_MODES_DIR = os.path.join("~", ".config", "WenZi", "enhance_modes")
 
 
 @dataclass

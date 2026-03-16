@@ -128,11 +128,11 @@ class WenZiApp(StatusBarApp):
     """Menubar app: hold hotkey to record, release to transcribe and type."""
 
     def __init__(self, config_dir: Optional[str] = None) -> None:
-        super().__init__("闻字", icon=None, title="VT")
+        super().__init__("WenZi", icon=None, title="VT")
         self._current_status = "VT"
 
         # Seed the SF Symbol icon so the first render shows an icon, not text
-        nsimage = self._sf_symbol_image("mic.fill", "闻字")
+        nsimage = self._sf_symbol_image("mic.fill", "WenZi")
         if nsimage is not None:
             self._icon_nsimage = nsimage
             self._title = None  # clear text; icon takes over
@@ -424,7 +424,7 @@ class WenZiApp(StatusBarApp):
         )
 
         # About item
-        self._about_item = StatusMenuItem("About 闻字", callback=self._on_about)
+        self._about_item = StatusMenuItem("About WenZi", callback=self._on_about)
 
         # History browser (lazy-created)
         self._history_browser = None

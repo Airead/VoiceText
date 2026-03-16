@@ -189,12 +189,12 @@ class ConfigController:
             new_config, config_error = load_config(app._config_path)
         except Exception as e:
             logger.error("Failed to reload config: %s", e)
-            send_notification("闻字", "Reload Failed", str(e))
+            send_notification("WenZi", "Reload Failed", str(e))
             return
 
         if config_error is not None:
             logger.error("Config reload error: %s", config_error)
-            send_notification("闻字", "Config Error", config_error.message)
+            send_notification("WenZi", "Config Error", config_error.message)
             return
 
         app._config = new_config
@@ -283,7 +283,7 @@ class ConfigController:
                 app._clipboard_hotkey_listener.start()
 
         logger.info("Configuration reloaded successfully")
-        send_notification("闻字", "Config Reloaded", "Configuration has been reloaded.")
+        send_notification("WenZi", "Config Reloaded", "Configuration has been reloaded.")
 
     def on_browse_history(self, _=None) -> None:
         """Open the conversation history browser panel."""
@@ -319,5 +319,5 @@ class ConfigController:
         from wenzi._build_info import BUILD_DATE, GIT_HASH
 
         message = f"Version: {__version__}\nBuild:   {GIT_HASH}\nDate:    {BUILD_DATE}"
-        topmost_alert(title="闻字", message=message)
+        topmost_alert(title="WenZi", message=message)
         restore_accessory()

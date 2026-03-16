@@ -56,7 +56,7 @@ DMG_PATH="$DIST_DIR/WenZi-${VERSION}-arm64.dmg"
 
 cd "$PROJECT_DIR"
 
-echo "==> Building 闻字 v${VERSION}..."
+echo "==> Building WenZi v${VERSION}..."
 
 echo "==> Injecting build info..."
 uv run python scripts/inject_build_info.py
@@ -83,7 +83,7 @@ echo "==> Creating DMG..."
 DMG_DIR=$(mktemp -d)
 cp -R "$APP_PATH" "$DMG_DIR/"
 ln -s /Applications "$DMG_DIR/Applications"
-hdiutil create -volname "闻字" \
+hdiutil create -volname "WenZi" \
     -srcfolder "$DMG_DIR" \
     -ov -format UDZO \
     "$DMG_PATH"

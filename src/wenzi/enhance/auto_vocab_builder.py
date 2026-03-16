@@ -104,7 +104,7 @@ class AutoVocabBuilder:
             if new_entries > 0:
                 try:
                     send_notification(
-                        "闻字",
+                        "WenZi",
                         "Vocabulary Auto-Built",
                         f"{new_entries} new entries ({total_entries} total)",
                     )
