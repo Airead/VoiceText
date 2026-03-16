@@ -174,5 +174,6 @@ app = BUNDLE(
         'LSUIElement': True,
         'NSMicrophoneUsageDescription': 'WenZi needs microphone access to record speech for transcription.',
         'NSAppleEventsUsageDescription': 'WenZi needs accessibility access to type transcribed text.',
+        'NSSpeechRecognitionUsageDescription': 'WenZi needs speech recognition access for Apple Speech transcription.',
     },
 )
