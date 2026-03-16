@@ -26,6 +26,8 @@ class RecordingController:
         self._prefer_mode: Optional[str] = None
         # Saved state for restoring after a per-hotkey mode override
         self._saved_mode: Optional[tuple] = None  # (enhance_mode, enhancer_mode, enhancer_enabled)
+        # Set by on_cancel_recording to abort a pending _delayed_start
+        self._cancel_delayed = threading.Event()
 
     def _fire_scripting_event(self, event_name: str, **kwargs) -> None:
         """Fire a scripting event if the script engine is available."""
@@ -67,11 +69,12 @@ class RecordingController:
             app._usage_stats.record_sound_feedback()
 
         app._recording_started.clear()
+        self._cancel_delayed.clear()
 
         def _delayed_start():
             import time
             time.sleep(0.35)
-            if not app._busy:
+            if not app._busy and not self._cancel_delayed.is_set():
                 self._start_recording_and_update_indicator()
             app._recording_started.set()
 
@@ -262,6 +265,7 @@ class RecordingController:
 
         # Reset state
         app._recording_started.clear()
+        self._cancel_delayed.clear()
 
         # Replay prompt sound and restart recording
         app._set_status("Recording...")
@@ -272,7 +276,7 @@ class RecordingController:
         def _delayed_start():
             import time
             time.sleep(0.35)
-            if not app._busy:
+            if not app._busy and not self._cancel_delayed.is_set():
                 self._start_recording_and_update_indicator()
             app._recording_started.set()
 
@@ -290,20 +294,23 @@ class RecordingController:
 
     def on_preview_history(self) -> None:
         """Called when preview_history_key is pressed during recording — cancel and show history."""
-        app = self._app
-        # Cancel recording first (same as on_cancel_recording)
-        if app._recorder.is_recording:
-            self.on_cancel_recording()
+        self.on_cancel_recording()
         # Show last preview history record
-        app._preview_controller.on_show_last_preview()
+        self._app._preview_controller.on_show_last_preview()
 
     def on_cancel_recording(self) -> None:
         """Called when cancel key (cmd) is pressed during recording — discard and stop."""
         app = self._app
         if not app._recorder.is_recording:
-            # Still clean up overlays that may have been shown before
-            # recording actually started (e.g. during sound feedback delay)
+            # Recording hasn't started yet (e.g. still in sound feedback
+            # delay).  Signal _delayed_start to skip recorder.start(),
+            # then clean up indicator and overlays.
+            self._cancel_delayed.set()
             self._hide_live_overlay()
+            self.stop_recording_indicator()
+            app._recording_started.set()
+            app._set_status("VT")
+            self._restore_mode()
             return
         logger.info("Cancel key pressed, cancelling recording")
 
