@@ -199,8 +199,7 @@ class TestUnitConversion:
         assert calc_with_pint.search("10 foo to bar") == []
 
     def test_pint_not_ready(self, calc):
-        # Default calc fixture has _ureg_ready=False (thread may not finish)
-        calc._ureg_ready = False
+        # Ensure _ureg is None to simulate pint not yet initialized
         calc._ureg = None
         # Should fall through to math or return empty — not crash
         result = calc.search("10 km to mi")

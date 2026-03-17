@@ -168,14 +168,12 @@ class CalculatorSource:
 
         # pint — heavy, loaded in background thread
         self._ureg = None
-        self._ureg_ready = False
 
         def _init_pint() -> None:
             try:
                 import pint
 
                 self._ureg = pint.UnitRegistry(cache_folder=":auto:")
-                self._ureg_ready = True
                 logger.info("Pint UnitRegistry initialized")
             except Exception:
                 logger.exception("Failed to initialize pint")
@@ -203,7 +201,7 @@ class CalculatorSource:
             return [item]
 
         # 2. Try math expression
-        item = self._try_math_item(expr, q)
+        item = self._try_math_item(expr)
         if item is not None:
             return [item]
 
@@ -224,7 +222,7 @@ class CalculatorSource:
     # -- unit conversion -----------------------------------------------------
 
     def _try_conversion_item(self, expr: str) -> ChooserItem | None:
-        if not self._ureg_ready:
+        if self._ureg is None:
             return None
 
         m = _CONVERSION_RE.match(expr)
@@ -260,7 +258,7 @@ class CalculatorSource:
 
     # -- math expression -----------------------------------------------------
 
-    def _try_math_item(self, expr: str, original_query: str) -> ChooserItem | None:
+    def _try_math_item(self, expr: str) -> ChooserItem | None:
         if not _looks_like_math(expr):
             return None
         if not _is_complete(expr):
