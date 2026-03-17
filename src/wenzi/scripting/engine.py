@@ -29,6 +29,7 @@ class ScriptEngine:
         self._registry = ScriptingRegistry()
         self._clipboard_monitor = None
         self._usage_tracker = None
+        self._query_history = None
         self._snippet_store = None
         self._snippet_expander = None
         self._reloading = False
@@ -65,6 +66,8 @@ class ScriptEngine:
         if self._snippet_expander is not None:
             self._snippet_expander.stop()
             self._snippet_expander = None
+        if self._query_history is not None:
+            self._query_history.flush_sync()
         self._wz.pasteboard._set_monitor(None)
         self._wz.snippets._set_store(None)
         self._wz.store.flush_sync()
@@ -130,6 +133,7 @@ class ScriptEngine:
 
         self._snippet_store = None
         self._usage_tracker = None
+        self._query_history = None
         self._wz.pasteboard._set_monitor(None)
         self._wz.snippets._set_store(None)
 
@@ -137,6 +141,7 @@ class ScriptEngine:
         panel = self._wz.chooser._get_panel()
         panel._sources.clear()
         panel._usage_tracker = None
+        panel._query_history = None
 
         logger.info("Chooser disabled at runtime")
 
@@ -357,6 +362,17 @@ class ScriptEngine:
                 logger.info("Usage learning tracker enabled")
             except Exception:
                 logger.exception("Failed to set up usage tracker")
+
+        # Query history
+        try:
+            from wenzi.scripting.sources.query_history import QueryHistory
+
+            self._query_history = QueryHistory()
+            panel = self._wz.chooser._get_panel()
+            panel._query_history = self._query_history
+            logger.info("Query history enabled")
+        except Exception:
+            logger.exception("Failed to set up query history")
 
         prefixes = chooser_config.get("prefixes", {})
 

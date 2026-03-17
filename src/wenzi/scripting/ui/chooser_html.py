@@ -250,6 +250,8 @@ var activeModifier = null;  // "alt", "ctrl", "shift" or null
 var qlPreviewOpen = false;  // Shift-toggle Quick Look preview
 var _shiftAlone = false;    // true when Shift pressed without other keys
 var _shiftDownTime = 0;
+var inHistoryMode = false;
+var _settingHistoryValue = false;
 
 // --- Virtual scrolling ---
 var ITEM_HEIGHT = 0;  // measured from first rendered row
@@ -504,6 +506,11 @@ function updateSelection(newIndex) {
 // --- Input handling (with debounce for longer queries) ---
 var _debounceTimer = null;
 searchInput.addEventListener('input', function() {
+    if (_settingHistoryValue) return;
+    if (inHistoryMode) {
+        inHistoryMode = false;
+        post('exitHistory');
+    }
     var query = searchInput.value;
     if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
     // Short queries (<=3 chars): search immediately (prefix activation like "f ")
@@ -530,16 +537,25 @@ document.addEventListener('keydown', function(e) {
     }
     if (e.key === 'ArrowDown') {
         e.preventDefault();
-        updateSelection(selectedIndex + 1);
+        if (inHistoryMode) {
+            post('historyDown');
+        } else {
+            updateSelection(selectedIndex + 1);
+        }
         return;
     }
     if (e.key === 'ArrowUp') {
         e.preventDefault();
-        updateSelection(selectedIndex - 1);
+        if (inHistoryMode || (searchInput.value === '' && items.length === 0)) {
+            post('historyUp');
+        } else {
+            updateSelection(selectedIndex - 1);
+        }
         return;
     }
     if (e.key === 'Enter') {
         e.preventDefault();
+        inHistoryMode = false;
         if (selectedIndex >= 0 && selectedIndex < items.length) {
             if (e.metaKey) {
                 post('reveal', {
@@ -716,6 +732,7 @@ function focusInput() {
 
 function clearInput() {
     searchInput.value = '';
+    inHistoryMode = false;
     items = [];
     selectedIndex = -1;
     renderItems();
@@ -725,6 +742,19 @@ function setInputValue(value) {
     searchInput.value = value;
     searchInput.setSelectionRange(value.length, value.length);
     post('search', { query: value });
+}
+
+function setHistoryQuery(value) {
+    _settingHistoryValue = true;
+    searchInput.value = value;
+    searchInput.setSelectionRange(value.length, value.length);
+    _settingHistoryValue = false;
+    inHistoryMode = true;
+    post('search', { query: value });
+}
+
+function exitHistoryMode() {
+    inHistoryMode = false;
 }
 
 // --- Action hints (dynamic per source) ---

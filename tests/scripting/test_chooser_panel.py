@@ -8,6 +8,7 @@ import json
 from unittest.mock import MagicMock, patch
 
 from wenzi.scripting.sources import ChooserItem, ChooserSource, ModifierAction
+from wenzi.scripting.sources.query_history import QueryHistory
 from wenzi.scripting.sources.usage_tracker import UsageTracker
 from wenzi.scripting.ui.chooser_panel import ChooserPanel
 
@@ -851,3 +852,154 @@ class TestModifierActions:
             panel._execute_item(0)
         time.sleep(0.3)
         assert called == ["default"]
+
+
+class TestQueryHistory:
+    def test_historyUp_enters_history_mode(self, tmp_path):
+        path = str(tmp_path / "history.json")
+        qh = QueryHistory(path=path)
+        qh.record("safari")
+        qh.record("chrome")
+
+        panel = _make_panel()
+        panel._query_history = qh
+        panel._handle_js_message({"type": "historyUp"})
+
+        # Should call setHistoryQuery with newest entry
+        call_args = panel._eval_js.call_args[0][0]
+        assert "setHistoryQuery" in call_args
+        assert "chrome" in call_args
+        assert panel._history_index == 0
+
+    def test_historyUp_navigates_older(self, tmp_path):
+        path = str(tmp_path / "history.json")
+        qh = QueryHistory(path=path)
+        qh.record("alpha")
+        qh.record("beta")
+        qh.record("gamma")
+
+        panel = _make_panel()
+        panel._query_history = qh
+
+        panel._handle_js_message({"type": "historyUp"})
+        assert panel._history_index == 0
+        call_args = panel._eval_js.call_args[0][0]
+        assert "gamma" in call_args
+
+        panel._handle_js_message({"type": "historyUp"})
+        assert panel._history_index == 1
+        call_args = panel._eval_js.call_args[0][0]
+        assert "beta" in call_args
+
+        panel._handle_js_message({"type": "historyUp"})
+        assert panel._history_index == 2
+        call_args = panel._eval_js.call_args[0][0]
+        assert "alpha" in call_args
+
+    def test_historyUp_noop_at_oldest(self, tmp_path):
+        path = str(tmp_path / "history.json")
+        qh = QueryHistory(path=path)
+        qh.record("only")
+
+        panel = _make_panel()
+        panel._query_history = qh
+        panel._handle_js_message({"type": "historyUp"})
+        assert panel._history_index == 0
+
+        # Second press should stay at 0
+        panel._eval_js.reset_mock()
+        panel._handle_js_message({"type": "historyUp"})
+        assert panel._history_index == 0
+        # No new JS call since we're already at oldest
+        panel._eval_js.assert_not_called()
+
+    def test_historyDown_exits_at_newest(self, tmp_path):
+        path = str(tmp_path / "history.json")
+        qh = QueryHistory(path=path)
+        qh.record("alpha")
+        qh.record("beta")
+
+        panel = _make_panel()
+        panel._query_history = qh
+
+        # Navigate to second entry
+        panel._handle_js_message({"type": "historyUp"})
+        panel._handle_js_message({"type": "historyUp"})
+        assert panel._history_index == 1
+
+        # Down once → back to newest
+        panel._handle_js_message({"type": "historyDown"})
+        assert panel._history_index == 0
+
+        # Down again → exit history mode
+        panel._handle_js_message({"type": "historyDown"})
+        assert panel._history_index == -1
+        call_args = panel._eval_js.call_args[0][0]
+        assert "clearInput" in call_args
+        assert "exitHistoryMode" in call_args
+
+    def test_execute_records_query_history(self, tmp_path):
+        path = str(tmp_path / "history.json")
+        qh = QueryHistory(path=path)
+
+        panel = _make_panel()
+        panel._query_history = qh
+        panel._last_query = "safari"
+        panel._current_items = [
+            ChooserItem(title="Safari", action=lambda: None),
+        ]
+        panel.close = MagicMock()
+        with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn, *a, **kw: fn(*a, **kw)):
+            panel._execute_item(0)
+
+        assert qh.entries() == ["safari"]
+
+    def test_execute_does_not_record_empty_query(self, tmp_path):
+        path = str(tmp_path / "history.json")
+        qh = QueryHistory(path=path)
+
+        panel = _make_panel()
+        panel._query_history = qh
+        panel._last_query = ""
+        panel._current_items = [
+            ChooserItem(title="Item", action=lambda: None),
+        ]
+        panel.close = MagicMock()
+        with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn, *a, **kw: fn(*a, **kw)):
+            panel._execute_item(0)
+
+        assert qh.entries() == []
+
+    def test_exitHistory_resets_index(self):
+        panel = _make_panel()
+        panel._history_index = 3
+        panel._handle_js_message({"type": "exitHistory"})
+        assert panel._history_index == -1
+
+    def test_close_resets_history_index(self):
+        panel = _make_panel()
+        panel._history_index = 5
+        with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn, *a, **kw: fn(*a, **kw)), \
+             patch("wenzi.scripting.ui.chooser_panel.reactivate_app"), \
+             patch("wenzi.scripting.ui.chooser_panel.restore_accessory"):
+            panel.close()
+        assert panel._history_index == -1
+
+    def test_history_navigation_without_history(self):
+        """historyUp/Down with query_history=None should not crash."""
+        panel = _make_panel()
+        panel._query_history = None
+        panel._handle_js_message({"type": "historyUp"})
+        panel._handle_js_message({"type": "historyDown"})
+        # No crash, no JS calls for history
+        # _eval_js may or may not be called, just ensure no exception
+
+    def test_historyUp_with_empty_history(self, tmp_path):
+        """historyUp with no recorded queries should be a no-op."""
+        path = str(tmp_path / "history.json")
+        qh = QueryHistory(path=path)
+
+        panel = _make_panel()
+        panel._query_history = qh
+        panel._handle_js_message({"type": "historyUp"})
+        assert panel._history_index == -1

@@ -173,6 +173,8 @@ class ChooserPanel:
         self._last_query: str = ""  # Track query for usage recording
 
         self._usage_tracker = usage_tracker
+        self._query_history = None
+        self._history_index: int = -1
         self._on_close: Optional[Callable] = None
         self._pending_initial_query: Optional[str] = None
         self._pending_placeholder: Optional[str] = None
@@ -325,6 +327,7 @@ class ChooserPanel:
         self._page_loaded = False
         self._pending_js = []
         self._current_items = []
+        self._history_index = -1
         self._closing = False
 
         # Reactivate the previous app's focused window, then restore accessory mode.
@@ -538,6 +541,15 @@ class ChooserPanel:
             modifier = body.get("modifier")
             self._send_modifier_subtitle(index, modifier)
 
+        elif msg_type == "historyUp":
+            self._history_navigate(1)
+
+        elif msg_type == "historyDown":
+            self._history_navigate(-1)
+
+        elif msg_type == "exitHistory":
+            self._history_index = -1
+
         elif msg_type == "shiftPreview":
             is_open = body.get("open", False)
             index = body.get("index", -1)
@@ -546,6 +558,28 @@ class ChooserPanel:
         elif msg_type == "qlNavigate":
             index = body.get("index", -1)
             self._update_quicklook(index)
+
+    def _history_navigate(self, direction: int) -> None:
+        """Navigate query history. direction=1 means older, -1 means newer."""
+        if self._query_history is None:
+            return
+        history = self._query_history.entries()  # newest-first
+        if not history:
+            return
+
+        new_index = self._history_index + direction
+        if new_index < 0:
+            # Already at newest or before history — exit history mode
+            self._history_index = -1
+            self._eval_js("clearInput();exitHistoryMode()")
+            return
+        if new_index >= len(history):
+            # At the oldest entry — do nothing
+            return
+
+        self._history_index = new_index
+        query = history[new_index]
+        self._eval_js(f"setHistoryQuery({json.dumps(query)})")
 
     def _delete_item(self, index: int, version: int = 0) -> None:
         """Delete an item and refresh the list, preserving selection position."""
@@ -589,6 +623,10 @@ class ChooserPanel:
             # Record usage for learning
             if self._usage_tracker and item.item_id:
                 self._usage_tracker.record(self._last_query, item.item_id)
+
+            # Record query history
+            if self._query_history and self._last_query and self._last_query.strip():
+                self._query_history.record(self._last_query)
 
             self._fire_event("select", {
                 "title": item.title,

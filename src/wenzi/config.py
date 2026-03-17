@@ -35,6 +35,7 @@ DEFAULT_SNIPPETS_DIR = os.path.join(DEFAULT_CONFIG_DIR, "snippets")
 DEFAULT_CLIPBOARD_HISTORY_PATH = os.path.join(DEFAULT_DATA_DIR, "clipboard_history.json")
 DEFAULT_CLIPBOARD_IMAGES_DIR = os.path.join(DEFAULT_DATA_DIR, "clipboard_images")
 DEFAULT_CHOOSER_USAGE_PATH = os.path.join(DEFAULT_DATA_DIR, "chooser_usage.json")
+DEFAULT_CHOOSER_HISTORY_PATH = os.path.join(DEFAULT_DATA_DIR, "chooser_history.json")
 DEFAULT_SCRIPT_DATA_PATH = os.path.join(DEFAULT_DATA_DIR, "script_data.json")
 
 # Cache files (can be safely deleted and regenerated)
