@@ -219,6 +219,55 @@ class TestCommandSourceUnregister:
         assert len(src._commands) == 0
 
 
+class TestCommandSourcePromoted:
+    def test_promoted_search_returns_only_promoted(self):
+        src = CommandSource()
+        src.register(CommandEntry(name="reload", title="Reload", promoted=True))
+        src.register(CommandEntry(name="debug", title="Debug Log", promoted=False))
+        items = src.promoted_search("re")
+        assert len(items) == 1
+        assert items[0].title == "Reload"
+
+    def test_promoted_search_empty_query_returns_nothing(self):
+        src = CommandSource()
+        src.register(CommandEntry(name="reload", title="Reload", promoted=True))
+        items = src.promoted_search("")
+        assert items == []
+
+    def test_promoted_search_no_promoted_commands(self):
+        src = CommandSource()
+        src.register(CommandEntry(name="debug", title="Debug Log"))
+        items = src.promoted_search("debug")
+        assert items == []
+
+    def test_promoted_search_no_args_mode(self):
+        """Promoted search does not support args mode — space is part of query."""
+        src = CommandSource()
+        src.register(CommandEntry(name="reload", title="Reload", promoted=True))
+        # "reload foo" as a whole fuzzy-matches nothing (not exact+args)
+        items = src.promoted_search("reload foo")
+        assert items == []
+
+    def test_promoted_command_also_in_prefixed_search(self):
+        src = CommandSource()
+        src.register(CommandEntry(name="reload", title="Reload", promoted=True))
+        # Promoted commands still appear in the prefixed (>) search
+        items = src.search("reload")
+        assert len(items) == 1
+        assert items[0].title == "Reload"
+
+    def test_promoted_action_receives_empty_args(self):
+        received = []
+        src = CommandSource()
+        src.register(CommandEntry(
+            name="reload", title="Reload", promoted=True,
+            action=lambda args: received.append(args),
+        ))
+        items = src.promoted_search("reload")
+        items[0].action()
+        assert received == [""]
+
+
 class TestCommandSourceAsChooserSource:
     def test_returns_chooser_source(self):
         src = CommandSource()
@@ -229,3 +278,12 @@ class TestCommandSourceAsChooserSource:
         assert cs.complete is not None
         assert cs.action_hints["enter"] == "Run"
         assert cs.action_hints["tab"] == "Complete"
+
+    def test_returns_promoted_chooser_source(self):
+        src = CommandSource()
+        cs = src.as_promoted_chooser_source()
+        assert cs.name == "commands-promoted"
+        assert cs.prefix is None
+        assert cs.search is not None
+        assert cs.complete is None
+        assert cs.priority == 6

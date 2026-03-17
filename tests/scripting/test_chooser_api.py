@@ -438,8 +438,11 @@ class TestChooserAPICommands:
         api = ChooserAPI()
         api._ensure_command_source()
         assert "commands" in api.panel._sources
+        assert "commands-promoted" in api.panel._sources
         src = api.panel._sources["commands"]
         assert src.prefix == ">"
+        promoted_src = api.panel._sources["commands-promoted"]
+        assert promoted_src.prefix is None
 
     def test_ensure_command_source_after_clear(self):
         api = ChooserAPI()
@@ -447,3 +450,33 @@ class TestChooserAPICommands:
         assert "commands" not in api.panel._sources
         api._ensure_command_source()
         assert "commands" in api.panel._sources
+        assert "commands-promoted" in api.panel._sources
+
+    def test_promoted_command(self):
+        api = ChooserAPI()
+        api._ensure_command_source()
+        called = []
+
+        @api.command("reload", title="Reload Scripts", promoted=True)
+        def reload(args):
+            called.append(args)
+
+        entry = api._command_source._commands["reload"]
+        assert entry.promoted is True
+
+        # Should appear in promoted (unprefixed) source
+        promoted_src = api.panel._sources["commands-promoted"]
+        items = promoted_src.search("reload")
+        assert len(items) == 1
+        assert items[0].title == "Reload Scripts"
+
+    def test_non_promoted_command_not_in_main_search(self):
+        api = ChooserAPI()
+        api._ensure_command_source()
+        api.register_command(
+            name="debug-log", title="Debug Log",
+            action=lambda args: None,
+        )
+        promoted_src = api.panel._sources["commands-promoted"]
+        items = promoted_src.search("debug")
+        assert items == []

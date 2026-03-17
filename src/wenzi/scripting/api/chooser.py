@@ -74,6 +74,10 @@ class ChooserAPI:
         """Re-register the command source if it was removed (e.g. by disable_chooser)."""
         if "commands" not in self._panel._sources:
             self._panel.register_source(self._command_source.as_chooser_source())
+        if "commands-promoted" not in self._panel._sources:
+            self._panel.register_source(
+                self._command_source.as_promoted_chooser_source(),
+            )
 
     def register_source(self, source: ChooserSource) -> None:
         """Register a data source."""
@@ -267,6 +271,7 @@ class ChooserAPI:
         subtitle: str = "",
         icon: str = "",
         modifiers: Optional[Dict] = None,
+        promoted: bool = False,
     ) -> None:
         """Register a named command in the command palette (``>`` prefix).
 
@@ -278,6 +283,7 @@ class ChooserAPI:
             icon: Optional icon (``file://`` URL or ``data:`` URI).
             modifiers: Optional modifier actions, e.g.
                 ``{"alt": {"subtitle": "Force", "action": callable}}``.
+            promoted: If ``True``, also appear in the unprefixed main search.
         """
         entry = CommandEntry(
             name=name,
@@ -286,6 +292,7 @@ class ChooserAPI:
             icon=icon,
             action=action,
             modifiers=_parse_modifiers(modifiers),
+            promoted=promoted,
         )
         self._command_source.register(entry)
 
@@ -300,6 +307,7 @@ class ChooserAPI:
         subtitle: str = "",
         icon: str = "",
         modifiers: Optional[Dict] = None,
+        promoted: bool = False,
     ) -> Callable:
         """Decorator to register a function as a chooser command.
 
@@ -309,6 +317,12 @@ class ChooserAPI:
             def greet(args):
                 name = args.strip() or "World"
                 wz.notify.show(f"Hello, {name}!")
+
+        Set ``promoted=True`` to also show in the unprefixed main search::
+
+            @wz.chooser.command("reload", title="Reload Scripts", promoted=True)
+            def reload(args):
+                wz.reload()
         """
 
         def decorator(func: Callable[[str], None]) -> Callable:
@@ -319,6 +333,7 @@ class ChooserAPI:
                 subtitle=subtitle,
                 icon=icon,
                 modifiers=modifiers,
+                promoted=promoted,
             )
             return func
 

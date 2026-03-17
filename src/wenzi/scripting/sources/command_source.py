@@ -42,6 +42,7 @@ class CommandEntry:
     modifiers: Optional[Dict[str, ModifierAction]] = field(
         default=None, repr=False,
     )
+    promoted: bool = False  # Also appear in unprefixed main search
 
 
 class CommandSource:
@@ -128,6 +129,30 @@ class CommandSource:
             return cmd_name + " "
         return None
 
+    # ── Promoted (unprefixed) search ─────────────────────────────
+
+    def promoted_search(self, query: str) -> List[ChooserItem]:
+        """Search only promoted commands (no args mode, no prefix needed)."""
+        promoted = [c for c in self._commands.values() if c.promoted]
+        if not promoted:
+            return []
+
+        if not query.strip():
+            return []
+
+        scored: List[tuple] = []
+        for cmd in promoted:
+            matched, score = fuzzy_match(query, cmd.title)
+            if not matched:
+                m2, s2 = fuzzy_match(query, cmd.name)
+                if m2:
+                    matched, score = True, s2
+            if matched:
+                scored.append((-score, cmd.name, cmd))
+
+        scored.sort()
+        return [self._make_item(cmd, "") for _, _, cmd in scored]
+
     # ── ChooserSource factory ─────────────────────────────────────
 
     def as_chooser_source(self) -> ChooserSource:
@@ -141,6 +166,18 @@ class CommandSource:
             action_hints={
                 "enter": "Run",
                 "tab": "Complete",
+            },
+        )
+
+    def as_promoted_chooser_source(self) -> ChooserSource:
+        """Return an unprefixed :class:`ChooserSource` for promoted commands."""
+        return ChooserSource(
+            name="commands-promoted",
+            prefix=None,
+            search=self.promoted_search,
+            priority=6,
+            action_hints={
+                "enter": "Run",
             },
         )
 
