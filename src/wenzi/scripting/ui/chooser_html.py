@@ -247,6 +247,9 @@ var _PLACEHOLDER_SVG = "data:image/svg+xml,"
     + "%3C/svg%3E";
 var prefixHints = [];
 var activeModifier = null;  // "alt", "ctrl", "shift" or null
+var qlPreviewOpen = false;  // Shift-toggle Quick Look preview
+var _shiftAlone = false;    // true when Shift pressed without other keys
+var _shiftDownTime = 0;
 
 // --- Virtual scrolling ---
 var ITEM_HEIGHT = 0;  // measured from first rendered row
@@ -493,6 +496,9 @@ function updateSelection(newIndex) {
     }
     _renderVisibleRows();
     updatePreview();
+    if (qlPreviewOpen) {
+        post('qlNavigate', { index: selectedIndex });
+    }
 }
 
 // --- Input handling (with debounce for longer queries) ---
@@ -515,6 +521,10 @@ searchInput.addEventListener('input', function() {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         e.preventDefault();
+        if (qlPreviewOpen) {
+            qlPreviewOpen = false;
+            post('shiftPreview', { open: false, index: selectedIndex });
+        }
         post('close');
         return;
     }
@@ -579,6 +589,14 @@ function getModifierName(e) {
 }
 
 document.addEventListener('keydown', function(e) {
+    // Track Shift-alone for Quick Look toggle
+    if (e.key === 'Shift' && !e.metaKey && !e.altKey && !e.ctrlKey) {
+        _shiftAlone = true;
+        _shiftDownTime = Date.now();
+    } else if (e.key !== 'Shift') {
+        _shiftAlone = false;
+    }
+
     if (e.key === 'Alt' || e.key === 'Control' || e.key === 'Shift') {
         var mod = getModifierName(e);
         if (mod !== activeModifier) {
@@ -593,6 +611,15 @@ document.addEventListener('keydown', function(e) {
 }, true);
 
 document.addEventListener('keyup', function(e) {
+    // Shift-alone tap toggles Quick Look preview
+    if (e.key === 'Shift' && _shiftAlone
+            && (Date.now() - _shiftDownTime < 400)) {
+        _shiftAlone = false;
+        qlPreviewOpen = !qlPreviewOpen;
+        post('shiftPreview', { open: qlPreviewOpen, index: selectedIndex });
+    }
+    _shiftAlone = false;
+
     if (e.key === 'Alt' || e.key === 'Control' || e.key === 'Shift') {
         if (activeModifier !== null) {
             activeModifier = null;
@@ -711,6 +738,9 @@ function setActionHints(hints) {
     }
     if (hints['delete']) {
         parts.push('<kbd>\u2318\u232b</kbd> ' + hints['delete']);
+    }
+    if (hints.shift) {
+        parts.push('<kbd>\u21e7</kbd> ' + hints.shift);
     }
     parts.push('<kbd>Esc</kbd> Close');
     footerLeft.innerHTML = parts.join('  ');

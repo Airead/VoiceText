@@ -613,6 +613,151 @@ class TestInitialQuery:
         assert len(panel._current_items) == 2
 
 
+class TestQuickLookIntegration:
+    def test_shift_preview_open(self):
+        """shiftPreview open should create and show QL panel."""
+        panel = _make_panel()
+        panel._current_items = [
+            ChooserItem(title="test.pdf", reveal_path="/tmp/test.pdf"),
+        ]
+        with patch("os.path.exists", return_value=True), \
+             patch(
+                 "wenzi.scripting.ui.quicklook_panel.QuickLookPanel",
+             ) as MockQL:
+            mock_ql = MagicMock()
+            MockQL.return_value = mock_ql
+            panel._handle_js_message({
+                "type": "shiftPreview", "open": True, "index": 0,
+            })
+            MockQL.assert_called_once_with(
+                on_resign_key=panel._maybe_close,
+            )
+            mock_ql.show.assert_called_once_with(
+                "/tmp/test.pdf", anchor_panel=panel._panel,
+            )
+
+    def test_shift_preview_close(self):
+        """shiftPreview close should close QL panel."""
+        panel = _make_panel()
+        panel._ql_panel = MagicMock()
+        panel._handle_js_message({
+            "type": "shiftPreview", "open": False, "index": 0,
+        })
+        panel._ql_panel.close.assert_called_once()
+
+    def test_ql_navigate_updates_preview(self):
+        """qlNavigate should update the QL panel."""
+        panel = _make_panel()
+        panel._ql_panel = MagicMock()
+        panel._ql_panel.is_visible = True
+        panel._current_items = [
+            ChooserItem(title="a.pdf", reveal_path="/tmp/a.pdf"),
+            ChooserItem(title="b.pdf", reveal_path="/tmp/b.pdf"),
+        ]
+        with patch("os.path.exists", return_value=True):
+            panel._handle_js_message({"type": "qlNavigate", "index": 1})
+        panel._ql_panel.update.assert_called_once_with("/tmp/b.pdf")
+
+    def test_ql_navigate_when_not_visible_is_noop(self):
+        """qlNavigate without visible QL panel should be a no-op."""
+        panel = _make_panel()
+        panel._ql_panel = MagicMock()
+        panel._ql_panel.is_visible = False
+        panel._current_items = [
+            ChooserItem(title="a", reveal_path="/tmp/a"),
+        ]
+        panel._handle_js_message({"type": "qlNavigate", "index": 0})
+        panel._ql_panel.update.assert_not_called()
+
+    def test_ql_navigate_when_no_ql_panel_is_noop(self):
+        """qlNavigate without QL panel should be a no-op."""
+        panel = _make_panel()
+        panel._current_items = [
+            ChooserItem(title="a", reveal_path="/tmp/a"),
+        ]
+        panel._handle_js_message({"type": "qlNavigate", "index": 0})
+        # Should not raise
+
+    def test_shift_preview_no_reveal_path(self):
+        """Items without reveal_path should close QL."""
+        panel = _make_panel()
+        panel._ql_panel = MagicMock()
+        panel._current_items = [
+            ChooserItem(title="no path"),
+        ]
+        panel._handle_js_message({
+            "type": "shiftPreview", "open": True, "index": 0,
+        })
+        panel._ql_panel.close.assert_called_once()
+
+    def test_close_cleans_up_ql(self):
+        """close() should close QL panel."""
+        panel = _make_panel()
+        mock_ql = MagicMock()
+        panel._ql_panel = mock_ql
+        with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn: fn()), \
+             patch("wenzi.scripting.ui.chooser_panel.reactivate_app"), \
+             patch("wenzi.scripting.ui.chooser_panel.restore_accessory"):
+            panel.close()
+        mock_ql.close.assert_called_once()
+        assert panel._ql_panel is None
+
+    def test_maybe_close_keeps_open_when_ql_is_key(self):
+        """_maybe_close should not close when QL panel is the key window."""
+        panel = _make_panel()
+        mock_ql = MagicMock()
+        mock_ql._panel = MagicMock()
+        panel._ql_panel = mock_ql
+        panel._panel = MagicMock()
+        panel.close = MagicMock()
+
+        mock_nsapp = MagicMock()
+        mock_nsapp.keyWindow.return_value = mock_ql._panel
+
+        with patch("PyObjCTools.AppHelper.callLater") as mock_later:
+            panel._maybe_close()
+            # Extract and run the deferred _check callback
+            check_fn = mock_later.call_args[0][1]
+
+        with patch("AppKit.NSApp", mock_nsapp):
+            check_fn()
+        panel.close.assert_not_called()
+
+    def test_maybe_close_keeps_open_when_chooser_is_key(self):
+        """_maybe_close should not close when chooser panel is the key window."""
+        panel = _make_panel()
+        panel._panel = MagicMock()
+        panel.close = MagicMock()
+
+        mock_nsapp = MagicMock()
+        mock_nsapp.keyWindow.return_value = panel._panel
+
+        with patch("PyObjCTools.AppHelper.callLater") as mock_later:
+            panel._maybe_close()
+            check_fn = mock_later.call_args[0][1]
+
+        with patch("AppKit.NSApp", mock_nsapp):
+            check_fn()
+        panel.close.assert_not_called()
+
+    def test_maybe_close_closes_when_neither_panel_is_key(self):
+        """_maybe_close should close when neither panel is key."""
+        panel = _make_panel()
+        panel._panel = MagicMock()
+        panel.close = MagicMock()
+
+        mock_nsapp = MagicMock()
+        mock_nsapp.keyWindow.return_value = MagicMock()  # some other window
+
+        with patch("PyObjCTools.AppHelper.callLater") as mock_later:
+            panel._maybe_close()
+            check_fn = mock_later.call_args[0][1]
+
+        with patch("AppKit.NSApp", mock_nsapp):
+            check_fn()
+        panel.close.assert_called_once()
+
+
 class TestModifierActions:
     def test_modifier_subtitle_message(self):
         panel = _make_panel()

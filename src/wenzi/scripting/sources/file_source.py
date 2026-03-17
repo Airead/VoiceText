@@ -309,6 +309,7 @@ class FileSource:
             action_hints={
                 "enter": "Open",
                 "cmd_enter": "Reveal",
+                "shift": "Preview",
             },
         )
 
@@ -392,6 +393,7 @@ class FolderSource:
             action_hints={
                 "enter": "Open",
                 "cmd_enter": "Reveal",
+                "shift": "Preview",
             },
         )
 

@@ -119,7 +119,11 @@ _PanelDelegate = None
 
 
 def _get_panel_delegate_class():
-    """Return an NSObject subclass that closes the panel on focus loss."""
+    """Return an NSObject subclass that closes the panel on focus loss.
+
+    Uses a deferred check so the chooser stays open when the user clicks
+    on the Quick Look preview panel (which becomes key window).
+    """
     global _PanelDelegate
     if _PanelDelegate is not None:
         return _PanelDelegate
@@ -131,7 +135,7 @@ def _get_panel_delegate_class():
 
         def windowDidResignKey_(self, notification):
             if self._panel_ref is not None:
-                self._panel_ref.close()
+                self._panel_ref._maybe_close()
 
     _PanelDelegate = ChooserPanelDelegate
     return _PanelDelegate
@@ -174,6 +178,7 @@ class ChooserPanel:
         self._pending_placeholder: Optional[str] = None
         self._event_callback: Optional[Callable] = None  # (event, *args)
         self._previous_app = None  # NSRunningApplication saved on show()
+        self._ql_panel = None  # Quick Look preview panel
 
     # ------------------------------------------------------------------
     # Source management
@@ -199,6 +204,41 @@ class ChooserPanel:
                 self._event_callback(event, *args)
             except Exception:
                 logger.exception("Panel event callback error (%s)", event)
+
+    def _maybe_close(self) -> None:
+        """Close unless one of our panels (chooser or QL) is still key.
+
+        Called on a deferred schedule after either the chooser or the QL
+        panel loses key-window status.  Gives macOS time to assign the
+        new key window before we check.
+        """
+        if self._closing:
+            return
+
+        def _check():
+            if self._closing or self._panel is None:
+                return
+            try:
+                from AppKit import NSApp
+
+                key = NSApp.keyWindow()
+                # Chooser panel regained key — do nothing
+                if key is not None and key == self._panel:
+                    return
+                # QL panel is now key — user is interacting with preview
+                if (
+                    self._ql_panel is not None
+                    and self._ql_panel._panel is not None
+                    and key == self._ql_panel._panel
+                ):
+                    return
+            except Exception:
+                pass
+            self.close()
+
+        from PyObjCTools import AppHelper
+
+        AppHelper.callLater(0.1, _check)
 
     # ------------------------------------------------------------------
     # Public API
@@ -255,6 +295,10 @@ class ChooserPanel:
         if self._closing:
             return
         self._closing = True
+
+        if self._ql_panel is not None:
+            self._ql_panel.close()
+            self._ql_panel = None
 
         if self._webview is not None:
             self._webview.setNavigationDelegate_(None)
@@ -495,6 +539,15 @@ class ChooserPanel:
             modifier = body.get("modifier")
             self._send_modifier_subtitle(index, modifier)
 
+        elif msg_type == "shiftPreview":
+            is_open = body.get("open", False)
+            index = body.get("index", -1)
+            self._toggle_quicklook(is_open, index)
+
+        elif msg_type == "qlNavigate":
+            index = body.get("index", -1)
+            self._update_quicklook(index)
+
     def _delete_item(self, index: int, version: int = 0) -> None:
         """Delete an item and refresh the list, preserving selection position."""
         if version and version != self._items_version:
@@ -576,6 +629,35 @@ class ChooserPanel:
             )
         else:
             self._eval_js(f"setModifierSubtitle({index},null)")
+
+    def _toggle_quicklook(self, is_open: bool, index: int) -> None:
+        """Toggle Quick Look preview for the selected item."""
+        if is_open:
+            if 0 <= index < len(self._current_items):
+                item = self._current_items[index]
+                path = item.reveal_path
+                if path and os.path.exists(path):
+                    if self._ql_panel is None:
+                        from wenzi.scripting.ui.quicklook_panel import QuickLookPanel
+
+                        self._ql_panel = QuickLookPanel(
+                            on_resign_key=self._maybe_close,
+                        )
+                    self._ql_panel.show(path, anchor_panel=self._panel)
+                    return
+        # Close
+        if self._ql_panel is not None:
+            self._ql_panel.close()
+
+    def _update_quicklook(self, index: int) -> None:
+        """Update Quick Look preview when navigating with ↑↓."""
+        if self._ql_panel is None or not self._ql_panel.is_visible:
+            return
+        if 0 <= index < len(self._current_items):
+            item = self._current_items[index]
+            path = item.reveal_path
+            if path and os.path.exists(path):
+                self._ql_panel.update(path)
 
     def _reveal_item(self, index: int, version: int = 0) -> None:
         """Execute the secondary action (Cmd+Enter).
