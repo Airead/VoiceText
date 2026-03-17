@@ -303,6 +303,10 @@ Output only the processed text without any explanation."""
                 on_batch_done=lambda i, t, c: progress_panel.update_status(
                     f"Batch {i}/{t} done — {c} entries found"
                 ),
+                on_batch_retry=lambda i, t: (
+                    progress_panel.clear_stream_text(),
+                    progress_panel.update_status(f"Batch {i}/{t} — retrying..."),
+                ),
                 on_usage_update=lambda p, c, t: progress_panel.update_token_usage(p, c, t),
             )
 

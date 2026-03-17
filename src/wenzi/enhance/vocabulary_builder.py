@@ -25,6 +25,7 @@ class BuildCallbacks:
     on_batch_start: Optional[Callable[[int, int], None]] = None  # (batch_idx, total)
     on_stream_chunk: Optional[Callable[[str], None]] = None  # (chunk_text)
     on_batch_done: Optional[Callable[[int, int, int], None]] = None  # (batch_idx, total, entries_count)
+    on_batch_retry: Optional[Callable[[int, int], None]] = None  # (batch_idx, total)
     on_usage_update: Optional[Callable[[int, int, int], None]] = None  # (prompt, completion, total)
 
 
@@ -78,7 +79,12 @@ class VocabularyBuilder:
         logger.info("Processing %d records in %d batches", len(records), len(batches))
         all_new_entries: List[Dict[str, Any]] = []
         total_usage: Dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        merged_entries = list(existing.get("entries", []))
+        records_processed = 0
         cancelled = False
+        aborted = False
+
+        provider_cfg = self._get_provider_config()
 
         for i, batch in enumerate(batches, 1):
             if cancel_event is not None and cancel_event.is_set():
@@ -86,65 +92,108 @@ class VocabularyBuilder:
                 cancelled = True
                 break
 
-            try:
-                if callbacks and callbacks.on_batch_start:
-                    callbacks.on_batch_start(i, len(batches))
+            # Try extraction with one retry on failure
+            extracted = None
+            batch_usage: Dict[str, int] = {}
+            for attempt in range(2):
+                try:
+                    if attempt == 0:
+                        if callbacks and callbacks.on_batch_start:
+                            callbacks.on_batch_start(i, len(batches))
+                    else:
+                        if cancel_event is not None and cancel_event.is_set():
+                            logger.info("Build cancelled before retry of batch %d/%d", i, len(batches))
+                            break
+                        logger.info("Retrying batch %d/%d...", i, len(batches))
+                        if callbacks and callbacks.on_batch_retry:
+                            callbacks.on_batch_retry(i, len(batches))
 
-                logger.info("Extracting batch %d/%d (%d records)...", i, len(batches), len(batch))
-                on_chunk = callbacks.on_stream_chunk if callbacks else None
-                extracted, usage = await self._extract_batch(batch, on_stream_chunk=on_chunk)
-                for key in total_usage:
-                    total_usage[key] += usage.get(key, 0)
-                if callbacks and callbacks.on_usage_update:
-                    callbacks.on_usage_update(
-                        total_usage["prompt_tokens"],
-                        total_usage["completion_tokens"],
-                        total_usage["total_tokens"],
+                    logger.info(
+                        "Extracting batch %d/%d (%d records, attempt %d)...",
+                        i, len(batches), len(batch), attempt + 1,
                     )
-                logger.info("Batch %d/%d: extracted %d entries", i, len(batches), len(extracted))
-                all_new_entries.extend(extracted)
+                    on_chunk = callbacks.on_stream_chunk if callbacks else None
+                    extracted, batch_usage = await self._extract_batch(
+                        batch, on_stream_chunk=on_chunk
+                    )
+                    break
+                except Exception as e:
+                    if attempt == 0:
+                        logger.warning(
+                            "Batch %d/%d failed (attempt 1), will retry: %s",
+                            i, len(batches), e,
+                        )
+                    else:
+                        logger.error(
+                            "Batch %d/%d failed after retry, aborting build: %s",
+                            i, len(batches), e,
+                        )
 
-                if callbacks and callbacks.on_batch_done:
-                    callbacks.on_batch_done(i, len(batches), len(extracted))
-            except Exception as e:
-                logger.warning("Failed to extract batch %d/%d: %s", i, len(batches), e)
+            if extracted is None:
+                if cancel_event is not None and cancel_event.is_set():
+                    cancelled = True
+                else:
+                    aborted = True
+                break
 
-        existing_entries = existing.get("entries", [])
-        merged = self._merge_entries(existing_entries, all_new_entries)
+            # Batch succeeded — accumulate results
+            for key in total_usage:
+                total_usage[key] += batch_usage.get(key, 0)
+            if callbacks and callbacks.on_usage_update:
+                callbacks.on_usage_update(
+                    total_usage["prompt_tokens"],
+                    total_usage["completion_tokens"],
+                    total_usage["total_tokens"],
+                )
+            logger.info("Batch %d/%d: extracted %d entries", i, len(batches), len(extracted))
+            all_new_entries.extend(extracted)
+            records_processed += len(batch)
 
-        # Determine the latest timestamp from processed records
-        last_ts = records[-1].get("timestamp", datetime.now(timezone.utc).isoformat())
+            if callbacks and callbacks.on_batch_done:
+                callbacks.on_batch_done(i, len(batches), len(extracted))
 
-        provider_cfg = self._get_provider_config()
-        vocabulary = {
-            "last_processed_timestamp": last_ts,
-            "built_at": datetime.now(timezone.utc).isoformat(),
-            "built_with": {
-                "provider": self._get_active_provider_name(),
-                "model": provider_cfg["model"] if provider_cfg else "N/A",
-                "usage": total_usage,
-            },
-            "entries": merged,
-        }
-        self._save_vocabulary(vocabulary)
+            # Persist progress after each successful batch
+            merged_entries = self._merge_entries(merged_entries, extracted)
+            batch_last_ts = batch[-1].get("timestamp", datetime.now(timezone.utc).isoformat())
+            vocabulary = {
+                "last_processed_timestamp": batch_last_ts,
+                "built_at": datetime.now(timezone.utc).isoformat(),
+                "built_with": {
+                    "provider": self._get_active_provider_name(),
+                    "model": provider_cfg["model"] if provider_cfg else "N/A",
+                    "usage": total_usage,
+                },
+                "entries": merged_entries,
+            }
+            self._save_vocabulary(vocabulary)
 
         summary: Dict[str, Any] = {
-            "new_records": len(records),
+            "new_records": records_processed,
             "new_entries": len(all_new_entries),
-            "total_entries": len(merged),
+            "total_entries": len(merged_entries),
             "usage": total_usage,
         }
         if cancelled:
             summary["cancelled"] = True
+        if aborted:
+            summary["aborted"] = True
+
+        status_parts = []
+        if cancelled:
+            status_parts.append("cancelled")
+        if aborted:
+            status_parts.append("aborted")
+        status_suffix = f" ({', '.join(status_parts)})" if status_parts else ""
 
         logger.info(
-            "Vocabulary built: %d new records, %d new entries, %d total entries, "
+            "Vocabulary built: %d/%d records, %d new entries, %d total entries, "
             "%d tokens used%s",
-            summary["new_records"],
+            records_processed,
+            len(records),
             summary["new_entries"],
             summary["total_entries"],
             total_usage["total_tokens"],
-            " (cancelled)" if cancelled else "",
+            status_suffix,
         )
         return summary
 

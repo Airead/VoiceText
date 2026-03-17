@@ -117,6 +117,7 @@ class AutoVocabBuilder:
 
             # Track extracted entry lines in real-time via stream chunks
             entry_count = 0
+            entry_count_before_batch = 0
             got_header = False
             existing_count = get_vocab_entry_count(
                 self._config_dir or ""
@@ -136,12 +137,19 @@ class AutoVocabBuilder:
                                 )
 
             def _on_batch_start(batch_idx: int, total: int) -> None:
-                nonlocal got_header
-                got_header = False  # reset header detection for each batch
+                nonlocal got_header, entry_count_before_batch
+                got_header = False
+                entry_count_before_batch = entry_count
+
+            def _on_batch_retry(batch_idx: int, total: int) -> None:
+                nonlocal entry_count, got_header
+                got_header = False
+                entry_count = entry_count_before_batch  # rollback partial count
 
             callbacks = BuildCallbacks(
                 on_batch_start=_on_batch_start,
-                on_stream_chunk=_on_stream_chunk,
+                on_stream_chunk=_on_stream_chunk if self._on_status_update else None,
+                on_batch_retry=_on_batch_retry,
             )
 
             loop = asyncio.new_event_loop()
