@@ -105,22 +105,11 @@ class PreviewController:
         user_corrected = bool(result_holder.get("user_corrected"))
 
         if chain_steps and len(chain_steps) > 1:
-            ts = None
-            for i, step in enumerate(chain_steps):
-                is_last = i == len(chain_steps) - 1
-                ts = app._conversation_history.log(
-                    asr_text=step["asr_text"],
-                    enhanced_text=step["enhanced_text"],
-                    # Last step: use user's final_text (may have corrections)
-                    final_text=final_text if is_last else step["enhanced_text"],
-                    enhance_mode=step["enhance_mode"],
-                    preview_enabled=True,
-                    stt_model=stt_model,
-                    llm_model=llm_model,
-                    user_corrected=user_corrected if is_last else False,
-                    audio_duration=audio_duration if is_last else 0.0,
-                )
-            return ts
+            # Chain modes only *read* from each step's per-mode history
+            # during execution — they do not *write* to any mode's history.
+            # The user cannot verify or correct intermediate step results,
+            # so logging them as confirmed history could mislead the LLM.
+            return None
         else:
             # Non-chain mode or single-step chain
             return app._conversation_history.log(

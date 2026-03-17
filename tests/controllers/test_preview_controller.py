@@ -290,11 +290,10 @@ class TestLogWithChainSteps:
         assert call_kwargs["final_text"] == "Hello."
 
     @patch("wenzi.controllers.preview_controller.save_config")
-    def test_chain_mode_logs_per_step(self, _mock_save, ctrl, mock_app):
-        """Chain mode with 2 steps logs each step under its own enhance_mode."""
+    def test_chain_mode_skips_logging(self, _mock_save, ctrl, mock_app):
+        """Chain mode with 2+ steps does not log to conversation history."""
         mock_app._current_stt_model.return_value = "funasr"
         mock_app._current_llm_model.return_value = "gpt-4o"
-        mock_app._conversation_history.log.side_effect = ["ts-001", "ts-002"]
 
         result_holder = {
             "enhanced_text": "Hello World",
@@ -317,30 +316,12 @@ class TestLogWithChainSteps:
             mock_app,
             result_holder=result_holder,
             asr_text="你好试解",
-            final_text="Hello World!",  # user corrected
+            final_text="Hello World!",
             audio_duration=2.5,
         )
 
-        assert ts == "ts-002"
-        assert mock_app._conversation_history.log.call_count == 2
-
-        # Step 0: proofread — intermediate, no user correction
-        step0 = mock_app._conversation_history.log.call_args_list[0].kwargs
-        assert step0["asr_text"] == "你好试解"
-        assert step0["enhanced_text"] == "你好世界"
-        assert step0["final_text"] == "你好世界"  # not user's final
-        assert step0["enhance_mode"] == "proofread"
-        assert step0["user_corrected"] is False
-        assert step0["audio_duration"] == 0.0
-
-        # Step 1: translate — last step, gets user's final_text
-        step1 = mock_app._conversation_history.log.call_args_list[1].kwargs
-        assert step1["asr_text"] == "你好世界"
-        assert step1["enhanced_text"] == "Hello World"
-        assert step1["final_text"] == "Hello World!"  # user corrected
-        assert step1["enhance_mode"] == "translate_en"
-        assert step1["user_corrected"] is True
-        assert step1["audio_duration"] == 2.5
+        assert ts is None
+        mock_app._conversation_history.log.assert_not_called()
 
     @patch("wenzi.controllers.preview_controller.save_config")
     def test_single_step_chain_logs_as_single(self, _mock_save, ctrl, mock_app):
