@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from wenzi.scripting.sources.file_source import (
     FileSource,
+    FolderSource,
     _file_type_label,
     _icon_png_path_for_ext,
     _icon_png_path_for_folder,
@@ -56,7 +57,17 @@ class TestMdfind:
             return_value=[],
         ) as mock_search:
             _mdfind("file", max_results=5)
-            mock_search.assert_called_once_with("file", 5)
+            mock_search.assert_called_once_with("file", 5, content_type=None)
+
+    def test_content_type_passed_through(self):
+        with patch(
+            "wenzi.scripting.sources.file_source.mdquery_search",
+            return_value=[],
+        ) as mock_search:
+            _mdfind("file", content_type="public.folder")
+            mock_search.assert_called_once_with(
+                "file", 30, content_type="public.folder",
+            )
 
 
 class TestFileSource:
@@ -80,6 +91,18 @@ class TestFileSource:
             assert items[0].title == "readme.md"
             assert items[0].reveal_path == "/Users/test/readme.md"
             assert items[0].action is not None
+
+    def test_search_excludes_folders(self, tmp_path):
+        """FileSource should pass content_type='!public.folder' to mdfind."""
+        with patch(
+            "wenzi.scripting.sources.file_source.mdquery_search",
+            return_value=[],
+        ) as mock_search:
+            source = self._make_source(tmp_path)
+            source.search("test")
+            mock_search.assert_called_once_with(
+                "test", 30, content_type="!public.folder",
+            )
 
     def test_nonexistent_paths_filtered(self, tmp_path):
         def exists_side_effect(path):
@@ -123,6 +146,79 @@ class TestFileSource:
             assert items[0].preview["content"] == "/Users/test/file.txt"
 
 
+class TestFolderSource:
+    def _make_source(self, tmp_path):
+        """Create a FolderSource with a temp icon cache dir."""
+        return FolderSource(icon_cache_dir=str(tmp_path / "icons"))
+
+    def test_empty_query_returns_empty(self, tmp_path):
+        source = self._make_source(tmp_path)
+        assert source.search("") == []
+
+    def test_search_only_folders(self, tmp_path):
+        """FolderSource should pass content_type='public.folder' to mdfind."""
+        with patch(
+            "wenzi.scripting.sources.file_source.mdquery_search",
+            return_value=[],
+        ) as mock_search:
+            source = self._make_source(tmp_path)
+            source.search("doc")
+            mock_search.assert_called_once_with(
+                "doc", 30, content_type="public.folder",
+            )
+
+    def test_search_returns_items(self, tmp_path):
+        with patch(
+            "wenzi.scripting.sources.file_source.mdquery_search",
+            return_value=["/Users/test/Documents"],
+        ), patch("os.path.exists", return_value=True):
+            source = self._make_source(tmp_path)
+            items = source.search("doc")
+            assert len(items) == 1
+            assert items[0].title == "Documents"
+            assert "Folder" in items[0].subtitle
+            assert items[0].reveal_path == "/Users/test/Documents"
+            assert items[0].item_id == "folder:/Users/test/Documents"
+
+    def test_as_chooser_source(self, tmp_path):
+        source = self._make_source(tmp_path)
+        cs = source.as_chooser_source()
+        assert cs.name == "folders"
+        assert cs.prefix == "fd"
+        assert cs.priority == 3
+
+    def test_folder_icon_cache_hit(self, tmp_path):
+        """Cached folder icon should return file:// URL."""
+        icon_dir = tmp_path / "icons"
+        icon_dir.mkdir()
+        folder_path = "/Users/test/Documents"
+        png_path = _icon_png_path_for_folder(str(icon_dir), folder_path)
+        with open(png_path, "wb") as f:
+            f.write(b"\x89PNGfake")
+
+        source = FolderSource(icon_cache_dir=str(icon_dir))
+        with patch(
+            "wenzi.scripting.sources.file_source.mdquery_search",
+            return_value=[folder_path],
+        ), patch("os.path.exists", return_value=True):
+            items = source.search("doc")
+
+        assert len(items) == 1
+        assert items[0].icon == "file://" + png_path
+
+    def test_folder_icon_cache_miss_returns_empty(self, tmp_path):
+        """Missing folder icon should return empty string."""
+        source = FolderSource(icon_cache_dir=str(tmp_path / "icons"))
+        with patch(
+            "wenzi.scripting.sources.file_source.mdquery_search",
+            return_value=["/Users/test/SomeFolder"],
+        ), patch("os.path.exists", return_value=True):
+            items = source.search("some")
+
+        assert len(items) == 1
+        assert items[0].icon == ""
+
+
 class TestFileIconCache:
     """Tests for file icon caching."""
 
@@ -159,27 +255,6 @@ class TestFileIconCache:
 
         assert len(items) == 1
         assert items[0].icon == ""
-
-    def test_folder_icon_cache_hit(self, tmp_path):
-        """Cached folder icon should return file:// URL."""
-        icon_dir = tmp_path / "icons"
-        icon_dir.mkdir()
-        folder_path = "/Users/test/Documents"
-        png_path = _icon_png_path_for_folder(str(icon_dir), folder_path)
-        with open(png_path, "wb") as f:
-            f.write(b"\x89PNGfake")
-
-        source = FileSource(icon_cache_dir=str(icon_dir))
-        with patch(
-            "wenzi.scripting.sources.file_source.mdquery_search",
-            return_value=[folder_path],
-        ), patch("os.path.exists", return_value=True), patch(
-            "os.path.isdir", return_value=True,
-        ):
-            items = source.search("doc")
-
-        assert len(items) == 1
-        assert items[0].icon == "file://" + png_path
 
     def test_app_icon_from_app_source_cache(self, tmp_path):
         """A .app file should reuse app_source's icon cache."""

@@ -137,9 +137,11 @@ def _extract_folder_icon(path: str, icon_cache_dir: str) -> None:
         logger.debug("Failed to extract folder icon for %s", path, exc_info=True)
 
 
-def _mdfind(query: str, max_results: int = _MAX_RESULTS) -> list[str]:
+def _mdfind(
+    query: str, max_results: int = _MAX_RESULTS, content_type: str | None = None,
+) -> list[str]:
     """Search files by name using MDQuery (Spotlight C API)."""
-    return mdquery_search(query, max_results)
+    return mdquery_search(query, max_results, content_type=content_type)
 
 
 def _open_file(path: str) -> None:
@@ -205,7 +207,6 @@ class FileSource:
         self._icon_cache_dir = icon_cache_dir or _DEFAULT_ICON_CACHE_DIR
         # Track extensions already submitted for background extraction
         self._pending_exts: Set[str] = set()
-        self._pending_folders: Set[str] = set()
         self._lock = threading.Lock()
         self._prewarm_common_extensions()
 
@@ -225,9 +226,6 @@ class FileSource:
         Only checks disk — never calls AppKit. Schedules background
         extraction for cache misses.
         """
-        if os.path.isdir(path):
-            return self._get_folder_icon_url(path)
-
         ext = os.path.splitext(path)[1].lower()
         if ext == ".app":
             return self._get_app_icon_url(path)
@@ -241,16 +239,6 @@ class FileSource:
 
         # Schedule background extraction
         self._schedule_ext_extraction(ext)
-        return ""
-
-    def _get_folder_icon_url(self, path: str) -> str:
-        """Return file:// URL for a folder icon from disk cache."""
-        png_path = _icon_png_path_for_folder(self._icon_cache_dir, path)
-        if os.path.isfile(png_path):
-            return "file://" + png_path
-
-        # Schedule background extraction
-        self._schedule_folder_extraction(path)
         return ""
 
     def _get_app_icon_url(self, path: str) -> str:
@@ -277,28 +265,12 @@ class FileSource:
 
         threading.Thread(target=_extract, daemon=True).start()
 
-    def _schedule_folder_extraction(self, path: str) -> None:
-        """Submit folder icon extraction to background thread (deduped)."""
-        with self._lock:
-            if path in self._pending_folders:
-                return
-            self._pending_folders.add(path)
-
-        cache_dir = self._icon_cache_dir
-
-        def _extract(p=path, d=cache_dir):
-            _extract_folder_icon(p, d)
-            with self._lock:
-                self._pending_folders.discard(p)
-
-        threading.Thread(target=_extract, daemon=True).start()
-
     def search(self, query: str) -> List[ChooserItem]:
-        """Search files by name using mdfind."""
+        """Search files (excluding folders) by name using mdfind."""
         if not query.strip():
             return []
 
-        paths = _mdfind(query, self._max_results)
+        paths = _mdfind(query, self._max_results, content_type="!public.folder")
         items = []
         for path in paths:
             if not os.path.exists(path):
@@ -331,6 +303,89 @@ class FileSource:
         """Return a ChooserSource wrapping this FileSource."""
         return ChooserSource(
             name="files",
+            prefix=prefix,
+            search=self.search,
+            priority=3,
+            action_hints={
+                "enter": "Open",
+                "cmd_enter": "Reveal",
+            },
+        )
+
+
+class FolderSource:
+    """Folder search data source using macOS Spotlight.
+
+    Only returns folders. Icons are resolved from disk cache;
+    missing icons are extracted in a background thread.
+    """
+
+    def __init__(
+        self,
+        max_results: int = _MAX_RESULTS,
+        icon_cache_dir: Optional[str] = None,
+    ) -> None:
+        self._max_results = max_results
+        self._icon_cache_dir = icon_cache_dir or _DEFAULT_ICON_CACHE_DIR
+        self._pending_folders: Set[str] = set()
+        self._lock = threading.Lock()
+
+    def _get_icon_url(self, path: str) -> str:
+        """Return file:// URL for a folder icon from disk cache."""
+        png_path = _icon_png_path_for_folder(self._icon_cache_dir, path)
+        if os.path.isfile(png_path):
+            return "file://" + png_path
+
+        # Schedule background extraction
+        with self._lock:
+            if path in self._pending_folders:
+                return ""
+            self._pending_folders.add(path)
+
+        cache_dir = self._icon_cache_dir
+
+        def _extract(p=path, d=cache_dir):
+            _extract_folder_icon(p, d)
+            with self._lock:
+                self._pending_folders.discard(p)
+
+        threading.Thread(target=_extract, daemon=True).start()
+        return ""
+
+    def search(self, query: str) -> List[ChooserItem]:
+        """Search folders by name using mdfind."""
+        if not query.strip():
+            return []
+
+        paths = _mdfind(query, self._max_results, content_type="public.folder")
+        items = []
+        for path in paths:
+            if not os.path.exists(path):
+                continue
+            name = os.path.basename(path)
+            parent = os.path.dirname(path)
+            home = os.path.expanduser("~")
+            if parent.startswith(home):
+                parent = "~" + parent[len(home):]
+
+            items.append(
+                ChooserItem(
+                    title=name,
+                    subtitle=f"Folder  {parent}",
+                    icon=self._get_icon_url(path),
+                    item_id=f"folder:{path}",
+                    action=lambda p=path: _open_file(p),
+                    reveal_path=path,
+                    preview=_make_file_preview(path),
+                )
+            )
+
+        return items
+
+    def as_chooser_source(self, prefix: str = "fd") -> ChooserSource:
+        """Return a ChooserSource wrapping this FolderSource."""
+        return ChooserSource(
+            name="folders",
             prefix=prefix,
             search=self.search,
             priority=3,

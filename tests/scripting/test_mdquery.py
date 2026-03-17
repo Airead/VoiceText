@@ -45,6 +45,26 @@ class TestBuildQueryString:
         result = _build_query_string('te"st')
         assert result == 'kMDItemFSName == "*te\\"st*"cd'
 
+    def test_content_type_folder(self):
+        from wenzi.scripting.sources._mdquery import _build_query_string
+
+        result = _build_query_string("docs", content_type="public.folder")
+        assert 'kMDItemContentType == "public.folder"' in result
+        assert 'kMDItemFSName == "*docs*"cd' in result
+
+    def test_content_type_exclude_folder(self):
+        from wenzi.scripting.sources._mdquery import _build_query_string
+
+        result = _build_query_string("readme", content_type="!public.folder")
+        assert 'kMDItemContentType != "public.folder"' in result
+        assert 'kMDItemFSName == "*readme*"cd' in result
+
+    def test_content_type_none(self):
+        from wenzi.scripting.sources._mdquery import _build_query_string
+
+        result = _build_query_string("file")
+        assert "kMDItemContentType" not in result
+
 
 class TestMdquerySearch:
     """Test mdquery_search with mocked ctypes calls."""

@@ -143,13 +143,22 @@ def _escape_query(s: str) -> str:
     return s
 
 
-def _build_query_string(query: str) -> str:
+def _build_query_string(query: str, content_type: str | None = None) -> str:
     """Build an MDQuery query string for filename matching.
 
     Uses ``cd`` flags for case- and diacritic-insensitive matching.
+
+    *content_type* optionally filters results:
+      - ``"public.folder"`` — only folders
+      - ``"!public.folder"`` — exclude folders (files only)
     """
     escaped = _escape_query(query)
-    return f'kMDItemFSName == "*{escaped}*"cd'
+    qs = f'kMDItemFSName == "*{escaped}*"cd'
+    if content_type == "public.folder":
+        qs += ' && kMDItemContentType == "public.folder"'
+    elif content_type == "!public.folder":
+        qs += ' && kMDItemContentType != "public.folder"'
+    return qs
 
 
 # ---------------------------------------------------------------------------
@@ -157,16 +166,20 @@ def _build_query_string(query: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def mdquery_search(query: str, max_results: int = 30) -> List[str]:
+def mdquery_search(
+    query: str, max_results: int = 30, content_type: str | None = None,
+) -> List[str]:
     """Search Spotlight for files matching *query* by name.
 
     Returns up to *max_results* file paths.  Uses ``MDQuerySetMaxCount``
     for server-side limiting so we never transfer thousands of results.
+
+    *content_type* is forwarded to ``_build_query_string`` for filtering.
     """
     if not query or not query.strip():
         return []
 
-    qs = _build_query_string(query.strip())
+    qs = _build_query_string(query.strip(), content_type=content_type)
     qs_ref = _cfstr(qs)
     md_query = None
 

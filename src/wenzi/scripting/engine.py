@@ -191,6 +191,7 @@ class ScriptEngine:
             "app_search": ("apps", self._enable_app_source),
             "clipboard_history": ("clipboard", lambda p: self.enable_clipboard()),
             "file_search": ("files", self._enable_file_source),
+            "folder_search": ("folders", self._enable_folder_source),
             "snippets": ("snippets", self._enable_snippet_source),
             "bookmarks": ("bookmarks", self._enable_bookmark_source),
         }
@@ -207,6 +208,7 @@ class ScriptEngine:
             "app_search": "apps",
             "clipboard_history": "clipboard",
             "file_search": "files",
+            "folder_search": "folders",
             "snippets": "snippets",
             "bookmarks": "bookmarks",
         }
@@ -247,6 +249,18 @@ class ScriptEngine:
             logger.info("File source enabled at runtime")
         except Exception:
             logger.exception("Failed to enable file source")
+
+    def _enable_folder_source(self, prefix: str) -> None:
+        try:
+            from wenzi.scripting.sources.file_source import FolderSource
+
+            folder_source = FolderSource()
+            self._wz.chooser.register_source(
+                folder_source.as_chooser_source(prefix=prefix)
+            )
+            logger.info("Folder source enabled at runtime")
+        except Exception:
+            logger.exception("Failed to enable folder source")
 
     def _enable_snippet_source(self, prefix: str) -> None:
         try:
@@ -389,6 +403,21 @@ class ScriptEngine:
                 logger.info("Built-in file search source registered")
             except Exception:
                 logger.exception("Failed to register file search source")
+
+        # Folder search source
+        if chooser_config.get("folder_search", True):
+            try:
+                from wenzi.scripting.sources.file_source import FolderSource
+
+                folder_source = FolderSource()
+                self._wz.chooser.register_source(
+                    folder_source.as_chooser_source(
+                        prefix=prefixes.get("folders", "fd"),
+                    )
+                )
+                logger.info("Built-in folder search source registered")
+            except Exception:
+                logger.exception("Failed to register folder search source")
 
         # Snippet source
         if chooser_config.get("snippets", True):
