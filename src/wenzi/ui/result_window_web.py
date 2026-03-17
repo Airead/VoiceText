@@ -402,6 +402,15 @@ function selectMode(index) {
     postAction('modeChange', { index: index });
 }
 
+function setActiveModeById(modeId) {
+    // Visually highlight the tab matching modeId without triggering modeChange.
+    if (!CONFIG.modes || CONFIG.modes.length === 0) return;
+    CONFIG.modes.forEach(([id], i) => {
+        document.querySelectorAll('.segment-btn')[i]
+            ?.classList.toggle('active', id === modeId);
+    });
+}
+
 function doConfirm(copyToClipboard) {
     const text = document.getElementById('final-text').value;
     const enhanceText = document.getElementById('enhance-text').textContent;
@@ -643,15 +652,16 @@ function loadHistoryRecord(data) {
     document.getElementById('asr-text').textContent = data.asrText;
     document.getElementById('asr-info').textContent = data.asrInfo || '';
 
-    // Update enhance
+    // Update enhance — switch mode tab visually, show token info in label
+    setActiveModeById(data.enhanceMode || 'off');
     const enhEl = document.getElementById('enhance-text');
     if (data.enhancedText) {
         document.getElementById('enhance-section').classList.remove('hidden');
         enhEl.textContent = data.enhancedText;
-        setEnhanceInfo(data.enhanceInfo || data.enhanceMode || '');
+        setEnhanceInfo(data.enhanceInfo || '');
     } else {
         enhEl.textContent = '';
-        setEnhanceInfo(data.enhanceMode || 'Off');
+        setEnhanceInfo('');
     }
 
     // Update final text
@@ -1207,14 +1217,8 @@ class ResultPreviewPanel:
 
         from PyObjCTools import AppHelper
 
-        # Build enhance info: mode name + token suffix
-        token_suffix = self._format_token_suffix(token_usage)
-        if token_suffix and enhance_mode:
-            enhance_info = f"{enhance_mode}  {token_suffix}"
-        elif token_suffix:
-            enhance_info = token_suffix
-        else:
-            enhance_info = enhance_mode or ""
+        # Token info only — mode is shown via the segmented control tab
+        enhance_info = self._format_token_suffix(token_usage)
 
         data = {
             "asrText": asr_text,
