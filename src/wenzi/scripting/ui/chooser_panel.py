@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import Callable, Dict, List, Optional
 
 from wenzi.scripting.sources import ChooserItem, ChooserSource
@@ -164,8 +165,6 @@ class ChooserPanel:
         self._sources: Dict[str, ChooserSource] = {}
         self._current_items: List[ChooserItem] = []
         self._items_version: int = 0  # incremented on every setResults push
-        self._js_icon_cache: dict[str, str] = {}  # icon data URI → short key
-        self._js_icon_counter: int = 0
         self._closing: bool = False
         self._last_query: str = ""  # Track query for usage recording
 
@@ -226,8 +225,6 @@ class ChooserPanel:
         self._on_close = on_close
         self._pending_initial_query = initial_query
         self._pending_placeholder = placeholder
-        self._js_icon_cache.clear()
-        self._js_icon_counter = 0
 
         if self._panel is not None and self._panel.isVisible():
             # Already visible — apply initial query if provided, else focus
@@ -329,9 +326,6 @@ class ChooserPanel:
         ``cb hello``), the matching source is activated and the prefix is
         stripped.  Otherwise all non-prefix sources are searched.
         """
-        import time as _time
-        _t0 = _time.perf_counter()
-
         self._last_query = query
         source = None
 
@@ -363,50 +357,23 @@ class ChooserPanel:
                     continue  # Skip prefix-only sources
                 if src.search is not None:
                     try:
-                        _ts = _time.perf_counter()
                         all_items.extend(src.search(query))
-                        _te = _time.perf_counter()
-                        logger.debug(
-                            "[perf] source %s search: %.1fms (%d items)",
-                            src.name, (_te - _ts) * 1000, len(all_items),
-                        )
                     except Exception:
                         logger.exception("Chooser source %s search error", src.name)
             self._current_items = all_items[:self._MAX_TOTAL_RESULTS]
         else:
             try:
-                _ts = _time.perf_counter()
                 items = source.search(query) if source.search else []
-                _te = _time.perf_counter()
-                logger.debug(
-                    "[perf] source %s search: %.1fms (%d items)",
-                    source.name, (_te - _ts) * 1000, len(items),
-                )
                 self._current_items = items[:self._MAX_TOTAL_RESULTS]
             except Exception:
                 logger.exception("Chooser source %s search error", source.name)
                 self._current_items = []
 
         # Apply usage-based boosting
-        _tb = _time.perf_counter()
         if self._usage_tracker and self._current_items:
             self._boost_by_usage(query)
-        _tb2 = _time.perf_counter()
 
-        _tp = _time.perf_counter()
         self._push_items_to_js(source=source)
-        _tp2 = _time.perf_counter()
-
-        _total = _time.perf_counter()
-        logger.debug(
-            "[perf] _do_search total: %.1fms "
-            "(boost=%.1fms, push=%.1fms, items=%d, query=%r)",
-            (_total - _t0) * 1000,
-            (_tb2 - _tb) * 1000,
-            (_tp2 - _tp) * 1000,
-            len(self._current_items),
-            query[:20],
-        )
 
     def _boost_by_usage(self, query: str) -> None:
         """Re-sort items by usage frequency while preserving source order."""
@@ -436,24 +403,12 @@ class ChooserPanel:
         """
         self._items_version += 1
 
-        # Collect new icons that JS hasn't seen yet
-        new_icons: dict[str, str] = {}
         js_items = []
         for item in self._current_items:
-            icon_key = ""
-            if item.icon:
-                if item.icon in self._js_icon_cache:
-                    icon_key = self._js_icon_cache[item.icon]
-                else:
-                    self._js_icon_counter += 1
-                    icon_key = f"i{self._js_icon_counter}"
-                    self._js_icon_cache[item.icon] = icon_key
-                    new_icons[icon_key] = item.icon
-
             js_item: dict = {
                 "title": item.title,
                 "subtitle": item.subtitle,
-                "iconKey": icon_key,
+                "icon": item.icon,
                 "badge": "",
                 "hasReveal": (
                     item.reveal_path is not None
@@ -481,10 +436,6 @@ class ChooserPanel:
 
         # Build a single JS snippet
         parts: list[str] = []
-        if new_icons:
-            parts.append(
-                f"setIconCache({json.dumps(new_icons, ensure_ascii=False)})"
-            )
 
         idx_arg = "" if selected_index is None else f",{selected_index}"
         parts.append(
@@ -509,17 +460,11 @@ class ChooserPanel:
 
     def _handle_js_message(self, body: dict) -> None:
         """Dispatch messages from JavaScript."""
-        import time as _time
-        _t0 = _time.perf_counter()
         msg_type = body.get("type", "")
 
         if msg_type == "search":
             query = body.get("query", "")
             self._do_search(query)
-            logger.debug(
-                "[perf] handle 'search' message total: %.1fms",
-                (_time.perf_counter() - _t0) * 1000,
-            )
 
         elif msg_type == "execute":
             index = body.get("index", 0)
@@ -531,9 +476,6 @@ class ChooserPanel:
             index = body.get("index", 0)
             version = body.get("version", self._items_version)
             self._reveal_item(index, version)
-
-        elif msg_type == "log":
-            logger.debug("%s", body.get("text", ""))
 
         elif msg_type == "close":
             from PyObjCTools import AppHelper
@@ -817,9 +759,17 @@ class ChooserPanel:
         self._pending_js = []
         self._current_items = []
 
-        # Load HTML
+        # Load HTML from a temp file so WKWebView grants file:// access
+        # to the config directory (needed for icon cache images).
         from wenzi.scripting.ui.chooser_html import CHOOSER_HTML
+        from wenzi.config import DEFAULT_CONFIG_DIR
 
-        webview.loadHTMLString_baseURL_(
-            CHOOSER_HTML, NSURL.fileURLWithPath_("/")
+        config_dir = os.path.expanduser(DEFAULT_CONFIG_DIR)
+        os.makedirs(config_dir, exist_ok=True)
+        html_path = os.path.join(config_dir, "_chooser.html")
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(CHOOSER_HTML)
+        webview.loadFileURL_allowingReadAccessToURL_(
+            NSURL.fileURLWithPath_(html_path),
+            NSURL.fileURLWithPath_(config_dir),
         )

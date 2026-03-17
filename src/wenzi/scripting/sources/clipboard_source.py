@@ -210,12 +210,12 @@ class ClipboardSource:
     _ICON_MISS_TTL = 30.0  # seconds before rechecking disk for a missed icon
 
     def _get_icon_uri(self, bundle_id: str) -> str:
-        """Return base64 data URI for an app icon.
+        """Return a file:// URL for an app icon.
 
-        Reads from memory cache → disk cache (pre-populated by the
+        Checks memory cache → disk existence (pre-populated by the
         polling thread via ClipboardMonitor._cache_app_icon).
-        Never blocks the main thread with icon extraction; returns
-        empty string if the icon is not yet cached.
+        Never reads file content or does base64 encoding; the browser
+        loads the file natively via file:// URL with its own cache.
         """
         if not bundle_id:
             return ""
@@ -233,15 +233,10 @@ class ClipboardSource:
         # Check disk cache (normally pre-populated by polling thread)
         png_path = _icon_cache_path(icon_dir, bundle_id)
         if os.path.isfile(png_path):
-            try:
-                with open(png_path, "rb") as f:
-                    png = f.read()
-                uri = _png_to_data_uri(png)
-                self._icon_mem_cache[bundle_id] = uri
-                self._icon_miss_until.pop(bundle_id, None)
-                return uri
-            except Exception:
-                pass
+            uri = "file://" + png_path
+            self._icon_mem_cache[bundle_id] = uri
+            self._icon_miss_until.pop(bundle_id, None)
+            return uri
 
         # Icon not cached yet — suppress disk checks for a while.
         # Polling thread will cache it on the next clipboard change.

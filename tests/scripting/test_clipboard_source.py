@@ -576,7 +576,7 @@ class TestIconCaching:
         )
         source = ClipboardSource(monitor)
         result = source.search("")
-        assert result[0].icon.startswith("data:image/png;base64,")
+        assert result[0].icon.startswith("file://")
 
     def test_icon_cached_in_memory(self, tmp_path):
         icon_dir = str(tmp_path / "icons")
@@ -600,7 +600,7 @@ class TestIconCaching:
 
         # Second call should use memory cache
         assert bundle_id in source._icon_mem_cache
-        assert source._icon_mem_cache[bundle_id].startswith("data:image/png;base64,")
+        assert source._icon_mem_cache[bundle_id].startswith("file://")
 
     def test_uncached_icon_returns_empty_no_block(self, tmp_path):
         """When disk cache is empty, return empty (no main-thread fallback)."""
@@ -658,7 +658,7 @@ class TestIconCaching:
         source._empty_cache = None
 
         result = source.search("")
-        assert result[0].icon.startswith("data:image/png;base64,")
+        assert result[0].icon.startswith("file://")
         assert bundle_id in source._icon_mem_cache
 
     def test_image_entry_also_gets_icon(self, tmp_path):
@@ -689,4 +689,4 @@ class TestIconCaching:
         ):
             result = source.search("")
 
-        assert result[0].icon.startswith("data:image/png;base64,")
+        assert result[0].icon.startswith("file://")

@@ -234,7 +234,6 @@ var items = [];
 var selectedIndex = -1;
 var itemsVersion = 0;
 var hasAnyIcon = false;  // true when at least one item has an icon
-var _iconCache = {};  // iconKey → data URI
 var _lastMouseX = -1, _lastMouseY = -1;  // suppress scroll-induced hover
 var _PLACEHOLDER_SVG = "data:image/svg+xml,"
     + "%3Csvg xmlns='http://www.w3.org/2000/svg' "
@@ -290,11 +289,9 @@ function _buildRowHtml(item, i) {
         '" style="position:absolute;top:', (i * h),
         'px;left:0;right:0;height:', h, 'px" data-idx="', i, '">'];
 
-    // Icons: use data-ik attr; src set after innerHTML to avoid
-    // browser decoding base64 during HTML parsing.
-    if (item.iconKey && _iconCache[item.iconKey]) {
-        parts.push('<img class="icon" draggable="false" data-ik="',
-                   _escHtml(item.iconKey), '">');
+    if (item.icon) {
+        parts.push('<img class="icon" draggable="false" src="',
+                   _escHtml(item.icon), '">');
     } else if (hasAnyIcon) {
         parts.push('<div class="icon icon-placeholder"></div>');
     }
@@ -318,15 +315,6 @@ function _buildRowHtml(item, i) {
     }
     parts.push('</div></div>');
     return parts.join('');
-}
-
-function _applyIconSrc(container) {
-    // Set img.src from cache AFTER innerHTML is parsed
-    var imgs = container.querySelectorAll('img[data-ik]');
-    for (var j = 0; j < imgs.length; j++) {
-        var key = imgs[j].getAttribute('data-ik');
-        if (key && _iconCache[key]) imgs[j].src = _iconCache[key];
-    }
 }
 
 var _spacer = null;  // reuse spacer element across renders
@@ -388,7 +376,6 @@ function _renderVisibleRows() {
         htmlParts.push(_buildRowHtml(items[i], i));
     }
     _spacer.innerHTML = htmlParts.join('');
-    if (hasAnyIcon) _applyIconSrc(_spacer);
 }
 
 // --- Event delegation on resultList (replaces per-row listeners) ---
@@ -620,17 +607,10 @@ document.addEventListener('keyup', function(e) {
 
 // --- Python -> JS API ---
 
-function setIconCache(icons) {
-    for (var key in icons) {
-        _iconCache[key] = icons[key];
-    }
-}
-
 function setResults(newItems, version, selectedIdx) {
-    var _t0 = performance.now();
     items = newItems || [];
     itemsVersion = version || 0;
-    hasAnyIcon = items.some(function(it) { return !!it.iconKey; });
+    hasAnyIcon = items.some(function(it) { return !!it.icon; });
     if (typeof selectedIdx === 'number') {
         // Preserve scroll position for delete/refresh operations
         selectedIndex = Math.max(0, Math.min(selectedIdx, items.length - 1));
@@ -654,13 +634,6 @@ function setResults(newItems, version, selectedIdx) {
             resultList.scrollTop = itemBottom - viewportHeight;
             _renderVisibleRows();
         }
-    }
-    var _elapsed = performance.now() - _t0;
-    if (_elapsed > 2) {
-        window.webkit.messageHandlers.chooser.postMessage({
-            type: 'log',
-            text: '[perf] setResults JS: ' + _elapsed.toFixed(1) + 'ms (' + items.length + ' items)'
-        });
     }
 }
 
