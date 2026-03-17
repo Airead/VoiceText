@@ -117,9 +117,12 @@
 </ul>
 </li>
 <li><a href="#_16">启动器配置</a></li>
-<li><a href="#_17">脚本运行环境</a></li>
-<li><a href="#_18">安全说明</a></li>
-<li><a href="#_19">常见问题</a></li>
+<li><a href="#_17">脚本运行环境</a><ul>
+<li><a href="#_18">多文件脚本</a></li>
+</ul>
+</li>
+<li><a href="#_19">安全说明</a></li>
+<li><a href="#_20">常见问题</a></li>
 </ul>
 </div>
 
@@ -411,7 +414,7 @@ wz.date(&quot;%H:%M:%S&quot;)   # &quot;14:30:00&quot;
 wz.date(&quot;%Y-%m-%d %H:%M&quot;)  # &quot;2025-03-15 14:30&quot;
 </code></pre>
 <h3 id="wzreload"><a href="#wzreload" class="heading-anchor"><code>wz.reload()</code></a></h3>
-<p>重新加载所有脚本。停止当前监听器，重新读取 <code>init.py</code>，然后重启。</p>
+<p>重新加载所有脚本。停止当前监听器，清除脚本目录下已缓存的模块，重新读取 <code>init.py</code>（及其导入的所有子模块），然后重启。所有文件变更都会在重载后生效。</p>
 <pre><code class="language-python">wz.reload()
 </code></pre>
 <h3 id="wzchoosershowinitial_querynone"><a href="#wzchoosershowinitial_querynone" class="heading-anchor"><code>wz.chooser.show(initial_query=None)</code></a></h3>
@@ -582,13 +585,43 @@ wz.hotkey.bind(&quot;ctrl+cmd+n&quot;, lambda: wz.execute(&quot;open -a Notes&qu
 <h2 id="_17"><a href="#_17" class="heading-anchor">脚本运行环境</a></h2>
 <ul>
 <li>脚本作为标准 Python 代码运行，可以使用 <code>import</code> 导入任何模块</li>
-<li><code>wz</code> 对象作为全局变量直接可用，无需导入</li>
+<li><code>wz</code> 对象在 <code>init.py</code> 中作为全局变量直接可用，无需导入</li>
+<li>在子模块中通过 <code>from wenzi.scripting.api import wz</code> 获取 <code>wz</code> 对象</li>
 <li>脚本中的错误会被捕获并以浮窗提示显示</li>
 <li>脚本在启动时加载一次，修改后需调用 <code>wz.reload()</code> 重新加载</li>
 <li>脚本路径：<code>~/.config/WenZi/scripts/init.py</code></li>
 <li>可通过 <code>"scripting": {"script_dir": "/path/to/scripts"}</code> 自定义脚本目录</li>
 </ul>
-<h2 id="_18"><a href="#_18" class="heading-anchor">安全说明</a></h2>
+<h3 id="_18"><a href="#_18" class="heading-anchor">多文件脚本</a></h3>
+<p>可以将脚本拆分为多个 <code>.py</code> 文件。<code>init.py</code> 是入口文件，同目录下的其他文件可通过标准 <code>import</code> 语句导入：</p>
+<pre><code>~/.config/WenZi/scripts/
+├── init.py          # 入口文件
+├── my_sources.py    # 自定义启动器数据源
+└── utils/
+    ├── __init__.py
+    └── formatting.py
+</code></pre>
+<pre><code class="language-python"># init.py
+import my_sources
+from utils.formatting import fmt_date
+
+wz.chooser.register_source(my_sources.build_source())
+wz.hotkey.bind(&quot;cmd+shift+d&quot;, lambda: wz.type_text(fmt_date()))
+</code></pre>
+<pre><code class="language-python"># my_sources.py
+from wenzi.scripting.api import wz   # 子模块中需要导入 wz
+
+def build_source():
+    @wz.chooser.source(&quot;todos&quot;, prefix=&quot;td&quot;)
+    def search_todos(query):
+        return [{&quot;title&quot;: &quot;示例待办&quot;, &quot;action&quot;: lambda: wz.alert(&quot;Done!&quot;)}]
+</code></pre>
+<p>调用 <code>wz.reload()</code> 时，脚本目录下的<strong>所有文件</strong>都会被重新加载，而不仅仅是 <code>init.py</code>。</p>
+<blockquote>
+<p><strong>注意：</strong> 仅支持绝对导入（<code>import helper</code>、<code>from utils import foo</code>）。不支持相对导入（<code>from . import foo</code>），因为 <code>init.py</code> 不是作为 Python 包加载的。</p>
+<p><strong>注意：</strong> 不要在用户脚本中定义 PyObjC 的 <code>NSObject</code> 子类。Objective-C 运行时不支持重复注册同名类，重载时会导致崩溃。</p>
+</blockquote>
+<h2 id="_19"><a href="#_19" class="heading-anchor">安全说明</a></h2>
 <p>脚本以<strong>未沙箱化的 Python</strong> 运行，拥有与 闻字 相同的系统权限。这意味着脚本可以：</p>
 <ul>
 <li>读写你的用户账户能访问的任何文件</li>
@@ -599,7 +632,7 @@ wz.hotkey.bind(&quot;ctrl+cmd+n&quot;, lambda: wz.execute(&quot;open -a Notes&qu
 </ul>
 <p><strong>请只运行你自己编写或仔细审查过的脚本。</strong> 不要从不可信的来源直接复制粘贴脚本。恶意脚本可能会在你不知情的情况下窃取数据、安装软件或修改文件。</p>
 <p>出于安全考虑，脚本系统默认处于禁用状态。</p>
-<h2 id="_19"><a href="#_19" class="heading-anchor">常见问题</a></h2>
+<h2 id="_20"><a href="#_20" class="heading-anchor">常见问题</a></h2>
 <p><strong>脚本没有加载？</strong>
 - 确认 <code>config.json</code> 中 <code>"scripting": {"enabled": true}</code> 已设置
 - 启用后需要重启闻字

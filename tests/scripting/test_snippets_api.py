@@ -25,14 +25,19 @@ class _FakeStore:
 
     def add(
         self, name: str, keyword: str, content: str, category: str = "",
-        auto_expand: bool = True,
+        auto_expand: bool = True, *, random: bool = False,
+        variants: Optional[List[str]] = None,
     ) -> bool:
         if self.find_by_keyword(keyword) is not None:
             return False
-        self._snippets.append({
+        d: Dict = {
             "name": name, "keyword": keyword, "content": content,
             "category": category, "auto_expand": auto_expand,
-        })
+        }
+        if random:
+            d["random"] = True
+            d["variants"] = variants or [content]
+        self._snippets.append(d)
         return True
 
     def remove(self, name: str, category: str = "") -> bool:
@@ -52,6 +57,8 @@ class _FakeStore:
         content: Optional[str] = None,
         new_category: Optional[str] = None,
         new_auto_expand: Optional[bool] = None,
+        new_random: Optional[bool] = None,
+        new_variants: Optional[List[str]] = None,
     ) -> bool:
         for s in self._snippets:
             if s["name"] == name and s.get("category", "") == category:
@@ -65,6 +72,14 @@ class _FakeStore:
                     s["category"] = new_category
                 if new_auto_expand is not None:
                     s["auto_expand"] = new_auto_expand
+                if new_random is not None:
+                    if new_random:
+                        s["random"] = True
+                    else:
+                        s.pop("random", None)
+                        s.pop("variants", None)
+                if new_variants is not None:
+                    s["variants"] = new_variants
                 return True
         return False
 
@@ -158,6 +173,31 @@ class TestSnippetsAPI:
         store.add(name="T", keyword="t", content="c")
         assert api.update("t", new_auto_expand=False) is True
         assert store.find_by_keyword("t")["auto_expand"] is False
+
+    def test_add_random_snippet(self):
+        api, store = self._api_with_store()
+        variants = ["Thanks!", "Thank you!"]
+        assert api.add(
+            name="Thx", keyword="thx", content="Thanks!",
+            random=True, variants=variants,
+        ) is True
+        s = store.snippets[0]
+        assert s["random"] is True
+        assert s["variants"] == variants
+
+    def test_update_random(self):
+        api, store = self._api_with_store()
+        store.add(name="T", keyword="t", content="c", random=True, variants=["A", "B"])
+        assert api.update("t", new_random=False) is True
+        s = store.find_by_keyword("t")
+        assert "random" not in s
+
+    def test_update_variants(self):
+        api, store = self._api_with_store()
+        store.add(name="T", keyword="t", content="c", random=True, variants=["A"])
+        assert api.update("t", new_variants=["X", "Y"]) is True
+        s = store.find_by_keyword("t")
+        assert s["variants"] == ["X", "Y"]
 
     def test_set_store_none(self):
         api, _ = self._api_with_store()

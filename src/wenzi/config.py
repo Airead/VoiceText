@@ -23,6 +23,13 @@ _VALID_MODIFIER_KEYS = {k for k, _ in MODIFIER_KEY_CHOICES}
 DEFAULT_CONFIG_DIR = os.path.join("~", ".config", "WenZi")
 DEFAULT_CONFIG_PATH = os.path.join(DEFAULT_CONFIG_DIR, "config.json")
 DEFAULT_ENHANCE_MODES_DIR = os.path.join(DEFAULT_CONFIG_DIR, "enhance_modes")
+DEFAULT_SCRIPTS_DIR = os.path.join(DEFAULT_CONFIG_DIR, "scripts")
+DEFAULT_CLIPBOARD_HISTORY_PATH = os.path.join(DEFAULT_CONFIG_DIR, "clipboard_history.json")
+DEFAULT_CLIPBOARD_IMAGES_DIR = os.path.join(DEFAULT_CONFIG_DIR, "clipboard_images")
+DEFAULT_SNIPPETS_DIR = os.path.join(DEFAULT_CONFIG_DIR, "snippets")
+DEFAULT_ICON_CACHE_DIR = os.path.join(DEFAULT_CONFIG_DIR, "icon_cache")
+DEFAULT_CHOOSER_USAGE_PATH = os.path.join(DEFAULT_CONFIG_DIR, "chooser_usage.json")
+DEFAULT_SCRIPT_DATA_PATH = os.path.join(DEFAULT_CONFIG_DIR, "script_data.json")
 
 # Legacy paths for migration from VoiceText → WenZi
 _LEGACY_CONFIG_DIR = os.path.join("~", ".config", "VoiceText")

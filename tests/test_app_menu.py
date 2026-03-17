@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from unittest.mock import MagicMock, patch
 
 from wenzi.controllers.config_controller import ConfigController
@@ -70,7 +71,10 @@ class TestBuildConfigInfo:
         info = _get_info(app)
 
         assert "None" not in info
-        assert ".config/WenZi/config.json" in info
+        # Config path may be patched by conftest; check the live value
+        import wenzi.config as _cfg
+        expected = os.path.expanduser(_cfg.DEFAULT_CONFIG_PATH)
+        assert expected in info
 
     def test_no_enhancer(self):
         app = _make_mock_app()

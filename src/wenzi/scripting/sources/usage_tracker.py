@@ -13,9 +13,11 @@ import os
 import threading
 from typing import Dict, Optional
 
+from wenzi.config import DEFAULT_CHOOSER_USAGE_PATH
+
 logger = logging.getLogger(__name__)
 
-_DEFAULT_PATH = os.path.expanduser("~/.config/WenZi/chooser_usage.json")
+_DEFAULT_PATH = os.path.expanduser(DEFAULT_CHOOSER_USAGE_PATH)
 _MAX_PREFIX_LEN = 3  # Group by first N chars of query
 _FLUSH_DELAY = 2.0  # Seconds to wait before flushing to disk
 

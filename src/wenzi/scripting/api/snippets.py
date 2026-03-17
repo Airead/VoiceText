@@ -44,18 +44,24 @@ class SnippetsAPI:
         content: str,
         category: str = "",
         auto_expand: bool = True,
+        *,
+        random: bool = False,
+        variants: Optional[List[str]] = None,
     ) -> bool:
         """Add a new snippet.
 
         Returns ``True`` on success, ``False`` if the keyword already exists
         or the store is not available.
+
+        Set *random* to ``True`` and pass *variants* to create a random
+        snippet that picks a variant on each expansion.
         """
         if self._store is None:
             logger.warning("Snippet store not available")
             return False
         return self._store.add(
             name=name, keyword=keyword, content=content, category=category,
-            auto_expand=auto_expand,
+            auto_expand=auto_expand, random=random, variants=variants,
         )
 
     def remove(self, keyword: str) -> bool:
@@ -81,6 +87,8 @@ class SnippetsAPI:
         content: Optional[str] = None,
         new_category: Optional[str] = None,
         new_auto_expand: Optional[bool] = None,
+        new_random: Optional[bool] = None,
+        new_variants: Optional[List[str]] = None,
     ) -> bool:
         """Update an existing snippet identified by its keyword.
 
@@ -100,4 +108,6 @@ class SnippetsAPI:
             content=content,
             new_category=new_category,
             new_auto_expand=new_auto_expand,
+            new_random=new_random,
+            new_variants=new_variants,
         )

@@ -156,3 +156,18 @@ class TestPreviewHistoryStore:
     def test_default_max_size(self):
         store = PreviewHistoryStore()
         assert store._max_size == 10
+
+    def test_system_prompt_and_thinking_text_defaults(self):
+        r = _make_record()
+        assert r.system_prompt == ""
+        assert r.thinking_text == ""
+
+    def test_system_prompt_and_thinking_text_stored(self):
+        store = PreviewHistoryStore()
+        store.add(_make_record(
+            system_prompt="You are helpful.",
+            thinking_text="Let me think...",
+        ))
+        rec = store.get(0)
+        assert rec.system_prompt == "You are helpful."
+        assert rec.thinking_text == "Let me think..."

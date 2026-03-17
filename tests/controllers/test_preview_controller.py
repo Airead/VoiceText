@@ -1,4 +1,4 @@
-"""Tests for PreviewController enhance mode debounce."""
+"""Tests for PreviewController enhance mode debounce and history caching."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from wenzi.controllers.preview_controller import PreviewController
+from wenzi.enhance.preview_history import PreviewRecord
 
 
 @pytest.fixture
@@ -138,3 +139,160 @@ class TestEnhanceModeDebounce:
 
         # Timer fired but guard prevented run()
         mock_app._enhance_controller.run.assert_not_called()
+
+
+def _make_record(**overrides) -> PreviewRecord:
+    defaults = dict(
+        timestamp="2026-01-01T00:00:00+00:00",
+        created_at="2026-01-01T08:00:00",
+        action="confirm",
+        asr_text="hello",
+        enhanced_text="Hello.",
+        final_text="Hello.",
+        enhance_mode="proofread",
+        stt_model="funasr",
+        llm_model="openai/gpt-4o",
+        wav_data=b"\x00" * 100,
+        audio_duration=2.5,
+        source="voice",
+    )
+    defaults.update(overrides)
+    return PreviewRecord(**defaults)
+
+
+class TestSaveToPreviewHistory:
+    """Tests for _save_to_preview_history including system_prompt/thinking_text."""
+
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_save_includes_system_prompt_and_thinking(self, _mock_save, ctrl, mock_app):
+        result_holder = {
+            "enhanced_text": "Hello.",
+            "system_prompt": "Be helpful.",
+            "thinking_text": "Hmm...",
+        }
+        mock_app._current_preview_asr_text = "hello"
+        mock_app._enhance_mode = "proofread"
+        mock_app._current_stt_model.return_value = "funasr"
+        mock_app._current_llm_model.return_value = "openai/gpt-4o"
+
+        ctrl._save_to_preview_history(
+            "ts1", "confirm", result_holder, None, 0.0, "voice",
+        )
+
+        rec = ctrl._preview_history.get(0)
+        assert rec.system_prompt == "Be helpful."
+        assert rec.thinking_text == "Hmm..."
+
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_save_defaults_when_keys_missing(self, _mock_save, ctrl, mock_app):
+        result_holder = {"enhanced_text": "Hello."}
+        mock_app._current_preview_asr_text = "hello"
+        mock_app._enhance_mode = "proofread"
+        mock_app._current_stt_model.return_value = "funasr"
+        mock_app._current_llm_model.return_value = "openai/gpt-4o"
+
+        ctrl._save_to_preview_history(
+            "ts1", "confirm", result_holder, None, 0.0, "voice",
+        )
+
+        rec = ctrl._preview_history.get(0)
+        assert rec.system_prompt == ""
+        assert rec.thinking_text == ""
+
+
+class TestHandleHistoryConfirm:
+    """Tests for _handle_history_confirm system_prompt/thinking_text update."""
+
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_updates_prompt_and_thinking_when_present(self, _mock_save, ctrl, mock_app):
+        record = _make_record(system_prompt="old", thinking_text="old think")
+        ctrl._preview_history.add(record)
+
+        mock_app._enhance_mode = "proofread"
+        mock_app._current_stt_model.return_value = "funasr"
+        mock_app._current_llm_model.return_value = "openai/gpt-4o"
+
+        result_holder = {
+            "text": "Hello.",
+            "enhanced_text": "Hello.",
+            "system_prompt": "new prompt",
+            "thinking_text": "new think",
+        }
+
+        ctrl._handle_history_confirm(0, result_holder, None, 0.0, "voice")
+        assert record.system_prompt == "new prompt"
+        assert record.thinking_text == "new think"
+
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_preserves_prompt_and_thinking_when_absent(self, _mock_save, ctrl, mock_app):
+        record = _make_record(system_prompt="keep", thinking_text="keep think")
+        ctrl._preview_history.add(record)
+
+        mock_app._enhance_mode = "proofread"
+        mock_app._current_stt_model.return_value = "funasr"
+        mock_app._current_llm_model.return_value = "openai/gpt-4o"
+
+        result_holder = {"text": "Hello.", "enhanced_text": "Hello."}
+
+        ctrl._handle_history_confirm(0, result_holder, None, 0.0, "voice")
+        assert record.system_prompt == "keep"
+        assert record.thinking_text == "keep think"
+
+
+class TestSelectHistory:
+    """Tests for on_select_history passing system_prompt/thinking_text."""
+
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_passes_prompt_and_thinking_to_panel(self, _mock_save, ctrl, mock_app):
+        record = _make_record(
+            system_prompt="sys prompt",
+            thinking_text="think text",
+            wav_data=None,
+            audio_duration=0.0,
+        )
+        ctrl._preview_history.add(record)
+
+        ctrl.on_select_history(0)
+
+        mock_app._preview_panel.load_history_record.assert_called_once()
+        call_kwargs = mock_app._preview_panel.load_history_record.call_args
+        assert call_kwargs.kwargs.get("system_prompt") == "sys prompt" or \
+            call_kwargs[1].get("system_prompt") == "sys prompt"
+        assert call_kwargs.kwargs.get("thinking_text") == "think text" or \
+            call_kwargs[1].get("thinking_text") == "think text"
+
+
+class TestModeChangeResultHolder:
+    """Tests for on_preview_mode_change updating result_holder."""
+
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_mode_off_clears_result_holder(self, _mock_save, ctrl, mock_app):
+        ctrl._result_holder = {
+            "enhanced_text": "Hello.",
+            "system_prompt": "old",
+            "thinking_text": "old think",
+        }
+
+        ctrl.on_preview_mode_change("off")
+
+        assert ctrl._result_holder["enhanced_text"] is None
+        assert ctrl._result_holder["system_prompt"] == ""
+        assert ctrl._result_holder["thinking_text"] == ""
+
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_cache_hit_updates_result_holder(self, _mock_save, ctrl, mock_app):
+        cached = MagicMock()
+        cached.display_text = "Hello."
+        cached.usage = None
+        cached.system_prompt = "cached prompt"
+        cached.thinking_text = "cached think"
+        cached.final_text = "Hello."
+        mock_app._enhance_controller.get_cached.return_value = cached
+
+        ctrl._result_holder = {"enhanced_text": None}
+
+        ctrl.on_preview_mode_change("translate")
+
+        assert ctrl._result_holder["enhanced_text"] == "Hello."
+        assert ctrl._result_holder["system_prompt"] == "cached prompt"
+        assert ctrl._result_holder["thinking_text"] == "cached think"

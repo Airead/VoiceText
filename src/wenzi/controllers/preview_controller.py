@@ -51,6 +51,7 @@ class PreviewController:
         self._preview_history = PreviewHistoryStore(max_size=10)
         # Track the history record currently being viewed (None = normal mode)
         self._viewing_history_index: int | None = None
+        self._result_holder: dict | None = None
 
     # ------------------------------------------------------------------
     # Preview history helpers
@@ -118,6 +119,8 @@ class PreviewController:
             wav_data=wav_data,
             audio_duration=audio_duration,
             source=source,
+            system_prompt=result_holder.get("system_prompt", ""),
+            thinking_text=result_holder.get("thinking_text", ""),
         )
         self._preview_history.add(record)
 
@@ -177,6 +180,8 @@ class PreviewController:
             enhance_mode=record.enhance_mode,
             has_audio=record.wav_data is not None,
             asr_info=asr_info,
+            system_prompt=record.system_prompt,
+            thinking_text=record.thinking_text,
         )
 
     def _handle_history_confirm(
@@ -244,6 +249,10 @@ class PreviewController:
         record.stt_model = current_stt
         record.llm_model = current_llm
         record.action = "copy" if result_holder.get("copy_to_clipboard") else "confirm"
+        if "system_prompt" in result_holder:
+            record.system_prompt = result_holder["system_prompt"]
+        if "thinking_text" in result_holder:
+            record.thinking_text = result_holder["thinking_text"]
 
         # Move to front so it won't be evicted first
         self._preview_history.move_to_front(history_index)
@@ -285,6 +294,7 @@ class PreviewController:
 
         result_event = threading.Event()
         result_holder = {"text": None, "confirmed": False, "enhanced_text": None}
+        self._result_holder = result_holder
 
         def on_confirm(
             text: str,
@@ -695,6 +705,7 @@ class PreviewController:
 
         result_event = threading.Event()
         result_holder = {"text": None, "confirmed": False, "enhanced_text": None}
+        self._result_holder = result_holder
 
         def on_confirm(
             text: str,
@@ -916,6 +927,10 @@ class PreviewController:
 
         if mode_id == MODE_OFF:
             AppHelper.callAfter(app._preview_panel.set_enhance_off)
+            if self._result_holder is not None:
+                self._result_holder["enhanced_text"] = None
+                self._result_holder["system_prompt"] = ""
+                self._result_holder["thinking_text"] = ""
             return
 
         # Show loading state immediately as visual feedback
@@ -928,6 +943,10 @@ class PreviewController:
                 thinking_text=cached.thinking_text,
                 final_text=cached.final_text,
             )
+            if self._result_holder is not None:
+                self._result_holder["enhanced_text"] = cached.final_text
+                self._result_holder["system_prompt"] = cached.system_prompt
+                self._result_holder["thinking_text"] = cached.thinking_text
             return
 
         AppHelper.callAfter(app._preview_panel.set_enhance_loading)
@@ -941,7 +960,7 @@ class PreviewController:
             if app._preview_panel.enhance_request_id != request_id:
                 return
             asr_text = getattr(app, "_current_preview_asr_text", "")
-            app._enhance_controller.run(asr_text, request_id)
+            app._enhance_controller.run(asr_text, request_id, self._result_holder)
 
         self._enhance_debounce_timer = threading.Timer(
             self._ENHANCE_DEBOUNCE_SECONDS, _fire_enhance,
@@ -1056,7 +1075,8 @@ class PreviewController:
                         app._preview_panel.set_enhance_loading()
                         app._preview_panel.enhance_request_id += 1
                         app._enhance_controller.run(
-                            new_text, app._preview_panel.enhance_request_id
+                            new_text, app._preview_panel.enhance_request_id,
+                            self._result_holder,
                         )
 
                 AppHelper.callAfter(_on_success)
@@ -1120,12 +1140,17 @@ class PreviewController:
                     thinking_text=cached.thinking_text,
                     final_text=cached.final_text,
                 )
+                if self._result_holder is not None:
+                    self._result_holder["enhanced_text"] = cached.final_text
+                    self._result_holder["system_prompt"] = cached.system_prompt
+                    self._result_holder["thinking_text"] = cached.thinking_text
             else:
                 app._preview_panel.set_enhance_loading()
                 app._preview_panel.enhance_request_id += 1
                 asr_text = getattr(app, "_current_preview_asr_text", "")
                 app._enhance_controller.run(
-                    asr_text, app._preview_panel.enhance_request_id
+                    asr_text, app._preview_panel.enhance_request_id,
+                    self._result_holder,
                 )
 
     def on_preview_punc_toggle(self, enabled: bool) -> None:
@@ -1162,7 +1187,8 @@ class PreviewController:
                         app._preview_panel.set_enhance_loading()
                         app._preview_panel.enhance_request_id += 1
                         app._enhance_controller.run(
-                            new_text, app._preview_panel.enhance_request_id
+                            new_text, app._preview_panel.enhance_request_id,
+                            self._result_holder,
                         )
 
                 AppHelper.callAfter(_on_done)
@@ -1211,9 +1237,14 @@ class PreviewController:
                     thinking_text=cached.thinking_text,
                     final_text=cached.final_text,
                 )
+                if self._result_holder is not None:
+                    self._result_holder["enhanced_text"] = cached.final_text
+                    self._result_holder["system_prompt"] = cached.system_prompt
+                    self._result_holder["thinking_text"] = cached.thinking_text
             else:
                 AppHelper.callAfter(app._preview_panel.set_enhance_loading)
                 asr_text = getattr(app, "_current_preview_asr_text", "")
                 app._enhance_controller.run(
-                    asr_text, app._preview_panel.enhance_request_id
+                    asr_text, app._preview_panel.enhance_request_id,
+                    self._result_holder,
                 )

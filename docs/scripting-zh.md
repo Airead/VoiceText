@@ -255,7 +255,7 @@ wz.date("%Y-%m-%d %H:%M")  # "2025-03-15 14:30"
 
 ### `wz.reload()`
 
-重新加载所有脚本。停止当前监听器，重新读取 `init.py`，然后重启。
+重新加载所有脚本。停止当前监听器，清除脚本目录下已缓存的模块，重新读取 `init.py`（及其导入的所有子模块），然后重启。所有文件变更都会在重载后生效。
 
 ```python
 wz.reload()
@@ -427,11 +427,50 @@ wz.hotkey.bind("ctrl+cmd+n", lambda: wz.execute("open -a Notes"))
 ## 脚本运行环境
 
 - 脚本作为标准 Python 代码运行，可以使用 `import` 导入任何模块
-- `wz` 对象作为全局变量直接可用，无需导入
+- `wz` 对象在 `init.py` 中作为全局变量直接可用，无需导入
+- 在子模块中通过 `from wenzi.scripting.api import wz` 获取 `wz` 对象
 - 脚本中的错误会被捕获并以浮窗提示显示
 - 脚本在启动时加载一次，修改后需调用 `wz.reload()` 重新加载
 - 脚本路径：`~/.config/WenZi/scripts/init.py`
 - 可通过 `"scripting": {"script_dir": "/path/to/scripts"}` 自定义脚本目录
+
+### 多文件脚本
+
+可以将脚本拆分为多个 `.py` 文件。`init.py` 是入口文件，同目录下的其他文件可通过标准 `import` 语句导入：
+
+```
+~/.config/WenZi/scripts/
+├── init.py          # 入口文件
+├── my_sources.py    # 自定义启动器数据源
+└── utils/
+    ├── __init__.py
+    └── formatting.py
+```
+
+```python
+# init.py
+import my_sources
+from utils.formatting import fmt_date
+
+wz.chooser.register_source(my_sources.build_source())
+wz.hotkey.bind("cmd+shift+d", lambda: wz.type_text(fmt_date()))
+```
+
+```python
+# my_sources.py
+from wenzi.scripting.api import wz   # 子模块中需要导入 wz
+
+def build_source():
+    @wz.chooser.source("todos", prefix="td")
+    def search_todos(query):
+        return [{"title": "示例待办", "action": lambda: wz.alert("Done!")}]
+```
+
+调用 `wz.reload()` 时，脚本目录下的**所有文件**都会被重新加载，而不仅仅是 `init.py`。
+
+> **注意：** 仅支持绝对导入（`import helper`、`from utils import foo`）。不支持相对导入（`from . import foo`），因为 `init.py` 不是作为 Python 包加载的。
+>
+> **注意：** 不要在用户脚本中定义 PyObjC 的 `NSObject` 子类。Objective-C 运行时不支持重复注册同名类，重载时会导致崩溃。
 
 ## 安全说明
 

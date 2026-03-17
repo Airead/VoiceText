@@ -255,7 +255,7 @@ wz.date("%Y-%m-%d %H:%M")  # "2025-03-15 14:30"
 
 ### `wz.reload()`
 
-Reload all scripts. Stops current listeners, re-reads `init.py`, and restarts.
+Reload all scripts. Stops current listeners, purges cached modules from the scripts directory, re-reads `init.py` (and any imported sub-modules), and restarts. All file changes are picked up on reload.
 
 ```python
 wz.reload()
@@ -427,11 +427,50 @@ The Launcher is configured under `scripting.chooser` in `config.json`:
 ## Script Environment
 
 - Scripts run as standard Python with full access to `import`
-- The `wz` object is available as a global variable — no import needed
+- The `wz` object is available as a global variable in `init.py` — no import needed
+- In sub-modules, access `wz` via `from wenzi.scripting.api import wz`
 - Errors in scripts are caught and displayed as alerts
 - Scripts are loaded once at startup; use `wz.reload()` to re-read changes
 - Script path: `~/.config/WenZi/scripts/init.py`
 - Custom script directory can be set via `"scripting": {"script_dir": "/path/to/scripts"}` in config
+
+### Multi-file Scripts
+
+You can split your scripts into multiple `.py` files. `init.py` is the entry point; other files in the same directory can be imported using standard `import` statements:
+
+```
+~/.config/WenZi/scripts/
+├── init.py          # Entry point
+├── my_sources.py    # Custom launcher sources
+└── utils/
+    ├── __init__.py
+    └── formatting.py
+```
+
+```python
+# init.py
+import my_sources
+from utils.formatting import fmt_date
+
+wz.chooser.register_source(my_sources.build_source())
+wz.hotkey.bind("cmd+shift+d", lambda: wz.type_text(fmt_date()))
+```
+
+```python
+# my_sources.py
+from wenzi.scripting.api import wz   # import wz in sub-modules
+
+def build_source():
+    @wz.chooser.source("todos", prefix="td")
+    def search_todos(query):
+        return [{"title": "Example todo", "action": lambda: wz.alert("Done!")}]
+```
+
+When you call `wz.reload()`, **all files** in the scripts directory are reloaded — not just `init.py`.
+
+> **Note:** Only absolute imports are supported (`import helper`, `from utils import foo`). Relative imports (`from . import foo`) do not work because `init.py` is not loaded as a Python package.
+>
+> **Note:** Do not define PyObjC `NSObject` subclasses in user scripts. The Objective-C runtime does not support re-registering a class with the same name, which causes a crash on reload.
 
 ## Security
 

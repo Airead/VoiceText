@@ -229,6 +229,58 @@ class TestExpand:
         mock_paste.assert_called_once_with("Today is {date}")
 
 
+class TestRandomExpansion:
+    """Test auto-expansion with random variant snippets."""
+
+    def _make_expander(self, setup_fn=None):
+        store = _make_store(setup_fn)
+        return SnippetExpander(store)
+
+    def test_random_snippet_picks_from_variants(self):
+        def setup(d):
+            path = os.path.join(d, "thx.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: "thx "\n'
+                    'random: true\n'
+                    '---\n'
+                    'Thanks!\n'
+                    '===\n'
+                    'Thank you!\n'
+                    '===\n'
+                    'Much appreciated!\n'
+                )
+
+        expander = self._make_expander(setup)
+
+        # Verify expansion picks a variant via random.choice
+        expand_mock = MagicMock()
+        with (
+            patch.object(expander, "_expand", expand_mock),
+            patch("random.choice", return_value="Thank you!"),
+        ):
+            expander._check_expansion("hello thx ")
+
+        expand_mock.assert_called_once()
+        args = expand_mock.call_args[0]
+        assert args[0] == "thx "
+        assert args[1] == "Thank you!"
+
+    def test_non_random_snippet_uses_content(self):
+        def setup(d):
+            _write_snippet(d, "email", "@@e", "user@example.com")
+
+        expander = self._make_expander(setup)
+        expand_mock = MagicMock()
+        with patch.object(expander, "_expand", expand_mock):
+            expander._check_expansion("text @@e")
+
+        expand_mock.assert_called_once()
+        args = expand_mock.call_args[0]
+        assert args[1] == "user@example.com"
+
+
 class TestEngineIntegration:
     """Test that the engine wires up the expander correctly."""
 

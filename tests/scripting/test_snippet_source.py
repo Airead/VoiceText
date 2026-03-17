@@ -11,6 +11,7 @@ from wenzi.scripting.sources.snippet_source import (
     _format_snippet_file,
     _parse_frontmatter,
     _sanitize_filename,
+    _split_random_sections,
 )
 
 
@@ -969,3 +970,465 @@ class TestSnippetSource:
         results = source.search("long")
         assert len(results[0].subtitle) <= 60
         assert results[0].subtitle.endswith("...")
+
+
+# ---------------------------------------------------------------------------
+# _split_random_sections tests
+# ---------------------------------------------------------------------------
+
+
+class TestSplitRandomSections:
+    def test_single_section(self):
+        result = _split_random_sections("Hello world")
+        assert result == ["Hello world"]
+
+    def test_two_sections(self):
+        result = _split_random_sections("Section 1\n===\nSection 2")
+        assert result == ["Section 1", "Section 2"]
+
+    def test_three_sections(self):
+        body = "A\n===\nB\n===\nC"
+        result = _split_random_sections(body)
+        assert result == ["A", "B", "C"]
+
+    def test_four_equals_not_separator(self):
+        body = "Line with ====\nstill same section"
+        result = _split_random_sections(body)
+        assert result == ["Line with ====\nstill same section"]
+
+    def test_five_equals_not_separator(self):
+        body = "Above\n=====\nBelow"
+        result = _split_random_sections(body)
+        assert result == ["Above\n=====\nBelow"]
+
+    def test_escaped_separator(self):
+        body = "Has literal\n\\===\nin content"
+        result = _split_random_sections(body)
+        assert result == ["Has literal\n===\nin content"]
+
+    def test_escaped_and_real_separator(self):
+        body = "Section 1\n\\===\nstill 1\n===\nSection 2"
+        result = _split_random_sections(body)
+        assert result == ["Section 1\n===\nstill 1", "Section 2"]
+
+    def test_whitespace_around_separator(self):
+        body = "A\n  ===  \nB"
+        result = _split_random_sections(body)
+        assert result == ["A", "B"]
+
+    def test_multiline_sections(self):
+        body = "Line 1\nLine 2\n===\nLine 3\nLine 4"
+        result = _split_random_sections(body)
+        assert result == ["Line 1\nLine 2", "Line 3\nLine 4"]
+
+    def test_empty_sections_dropped(self):
+        body = "===\nA\n===\n===\nB\n==="
+        result = _split_random_sections(body)
+        assert result == ["A", "B"]
+
+    def test_only_separators(self):
+        body = "===\n===\n==="
+        result = _split_random_sections(body)
+        assert result == []
+
+    def test_empty_body(self):
+        result = _split_random_sections("")
+        assert result == []
+
+    def test_triple_dashes_not_separator(self):
+        """--- in body is NOT a separator (only === is)."""
+        body = "Above\n---\nBelow"
+        result = _split_random_sections(body)
+        assert result == ["Above\n---\nBelow"]
+
+
+# ---------------------------------------------------------------------------
+# Random snippet store tests
+# ---------------------------------------------------------------------------
+
+
+class TestSnippetStoreRandom:
+    def _make_store(self, setup_fn=None):
+        tmpdir = tempfile.mkdtemp()
+        snippets_dir = os.path.join(tmpdir, "snippets")
+        if setup_fn is not None:
+            os.makedirs(snippets_dir, exist_ok=True)
+            setup_fn(snippets_dir)
+        return SnippetStore(path=snippets_dir), snippets_dir, tmpdir
+
+    def test_load_random_snippet(self):
+        def setup(d):
+            path = os.path.join(d, "thanks.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: "thx "\n'
+                    'random: true\n'
+                    '---\n'
+                    'Thank you!\n'
+                    '===\n'
+                    'Thanks a lot!\n'
+                    '===\n'
+                    'Much appreciated!\n'
+                )
+
+        store, _, _ = self._make_store(setup)
+        assert len(store.snippets) == 1
+        s = store.snippets[0]
+        assert s["random"] is True
+        assert s["variants"] == ["Thank you!", "Thanks a lot!", "Much appreciated!"]
+        assert s["keyword"] == "thx "
+        # content is the joined variant text (no --- separators)
+        assert s["content"] == "Thank you!\n\nThanks a lot!\n\nMuch appreciated!"
+
+    def test_random_single_variant(self):
+        def setup(d):
+            path = os.path.join(d, "single.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: ";;s"\n'
+                    'random: true\n'
+                    '---\n'
+                    'Only one variant\n'
+                )
+
+        store, _, _ = self._make_store(setup)
+        s = store.snippets[0]
+        assert s["random"] is True
+        assert s["variants"] == ["Only one variant"]
+
+    def test_random_with_multiline_variants(self):
+        def setup(d):
+            path = os.path.join(d, "sig.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: ";;sig"\n'
+                    'random: true\n'
+                    '---\n'
+                    'Best regards,\n'
+                    'Alice\n'
+                    '===\n'
+                    'Kind regards,\n'
+                    'Bob\n'
+                )
+
+        store, _, _ = self._make_store(setup)
+        s = store.snippets[0]
+        assert s["variants"] == ["Best regards,\nAlice", "Kind regards,\nBob"]
+
+    def test_random_with_escaped_separator(self):
+        def setup(d):
+            path = os.path.join(d, "hr.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: ";;hr"\n'
+                    'random: true\n'
+                    '---\n'
+                    'Section with\n'
+                    '\\===\n'
+                    'equals line\n'
+                    '===\n'
+                    'Another section\n'
+                )
+
+        store, _, _ = self._make_store(setup)
+        s = store.snippets[0]
+        assert len(s["variants"]) == 2
+        assert s["variants"][0] == "Section with\n===\nequals line"
+        assert s["variants"][1] == "Another section"
+
+    def test_random_four_equals_not_split(self):
+        def setup(d):
+            path = os.path.join(d, "equals.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: ";;d"\n'
+                    'random: true\n'
+                    '---\n'
+                    'Content with ====\n'
+                    'still same variant\n'
+                )
+
+        store, _, _ = self._make_store(setup)
+        s = store.snippets[0]
+        assert len(s["variants"]) == 1
+        assert "====" in s["variants"][0]
+
+    def test_non_random_snippet_no_variants(self):
+        def setup(d):
+            _write_snippet(d, "normal", ";;n", "plain content")
+
+        store, _, _ = self._make_store(setup)
+        s = store.snippets[0]
+        assert "variants" not in s
+        assert "random" not in s
+
+    def test_add_random_snippet(self):
+        store, sdir, _ = self._make_store()
+        variants = ["Thanks!", "Thank you!"]
+        assert store.add(
+            "thx", "thx ", "Thanks!",
+            random=True, variants=variants,
+        ) is True
+        s = store.snippets[0]
+        assert s["random"] is True
+        assert s["variants"] == variants
+        # content must be synced with variants, not the raw content arg
+        assert s["content"] == "Thanks!\n\nThank you!"
+        # Verify file on disk has random: true
+        with open(s["file_path"], "r") as f:
+            text = f.read()
+        assert "random: true" in text
+
+    def test_add_random_no_variants_defaults_to_content(self):
+        store, _, _ = self._make_store()
+        assert store.add("t", ";;t", "fallback", random=True) is True
+        s = store.snippets[0]
+        assert s["random"] is True
+        assert s["variants"] == ["fallback"]
+
+    def test_update_preserves_random(self):
+        def setup(d):
+            path = os.path.join(d, "thx.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: "thx "\n'
+                    'random: true\n'
+                    '---\n'
+                    'Thanks!\n'
+                    '===\n'
+                    'Thank you!\n'
+                )
+
+        store, _, _ = self._make_store(setup)
+        # Update keyword only — random/variants should be preserved
+        assert store.update("thx", new_keyword="thx2 ") is True
+        s = store.snippets[0]
+        assert s["random"] is True
+        assert s["variants"] == ["Thanks!", "Thank you!"]
+        # Verify file on disk still has random: true
+        with open(s["file_path"], "r") as f:
+            text = f.read()
+        assert "random: true" in text
+
+    def test_update_variants(self):
+        def setup(d):
+            path = os.path.join(d, "thx.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: "thx "\n'
+                    'random: true\n'
+                    '---\n'
+                    'Thanks!\n'
+                    '===\n'
+                    'Thank you!\n'
+                )
+
+        store, _, _ = self._make_store(setup)
+        new_variants = ["A", "B", "C"]
+        assert store.update("thx", new_variants=new_variants) is True
+        s = store.snippets[0]
+        assert s["variants"] == new_variants
+        # content must be synced with variants
+        assert s["content"] == "A\n\nB\n\nC"
+
+    def test_update_content_on_random_syncs_variants(self):
+        def setup(d):
+            path = os.path.join(d, "thx.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: "thx "\n'
+                    'random: true\n'
+                    '---\n'
+                    'Thanks!\n'
+                    '===\n'
+                    'Thank you!\n'
+                )
+
+        store, _, _ = self._make_store(setup)
+        # Update content only — variants should become single-element
+        assert store.update("thx", content="New text") is True
+        s = store.snippets[0]
+        assert s["random"] is True
+        assert s["variants"] == ["New text"]
+        assert s["content"] == "New text"
+
+    def test_update_disable_random(self):
+        def setup(d):
+            path = os.path.join(d, "thx.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: "thx "\n'
+                    'random: true\n'
+                    '---\n'
+                    'Thanks!\n'
+                    '===\n'
+                    'Thank you!\n'
+                )
+
+        store, _, _ = self._make_store(setup)
+        assert store.update("thx", new_random=False) is True
+        s = store.snippets[0]
+        assert "random" not in s
+        assert "variants" not in s
+        # Verify file on disk no longer has random: true
+        with open(s["file_path"], "r") as f:
+            text = f.read()
+        assert "random" not in text
+
+    def test_random_false_no_variants(self):
+        def setup(d):
+            path = os.path.join(d, "norandom.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: ";;n"\n'
+                    'random: false\n'
+                    '---\n'
+                    'Section 1\n'
+                    '---\n'
+                    'Section 2\n'
+                )
+
+        store, _, _ = self._make_store(setup)
+        s = store.snippets[0]
+        assert "variants" not in s
+        # Content includes the --- as plain text
+        assert "---" in s["content"]
+
+
+# ---------------------------------------------------------------------------
+# _format_snippet_file random tests
+# ---------------------------------------------------------------------------
+
+
+class TestFormatSnippetFileRandom:
+    def test_random_with_variants(self):
+        result = _format_snippet_file(
+            "thx ", "ignored",
+            random=True,
+            variants=["Thank you!", "Thanks!"],
+        )
+        assert "random: true" in result
+        assert 'keyword: "thx "' in result
+        assert "Thank you!\n===\nThanks!" in result
+
+    def test_random_roundtrip(self):
+        variants = ["Best regards,\nAlice", "Kind regards,\nBob"]
+        text = _format_snippet_file(
+            ";;sig", "",
+            random=True,
+            variants=variants,
+        )
+        meta, body = _parse_frontmatter(text)
+        assert meta["random"] is True
+        assert meta["keyword"] == ";;sig"
+        parsed_variants = _split_random_sections(body.rstrip("\n"))
+        assert parsed_variants == variants
+
+    def test_random_escapes_literal_separator(self):
+        variants = ["Has\n===\ninside", "Normal"]
+        text = _format_snippet_file(
+            ";;t", "",
+            random=True,
+            variants=variants,
+        )
+        meta, body = _parse_frontmatter(text)
+        parsed = _split_random_sections(body.rstrip("\n"))
+        assert parsed == variants
+
+    def test_random_no_variants_uses_content(self):
+        result = _format_snippet_file(";;t", "fallback", random=True)
+        assert "random: true" in result
+        assert "fallback" in result
+
+
+# ---------------------------------------------------------------------------
+# SnippetSource random chooser tests
+# ---------------------------------------------------------------------------
+
+
+class TestSnippetSourceRandom:
+    def _make_source(self, setup_fn=None):
+        tmpdir = tempfile.mkdtemp()
+        snippets_dir = os.path.join(tmpdir, "snippets")
+        if setup_fn is not None:
+            os.makedirs(snippets_dir, exist_ok=True)
+            setup_fn(snippets_dir)
+        store = SnippetStore(path=snippets_dir)
+        return SnippetSource(store)
+
+    def test_random_title_shows_variant_count(self):
+        def setup(d):
+            path = os.path.join(d, "thx.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: "thx "\n'
+                    'random: true\n'
+                    '---\n'
+                    'Thanks!\n'
+                    '===\n'
+                    'Thank you!\n'
+                    '===\n'
+                    'Much appreciated!\n'
+                )
+
+        source = self._make_source(setup)
+        results = source.search("")
+        assert len(results) == 1
+        assert "(3 variants)" in results[0].title
+
+    def test_random_single_variant_no_count_in_title(self):
+        def setup(d):
+            path = os.path.join(d, "single.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: ";;s"\n'
+                    'random: true\n'
+                    '---\n'
+                    'Only one\n'
+                )
+
+        source = self._make_source(setup)
+        results = source.search("")
+        assert "variants" not in results[0].title
+
+    def test_random_preview_shows_all_variants(self):
+        def setup(d):
+            path = os.path.join(d, "thx.md")
+            with open(path, "w") as f:
+                f.write(
+                    '---\n'
+                    'keyword: "thx "\n'
+                    'random: true\n'
+                    '---\n'
+                    'Thanks!\n'
+                    '===\n'
+                    'Thank you!\n'
+                )
+
+        source = self._make_source(setup)
+        results = source.search("")
+        preview = results[0].preview["content"]
+        assert "Variant 1" in preview
+        assert "Variant 2" in preview
+        assert "Thanks!" in preview
+        assert "Thank you!" in preview
+
+    def test_normal_snippet_no_variant_in_title(self):
+        def setup(d):
+            _write_snippet(d, "normal", ";;n", "content")
+
+        source = self._make_source(setup)
+        results = source.search("")
+        assert "variants" not in results[0].title

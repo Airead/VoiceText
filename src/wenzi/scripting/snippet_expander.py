@@ -201,6 +201,8 @@ class SnippetExpander:
 
     def _check_expansion(self, buf: str) -> None:
         """Check if the buffer ends with a snippet keyword and trigger expansion."""
+        import random as _random
+
         snippets = self._store.snippets
         for s in snippets:
             keyword = s.get("keyword", "")
@@ -209,7 +211,12 @@ class SnippetExpander:
             if not s.get("auto_expand", True):
                 continue
             if buf.endswith(keyword):
-                content = s.get("content", "")
+                # Pick a random variant when available, otherwise use content
+                variants = s.get("variants")
+                if s.get("random", False) and variants:
+                    content = _random.choice(variants)
+                else:
+                    content = s.get("content", "")
                 raw = s.get("raw", False)
                 logger.info(
                     "Snippet keyword matched: %r -> %r",

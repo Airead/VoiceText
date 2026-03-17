@@ -117,7 +117,10 @@
 </ul>
 </li>
 <li><a href="#launcher-configuration">Launcher Configuration</a></li>
-<li><a href="#script-environment">Script Environment</a></li>
+<li><a href="#script-environment">Script Environment</a><ul>
+<li><a href="#multi-file-scripts">Multi-file Scripts</a></li>
+</ul>
+</li>
 <li><a href="#security">Security</a></li>
 <li><a href="#troubleshooting">Troubleshooting</a></li>
 </ul>
@@ -411,7 +414,7 @@ wz.date(&quot;%H:%M:%S&quot;)   # &quot;14:30:00&quot;
 wz.date(&quot;%Y-%m-%d %H:%M&quot;)  # &quot;2025-03-15 14:30&quot;
 </code></pre>
 <h3 id="wzreload"><a href="#wzreload" class="heading-anchor"><code>wz.reload()</code></a></h3>
-<p>Reload all scripts. Stops current listeners, re-reads <code>init.py</code>, and restarts.</p>
+<p>Reload all scripts. Stops current listeners, purges cached modules from the scripts directory, re-reads <code>init.py</code> (and any imported sub-modules), and restarts. All file changes are picked up on reload.</p>
 <pre><code class="language-python">wz.reload()
 </code></pre>
 <h3 id="wzchoosershowinitial_querynone"><a href="#wzchoosershowinitial_querynone" class="heading-anchor"><code>wz.chooser.show(initial_query=None)</code></a></h3>
@@ -582,12 +585,42 @@ wz.hotkey.bind(&quot;ctrl+cmd+n&quot;, lambda: wz.execute(&quot;open -a Notes&qu
 <h2 id="script-environment"><a href="#script-environment" class="heading-anchor">Script Environment</a></h2>
 <ul>
 <li>Scripts run as standard Python with full access to <code>import</code></li>
-<li>The <code>wz</code> object is available as a global variable — no import needed</li>
+<li>The <code>wz</code> object is available as a global variable in <code>init.py</code> — no import needed</li>
+<li>In sub-modules, access <code>wz</code> via <code>from wenzi.scripting.api import wz</code></li>
 <li>Errors in scripts are caught and displayed as alerts</li>
 <li>Scripts are loaded once at startup; use <code>wz.reload()</code> to re-read changes</li>
 <li>Script path: <code>~/.config/WenZi/scripts/init.py</code></li>
 <li>Custom script directory can be set via <code>"scripting": {"script_dir": "/path/to/scripts"}</code> in config</li>
 </ul>
+<h3 id="multi-file-scripts"><a href="#multi-file-scripts" class="heading-anchor">Multi-file Scripts</a></h3>
+<p>You can split your scripts into multiple <code>.py</code> files. <code>init.py</code> is the entry point; other files in the same directory can be imported using standard <code>import</code> statements:</p>
+<pre><code>~/.config/WenZi/scripts/
+├── init.py          # Entry point
+├── my_sources.py    # Custom launcher sources
+└── utils/
+    ├── __init__.py
+    └── formatting.py
+</code></pre>
+<pre><code class="language-python"># init.py
+import my_sources
+from utils.formatting import fmt_date
+
+wz.chooser.register_source(my_sources.build_source())
+wz.hotkey.bind(&quot;cmd+shift+d&quot;, lambda: wz.type_text(fmt_date()))
+</code></pre>
+<pre><code class="language-python"># my_sources.py
+from wenzi.scripting.api import wz   # import wz in sub-modules
+
+def build_source():
+    @wz.chooser.source(&quot;todos&quot;, prefix=&quot;td&quot;)
+    def search_todos(query):
+        return [{&quot;title&quot;: &quot;Example todo&quot;, &quot;action&quot;: lambda: wz.alert(&quot;Done!&quot;)}]
+</code></pre>
+<p>When you call <code>wz.reload()</code>, <strong>all files</strong> in the scripts directory are reloaded — not just <code>init.py</code>.</p>
+<blockquote>
+<p><strong>Note:</strong> Only absolute imports are supported (<code>import helper</code>, <code>from utils import foo</code>). Relative imports (<code>from . import foo</code>) do not work because <code>init.py</code> is not loaded as a Python package.</p>
+<p><strong>Note:</strong> Do not define PyObjC <code>NSObject</code> subclasses in user scripts. The Objective-C runtime does not support re-registering a class with the same name, which causes a crash on reload.</p>
+</blockquote>
 <h2 id="security"><a href="#security" class="heading-anchor">Security</a></h2>
 <p>Scripts run as <strong>unsandboxed Python</strong> with the same permissions as 闻字 itself. This means a script can:</p>
 <ul>

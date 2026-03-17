@@ -22,6 +22,22 @@ Multi-snippet file format (all snippets defined in frontmatter)::
         name: "current time"
     ---
 
+Random variant file format::
+
+    ---
+    keyword: "thx "
+    random: true
+    ---
+    Thank you so much!
+    ===
+    Thanks for your help!
+    ===
+    Much appreciated!
+
+When ``random: true`` is set, the body is split by ``===`` lines (exactly
+three equals signs, stripped) into multiple variants.  On each expansion a
+random variant is selected.  Use ``\\===`` to output a literal ``===``.
+
 Snippets can also be auto-expanded globally when the user types a keyword.
 """
 
@@ -30,14 +46,16 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random as _random
 import re
 from typing import Dict, List, Optional, Tuple
 
+from wenzi.config import DEFAULT_SNIPPETS_DIR as _CFG_SNIPPETS_DIR
 from wenzi.scripting.sources import ChooserItem, ChooserSource, fuzzy_match
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SNIPPETS_DIR = os.path.expanduser("~/.config/WenZi/snippets")
+_DEFAULT_SNIPPETS_DIR = os.path.expanduser(_CFG_SNIPPETS_DIR)
 
 _SUPPORTED_EXTENSIONS = (".md", ".txt")
 
@@ -82,21 +100,79 @@ def _parse_frontmatter(text: str) -> Tuple[dict, str]:
     return meta, body
 
 
+def _split_random_sections(body: str) -> List[str]:
+    """Split *body* into variant sections separated by ``===`` lines.
+
+    A separator is a line whose stripped content is exactly ``===`` (three
+    equals signs).  ``====`` or longer are NOT separators.
+
+    ``\\===`` on its own line is an escape — it produces a literal ``===``
+    in the output and is not treated as a separator.
+
+    Returns a list of section strings with leading/trailing whitespace
+    stripped per section.
+    """
+    lines = body.split("\n")
+    sections: List[str] = []
+    current: List[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped == "===":
+            sections.append("\n".join(current))
+            current = []
+        elif stripped == "\\===":
+            current.append(line.replace("\\===", "===", 1))
+        else:
+            current.append(line)
+
+    sections.append("\n".join(current))
+
+    # Strip each section and drop empty leading/trailing sections that
+    # result from separators at the very start or end of the body.
+    result = [s.strip() for s in sections]
+    return [s for s in result if s]
+
+
 def _format_snippet_file(
     keyword: str, content: str, auto_expand: bool = True,
+    *, random: bool = False, variants: Optional[List[str]] = None,
 ) -> str:
-    """Serialize a snippet back to the file format."""
-    has_frontmatter = bool(keyword) or not auto_expand
+    """Serialize a snippet back to the file format.
+
+    When *random* is ``True`` and *variants* is provided, the body is
+    composed by joining variants with ``===`` separators.  Any literal
+    ``===`` lines inside a variant are escaped as ``\\===``.
+    """
+    has_frontmatter = bool(keyword) or not auto_expand or random
     if not has_frontmatter:
         return content
 
     lines = []
     if keyword:
         lines.append(f'keyword: "{keyword}"')
+    if random:
+        lines.append("random: true")
     if not auto_expand:
         lines.append("auto_expand: false")
     header = "\n".join(lines)
-    return f"---\n{header}\n---\n{content}"
+
+    # Build body from variants or single content
+    if random and variants:
+        escaped = []
+        for v in variants:
+            # Escape literal === lines inside variant content
+            v_lines = v.split("\n")
+            v_lines = [
+                ln.replace("===", "\\===", 1) if ln.strip() == "===" else ln
+                for ln in v_lines
+            ]
+            escaped.append("\n".join(v_lines))
+        body = "\n===\n".join(escaped)
+    else:
+        body = content
+
+    return f"---\n{header}\n---\n{body}"
 
 
 def _sanitize_filename(name: str) -> str:
@@ -304,15 +380,34 @@ class SnippetStore:
 
                 # Single-snippet: keyword in frontmatter, body is content
                 if meta.get("keyword") or (body and not snippets_list):
-                    self._snippets.append({
+                    is_random = str(meta.get("random", False)).lower() == "true"
+                    snippet_body = body.rstrip("\n")
+
+                    if is_random:
+                        variants = _split_random_sections(snippet_body)
+                        # Store joined variant text as content so that
+                        # fuzzy search and subtitle display see clean text
+                        # without === separators or \=== escapes.
+                        display_content = "\n\n".join(variants)
+                    else:
+                        variants = None
+                        display_content = snippet_body
+
+                    snippet_dict = {
                         "name": base_name,
                         "keyword": meta.get("keyword", ""),
-                        "content": body.rstrip("\n"),
+                        "content": display_content,
                         "category": category,
                         "file_path": file_path,
                         "raw": bool(meta.get("raw", False)),
                         "auto_expand": auto_expand,
-                    })
+                    }
+
+                    if is_random:
+                        snippet_dict["random"] = True
+                        snippet_dict["variants"] = variants
+
+                    self._snippets.append(snippet_dict)
 
         logger.info(
             "Loaded %d snippets from %s", len(self._snippets), self._dir,
@@ -372,6 +467,9 @@ class SnippetStore:
         content: str,
         category: str = "",
         auto_expand: bool = True,
+        *,
+        random: bool = False,
+        variants: Optional[List[str]] = None,
     ) -> bool:
         """Add a new snippet. Returns False if keyword already exists."""
         self._ensure_loaded()
@@ -384,7 +482,10 @@ class SnippetStore:
         os.makedirs(cat_dir, exist_ok=True)
         file_path = os.path.join(cat_dir, f"{safe_name}.md")
 
-        text = _format_snippet_file(keyword, content, auto_expand=auto_expand)
+        text = _format_snippet_file(
+            keyword, content, auto_expand=auto_expand,
+            random=random, variants=variants,
+        )
         try:
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(text)
@@ -392,14 +493,19 @@ class SnippetStore:
             logger.exception("Failed to write snippet %s", file_path)
             return False
 
-        self._snippets.append({
+        actual_variants = (variants or [content]) if random else None
+        snippet_dict: Dict = {
             "name": safe_name,
             "keyword": keyword,
-            "content": content,
+            "content": "\n\n".join(actual_variants) if actual_variants else content,
             "category": category,
             "file_path": file_path,
             "auto_expand": auto_expand,
-        })
+        }
+        if random:
+            snippet_dict["random"] = True
+            snippet_dict["variants"] = actual_variants
+        self._snippets.append(snippet_dict)
         return True
 
     def remove(self, name: str, category: str = "") -> bool:
@@ -426,6 +532,8 @@ class SnippetStore:
         content: Optional[str] = None,
         new_category: Optional[str] = None,
         new_auto_expand: Optional[bool] = None,
+        new_random: Optional[bool] = None,
+        new_variants: Optional[List[str]] = None,
     ) -> bool:
         """Update an existing snippet. Supports rename and category move."""
         self._ensure_loaded()
@@ -436,6 +544,12 @@ class SnippetStore:
                 nm = _sanitize_filename(new_name) if new_name is not None else s["name"]
                 cat = new_category if new_category is not None else s.get("category", "")
                 ae = new_auto_expand if new_auto_expand is not None else s.get("auto_expand", True)
+                is_random = new_random if new_random is not None else s.get("random", False)
+                vts = new_variants if new_variants is not None else s.get("variants")
+
+                # Sync variants when only content is updated on a random snippet
+                if is_random and content is not None and new_variants is None:
+                    vts = [ct]
 
                 # Determine new file path
                 cat_dir = os.path.join(self._dir, cat) if cat else self._dir
@@ -443,7 +557,10 @@ class SnippetStore:
                 new_path = os.path.join(cat_dir, f"{nm}{ext}")
 
                 os.makedirs(cat_dir, exist_ok=True)
-                text = _format_snippet_file(kw, ct, auto_expand=ae)
+                text = _format_snippet_file(
+                    kw, ct, auto_expand=ae,
+                    random=is_random, variants=vts,
+                )
                 try:
                     with open(new_path, "w", encoding="utf-8") as f:
                         f.write(text)
@@ -461,10 +578,27 @@ class SnippetStore:
 
                 s["name"] = nm
                 s["keyword"] = kw
-                s["content"] = ct
                 s["category"] = cat
                 s["file_path"] = new_path
                 s["auto_expand"] = ae
+                if is_random:
+                    s["random"] = True
+                    # Sync content and variants:
+                    # - new_variants provided → update content from variants
+                    # - only content provided → treat as single variant
+                    if new_variants is not None:
+                        s["variants"] = vts
+                        s["content"] = "\n\n".join(vts)
+                    elif content is not None:
+                        s["variants"] = [ct]
+                        s["content"] = ct
+                    else:
+                        s["variants"] = vts or [ct]
+                        s["content"] = ct
+                else:
+                    s.pop("random", None)
+                    s.pop("variants", None)
+                    s["content"] = ct
                 return True
         return False
 
@@ -528,6 +662,12 @@ class SnippetSource:
 
         results.sort(key=lambda x: (-x[0], x[1].get("name", "")))
 
+        def _resolve(c, r):
+            return c if r else _expand_placeholders(c)
+
+        def _pick_and_resolve(vs, r):
+            return _resolve(_random.choice(vs), r)
+
         items = []
         for _score, s in results:
             name = s.get("name", "")
@@ -536,12 +676,17 @@ class SnippetSource:
             category = s.get("category", "")
             file_path = s.get("file_path")
 
-            # Build title: "Name  [@@kw]  ·  category"
+            variants = s.get("variants")
+            is_random = s.get("random", False) and variants
+
+            # Build title: "Name  [@@kw]  ·  category  (N variants)"
             title = name
             if keyword:
                 title = f"{name}  [{keyword}]"
             if category:
                 title = f"{title}  ·  {category}"
+            if is_random and len(variants) > 1:
+                title = f"{title}  ({len(variants)} variants)"
 
             display_content = content.replace("\n", " ").strip()
             if len(display_content) > 60:
@@ -555,24 +700,47 @@ class SnippetSource:
 
             raw = s.get("raw", False)
 
-            def _resolve(c, r):
-                return c if r else _expand_placeholders(c)
+            # Build preview content
+            if is_random and len(variants) > 1:
+                preview_parts = []
+                for idx, v in enumerate(variants, 1):
+                    preview_parts.append(f"── Variant {idx} ──\n{v}")
+                preview_content = "\n".join(preview_parts)
+            else:
+                preview_content = content
 
-            items.append(
-                ChooserItem(
-                    title=title,
-                    subtitle=display_content,
-                    item_id=item_id,
-                    action=lambda c=content, r=raw: _paste_text(
-                        _resolve(c, r)
-                    ),
-                    secondary_action=lambda c=content, r=raw: _copy_to_clipboard(
-                        _resolve(c, r)
-                    ),
-                    reveal_path=file_path,
-                    preview={"type": "text", "content": content},
+            if is_random:
+                items.append(
+                    ChooserItem(
+                        title=title,
+                        subtitle=display_content,
+                        item_id=item_id,
+                        action=lambda vs=variants, r=raw: _paste_text(
+                            _pick_and_resolve(vs, r)
+                        ),
+                        secondary_action=lambda vs=variants, r=raw: _copy_to_clipboard(
+                            _pick_and_resolve(vs, r)
+                        ),
+                        reveal_path=file_path,
+                        preview={"type": "text", "content": preview_content},
+                    )
                 )
-            )
+            else:
+                items.append(
+                    ChooserItem(
+                        title=title,
+                        subtitle=display_content,
+                        item_id=item_id,
+                        action=lambda c=content, r=raw: _paste_text(
+                            _resolve(c, r)
+                        ),
+                        secondary_action=lambda c=content, r=raw: _copy_to_clipboard(
+                            _resolve(c, r)
+                        ),
+                        reveal_path=file_path,
+                        preview={"type": "text", "content": content},
+                    )
+                )
 
         return items
 

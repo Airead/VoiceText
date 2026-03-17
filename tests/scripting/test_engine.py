@@ -1,5 +1,8 @@
 """Tests for script engine."""
 
+import os
+import sys
+import types
 from unittest.mock import patch
 
 from wenzi.scripting.engine import ScriptEngine
@@ -73,6 +76,27 @@ class TestScriptEngine:
         assert "alt_r" in engine._registry.leaders
         assert "cmd_r" not in engine._registry.leaders
 
+        engine.stop()
+
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
+    def test_reload_skips_when_already_reloading(self, mock_stop, mock_start, tmp_path):
+        """Concurrent reload calls should be skipped to prevent race conditions."""
+        script_dir = tmp_path / "scripts"
+        script_dir.mkdir()
+        init_py = script_dir / "init.py"
+        init_py.write_text("")
+
+        engine = ScriptEngine(script_dir=str(script_dir))
+        engine.start()
+
+        # Simulate reload already in progress
+        engine._reloading = True
+        engine.reload()
+        # stop() is only called once (from start), not again from reload
+        mock_stop.assert_not_called()
+
+        engine._reloading = False
         engine.stop()
 
     @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
@@ -365,3 +389,153 @@ class TestScriptEngine:
         import wenzi.scripting.api as api_mod
 
         assert api_mod.wz is engine.wz
+
+
+class TestMultiFileScripts:
+    """Tests for multi-file script support and hot-reload."""
+
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
+    def test_scripts_dir_added_to_sys_path(self, mock_stop, mock_start, tmp_path):
+        script_dir = tmp_path / "scripts"
+        script_dir.mkdir()
+        (script_dir / "init.py").write_text("pass\n")
+
+        engine = ScriptEngine(script_dir=str(script_dir))
+        engine.start()
+        try:
+            assert os.path.normpath(str(script_dir)) in sys.path
+        finally:
+            engine.stop()
+            sys.path[:] = [p for p in sys.path if p != os.path.normpath(str(script_dir))]
+
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
+    def test_multi_file_import(self, mock_stop, mock_start, tmp_path):
+        script_dir = tmp_path / "scripts"
+        script_dir.mkdir()
+        (script_dir / "helper.py").write_text("MAGIC = 42\n")
+        (script_dir / "init.py").write_text(
+            "import helper\nwz._test_magic = helper.MAGIC\n"
+        )
+
+        engine = ScriptEngine(script_dir=str(script_dir))
+        engine.start()
+        try:
+            assert engine.wz._test_magic == 42
+        finally:
+            engine.stop()
+            sys.path[:] = [p for p in sys.path if p != os.path.normpath(str(script_dir))]
+            sys.modules.pop("helper", None)
+
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
+    def test_reload_picks_up_submodule_changes(self, mock_stop, mock_start, tmp_path):
+        script_dir = tmp_path / "scripts"
+        script_dir.mkdir()
+        (script_dir / "helper.py").write_text('VALUE = "old"\n')
+        (script_dir / "init.py").write_text(
+            "import helper\nwz._test_val = helper.VALUE\n"
+        )
+
+        engine = ScriptEngine(script_dir=str(script_dir))
+        engine.start()
+        try:
+            assert engine.wz._test_val == "old"
+
+            # Modify sub-module and reload
+            (script_dir / "helper.py").write_text('VALUE = "new"\n')
+            engine.reload()
+            assert engine.wz._test_val == "new"
+        finally:
+            engine.stop()
+            sys.path[:] = [p for p in sys.path if p != os.path.normpath(str(script_dir))]
+            sys.modules.pop("helper", None)
+
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.start")
+    @patch("wenzi.scripting.api.hotkey.HotkeyAPI.stop")
+    def test_reload_with_package(self, mock_stop, mock_start, tmp_path):
+        """Reload picks up changes in sub-package modules."""
+        script_dir = tmp_path / "scripts"
+        pkg_dir = script_dir / "mypkg"
+        pkg_dir.mkdir(parents=True)
+        (pkg_dir / "__init__.py").write_text("")
+        (pkg_dir / "util.py").write_text('MSG = "hello"\n')
+        (script_dir / "init.py").write_text(
+            "from mypkg.util import MSG\nwz._test_msg = MSG\n"
+        )
+
+        engine = ScriptEngine(script_dir=str(script_dir))
+        engine.start()
+        norm_dir = os.path.normpath(str(script_dir))
+        try:
+            assert engine.wz._test_msg == "hello"
+
+            (pkg_dir / "util.py").write_text('MSG = "world"\n')
+            engine.reload()
+            assert engine.wz._test_msg == "world"
+        finally:
+            engine.stop()
+            sys.path[:] = [p for p in sys.path if p != norm_dir]
+            for name in list(sys.modules):
+                if name.startswith("mypkg"):
+                    del sys.modules[name]
+
+    def test_purge_only_removes_user_modules(self, tmp_path):
+        script_dir = tmp_path / "scripts"
+        script_dir.mkdir()
+
+        engine = ScriptEngine(script_dir=str(script_dir))
+
+        # Inject a fake user module under scripts dir
+        fake_mod = types.ModuleType("_wz_test_fake")
+        fake_mod.__file__ = str(script_dir / "fake.py")
+        sys.modules["_wz_test_fake"] = fake_mod
+
+        try:
+            engine._purge_user_modules()
+
+            # User module should be purged
+            assert "_wz_test_fake" not in sys.modules
+            # Stdlib module should remain
+            assert "json" in sys.modules or "os" in sys.modules
+        finally:
+            sys.modules.pop("_wz_test_fake", None)
+
+    def test_purge_no_false_positive_on_sibling_dir(self, tmp_path):
+        script_dir = tmp_path / "scripts"
+        script_dir.mkdir()
+        sibling_dir = tmp_path / "scripts-extra"
+        sibling_dir.mkdir()
+
+        engine = ScriptEngine(script_dir=str(script_dir))
+
+        fake_mod = types.ModuleType("_wz_test_sibling")
+        fake_mod.__file__ = str(sibling_dir / "foo.py")
+        sys.modules["_wz_test_sibling"] = fake_mod
+
+        try:
+            engine._purge_user_modules()
+            # Module in sibling dir must NOT be purged
+            assert "_wz_test_sibling" in sys.modules
+        finally:
+            sys.modules.pop("_wz_test_sibling", None)
+
+    def test_purge_handles_namespace_package(self, tmp_path):
+        script_dir = tmp_path / "scripts"
+        ns_dir = script_dir / "nspkg"
+        ns_dir.mkdir(parents=True)
+
+        engine = ScriptEngine(script_dir=str(script_dir))
+
+        # Namespace package: has __path__ but no __file__
+        fake_ns = types.ModuleType("_wz_test_nspkg")
+        fake_ns.__file__ = None
+        fake_ns.__path__ = [str(ns_dir)]
+        sys.modules["_wz_test_nspkg"] = fake_ns
+
+        try:
+            engine._purge_user_modules()
+            assert "_wz_test_nspkg" not in sys.modules
+        finally:
+            sys.modules.pop("_wz_test_nspkg", None)

@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, patch
 
 from wenzi.config import (
     DEFAULT_CONFIG,
-    DEFAULT_CONFIG_DIR,
     ConfigError,
     load_config,
     resolve_config_dir,
@@ -482,7 +481,9 @@ class TestResolveConfigDir:
     def test_falls_back_to_default_when_no_preference(self, mock_read):
         mock_read.return_value = None
         result = resolve_config_dir(None)
-        assert result == os.path.expanduser(DEFAULT_CONFIG_DIR)
+        # DEFAULT_CONFIG_DIR may be patched by conftest; read the live value
+        import wenzi.config as _cfg
+        assert result == os.path.expanduser(_cfg.DEFAULT_CONFIG_DIR)
 
     @patch("wenzi.config._read_user_defaults_config_dir")
     def test_explicit_argument_overrides_user_defaults(self, mock_read):

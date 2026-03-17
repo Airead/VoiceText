@@ -532,6 +532,10 @@ function setEnhanceLoading() {
 function setEnhanceOff() {
     document.getElementById('enhance-info').textContent = 'Off';
     document.getElementById('enhance-text').innerHTML = '';
+    const _pb = document.getElementById('prompt-btn');
+    _pb.classList.add('disabled'); _pb.style.opacity = '0.3';
+    const _tb = document.getElementById('thinking-btn');
+    _tb.classList.add('disabled'); _tb.style.opacity = '0.3';
 }
 
 function setEnhanceComplete(info, hasThinking, finalText) {
@@ -547,7 +551,8 @@ function setEnhanceComplete(info, hasThinking, finalText) {
 }
 
 function enablePromptButton() {
-    document.getElementById('prompt-btn').classList.remove('disabled');
+    const pb = document.getElementById('prompt-btn');
+    pb.classList.remove('disabled'); pb.style.opacity = '1';
 }
 
 function setFinalText(text) {
@@ -652,6 +657,21 @@ function loadHistoryRecord(data) {
     // Update final text
     document.getElementById('final-text').value = data.finalText;
     userEdited = false;
+
+    // Prompt button
+    const pb = document.getElementById('prompt-btn');
+    if (data.hasPrompt) {
+        pb.classList.remove('disabled'); pb.style.opacity = '1';
+    } else {
+        pb.classList.add('disabled'); pb.style.opacity = '0.3';
+    }
+    // Thinking button
+    const tb = document.getElementById('thinking-btn');
+    if (data.hasThinking) {
+        tb.classList.remove('disabled'); tb.style.opacity = '1';
+    } else {
+        tb.classList.add('disabled'); tb.style.opacity = '0.3';
+    }
 
     // Audio buttons
     const playBtn = document.getElementById('play-btn');
@@ -1177,6 +1197,8 @@ class ResultPreviewPanel:
         enhance_mode: str,
         has_audio: bool,
         asr_info: str = "",
+        system_prompt: str = "",
+        thinking_text: str = "",
     ) -> None:
         """Load a history record into the preview panel."""
         if self._webview is None:
@@ -1191,6 +1213,8 @@ class ResultPreviewPanel:
             "enhanceMode": enhance_mode,
             "hasAudio": has_audio,
             "asrInfo": asr_info,
+            "hasPrompt": bool(system_prompt),
+            "hasThinking": bool(thinking_text),
         }
 
         def _update():
@@ -1198,6 +1222,8 @@ class ResultPreviewPanel:
                 return
             self._asr_text = asr_text
             self._user_edited = False
+            self._system_prompt = system_prompt
+            self._thinking_text = thinking_text
             self._eval_js(f"loadHistoryRecord({json.dumps(data)})")
 
         AppHelper.callAfter(_update)
@@ -1259,6 +1285,8 @@ class ResultPreviewPanel:
 
         def _update():
             self._stop_loading_timer()
+            self._system_prompt = ""
+            self._thinking_text = ""
             if self._webview is not None:
                 self._eval_js("setEnhanceOff()")
                 if not self._user_edited:

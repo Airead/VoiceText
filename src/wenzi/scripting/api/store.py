@@ -8,9 +8,11 @@ import os
 import threading
 from typing import Any, List, Optional
 
+from wenzi.config import DEFAULT_SCRIPT_DATA_PATH
+
 logger = logging.getLogger(__name__)
 
-_DEFAULT_PATH = os.path.expanduser("~/.config/WenZi/script_data.json")
+_DEFAULT_PATH = os.path.expanduser(DEFAULT_SCRIPT_DATA_PATH)
 _FLUSH_DELAY = 2.0
 
 

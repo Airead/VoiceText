@@ -19,6 +19,8 @@ import time
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+from wenzi.config import DEFAULT_CLIPBOARD_IMAGES_DIR
+
 logger = logging.getLogger(__name__)
 
 # Pasteboard types that indicate concealed/transient/sensitive content.
@@ -46,7 +48,7 @@ def _mask_text(text: str) -> str:
     return f"{text[:2]}..{text[-2:]}"
 _MIN_IMAGE_DIM = 4  # ignore images smaller than 4×4 (tracking pixels, mock artifacts)
 
-_DEFAULT_IMAGE_DIR = os.path.expanduser("~/.config/WenZi/clipboard_images")
+_DEFAULT_IMAGE_DIR = os.path.expanduser(DEFAULT_CLIPBOARD_IMAGES_DIR)
 
 
 @dataclass
@@ -296,6 +298,7 @@ class ClipboardMonitor:
         self._image_dir = image_dir or _DEFAULT_IMAGE_DIR
         self._entries: List[ClipboardEntry] = []
         self._lock = threading.Lock()
+        self._version: int = 0
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._last_change_count: int = -1
@@ -330,6 +333,7 @@ class ClipboardMonitor:
         # Load into memory
         with self._lock:
             self._entries = self._db.load_all(self._max_days)
+            self._version += 1
         logger.info("Loaded %d clipboard history entries", len(self._entries))
 
     def _db_path(self) -> str:
@@ -356,6 +360,12 @@ class ClipboardMonitor:
         """Return a copy of the history (newest first)."""
         with self._lock:
             return list(self._entries)
+
+    @property
+    def version(self) -> int:
+        """Monotonic counter incremented on every entries mutation."""
+        with self._lock:
+            return self._version
 
     def start(self) -> None:
         """Start the background polling thread."""
@@ -391,6 +401,7 @@ class ClipboardMonitor:
         """Clear all history entries and associated image files."""
         with self._lock:
             self._entries.clear()
+            self._version += 1
         if self._db:
             self._db.delete_all()
         self._clear_image_dir()
@@ -493,6 +504,7 @@ class ClipboardMonitor:
                     self._entries.pop(i)
                     entry.timestamp = time.time()
                     self._entries.insert(0, entry)
+                    self._version += 1
                     break
             else:
                 return
@@ -507,6 +519,7 @@ class ClipboardMonitor:
                     self._entries.pop(i)
                     entry.timestamp = time.time()
                     self._entries.insert(0, entry)
+                    self._version += 1
                     break
             else:
                 return
@@ -519,6 +532,7 @@ class ClipboardMonitor:
             for i, entry in enumerate(self._entries):
                 if entry.text == text:
                     self._entries.pop(i)
+                    self._version += 1
                     break
             else:
                 return False
@@ -532,6 +546,7 @@ class ClipboardMonitor:
             for i, entry in enumerate(self._entries):
                 if entry.image_path == image_path:
                     self._entries.pop(i)
+                    self._version += 1
                     break
             else:
                 return False
@@ -570,6 +585,7 @@ class ClipboardMonitor:
             if self._entries and self._entries[0].image_path == filename:
                 return True  # already recorded, still counts as success
             self._entries.insert(0, entry)
+            self._version += 1
             removed = self._trim_expired_locked()
 
         if self._db:
@@ -674,6 +690,7 @@ class ClipboardMonitor:
             if self._entries and self._entries[0].text == text:
                 return
             self._entries.insert(0, entry)
+            self._version += 1
             removed = self._trim_expired_locked()
 
         if self._db:

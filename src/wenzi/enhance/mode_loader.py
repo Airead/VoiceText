@@ -8,11 +8,13 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
+from wenzi.config import DEFAULT_ENHANCE_MODES_DIR
+
 logger = logging.getLogger(__name__)
 
 MODE_OFF = "off"
 
-DEFAULT_MODES_DIR = os.path.join("~", ".config", "WenZi", "enhance_modes")
+DEFAULT_MODES_DIR = DEFAULT_ENHANCE_MODES_DIR
 
 
 @dataclass

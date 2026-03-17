@@ -25,6 +25,8 @@ class PreviewRecord:
     wav_data: Optional[bytes]
     audio_duration: float
     source: str  # "voice" | "clipboard"
+    system_prompt: str = ""
+    thinking_text: str = ""
 
 
 class PreviewHistoryStore:

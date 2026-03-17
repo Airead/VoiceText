@@ -14,6 +14,7 @@ import os
 import threading
 from typing import List, Optional
 
+from wenzi.config import DEFAULT_ICON_CACHE_DIR as _CFG_ICON_CACHE_DIR
 from wenzi.scripting.sources import (
     ChooserItem,
     ChooserSource,
@@ -24,7 +25,7 @@ from wenzi.scripting.sources import (
 logger = logging.getLogger(__name__)
 
 _ICON_SIZE = 32
-_DEFAULT_ICON_CACHE_DIR = os.path.expanduser("~/.config/WenZi/icon_cache")
+_DEFAULT_ICON_CACHE_DIR = os.path.expanduser(_CFG_ICON_CACHE_DIR)
 
 # Directories to scan for applications
 _APP_DIRS = [
