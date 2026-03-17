@@ -27,6 +27,7 @@ class PreviewRecord:
     source: str  # "voice" | "clipboard"
     system_prompt: str = ""
     thinking_text: str = ""
+    token_usage: dict | None = None
 
 
 class PreviewHistoryStore:

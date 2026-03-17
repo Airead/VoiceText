@@ -199,9 +199,43 @@ class TestSaveToPreviewHistory:
         assert rec.system_prompt == ""
         assert rec.thinking_text == ""
 
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_save_includes_token_usage(self, _mock_save, ctrl, mock_app):
+        usage = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+        result_holder = {
+            "enhanced_text": "Hello.",
+            "token_usage": usage,
+        }
+        mock_app._current_preview_asr_text = "hello"
+        mock_app._enhance_mode = "proofread"
+        mock_app._current_stt_model.return_value = "funasr"
+        mock_app._current_llm_model.return_value = "openai/gpt-4o"
+
+        ctrl._save_to_preview_history(
+            "ts1", "confirm", result_holder, None, 0.0, "voice",
+        )
+
+        rec = ctrl._preview_history.get(0)
+        assert rec.token_usage == usage
+
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_save_token_usage_none_when_missing(self, _mock_save, ctrl, mock_app):
+        result_holder = {"enhanced_text": "Hello."}
+        mock_app._current_preview_asr_text = "hello"
+        mock_app._enhance_mode = "proofread"
+        mock_app._current_stt_model.return_value = "funasr"
+        mock_app._current_llm_model.return_value = "openai/gpt-4o"
+
+        ctrl._save_to_preview_history(
+            "ts1", "confirm", result_holder, None, 0.0, "voice",
+        )
+
+        rec = ctrl._preview_history.get(0)
+        assert rec.token_usage is None
+
 
 class TestHandleHistoryConfirm:
-    """Tests for _handle_history_confirm system_prompt/thinking_text update."""
+    """Tests for _handle_history_confirm system_prompt/thinking_text/token_usage update."""
 
     @patch("wenzi.controllers.preview_controller.save_config")
     def test_updates_prompt_and_thinking_when_present(self, _mock_save, ctrl, mock_app):
@@ -238,9 +272,44 @@ class TestHandleHistoryConfirm:
         assert record.system_prompt == "keep"
         assert record.thinking_text == "keep think"
 
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_updates_token_usage_when_present(self, _mock_save, ctrl, mock_app):
+        old_usage = {"prompt_tokens": 50, "completion_tokens": 20, "total_tokens": 70}
+        new_usage = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+        record = _make_record(token_usage=old_usage)
+        ctrl._preview_history.add(record)
+
+        mock_app._enhance_mode = "proofread"
+        mock_app._current_stt_model.return_value = "funasr"
+        mock_app._current_llm_model.return_value = "openai/gpt-4o"
+
+        result_holder = {
+            "text": "Hello.",
+            "enhanced_text": "Hello.",
+            "token_usage": new_usage,
+        }
+
+        ctrl._handle_history_confirm(0, result_holder, None, 0.0, "voice")
+        assert record.token_usage == new_usage
+
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_preserves_token_usage_when_absent(self, _mock_save, ctrl, mock_app):
+        usage = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+        record = _make_record(token_usage=usage)
+        ctrl._preview_history.add(record)
+
+        mock_app._enhance_mode = "proofread"
+        mock_app._current_stt_model.return_value = "funasr"
+        mock_app._current_llm_model.return_value = "openai/gpt-4o"
+
+        result_holder = {"text": "Hello.", "enhanced_text": "Hello."}
+
+        ctrl._handle_history_confirm(0, result_holder, None, 0.0, "voice")
+        assert record.token_usage == usage
+
 
 class TestSelectHistory:
-    """Tests for on_select_history passing system_prompt/thinking_text."""
+    """Tests for on_select_history passing fields and syncing result_holder."""
 
     @patch("wenzi.controllers.preview_controller.save_config")
     def test_passes_prompt_and_thinking_to_panel(self, _mock_save, ctrl, mock_app):
@@ -260,6 +329,64 @@ class TestSelectHistory:
             call_kwargs[1].get("system_prompt") == "sys prompt"
         assert call_kwargs.kwargs.get("thinking_text") == "think text" or \
             call_kwargs[1].get("thinking_text") == "think text"
+
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_passes_token_usage_to_panel(self, _mock_save, ctrl, mock_app):
+        usage = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+        record = _make_record(
+            token_usage=usage,
+            wav_data=None,
+            audio_duration=0.0,
+        )
+        ctrl._preview_history.add(record)
+
+        ctrl.on_select_history(0)
+
+        call_kwargs = mock_app._preview_panel.load_history_record.call_args
+        assert call_kwargs.kwargs.get("token_usage") == usage or \
+            call_kwargs[1].get("token_usage") == usage
+
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_syncs_result_holder_with_record(self, _mock_save, ctrl, mock_app):
+        """Selecting history syncs result_holder to prevent stale data."""
+        usage = {"prompt_tokens": 80, "completion_tokens": 30, "total_tokens": 110}
+        record = _make_record(
+            enhanced_text="Record enhanced.",
+            system_prompt="record prompt",
+            thinking_text="record think",
+            token_usage=usage,
+            wav_data=None,
+            audio_duration=0.0,
+        )
+        ctrl._preview_history.add(record)
+
+        # Simulate an active preview session with stale data
+        ctrl._result_holder = {
+            "text": None,
+            "confirmed": False,
+            "enhanced_text": "Stale enhanced.",
+            "system_prompt": "stale prompt",
+            "thinking_text": "stale think",
+            "token_usage": {"prompt_tokens": 999, "total_tokens": 999},
+        }
+
+        ctrl.on_select_history(0)
+
+        assert ctrl._result_holder["enhanced_text"] == "Record enhanced."
+        assert ctrl._result_holder["system_prompt"] == "record prompt"
+        assert ctrl._result_holder["thinking_text"] == "record think"
+        assert ctrl._result_holder["token_usage"] == usage
+
+    @patch("wenzi.controllers.preview_controller.save_config")
+    def test_sync_skipped_when_result_holder_is_none(self, _mock_save, ctrl, mock_app):
+        """No crash when result_holder is None (e.g. direct test call)."""
+        record = _make_record(wav_data=None, audio_duration=0.0)
+        ctrl._preview_history.add(record)
+        ctrl._result_holder = None
+
+        ctrl.on_select_history(0)  # should not raise
+
+        mock_app._preview_panel.load_history_record.assert_called_once()
 
 
 class TestLogWithChainSteps:
@@ -358,6 +485,7 @@ class TestModeChangeResultHolder:
             "enhanced_text": "Hello.",
             "system_prompt": "old",
             "thinking_text": "old think",
+            "token_usage": {"total_tokens": 100},
         }
 
         ctrl.on_preview_mode_change("off")
@@ -365,12 +493,14 @@ class TestModeChangeResultHolder:
         assert ctrl._result_holder["enhanced_text"] is None
         assert ctrl._result_holder["system_prompt"] == ""
         assert ctrl._result_holder["thinking_text"] == ""
+        assert ctrl._result_holder["token_usage"] is None
 
     @patch("wenzi.controllers.preview_controller.save_config")
     def test_cache_hit_updates_result_holder(self, _mock_save, ctrl, mock_app):
+        cached_usage = {"prompt_tokens": 80, "completion_tokens": 30, "total_tokens": 110}
         cached = MagicMock()
         cached.display_text = "Hello."
-        cached.usage = None
+        cached.usage = cached_usage
         cached.system_prompt = "cached prompt"
         cached.thinking_text = "cached think"
         cached.final_text = "Hello."
@@ -383,3 +513,4 @@ class TestModeChangeResultHolder:
         assert ctrl._result_holder["enhanced_text"] == "Hello."
         assert ctrl._result_holder["system_prompt"] == "cached prompt"
         assert ctrl._result_holder["thinking_text"] == "cached think"
+        assert ctrl._result_holder["token_usage"] == cached_usage

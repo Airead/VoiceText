@@ -173,6 +173,7 @@ class PreviewController:
             source=source,
             system_prompt=result_holder.get("system_prompt", ""),
             thinking_text=result_holder.get("thinking_text", ""),
+            token_usage=result_holder.get("token_usage"),
         )
         self._preview_history.add(record)
 
@@ -217,6 +218,15 @@ class PreviewController:
         # Update internal state so confirm uses the correct ASR text
         app._current_preview_asr_text = record.asr_text
 
+        # Sync result_holder with the selected history record so that
+        # _handle_history_confirm sees the record's own values (not stale
+        # data from the current session's initial enhancement).
+        if self._result_holder is not None:
+            self._result_holder["enhanced_text"] = record.enhanced_text
+            self._result_holder["system_prompt"] = record.system_prompt
+            self._result_holder["thinking_text"] = record.thinking_text
+            self._result_holder["token_usage"] = record.token_usage
+
         # Load WAV data so Play/Save buttons work
         app._preview_panel._asr_wav_data = record.wav_data
 
@@ -234,6 +244,7 @@ class PreviewController:
             asr_info=asr_info,
             system_prompt=record.system_prompt,
             thinking_text=record.thinking_text,
+            token_usage=record.token_usage,
         )
 
     def _handle_history_confirm(
@@ -309,6 +320,8 @@ class PreviewController:
             record.system_prompt = result_holder["system_prompt"]
         if "thinking_text" in result_holder:
             record.thinking_text = result_holder["thinking_text"]
+        if "token_usage" in result_holder:
+            record.token_usage = result_holder["token_usage"]
 
         # Move to front so it won't be evicted first
         self._preview_history.move_to_front(history_index)
@@ -980,6 +993,7 @@ class PreviewController:
                 self._result_holder["enhanced_text"] = None
                 self._result_holder["system_prompt"] = ""
                 self._result_holder["thinking_text"] = ""
+                self._result_holder["token_usage"] = None
             return
 
         # Show loading state immediately as visual feedback
@@ -996,6 +1010,7 @@ class PreviewController:
                 self._result_holder["enhanced_text"] = cached.final_text
                 self._result_holder["system_prompt"] = cached.system_prompt
                 self._result_holder["thinking_text"] = cached.thinking_text
+                self._result_holder["token_usage"] = cached.usage
             return
 
         AppHelper.callAfter(app._preview_panel.set_enhance_loading)

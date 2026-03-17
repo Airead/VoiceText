@@ -215,6 +215,7 @@ class EnhanceController:
             result_holder["enhanced_text"] = enhanced
             result_holder["system_prompt"] = system_prompt
             result_holder["thinking_text"] = self._preview_panel._thinking_text
+            result_holder["token_usage"] = usage
 
         if collected:
             try:
@@ -377,6 +378,7 @@ class EnhanceController:
                 result_holder["system_prompt"] = system_prompt
                 result_holder["thinking_text"] = self._preview_panel._thinking_text
                 result_holder["is_chain"] = True
+                result_holder["token_usage"] = total_usage if total_usage["total_tokens"] > 0 else None
             self._preview_panel.set_enhance_complete(
                 request_id=request_id,
                 usage=total_usage if total_usage["total_tokens"] > 0 else None,

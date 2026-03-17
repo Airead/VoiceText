@@ -648,10 +648,10 @@ function loadHistoryRecord(data) {
     if (data.enhancedText) {
         document.getElementById('enhance-section').classList.remove('hidden');
         enhEl.textContent = data.enhancedText;
-        document.getElementById('enhance-info').textContent = data.enhanceMode || '';
+        setEnhanceInfo(data.enhanceInfo || data.enhanceMode || '');
     } else {
         enhEl.textContent = '';
-        document.getElementById('enhance-info').textContent = data.enhanceMode || 'Off';
+        setEnhanceInfo(data.enhanceMode || 'Off');
     }
 
     // Update final text
@@ -1199,6 +1199,7 @@ class ResultPreviewPanel:
         asr_info: str = "",
         system_prompt: str = "",
         thinking_text: str = "",
+        token_usage: dict | None = None,
     ) -> None:
         """Load a history record into the preview panel."""
         if self._webview is None:
@@ -1206,11 +1207,21 @@ class ResultPreviewPanel:
 
         from PyObjCTools import AppHelper
 
+        # Build enhance info: mode name + token suffix
+        token_suffix = self._format_token_suffix(token_usage)
+        if token_suffix and enhance_mode:
+            enhance_info = f"{enhance_mode}  {token_suffix}"
+        elif token_suffix:
+            enhance_info = token_suffix
+        else:
+            enhance_info = enhance_mode or ""
+
         data = {
             "asrText": asr_text,
             "enhancedText": enhanced_text,
             "finalText": final_text,
             "enhanceMode": enhance_mode,
+            "enhanceInfo": enhance_info,
             "hasAudio": has_audio,
             "asrInfo": asr_info,
             "hasPrompt": bool(system_prompt),

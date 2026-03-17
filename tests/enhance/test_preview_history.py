@@ -171,3 +171,20 @@ class TestPreviewHistoryStore:
         rec = store.get(0)
         assert rec.system_prompt == "You are helpful."
         assert rec.thinking_text == "Let me think..."
+
+    def test_token_usage_default_is_none(self):
+        r = _make_record()
+        assert r.token_usage is None
+
+    def test_token_usage_stored(self):
+        usage = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+        store = PreviewHistoryStore()
+        store.add(_make_record(token_usage=usage))
+        rec = store.get(0)
+        assert rec.token_usage == usage
+        assert rec.token_usage["total_tokens"] == 150
+
+    def test_token_usage_none_when_not_provided(self):
+        store = PreviewHistoryStore()
+        store.add(_make_record())
+        assert store.get(0).token_usage is None
