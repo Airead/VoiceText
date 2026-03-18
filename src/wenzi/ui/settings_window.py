@@ -157,6 +157,7 @@ class SettingsPanel:
                 - on_llm_select: (provider, model) -> None
                 - on_llm_add_provider: () -> None
                 - on_llm_remove_provider: (provider) -> None
+                - on_model_timeout: (value) -> None
                 - on_enhance_mode_select: (mode_id) -> None
                 - on_enhance_add_mode: () -> None
                 - on_thinking_toggle: (enabled) -> None
@@ -731,7 +732,7 @@ class SettingsPanel:
         llm_models = state.get("llm_models", [])
         current_llm = state.get("current_llm")
 
-        n_rows = len(llm_models) + 4
+        n_rows = len(llm_models) + 7
         total_h = max(content_h, n_rows * (self._CONTROL_HEIGHT + self._ROW_GAP) + 80)
 
         doc_view = NSView.alloc().initWithFrame_(
@@ -785,6 +786,25 @@ class SettingsPanel:
         remove_btn.setTarget_(self)
         remove_btn.setAction_(b"llmRemoveProviderClicked:")
         doc_view.addSubview_(remove_btn)
+
+        # --- Model Timeout section ---
+        y -= self._SECTION_GAP
+        y -= self._LABEL_HEIGHT
+        timeout_label = self._make_label("Model Timeout", pad, y, content_w, label_font)
+        doc_view.addSubview_(timeout_label)
+
+        y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
+        timeout_items = [(v, f"{v}s") for v in (5, 10, 15, 20, 30, 45, 60)]
+        current_timeout = state.get("model_timeout", 10)
+        self._model_timeout_popup = self._make_popup(
+            timeout_items, current_timeout,
+            pad + 12, y, 80, small_font,
+            b"modelTimeoutChanged:", doc_view,
+        )
+        y = self._add_hint(
+            "Maximum time to wait for a model response before giving up",
+            pad + 12, y, content_w - 24, doc_view,
+        )
 
         scroll.setDocumentView_(doc_view)
         tab_item.setView_(scroll)
@@ -1692,6 +1712,11 @@ class SettingsPanel:
 
     def llmRemoveProviderClicked_(self, sender):
         self._call("on_llm_remove_provider")
+
+    def modelTimeoutChanged_(self, sender):
+        value = sender.selectedItem().representedObject()
+        if value is not None:
+            self._call("on_model_timeout", int(value))
 
     def enhanceModeEditClicked_(self, sender):
         meta = self._get_meta(sender)

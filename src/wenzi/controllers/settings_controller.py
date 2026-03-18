@@ -113,6 +113,7 @@ class SettingsController:
             "stt_remote_models": stt_remote,
             "llm_models": llm_models,
             "current_llm": current_llm,
+            "model_timeout": app._config.get("ai_enhance", {}).get("connection_timeout", 10),
             "enhance_modes": enhance_modes,
             "current_enhance_mode": app._enhance_mode,
             "thinking": bool(app._enhancer and app._enhancer.thinking),
@@ -155,6 +156,7 @@ class SettingsController:
             "on_llm_select": self.llm_select,
             "on_llm_add_provider": lambda: app._model_controller.on_enhance_add_provider(None),
             "on_llm_remove_provider": self.llm_remove_provider,
+            "on_model_timeout": self.model_timeout_change,
             "on_enhance_mode_select": self.enhance_mode_select,
             "on_enhance_mode_edit": self.enhance_mode_edit,
             "on_enhance_add_mode": lambda: app._on_enhance_add_mode(None),
@@ -656,6 +658,16 @@ class SettingsController:
                 item = app._llm_remove_provider_items.get(first_name)
                 if item:
                     app._model_controller.on_enhance_remove_provider(item)
+
+    def model_timeout_change(self, value: int) -> None:
+        """Handle model timeout change from Settings panel."""
+        app = self._app
+        if app._enhancer:
+            app._enhancer._connection_timeout = value
+        app._config.setdefault("ai_enhance", {})
+        app._config["ai_enhance"]["connection_timeout"] = value
+        self._save_and_reload()
+        logger.info("Model connection timeout set to: %ds (from settings)", value)
 
     def enhance_mode_edit(self, mode_id: str) -> None:
         """Open the enhance mode markdown file in TextEdit."""

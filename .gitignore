@@ -35,6 +35,8 @@ htmlcov/
 .idea/
 .vscode/
 *.swp
+*~
+*.un~
 
 # Logs
 logs/

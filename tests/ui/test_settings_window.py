@@ -59,6 +59,7 @@ def _make_callbacks():
         "on_stt_select",
         "on_stt_remote_select", "on_stt_add_provider", "on_stt_remove_provider",
         "on_llm_select", "on_llm_add_provider", "on_llm_remove_provider",
+        "on_model_timeout",
         "on_enhance_mode_select", "on_enhance_add_mode", "on_enhance_mode_edit",
         "on_thinking_toggle", "on_vocab_toggle", "on_auto_build_toggle",
         "on_history_toggle", "on_vocab_build",
@@ -304,6 +305,15 @@ class TestSettingsCallbacks:
         panel.enhanceModeEditClicked_(sender)
 
         cbs["on_enhance_mode_edit"].assert_called_once_with("proofread")
+
+    def test_model_timeout_calls_callback(self):
+        panel, cbs = self._make_panel()
+
+        sender = MagicMock()
+        sender.selectedItem().representedObject.return_value = 60
+        panel.modelTimeoutChanged_(sender)
+
+        cbs["on_model_timeout"].assert_called_once_with(60)
 
 
 class TestEnhanceModeOrder:

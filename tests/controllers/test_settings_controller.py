@@ -302,6 +302,21 @@ class TestHistoryToggle:
         ctrl.history_toggle(True)  # Should not raise
 
 
+class TestModelTimeoutChange:
+    @patch("wenzi.controllers.settings_controller.save_config")
+    def test_change_timeout(self, mock_save, ctrl, mock_app):
+        ctrl.model_timeout_change(20)
+
+        assert mock_app._enhancer._connection_timeout == 20
+        assert mock_app._config["ai_enhance"]["connection_timeout"] == 20
+
+    @patch("wenzi.controllers.settings_controller.save_config")
+    def test_no_enhancer(self, mock_save, ctrl, mock_app):
+        mock_app._enhancer = None
+        ctrl.model_timeout_change(20)  # Should not raise
+        assert mock_app._config["ai_enhance"]["connection_timeout"] == 20
+
+
 class TestEnhanceModeEdit:
     def test_opens_textedit(self, ctrl):
         with patch("subprocess.Popen") as mock_popen:
