@@ -303,7 +303,7 @@ class WenZiApp(StatusBarApp):
         self._auto_vocab_builder = AutoVocabBuilder(
             config=self._config,
             enabled=vocab_cfg.get("auto_build", True),
-            threshold=vocab_cfg.get("auto_build_threshold", 10),
+            threshold=50,
             on_build_done=self._update_vocab_title,
             on_status_update=self._on_auto_vocab_status,
             conversation_history=self._conversation_history,

@@ -314,7 +314,7 @@ Output only the processed text without any explanation."""
                     progress_panel.clear_stream_text(),
                     progress_panel.update_status(f"Batch {i}/{t} — retrying..."),
                 ),
-                on_usage_update=lambda p, c, t: progress_panel.update_token_usage(p, c, t),
+                on_usage_update=lambda i, c, o, t: progress_panel.update_token_usage(i, c, o, t),
             )
 
             old_status = app._current_status

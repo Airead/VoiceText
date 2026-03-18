@@ -295,7 +295,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "embedding_model": "paraphrase-multilingual-MiniLM-L12-v2",
             "build_timeout": 600,
             "auto_build": True,
-            "auto_build_threshold": 10,
             "build_provider": "",
             "build_model": "",
         },

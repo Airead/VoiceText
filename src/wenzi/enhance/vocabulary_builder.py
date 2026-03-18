@@ -27,7 +27,7 @@ class BuildCallbacks:
     on_stream_chunk: Optional[Callable[[str], None]] = None  # (chunk_text)
     on_batch_done: Optional[Callable[[int, int, int], None]] = None  # (batch_idx, total, entries_count)
     on_batch_retry: Optional[Callable[[int, int], None]] = None  # (batch_idx, total)
-    on_usage_update: Optional[Callable[[int, int, int], None]] = None  # (prompt, completion, total)
+    on_usage_update: Optional[Callable[[int, int, int, int], None]] = None  # (input, cached, output, total)
 
 
 class VocabularyBuilder:
@@ -43,7 +43,7 @@ class VocabularyBuilder:
         self._data_dir = os.path.expanduser(data_dir)
         self._conversation_history = conversation_history or ConversationHistory(data_dir=self._data_dir)
         self._vocab_path = os.path.join(self._data_dir, "vocabulary.json")
-        self._batch_size = 20
+        self._batch_size = config.get("vocabulary", {}).get("batch_size", 60)
         self._batch_timeout = config.get("vocabulary", {}).get("build_timeout", 600)
 
     async def build(
@@ -53,6 +53,11 @@ class VocabularyBuilder:
         callbacks: Optional[BuildCallbacks] = None,
     ) -> Dict[str, Any]:
         """Build or update the vocabulary from correction logs.
+
+        Uses a multi-turn session when records exceed batch_size to leverage
+        KV cache: the system prompt and prior turns are cached by the
+        provider, and the LLM naturally avoids duplicate extractions by
+        seeing its previous responses.
 
         Args:
             full_rebuild: If True, reprocess all corrections from scratch.
@@ -79,13 +84,17 @@ class VocabularyBuilder:
         batches = self._batch_records(records, self._batch_size)
         logger.info("Processing %d records in %d batches", len(records), len(batches))
         all_new_entries: List[Dict[str, Any]] = []
-        total_usage: Dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        total_usage: Dict[str, int] = {
+            "input_tokens": 0, "cached_tokens": 0,
+            "output_tokens": 0, "total_tokens": 0,
+        }
         merged_entries = list(existing.get("entries", []))
         records_processed = 0
         cancelled = False
         aborted = False
 
         provider_cfg = self._get_provider_config()
+        existing_terms = [e.get("term", "") for e in merged_entries if e.get("term")]
 
         if callbacks and callbacks.on_progress_init:
             callbacks.on_progress_init(len(records), self._batch_size)
@@ -100,6 +109,12 @@ class VocabularyBuilder:
                 api_key=provider_cfg["api_key"],
             )
 
+        # Multi-turn session: system prompt is shared, conversation accumulates
+        system_prompt = self._build_system_prompt(existing_terms)
+        messages: List[Dict[str, str]] = [
+            {"role": "system", "content": system_prompt},
+        ]
+
         try:
             for i, batch in enumerate(batches, 1):
                 if cancel_event is not None and cancel_event.is_set():
@@ -107,9 +122,14 @@ class VocabularyBuilder:
                     cancelled = True
                     break
 
+                # Prepare once before retry loop
+                user_prompt = self._build_user_prompt(batch)
+                on_chunk = callbacks.on_stream_chunk if callbacks else None
+
                 # Try extraction with one retry on failure
                 extracted = None
                 batch_usage: Dict[str, int] = {}
+                response_text = ""
                 for attempt in range(2):
                     try:
                         if attempt == 0:
@@ -127,9 +147,9 @@ class VocabularyBuilder:
                             "Extracting batch %d/%d (%d records, attempt %d)...",
                             i, len(batches), len(batch), attempt + 1,
                         )
-                        on_chunk = callbacks.on_stream_chunk if callbacks else None
-                        extracted, batch_usage = await self._extract_batch(
-                            batch, client=client, on_stream_chunk=on_chunk
+                        extracted, batch_usage, response_text = await self._extract_batch(
+                            messages, user_prompt, client=client,
+                            on_stream_chunk=on_chunk, cancel_event=cancel_event,
                         )
                         break
                     except Exception as e:
@@ -151,13 +171,26 @@ class VocabularyBuilder:
                         aborted = True
                     break
 
+                # Mid-stream cancel: _extract_batch returned empty results
+                if cancel_event is not None and cancel_event.is_set() and not extracted:
+                    logger.info("Build cancelled mid-stream at batch %d/%d", i, len(batches))
+                    cancelled = True
+                    break
+
+                # Append this turn to the session for KV cache continuity
+                # (skip empty responses to avoid polluting session history)
+                if response_text:
+                    messages.append({"role": "user", "content": user_prompt})
+                    messages.append({"role": "assistant", "content": response_text})
+
                 # Batch succeeded — accumulate results
                 for key in total_usage:
                     total_usage[key] += batch_usage.get(key, 0)
                 if callbacks and callbacks.on_usage_update:
                     callbacks.on_usage_update(
-                        total_usage["prompt_tokens"],
-                        total_usage["completion_tokens"],
+                        total_usage["input_tokens"],
+                        total_usage["cached_tokens"],
+                        total_usage["output_tokens"],
                         total_usage["total_tokens"],
                     )
                 logger.info("Batch %d/%d: extracted %d entries", i, len(batches), len(extracted))
@@ -205,11 +238,14 @@ class VocabularyBuilder:
 
         logger.info(
             "Vocabulary built: %d/%d records, %d new entries, %d total entries, "
-            "%d tokens used%s",
+            "tokens(input=%d, cached=%d, output=%d, total=%d)%s",
             records_processed,
             len(records),
             summary["new_entries"],
             summary["total_entries"],
+            total_usage["input_tokens"],
+            total_usage["cached_tokens"],
+            total_usage["output_tokens"],
             total_usage["total_tokens"],
             status_suffix,
         )
@@ -230,17 +266,11 @@ class VocabularyBuilder:
             for i in range(0, len(records), batch_size)
         ]
 
-    def _build_extraction_prompt(self, batch: List[Dict[str, Any]]) -> str:
-        """Build the LLM prompt for vocabulary extraction."""
-        records_text = ""
-        for r in batch:
-            asr = r.get("asr_text", "")
-            final = r.get("final_text", "")
-            records_text += f"asr_text: {asr}\nfinal_text: {final}\n\n"
-
-        return (
-            "你是一个词汇提取助手。请从以下语音识别纠错记录中提取有价值的词汇。\n\n"
-            "每条记录包含：asr_text（ASR原始结果，可能有错）和 final_text（用户确认的正确文本）。\n\n"
+    def _build_system_prompt(self, existing_terms: List[str]) -> str:
+        """Build the system prompt (shared across all batches for KV cache)."""
+        prompt = (
+            "你是一个词汇提取助手。请从语音识别纠错记录中提取有价值的词汇。\n\n"
+            "每条纠错记录格式为 ASR原文 → 正确文本，一行一条。\n\n"
             "请提取专有名词、技术术语、常用短语，以及ASR容易识别错误的词汇。\n"
             "以管道符分隔的文本格式输出，第一行为表头，之后每行一个词条。\n"
             "字段：term|category|variants|context\n"
@@ -252,86 +282,136 @@ class VocabularyBuilder:
             "term|category|variants|context\n"
             "Python|tech|派森|编程语言\n"
             "Kubernetes|tech|库伯尼特斯,酷伯|容器编排\n\n"
-            "只输出表头和数据行，不要输出其他内容。\n\n"
-            "纠错记录：\n"
-            f"{records_text}"
+            "只输出表头和数据行，不要输出其他内容。\n"
         )
+
+        if existing_terms:
+            terms_list = ", ".join(existing_terms)
+            prompt += (
+                "\n以下词条已存在于词库中，无需重复提取：\n"
+                f"{terms_list}\n"
+            )
+
+        return prompt
+
+    @staticmethod
+    def _build_user_prompt(batch: List[Dict[str, Any]]) -> str:
+        """Build the user prompt with correction records for a single batch."""
+        lines = []
+        for r in batch:
+            asr = r.get("asr_text", "").replace("\n", "\u23ce")
+            final = r.get("final_text", "").replace("\n", "\u23ce")
+            lines.append(f"{asr} → {final}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _extract_usage(usage_obj: Any) -> Dict[str, int]:
+        """Extract token usage from an OpenAI-compatible usage object.
+
+        Handles both prompt_tokens_details.cached_tokens (OpenAI) and
+        providers that don't support cached token reporting.
+        """
+        if usage_obj is None:
+            return {}
+        input_tokens = usage_obj.prompt_tokens or 0
+        output_tokens = usage_obj.completion_tokens or 0
+        total_tokens = usage_obj.total_tokens or 0
+
+        # Extract cached tokens from prompt_tokens_details if available
+        cached_tokens = 0
+        details = getattr(usage_obj, "prompt_tokens_details", None)
+        if details is not None:
+            cached_tokens = getattr(details, "cached_tokens", 0) or 0
+
+        return {
+            "input_tokens": input_tokens,
+            "cached_tokens": cached_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+        }
 
     async def _extract_batch(
         self,
-        batch: List[Dict[str, Any]],
+        messages: List[Dict[str, str]],
+        user_prompt: str,
         *,
         client: Any = None,
         on_stream_chunk: Optional[Callable[[str], None]] = None,
-    ) -> tuple[List[Dict[str, Any]], Dict[str, int]]:
+        cancel_event: Optional[threading.Event] = None,
+    ) -> tuple[List[Dict[str, Any]], Dict[str, int], str]:
         """Call LLM to extract vocabulary entries from a batch of records.
 
+        Uses the accumulated messages list (multi-turn session) to leverage
+        KV cache on the shared prefix (system prompt + prior turns).
+
         Args:
-            batch: Records to process.
+            messages: Accumulated session messages (system + prior turns).
+            user_prompt: The user prompt for this batch.
             client: AsyncOpenAI client to use for API calls.
             on_stream_chunk: If provided, use streaming mode and call this
                 with each text chunk as it arrives.
+            cancel_event: If set during streaming, the extraction is
+                interrupted and returns empty results.
 
         Returns:
-            A tuple of (entries, usage) where usage has prompt_tokens,
-            completion_tokens, total_tokens.
+            A tuple of (entries, usage, response_text).
         """
         provider_cfg = self._get_provider_config()
         if not provider_cfg or client is None:
             logger.warning("No AI provider configured for vocabulary extraction")
-            return [], {}
+            return [], {}, ""
 
         model = provider_cfg["model"]
-        prompt = self._build_extraction_prompt(batch)
         extra_body = build_thinking_body(model, enabled=False)
         usage: Dict[str, int] = {}
+
+        # Build messages for this turn: session history + new user message
+        turn_messages = messages + [{"role": "user", "content": user_prompt}]
 
         if on_stream_chunk is not None:
             # Streaming path — request usage in final chunk
             stream_options = {"include_usage": True}
+            cancelled = False
             async with asyncio.timeout(self._batch_timeout):
                 async with await client.chat.completions.create(
                     model=model,
-                    messages=[{"role": "user", "content": prompt}],
+                    messages=turn_messages,
                     stream=True,
                     stream_options=stream_options,
                     extra_body=extra_body,
                 ) as stream:
                     parts: List[str] = []
                     async for chunk in stream:
+                        if cancel_event is not None and cancel_event.is_set():
+                            logger.info("Streaming cancelled mid-batch")
+                            cancelled = True
+                            break
                         if chunk.choices and chunk.choices[0].delta.content:
                             delta = chunk.choices[0].delta.content
                             parts.append(delta)
                             on_stream_chunk(delta)
                         if chunk.usage is not None:
-                            usage = {
-                                "prompt_tokens": chunk.usage.prompt_tokens or 0,
-                                "completion_tokens": chunk.usage.completion_tokens or 0,
-                                "total_tokens": chunk.usage.total_tokens or 0,
-                            }
+                            usage = self._extract_usage(chunk.usage)
+                if cancelled:
+                    return [], usage, ""
                 content = "".join(parts)
         else:
-            # Non-streaming path (backward compatible)
+            # Non-streaming path
             response = await asyncio.wait_for(
                 client.chat.completions.create(
                     model=model,
-                    messages=[{"role": "user", "content": prompt}],
+                    messages=turn_messages,
                     extra_body=extra_body,
                 ),
                 timeout=self._batch_timeout,
             )
             content = response.choices[0].message.content
-            if response.usage is not None:
-                usage = {
-                    "prompt_tokens": response.usage.prompt_tokens or 0,
-                    "completion_tokens": response.usage.completion_tokens or 0,
-                    "total_tokens": response.usage.total_tokens or 0,
-                }
+            usage = self._extract_usage(response.usage)
 
         if not content:
-            return [], usage
+            return [], usage, ""
 
-        return self._parse_llm_response(content), usage
+        return self._parse_llm_response(content), usage, content
 
     def _resolve_provider_and_model(self) -> tuple[str, str]:
         """Resolve the effective provider name and model for vocab building.
@@ -443,41 +523,92 @@ class VocabularyBuilder:
         existing: List[Dict[str, Any]],
         new_entries: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
-        """Merge new entries into existing, deduplicating by term."""
-        # Index existing by term
+        """Merge new entries into existing, deduplicating by term.
+
+        Deduplication uses case-insensitive, stripped term as the key.
+        When merging, the preferred term form is chosen (non-all-lowercase
+        wins over all-lowercase), variants are deduplicated
+        case-insensitively, and self-referencing variants are removed.
+        """
         by_term: Dict[str, Dict[str, Any]] = {}
+
         for entry in existing:
-            term = entry.get("term", "")
-            if term:
-                by_term[term] = entry
+            self._merge_into(by_term, entry)
 
         for entry in new_entries:
-            term = entry.get("term", "")
-            if not term:
-                continue
+            self._merge_into(by_term, entry)
 
-            if term in by_term:
-                # Merge: union variants, accumulate frequency
-                existing_entry = by_term[term]
-                existing_variants = set(existing_entry.get("variants", []))
-                new_variants = set(entry.get("variants", []))
-                existing_entry["variants"] = sorted(
-                    existing_variants | new_variants
-                )
-                existing_entry["frequency"] = existing_entry.get("frequency", 1) + 1
-                # Update context if new one is non-empty and existing is empty
-                if entry.get("context") and not existing_entry.get("context"):
-                    existing_entry["context"] = entry["context"]
-            else:
-                by_term[term] = {
-                    "term": term,
-                    "category": entry.get("category", "other"),
-                    "variants": entry.get("variants", []),
-                    "context": entry.get("context", ""),
-                    "frequency": 1,
-                }
+        # Remove self-referencing variants (variant matches term, case-insensitive)
+        for entry in by_term.values():
+            term_key = entry["term"].lower().strip()
+            entry["variants"] = [
+                v for v in entry["variants"]
+                if v.lower().strip() != term_key
+            ]
 
         return list(by_term.values())
+
+    @staticmethod
+    def _merge_into(
+        by_term: Dict[str, Dict[str, Any]],
+        entry: Dict[str, Any],
+    ) -> None:
+        """Merge a single entry into the by_term index.
+
+        Uses term.lower().strip() as the dedup key. Frequencies are summed,
+        variants are merged case-insensitively (first-seen form kept), and
+        context is filled in when the existing one is empty.
+        If the incoming term is not all-lowercase but the stored one is,
+        the stored term form is upgraded.
+        """
+        term = entry.get("term", "")
+        if not term:
+            return
+        key = term.lower().strip()
+        if not key:
+            return
+
+        if key in by_term:
+            existing_entry = by_term[key]
+
+            # Upgrade term form: prefer non-all-lowercase over all-lowercase
+            if existing_entry["term"].islower() and not term.islower():
+                existing_entry["term"] = term
+
+            # Merge variants case-insensitively, keeping first-seen form
+            seen: Dict[str, str] = {}
+            for v in existing_entry.get("variants", []):
+                v_stripped = v.strip()
+                if not v_stripped:
+                    continue
+                v_key = v_stripped.lower()
+                if v_key not in seen:
+                    seen[v_key] = v_stripped
+            for v in entry.get("variants", []):
+                v_stripped = v.strip()
+                if not v_stripped:
+                    continue
+                v_key = v_stripped.lower()
+                if v_key not in seen:
+                    seen[v_key] = v_stripped
+            existing_entry["variants"] = sorted(seen.values())
+
+            # Sum frequencies
+            existing_entry["frequency"] = (
+                existing_entry.get("frequency", 1) + entry.get("frequency", 1)
+            )
+
+            # Update context if new one is non-empty and existing is empty
+            if entry.get("context") and not existing_entry.get("context"):
+                existing_entry["context"] = entry["context"]
+        else:
+            by_term[key] = {
+                "term": term,
+                "category": entry.get("category", "other"),
+                "variants": [v.strip() for v in entry.get("variants", []) if v.strip()],
+                "context": entry.get("context", ""),
+                "frequency": entry.get("frequency", 1),
+            }
 
     def _load_existing_vocabulary(self) -> Dict[str, Any]:
         """Load existing vocabulary.json if it exists."""

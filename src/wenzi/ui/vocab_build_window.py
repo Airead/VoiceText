@@ -27,8 +27,6 @@ class VocabBuildProgressPanel:
     _PANEL_WIDTH = 520
     _STREAM_HEIGHT = 280
     _LABEL_HEIGHT = 20
-    _BUTTON_HEIGHT = 32
-    _BUTTON_WIDTH = 90
     _PADDING = 12
 
     def __init__(self) -> None:
@@ -117,7 +115,9 @@ class VocabBuildProgressPanel:
 
         AppHelper.callAfter(_append)
 
-    def update_token_usage(self, prompt: int, completion: int, total: int) -> None:
+    def update_token_usage(
+        self, input_tokens: int, cached_tokens: int, output_tokens: int, total: int
+    ) -> None:
         """Update the token usage label with confirmed totals. Thread-safe.
 
         Resets the streaming character counter since the batch is done.
@@ -128,8 +128,10 @@ class VocabBuildProgressPanel:
 
         def _update():
             if self._token_label is not None:
+                cached_info = f", cached {cached_tokens:,}" if cached_tokens else ""
                 self._token_label.setStringValue_(
-                    f"Tokens: {total:,}  (prompt {prompt:,} + completion {completion:,})"
+                    f"Tokens: {total:,}  (input {input_tokens:,}{cached_info}"
+                    f" + output {output_tokens:,})"
                 )
 
         AppHelper.callAfter(_update)
@@ -156,6 +158,12 @@ class VocabBuildProgressPanel:
                 self._close_delegate = None
                 self._panel.orderOut_(None)
                 self._panel = None
+            # Clear all UI references so background callbacks become no-ops
+            self._stream_text_view = None
+            self._status_label = None
+            self._token_label = None
+            self._info_label = None
+            self._stream_font = None
             # Clear callback to prevent double-firing
             self._on_cancel = None
             # Restore accessory activation policy (statusbar-only)
@@ -169,7 +177,6 @@ class VocabBuildProgressPanel:
         from AppKit import (
             NSBackingStoreBuffered,
             NSBezelBorder,
-            NSButton,
             NSClosableWindowMask,
             NSColor,
             NSStatusWindowLevel,
@@ -184,7 +191,6 @@ class VocabBuildProgressPanel:
 
         content_height = (
             self._PADDING  # bottom
-            + self._BUTTON_HEIGHT + self._PADDING  # buttons
             + self._LABEL_HEIGHT + self._PADDING  # token label
             + self._STREAM_HEIGHT + self._PADDING  # stream view
             + self._LABEL_HEIGHT  # status label
@@ -214,24 +220,6 @@ class VocabBuildProgressPanel:
         inner_width = self._PANEL_WIDTH - 2 * self._PADDING
 
         y = self._PADDING
-
-        # Cancel button
-        cancel_btn = NSButton.alloc().initWithFrame_(
-            NSMakeRect(
-                (self._PANEL_WIDTH - self._BUTTON_WIDTH) / 2,
-                y,
-                self._BUTTON_WIDTH,
-                self._BUTTON_HEIGHT,
-            )
-        )
-        cancel_btn.setTitle_("Cancel")
-        cancel_btn.setBezelStyle_(1)
-        cancel_btn.setKeyEquivalent_("\x1b")  # ESC
-        cancel_btn.setTarget_(self)
-        cancel_btn.setAction_(b"cancelClicked:")
-        content_view.addSubview_(cancel_btn)
-
-        y += self._BUTTON_HEIGHT + self._PADDING
 
         # Streaming output (NSScrollView + NSTextView)
         scroll_frame = NSMakeRect(self._PADDING, y, inner_width, self._STREAM_HEIGHT)
@@ -287,8 +275,8 @@ class VocabBuildProgressPanel:
 
         self._panel = panel
 
-    def cancelClicked_(self, sender) -> None:
-        """Handle cancel button click."""
+    def _on_close_button(self) -> None:
+        """Handle window close button (X) click."""
         callback = self._on_cancel
         self.close()
         if callback is not None:
@@ -311,7 +299,7 @@ def _get_panel_close_delegate_class():
 
             def windowWillClose_(self, notification):
                 if self._panel_ref is not None:
-                    self._panel_ref.cancelClicked_(None)
+                    self._panel_ref._on_close_button()
 
         _PanelCloseDelegate = VocabBuildPanelCloseDelegate
     return _PanelCloseDelegate

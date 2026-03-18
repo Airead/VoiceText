@@ -21,7 +21,7 @@ class AutoVocabBuilder:
         self,
         config: Dict[str, Any],
         enabled: bool = True,
-        threshold: int = 10,
+        threshold: int = 50,
         on_build_done: Optional[Callable[[], None]] = None,
         on_status_update: Optional[Callable[[str], None]] = None,
         conversation_history: Any = None,
@@ -117,7 +117,7 @@ class AutoVocabBuilder:
             # streaming entry count as real-time numerator within each batch,
             # snapping to actual records processed after each batch completes.
             total_records = 0
-            batch_size = 20
+            batch_size = 60
             records_completed = 0  # records from fully completed batches
             batch_entry_count = 0  # entries extracted in current batch (streaming)
             got_header = False

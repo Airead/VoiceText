@@ -64,12 +64,12 @@ class TestVocabBuildProgressPanel:
         mock_ns_panel.orderOut_.assert_called_with(None)
         assert panel._panel is None
 
-    def test_cancel_button_calls_callback(self, _mock_appkit):
+    def test_close_button_calls_callback(self, _mock_appkit):
         panel = self._make_panel()
         on_cancel = MagicMock()
         panel.show(on_cancel=on_cancel)
 
-        panel.cancelClicked_(None)
+        panel._on_close_button()
         on_cancel.assert_called_once()
 
     def test_close_when_already_closed(self, _mock_appkit):
@@ -99,18 +99,18 @@ class TestVocabBuildProgressPanel:
         cancelled = []
         panel.show(on_cancel=lambda: cancelled.append(True))
 
-        # Simulate close button via cancelClicked_ (same as windowWillClose: delegate)
-        panel.cancelClicked_(None)
+        # Simulate close button via _on_close_button (called by windowWillClose: delegate)
+        panel._on_close_button()
         assert cancelled == [True]
 
-    def test_cancel_via_close_only_fires_once(self, _mock_appkit):
-        """Cancel callback should not fire twice on repeated calls."""
+    def test_close_only_fires_callback_once(self, _mock_appkit):
+        """Cancel callback should not fire twice on repeated close."""
         panel = self._make_panel()
         cancel_count = []
         panel.show(on_cancel=lambda: cancel_count.append(1))
 
-        panel.cancelClicked_(None)
-        panel.cancelClicked_(None)
+        panel._on_close_button()
+        panel._on_close_button()
         assert len(cancel_count) == 1
 
     def test_close_clears_delegate(self, _mock_appkit):
