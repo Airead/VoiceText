@@ -589,6 +589,7 @@ searchInput.addEventListener('input', function() {
 
 // --- Keyboard navigation ---
 document.addEventListener('keydown', function(e) {
+    if (e.isComposing || e.keyCode === 229) return;
     // Discard leading space when input is empty
     if (e.key === ' ' && searchInput.value === '') {
         e.preventDefault();

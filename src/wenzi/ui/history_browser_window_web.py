@@ -462,6 +462,7 @@ closeBtn.addEventListener('click', () => post({type:'close'}));
 
 /* --- Keyboard --- */
 document.addEventListener('keydown', (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'Escape') {
         e.preventDefault();
         if (detail.style.display !== 'none') clearDetail();
