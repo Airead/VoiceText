@@ -873,8 +873,10 @@ class RecordingController:
         try:
             loop.run_until_complete(_stream())
         finally:
-            loop.run_until_complete(loop.shutdown_asyncgens())
-            loop.close()
+            try:
+                loop.run_until_complete(loop.shutdown_asyncgens())
+            finally:
+                loop.close()
 
         if usage:
             try:
@@ -984,5 +986,7 @@ class RecordingController:
             finally:
                 app._enhancer.mode = original_mode
         finally:
-            loop.run_until_complete(loop.shutdown_asyncgens())
-            loop.close()
+            try:
+                loop.run_until_complete(loop.shutdown_asyncgens())
+            finally:
+                loop.close()
