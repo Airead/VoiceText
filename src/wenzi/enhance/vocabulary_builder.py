@@ -140,12 +140,30 @@ class VocabularyBuilder:
             full_rebuild,
         )
         existing = self._load_existing_vocabulary()
+
+        # Read ALL correction records once — used for both batch processing
+        # and final frequency counting.
+        all_corrections = self._read_corrections(since=None)
+
         since = None
         if not full_rebuild and existing:
             since = existing.get("last_processed_timestamp")
             logger.info("Incremental build since: %s", since)
 
-        records = self._read_corrections(since=since)
+        # Filter to new records for LLM batch processing, capped to avoid
+        # excessive LLM calls when correction history is large.
+        max_records = self._config.get("vocabulary", {}).get("max_build_records", 300)
+        if since:
+            records = [r for r in all_corrections if r.get("timestamp", "") > since]
+        else:
+            records = list(all_corrections)
+        if len(records) > max_records:
+            logger.info(
+                "Capping LLM processing to most recent %d of %d records",
+                max_records, len(records),
+            )
+            records = records[-max_records:]
+
         if not records:
             logger.info("No new correction records to process")
             return {"new_records": 0, "new_entries": 0, "total_entries": len(existing.get("entries", []))}
@@ -159,6 +177,7 @@ class VocabularyBuilder:
         }
         merged_entries = list(existing.get("entries", []))
         records_processed = 0
+        last_processed_ts = existing.get("last_processed_timestamp", "")
         cancelled = False
         aborted = False
 
@@ -313,21 +332,22 @@ class VocabularyBuilder:
                 merged_entries = self._merge_entries(merged_entries, extracted)
                 # Update existing_terms for next batch's dedup hint
                 existing_terms = [e.get("term", "") for e in merged_entries if e.get("term")]
-                batch_last_ts = batch[-1].get("timestamp", datetime.now(timezone.utc).isoformat())
-                vocabulary = {
-                    "last_processed_timestamp": batch_last_ts,
-                    "built_at": datetime.now(timezone.utc).isoformat(),
-                    "built_with": {
-                        "provider": self._get_active_provider_name(),
-                        "model": provider_cfg["model"] if provider_cfg else "N/A",
-                        "usage": total_usage,
-                    },
-                    "entries": merged_entries,
-                }
-                self._save_vocabulary(vocabulary)
+                last_processed_ts = batch[-1].get("timestamp", datetime.now(timezone.utc).isoformat())
+                self._save_vocabulary(self._build_vocab_dict(
+                    last_processed_ts, provider_cfg, total_usage, merged_entries,
+                ))
         finally:
             if client is not None:
                 await client.close()
+
+        # Recount frequencies using ALL correction records for accuracy.
+        # This replaces the batch-extraction count with actual correction counts.
+        if merged_entries and all_corrections and records_processed > 0:
+            self._count_frequencies(merged_entries, all_corrections)
+            self._save_vocabulary(self._build_vocab_dict(
+                last_processed_ts, provider_cfg, total_usage, merged_entries,
+            ))
+            logger.info("Frequency recount complete using %d correction records", len(all_corrections))
 
         summary: Dict[str, Any] = {
             "new_records": records_processed,
@@ -877,6 +897,50 @@ class VocabularyBuilder:
                 "frequency": entry.get("frequency", 1),
             }
 
+    def _count_frequencies(
+        self,
+        entries: List[Dict[str, Any]],
+        records: List[Dict[str, Any]],
+    ) -> None:
+        """Recount entry frequencies based on actual correction evidence.
+
+        For each entry, counts correction records where:
+        1. A known variant appears in ``asr_text`` (known misrecognition), OR
+        2. The term appears in ``final_text`` but NOT in ``asr_text``
+           (unknown misrecognition or ASR omission).
+
+        Mutates each entry's ``"frequency"`` in place.
+        """
+        # Pre-compute lowercased texts once (avoids redundant .lower() per entry)
+        record_texts = [
+            (r.get("asr_text", "").lower(), r.get("final_text", "").lower())
+            for r in records
+        ]
+
+        for entry in entries:
+            term_lower = entry.get("term", "").lower()
+            if not term_lower:
+                continue
+            variant_lowers = [
+                v.lower() for v in entry.get("variants", []) if v.strip()
+            ]
+
+            count = 0
+            for asr, final in record_texts:
+                # Condition 1: known variant in ASR text
+                if any(self._term_in_texts(v, asr) for v in variant_lowers):
+                    count += 1
+                    continue
+
+                # Condition 2: term in final but not in ASR (unknown misrecognition)
+                if (
+                    self._term_in_texts(term_lower, final)
+                    and not self._term_in_texts(term_lower, asr)
+                ):
+                    count += 1
+
+            entry["frequency"] = max(count, 1)
+
     def _load_existing_vocabulary(self) -> Dict[str, Any]:
         """Load existing vocabulary.json if it exists."""
         if not os.path.exists(self._vocab_path):
@@ -888,6 +952,25 @@ class VocabularyBuilder:
         except Exception as e:
             logger.warning("Failed to load existing vocabulary: %s", e)
             return {}
+
+    def _build_vocab_dict(
+        self,
+        last_processed_ts: str,
+        provider_cfg: Optional[Dict[str, Any]],
+        total_usage: Dict[str, int],
+        entries: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Build the vocabulary dict for saving to JSON."""
+        return {
+            "last_processed_timestamp": last_processed_ts,
+            "built_at": datetime.now(timezone.utc).isoformat(),
+            "built_with": {
+                "provider": self._get_active_provider_name(),
+                "model": provider_cfg["model"] if provider_cfg else "N/A",
+                "usage": total_usage,
+            },
+            "entries": entries,
+        }
 
     def _save_vocabulary(self, vocabulary: Dict[str, Any]) -> None:
         """Save vocabulary to JSON file."""

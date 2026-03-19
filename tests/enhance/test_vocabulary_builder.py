@@ -685,6 +685,117 @@ class TestMergeEntries:
         assert set(result[0]["variants"]) == {"派森", "拍森"}
 
 
+class TestCountFrequencies:
+    """Tests for _count_frequencies — actual correction counting."""
+
+    def _make_records(self, pairs):
+        """Create correction records from (asr_text, final_text) pairs."""
+        return [
+            {"asr_text": asr, "final_text": final, "user_corrected": True}
+            for asr, final in pairs
+        ]
+
+    def test_known_variant_in_asr(self):
+        """Condition 1: known variant in asr_text → counted."""
+        builder = VocabularyBuilder(_make_config())
+        entries = [{"term": "Python", "variants": ["派森", "拍森"], "frequency": 1}]
+        records = self._make_records([
+            ("我用派森写代码", "我用Python写代码"),
+            ("这个拍森脚本有bug", "这个Python脚本有bug"),
+            ("今天天气很好", "今天天气很好"),
+        ])
+        builder._count_frequencies(entries, records)
+        assert entries[0]["frequency"] == 2
+
+    def test_term_in_final_not_in_asr(self):
+        """Condition 2: term in final but not in asr → counted."""
+        builder = VocabularyBuilder(_make_config())
+        entries = [{"term": "Kubernetes", "variants": ["库伯尼特斯"], "frequency": 1}]
+        records = self._make_records([
+            # Unknown variant — ASR produced something else entirely
+            ("我们用酷八来部署", "我们用Kubernetes来部署"),
+        ])
+        builder._count_frequencies(entries, records)
+        assert entries[0]["frequency"] == 1
+
+    def test_term_in_both_asr_and_final_not_counted(self):
+        """ASR got it right — should NOT be counted."""
+        builder = VocabularyBuilder(_make_config())
+        entries = [{"term": "Python", "variants": ["派森"], "frequency": 1}]
+        records = self._make_records([
+            ("我用Python写代码", "我用Python写代码很方便"),
+        ])
+        builder._count_frequencies(entries, records)
+        # No correction of this term, but min frequency is 1
+        assert entries[0]["frequency"] == 1
+
+    def test_minimum_frequency_one(self):
+        """Even with zero matches, frequency should be at least 1."""
+        builder = VocabularyBuilder(_make_config())
+        entries = [{"term": "Rare", "variants": ["稀有"], "frequency": 5}]
+        records = self._make_records([
+            ("今天天气很好", "今天天气很好"),
+        ])
+        builder._count_frequencies(entries, records)
+        assert entries[0]["frequency"] == 1
+
+    def test_no_variants_uses_condition_2(self):
+        """Entry with no variants can still be counted via condition 2."""
+        builder = VocabularyBuilder(_make_config())
+        entries = [{"term": "Docker", "variants": [], "frequency": 1}]
+        records = self._make_records([
+            ("我用多可来部署", "我用Docker来部署"),
+        ])
+        builder._count_frequencies(entries, records)
+        assert entries[0]["frequency"] == 1
+
+    def test_word_boundary_ascii(self):
+        """ASCII variant matching should respect word boundaries."""
+        builder = VocabularyBuilder(_make_config())
+        entries = [{"term": "Git", "variants": ["给他"], "frequency": 1}]
+        records = self._make_records([
+            # "Git" inside "GitHub" should NOT match as term-in-final
+            ("我用给他hub", "我用GitHub"),
+        ])
+        builder._count_frequencies(entries, records)
+        # "给他" variant matches in asr_text → count = 1
+        assert entries[0]["frequency"] == 1
+
+    def test_multiple_entries(self):
+        """Frequencies counted independently per entry."""
+        builder = VocabularyBuilder(_make_config())
+        entries = [
+            {"term": "Python", "variants": ["派森"], "frequency": 1},
+            {"term": "Kubernetes", "variants": ["库伯尼特斯"], "frequency": 1},
+        ]
+        records = self._make_records([
+            ("我用派森", "我用Python"),
+            ("我用派森和库伯尼特斯", "我用Python和Kubernetes"),
+            ("只有库伯尼特斯", "只有Kubernetes"),
+        ])
+        builder._count_frequencies(entries, records)
+        assert entries[0]["frequency"] == 2  # records 0 and 1
+        assert entries[1]["frequency"] == 2  # records 1 and 2
+
+    def test_both_conditions_same_record(self):
+        """Both conditions true in one record — still counts once."""
+        builder = VocabularyBuilder(_make_config())
+        entries = [{"term": "Python", "variants": ["派森"], "frequency": 1}]
+        records = self._make_records([
+            # variant in asr AND term in final but not in asr
+            ("我用派森写代码", "我用Python写代码"),
+        ])
+        builder._count_frequencies(entries, records)
+        assert entries[0]["frequency"] == 1  # counted once, not twice
+
+    def test_empty_records(self):
+        """No records → minimum frequency preserved."""
+        builder = VocabularyBuilder(_make_config())
+        entries = [{"term": "Python", "variants": ["派森"], "frequency": 10}]
+        builder._count_frequencies(entries, [])
+        assert entries[0]["frequency"] == 1
+
+
 class TestBuild:
     def test_build_no_records(self, tmp_path):
         builder = VocabularyBuilder(_make_config(), data_dir=str(tmp_path))
@@ -1297,11 +1408,13 @@ class TestBuildRetryAndAbort:
              patch.object(VocabularyBuilder, "_save_vocabulary", tracking_save):
             asyncio.run(builder.build())
 
-        # Should have saved twice (once per batch)
-        assert len(save_timestamps) == 2
+        # Should have saved 3 times: once per batch + final frequency recount
+        assert len(save_timestamps) == 3
         # First save covers batch 1 (records 0-59), second covers batch 2 (records 60-79)
         assert save_timestamps[0] == "2026-01-03T11:00:00+00:00"
         assert save_timestamps[1] == "2026-01-04T07:00:00+00:00"
+        # Third save is the frequency recount (same timestamp as last batch)
+        assert save_timestamps[2] == "2026-01-04T07:00:00+00:00"
 
     def test_batch_retry_callback(self, tmp_path):
         """on_batch_retry callback is called before retry."""
