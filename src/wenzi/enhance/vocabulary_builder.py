@@ -22,20 +22,23 @@ from .repetition import detect_repetition, truncate_repeated
 
 logger = logging.getLogger(__name__)
 
-# Standard English dictionary for filtering common words.
-_DICT_PATH = "/usr/share/dict/words"
+# Bundled word lists for filtering common words that LLMs already know.
+_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+_ENGLISH_WORDS_PATH = os.path.join(_DATA_DIR, "english_words.txt")
+_CHINESE_WORDS_PATH = os.path.join(_DATA_DIR, "chinese_words.txt")
 
 
-def _load_english_words() -> set[str]:
-    """Load the macOS system dictionary. Caller is responsible for releasing."""
-    try:
-        with open(_DICT_PATH, encoding="utf-8", errors="ignore") as f:
-            words = {line.strip().lower() for line in f if line.strip()}
-        logger.debug("Loaded %d English words from %s", len(words), _DICT_PATH)
-        return words
-    except OSError:
-        logger.warning("English dictionary not found at %s, skipping common-word filter", _DICT_PATH)
-        return set()
+def _load_common_words() -> set[str]:
+    """Load bundled English + Chinese word lists. Caller is responsible for releasing."""
+    words: set[str] = set()
+    for path in (_ENGLISH_WORDS_PATH, _CHINESE_WORDS_PATH):
+        try:
+            with open(path, encoding="utf-8", errors="ignore") as f:
+                words.update(line.strip().lower() for line in f if line.strip())
+            logger.debug("Loaded words from %s (total so far: %d)", path, len(words))
+        except OSError:
+            logger.warning("Word list not found at %s, skipping", path)
+    return words
 
 
 @dataclass
@@ -131,7 +134,7 @@ class VocabularyBuilder:
         callbacks: Optional[BuildCallbacks] = None,
     ) -> Dict[str, Any]:
         """Core build logic, wrapped by :meth:`build` for log management."""
-        self._english_words = _load_english_words()
+        self._english_words = _load_common_words()
         logger.info(
             "Starting vocabulary build (full_rebuild=%s)",
             full_rebuild,

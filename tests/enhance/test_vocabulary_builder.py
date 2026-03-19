@@ -406,10 +406,10 @@ class TestParseLLMResponse:
 
     def test_parse_filters_common_english_words(self):
         """Common English words are filtered out — LLMs already know them."""
-        from wenzi.enhance.vocabulary_builder import _load_english_words
+        from wenzi.enhance.vocabulary_builder import _load_common_words
 
         builder = VocabularyBuilder(_make_config())
-        builder._english_words = _load_english_words()
+        builder._english_words = _load_common_words()
         content = (
             "term|category|variants|context\n"
             "delete|tech|弟弟他|删除操作\n"
@@ -424,10 +424,10 @@ class TestParseLLMResponse:
 
     def test_parse_keeps_proper_nouns(self):
         """Proper nouns not in English dictionary are kept."""
-        from wenzi.enhance.vocabulary_builder import _load_english_words
+        from wenzi.enhance.vocabulary_builder import _load_common_words
 
         builder = VocabularyBuilder(_make_config())
-        builder._english_words = _load_english_words()
+        builder._english_words = _load_common_words()
         content = (
             "term|category|variants|context\n"
             "PyObjC|tech|pyobjectc|开发框架\n"
@@ -436,6 +436,24 @@ class TestParseLLMResponse:
         )
         result = builder._parse_llm_response(content)
         assert len(result) == 3
+
+    def test_parse_filters_common_chinese_words(self):
+        """Common Chinese words in THUOCL dictionary are filtered out."""
+        from wenzi.enhance.vocabulary_builder import _load_common_words
+
+        builder = VocabularyBuilder(_make_config())
+        builder._english_words = _load_common_words()
+        content = (
+            "term|category|variants|context\n"
+            "快捷键|tech|会计件|系统操作\n"
+            "剪贴板|tech|剪接版|系统组件\n"
+            "萍萍|name|平平|人名"
+        )
+        result = builder._parse_llm_response(content)
+        # 快捷键 and 剪贴板 are common Chinese words → filtered
+        # 萍萍 is a name not in dictionary → kept
+        assert len(result) == 1
+        assert result[0]["term"] == "萍萍"
 
     def test_parse_multiple_variants(self):
         builder = VocabularyBuilder(_make_config())
