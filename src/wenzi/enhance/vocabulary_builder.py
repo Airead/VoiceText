@@ -13,9 +13,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
-from wenzi.config import DEFAULT_DATA_DIR
+from pathlib import Path
+
+from wenzi.config import DEFAULT_DATA_DIR, DEFAULT_LOG_DIR
 from .conversation_history import ConversationHistory
 from .enhancer import build_thinking_body
+from .repetition import detect_repetition, truncate_repeated
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +71,49 @@ class VocabularyBuilder:
 
         Returns a summary dict with counts.
         """
+        file_handler = self._setup_build_log()
+        try:
+            return await self._build_inner(
+                full_rebuild=full_rebuild,
+                cancel_event=cancel_event,
+                callbacks=callbacks,
+            )
+        finally:
+            self._teardown_build_log(file_handler)
+
+    def _setup_build_log(self) -> Optional[logging.FileHandler]:
+        """Attach a DEBUG file handler so the entire build is captured."""
+        log_dir = Path(os.path.expanduser(DEFAULT_LOG_DIR))
+        log_path = log_dir / "vocab_build.log"
+        try:
+            log_dir.mkdir(parents=True, exist_ok=True)
+            fh = logging.FileHandler(str(log_path), mode="w", encoding="utf-8")
+            fh.setLevel(logging.DEBUG)
+            fh.setFormatter(logging.Formatter(
+                "%(asctime)s %(levelname)-5s %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            ))
+            logger.addHandler(fh)
+            logger.debug("Build log: %s", log_path)
+            return fh
+        except OSError as e:
+            logger.warning("Failed to create build log at %s: %s", log_path, e)
+            return None
+
+    @staticmethod
+    def _teardown_build_log(file_handler: Optional[logging.FileHandler]) -> None:
+        """Remove the build-specific file handler."""
+        if file_handler is not None:
+            logger.removeHandler(file_handler)
+            file_handler.close()
+
+    async def _build_inner(
+        self,
+        full_rebuild: bool = False,
+        cancel_event: Optional[threading.Event] = None,
+        callbacks: Optional[BuildCallbacks] = None,
+    ) -> Dict[str, Any]:
+        """Core build logic, wrapped by :meth:`build` for log management."""
         logger.info(
             "Starting vocabulary build (full_rebuild=%s)",
             full_rebuild,
@@ -97,6 +143,12 @@ class VocabularyBuilder:
 
         provider_cfg = self._get_provider_config()
         existing_terms = [e.get("term", "") for e in merged_entries if e.get("term")]
+        logger.debug(
+            "Provider config: provider=%s, model=%s",
+            self._get_active_provider_name(),
+            provider_cfg["model"] if provider_cfg else "N/A",
+        )
+        logger.debug("Existing vocabulary: %d terms", len(existing_terms))
 
         if callbacks and callbacks.on_progress_init:
             callbacks.on_progress_init(len(records), self._batch_size)
@@ -113,6 +165,7 @@ class VocabularyBuilder:
 
         # Multi-turn session: system prompt is shared, conversation accumulates
         system_prompt = self._build_system_prompt(existing_terms)
+        logger.debug("System prompt (%d chars):\n%s", len(system_prompt), system_prompt)
         messages: List[Dict[str, str]] = [
             {"role": "system", "content": system_prompt},
         ]
@@ -126,6 +179,10 @@ class VocabularyBuilder:
 
                 # Prepare once before retry loop
                 user_prompt = self._build_user_prompt(batch)
+                logger.debug(
+                    "Batch %d/%d user prompt (%d chars):\n%s",
+                    i, len(batches), len(user_prompt), user_prompt,
+                )
                 on_chunk = callbacks.on_stream_chunk if callbacks else None
 
                 # Try extraction with one retry on failure
@@ -184,6 +241,11 @@ class VocabularyBuilder:
                 if response_text:
                     messages.append({"role": "user", "content": user_prompt})
                     messages.append({"role": "assistant", "content": response_text})
+                    logger.debug(
+                        "Session now has %d messages (total chars: %d)",
+                        len(messages),
+                        sum(len(m["content"]) for m in messages),
+                    )
 
                 # Batch succeeded — accumulate results
                 for key in total_usage:
@@ -196,6 +258,21 @@ class VocabularyBuilder:
                         total_usage["total_tokens"],
                     )
                 logger.info("Batch %d/%d: extracted %d entries", i, len(batches), len(extracted))
+                if batch_usage:
+                    logger.debug(
+                        "Batch %d/%d tokens: input=%d, cached=%d, output=%d, total=%d",
+                        i, len(batches),
+                        batch_usage.get("input_tokens", 0),
+                        batch_usage.get("cached_tokens", 0),
+                        batch_usage.get("output_tokens", 0),
+                        batch_usage.get("total_tokens", 0),
+                    )
+                for entry in extracted:
+                    logger.debug(
+                        "  + %s [%s] variants=%s context=%s",
+                        entry.get("term"), entry.get("category"),
+                        entry.get("variants"), entry.get("context"),
+                    )
                 all_new_entries.extend(extracted)
                 records_processed += len(batch)
 
@@ -423,10 +500,20 @@ class VocabularyBuilder:
 
         model = provider_cfg["model"]
         extra_body = build_thinking_body(model, enabled=False)
+        max_tokens = self._config.get("vocabulary", {}).get("max_output_tokens", 4096)
         usage: Dict[str, int] = {}
 
         # Build messages for this turn: session history + new user message
         turn_messages = messages + [{"role": "user", "content": user_prompt}]
+        logger.debug(
+            "LLM request: model=%s, messages=%d, max_tokens=%d, extra_body=%s",
+            model, len(turn_messages), max_tokens, extra_body,
+        )
+        for idx, msg in enumerate(turn_messages):
+            logger.debug(
+                "  message[%d] role=%s len=%d",
+                idx, msg["role"], len(msg["content"]),
+            )
 
         if on_stream_chunk is not None:
             # Streaming path — request usage in final chunk
@@ -436,11 +523,14 @@ class VocabularyBuilder:
                 async with await client.chat.completions.create(
                     model=model,
                     messages=turn_messages,
+                    max_tokens=max_tokens,
                     stream=True,
                     stream_options=stream_options,
                     extra_body=extra_body,
                 ) as stream:
                     parts: List[str] = []
+                    repetition_aborted = False
+                    chars_since_check = 0
                     async for chunk in stream:
                         if cancel_event is not None and cancel_event.is_set():
                             logger.info("Streaming cancelled mid-batch")
@@ -450,28 +540,50 @@ class VocabularyBuilder:
                             delta = chunk.choices[0].delta.content
                             parts.append(delta)
                             on_stream_chunk(delta)
+                            chars_since_check += len(delta)
+                            if chars_since_check >= 200:
+                                chars_since_check = 0
+                                if detect_repetition("".join(parts)):
+                                    repetition_aborted = True
+                                    break
                         if chunk.usage is not None:
                             usage = self._extract_usage(chunk.usage)
                 if cancelled:
                     return [], usage, ""
                 content = "".join(parts)
+                if repetition_aborted:
+                    content = truncate_repeated(content)
         else:
             # Non-streaming path
             response = await asyncio.wait_for(
                 client.chat.completions.create(
                     model=model,
                     messages=turn_messages,
+                    max_tokens=max_tokens,
                     extra_body=extra_body,
                 ),
                 timeout=self._batch_timeout,
             )
             content = response.choices[0].message.content
             usage = self._extract_usage(response.usage)
+            if content:
+                content = truncate_repeated(content)
 
         if not content:
+            logger.debug("LLM returned empty response")
             return [], usage, ""
 
-        return self._parse_llm_response(content), usage, content
+        logger.debug("LLM response (%d chars):\n%s", len(content), content)
+        if usage:
+            logger.debug(
+                "LLM usage: input=%d, cached=%d, output=%d, total=%d",
+                usage.get("input_tokens", 0), usage.get("cached_tokens", 0),
+                usage.get("output_tokens", 0), usage.get("total_tokens", 0),
+            )
+
+        entries = self._parse_llm_response(content)
+        logger.debug("Parsed %d entries from LLM response", len(entries))
+        return entries, usage, content
 
     def _resolve_provider_and_model(self) -> tuple[str, str]:
         """Resolve the effective provider name and model for vocab building.
