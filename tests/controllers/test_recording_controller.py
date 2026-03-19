@@ -719,3 +719,91 @@ class TestPreferMode:
         # Should have restored to proofread, then applied "off"
         assert mock_app._enhance_mode == "off"
         assert ctrl._saved_mode[0] == "proofread"
+
+
+class TestRecordingWatchdog:
+    """Tests for the recording watchdog timer that auto-stops on timeout."""
+
+    def test_watchdog_starts_on_press(self, ctrl, mock_app):
+        mock_app._sound_manager.enabled = False
+        ctrl.on_hotkey_press()
+        assert ctrl._recording_watchdog is not None
+        assert ctrl._recording_watchdog.is_alive()
+        ctrl._cancel_recording_watchdog()
+
+    def test_watchdog_cancelled_on_release(self, ctrl, mock_app):
+        mock_app._sound_manager.enabled = False
+        # Return None so on_hotkey_release takes the early-return path
+        # (no audio) and does not call type_text.
+        mock_app._recorder.stop.return_value = None
+        ctrl.on_hotkey_press()
+        watchdog = ctrl._recording_watchdog
+        assert watchdog is not None
+
+        ctrl.on_hotkey_release()
+        assert ctrl._recording_watchdog is None
+        # Timer.cancel() prevents the callback from firing but the thread
+        # may still be briefly alive; what matters is it's been cancelled
+        watchdog.join(timeout=1.0)
+        assert not watchdog.is_alive()
+
+    def test_watchdog_cancelled_on_cancel(self, ctrl, mock_app):
+        mock_app._sound_manager.enabled = False
+        ctrl.on_hotkey_press()
+        watchdog = ctrl._recording_watchdog
+        assert watchdog is not None
+
+        ctrl.on_cancel_recording()
+        assert ctrl._recording_watchdog is None
+        watchdog.join(timeout=1.0)
+        assert not watchdog.is_alive()
+
+    def test_watchdog_restarted_on_restart(self, ctrl, mock_app):
+        mock_app._sound_manager.enabled = False
+        ctrl.on_hotkey_press()
+        first_watchdog = ctrl._recording_watchdog
+
+        ctrl.on_restart_recording()
+        assert ctrl._recording_watchdog is not None
+        assert ctrl._recording_watchdog is not first_watchdog
+        assert not first_watchdog.is_alive()
+        ctrl._cancel_recording_watchdog()
+
+    def test_watchdog_triggers_release(self, ctrl, mock_app):
+        import time
+
+        mock_app._sound_manager.enabled = False
+        mock_app._recorder.stop.return_value = None
+        mock_app._config["audio"] = {"max_recording_seconds": 0.1}
+
+        ctrl.on_hotkey_press()
+
+        # Wait for watchdog to fire
+        for _ in range(50):
+            if mock_app._recorder.stop.called:
+                break
+            time.sleep(0.02)
+
+        mock_app._recorder.stop.assert_called_once()
+
+    def test_watchdog_noop_when_not_recording(self, ctrl, mock_app):
+        mock_app._recorder.is_recording = False
+        ctrl._on_recording_timeout()
+        mock_app._recorder.stop.assert_not_called()
+
+    def test_watchdog_uses_config_value(self, ctrl, mock_app):
+        mock_app._sound_manager.enabled = False
+        mock_app._config["audio"] = {"max_recording_seconds": 60}
+        ctrl.on_hotkey_press()
+        assert ctrl._recording_watchdog is not None
+        assert ctrl._recording_watchdog.interval == 60
+        ctrl._cancel_recording_watchdog()
+
+    def test_watchdog_default_when_no_config(self, ctrl, mock_app):
+        """Falls back to 120s when audio.max_recording_seconds is missing."""
+        mock_app._sound_manager.enabled = False
+        mock_app._config["audio"] = {}
+        ctrl.on_hotkey_press()
+        assert ctrl._recording_watchdog is not None
+        assert ctrl._recording_watchdog.interval == 120
+        ctrl._cancel_recording_watchdog()

@@ -194,6 +194,64 @@ class TestQuartzAllKeysListener:
         assert listener._tap is None
         assert listener._loop is None
 
+    def test_tap_timeout_resyncs_modifier_flags(self):
+        """When CGEventTap is disabled by timeout, missed modifier releases
+        should be detected by polling CGEventSourceFlagsState."""
+        from wenzi.hotkey import _QuartzAllKeysListener, _FN_FLAG
+        import Quartz
+
+        on_release = MagicMock()
+        listener = _QuartzAllKeysListener(
+            on_press=MagicMock(), on_release=on_release
+        )
+        fake_tap = MagicMock()
+        listener._tap = fake_tap
+        # Simulate: fn was held (flag was set)
+        listener._mod_flags_prev = _FN_FLAG
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(Quartz, "CGEventTapEnable", lambda tap, en: None)
+            # Current flags show fn is no longer held
+            mp.setattr(Quartz, "CGEventSourceFlagsState", lambda src: 0)
+            mp.setattr(
+                Quartz, "kCGEventSourceStateCombinedSessionState", 0
+            )
+
+            listener._callback(
+                None, Quartz.kCGEventTapDisabledByTimeout, None, None
+            )
+
+        on_release.assert_called_once_with("fn")
+        assert listener._mod_flags_prev == 0
+
+    def test_tap_timeout_no_false_release(self):
+        """When modifier is still held during tap timeout, no release fires."""
+        from wenzi.hotkey import _QuartzAllKeysListener, _FN_FLAG
+        import Quartz
+
+        on_release = MagicMock()
+        listener = _QuartzAllKeysListener(
+            on_press=MagicMock(), on_release=on_release
+        )
+        fake_tap = MagicMock()
+        listener._tap = fake_tap
+        listener._mod_flags_prev = _FN_FLAG
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(Quartz, "CGEventTapEnable", lambda tap, en: None)
+            # fn is still held
+            mp.setattr(Quartz, "CGEventSourceFlagsState", lambda src: _FN_FLAG)
+            mp.setattr(
+                Quartz, "kCGEventSourceStateCombinedSessionState", 0
+            )
+
+            listener._callback(
+                None, Quartz.kCGEventTapDisabledByTimeout, None, None
+            )
+
+        on_release.assert_not_called()
+        assert listener._mod_flags_prev == _FN_FLAG
+
 
 class TestTapHotkeyListener:
     def test_creation(self):
@@ -240,12 +298,39 @@ class TestMultiHotkeyListener:
         assert 63 in listener._target_vks  # fn vk
         assert 120 in listener._target_vks  # f2 vk
 
+    def test_press_dispatched_to_background_thread(self):
+        """on_press callback should run in a background thread, not blocking."""
+        import time
+        call_thread_ids = []
+
+        def on_press(name):
+            call_thread_ids.append(threading.current_thread().ident)
+
+        listener = MultiHotkeyListener(["f2"], on_press, MagicMock())
+        listener._handle_press("f2")
+
+        # Wait for background thread to finish
+        for _ in range(50):
+            if call_thread_ids:
+                break
+            time.sleep(0.01)
+
+        assert len(call_thread_ids) == 1
+        assert call_thread_ids[0] != threading.current_thread().ident
+
     def test_press_release_target_key(self):
+        import time
+
         on_press = MagicMock()
         on_release = MagicMock()
         listener = MultiHotkeyListener(["f2"], on_press, on_release)
 
         listener._handle_press("f2")
+        # on_press is now dispatched to a background thread
+        for _ in range(50):
+            if on_press.called:
+                break
+            time.sleep(0.01)
         on_press.assert_called_once()
         assert "f2" in listener._held
 
@@ -258,14 +343,22 @@ class TestMultiHotkeyListener:
         listener = MultiHotkeyListener(["f2"], on_press, MagicMock())
 
         listener._handle_press("f3")
+        import time
+        time.sleep(0.05)
         on_press.assert_not_called()
 
     def test_repeated_press_ignored(self):
+        import time
+
         on_press = MagicMock()
         listener = MultiHotkeyListener(["f2"], on_press, MagicMock())
 
         listener._handle_press("f2")
         listener._handle_press("f2")
+        for _ in range(50):
+            if on_press.called:
+                break
+            time.sleep(0.01)
         assert on_press.call_count == 1
 
     def test_enable_disable_key(self):
@@ -302,11 +395,17 @@ class TestMultiHotkeyListener:
         on_recorded.assert_not_called()
 
     def test_fn_key_handling(self):
+        import time
+
         on_press = MagicMock()
         on_release = MagicMock()
         listener = MultiHotkeyListener(["fn"], on_press, on_release)
 
         listener._handle_press("fn")
+        for _ in range(50):
+            if on_press.called:
+                break
+            time.sleep(0.01)
         on_press.assert_called_once()
 
         listener._handle_release("fn")
@@ -315,6 +414,8 @@ class TestMultiHotkeyListener:
 
 class TestMultiHotkeyRestartKey:
     def test_restart_callback_when_hotkey_held(self):
+        import time
+
         on_press = MagicMock()
         on_release = MagicMock()
         on_restart = MagicMock()
@@ -324,14 +425,24 @@ class TestMultiHotkeyRestartKey:
 
         # Hold hotkey
         listener._handle_press("fn")
+        for _ in range(50):
+            if on_press.called:
+                break
+            time.sleep(0.01)
         on_press.assert_called_once()
 
         # Press cmd while hotkey is held
         result = listener._handle_press("cmd")
+        for _ in range(50):
+            if on_restart.called:
+                break
+            time.sleep(0.01)
         on_restart.assert_called_once()
         assert result is True  # should signal swallow
 
     def test_restart_not_called_when_hotkey_not_held(self):
+        import time
+
         on_restart = MagicMock()
         listener = MultiHotkeyListener(
             ["fn"], MagicMock(), MagicMock(), on_restart=on_restart
@@ -339,21 +450,31 @@ class TestMultiHotkeyRestartKey:
 
         # Press cmd without holding hotkey
         result = listener._handle_press("cmd")
+        time.sleep(0.05)
         on_restart.assert_not_called()
         assert result is False
 
     def test_restart_not_called_when_no_callback(self):
+        import time
+
         on_press = MagicMock()
         listener = MultiHotkeyListener(["fn"], on_press, MagicMock())
 
         listener._handle_press("fn")
         # Press cmd - should be ignored (no on_restart callback)
         result = listener._handle_press("cmd")
+        time.sleep(0.05)
         # on_press called only once (for fn)
+        for _ in range(50):
+            if on_press.called:
+                break
+            time.sleep(0.01)
         assert on_press.call_count == 1
         assert result is False
 
     def test_restart_with_custom_key(self):
+        import time
+
         on_restart = MagicMock()
         listener = MultiHotkeyListener(
             ["fn"], MagicMock(), MagicMock(),
@@ -362,10 +483,16 @@ class TestMultiHotkeyRestartKey:
 
         listener._handle_press("fn")
         result = listener._handle_press("f5")
+        for _ in range(50):
+            if on_restart.called:
+                break
+            time.sleep(0.01)
         on_restart.assert_called_once()
         assert result is True
 
     def test_restart_ignores_non_restart_keys(self):
+        import time
+
         on_restart = MagicMock()
         listener = MultiHotkeyListener(
             ["fn"], MagicMock(), MagicMock(), on_restart=on_restart
@@ -374,10 +501,13 @@ class TestMultiHotkeyRestartKey:
         listener._handle_press("fn")
         # Press a non-restart key
         result = listener._handle_press("a")
+        time.sleep(0.05)
         on_restart.assert_not_called()
         assert result is False
 
     def test_restart_multiple_times(self):
+        import time
+
         on_restart = MagicMock()
         listener = MultiHotkeyListener(
             ["fn"], MagicMock(), MagicMock(), on_restart=on_restart
@@ -387,6 +517,10 @@ class TestMultiHotkeyRestartKey:
         listener._handle_press("cmd")
         listener._handle_press("cmd")
         listener._handle_press("cmd")
+        for _ in range(50):
+            if on_restart.call_count >= 3:
+                break
+            time.sleep(0.01)
         assert on_restart.call_count == 3
 
     def test_press_returns_false_for_normal_key(self):
@@ -410,6 +544,10 @@ class TestMultiHotkeyCancelKey:
 
         # Hold hotkey
         listener._handle_press("fn")
+        for _ in range(50):
+            if on_press.called:
+                break
+            time.sleep(0.01)
         on_press.assert_called_once()
 
         # Press space while hotkey is held — runs cancel in background thread
@@ -525,6 +663,10 @@ class TestMultiHotkeyCancelKey:
 
         # Cmd triggers restart
         listener._handle_press("cmd")
+        for _ in range(50):
+            if on_restart.called:
+                break
+            time.sleep(0.01)
         on_restart.assert_called_once()
         on_cancel.assert_not_called()
 
@@ -612,6 +754,8 @@ class TestMultiHotkeyModeNav:
 
 class TestMultiHotkeySetKeys:
     def test_set_restart_key(self):
+        import time
+
         on_restart = MagicMock()
         listener = MultiHotkeyListener(
             ["fn"], MagicMock(), MagicMock(), on_restart=on_restart
@@ -620,16 +764,25 @@ class TestMultiHotkeySetKeys:
         # Default restart key is cmd
         listener._handle_press("fn")
         listener._handle_press("cmd")
+        for _ in range(50):
+            if on_restart.called:
+                break
+            time.sleep(0.01)
         on_restart.assert_called_once()
 
         # Change to f5
         listener.set_restart_key("f5")
         listener._handle_press("f5")
+        for _ in range(50):
+            if on_restart.call_count >= 2:
+                break
+            time.sleep(0.01)
         assert on_restart.call_count == 2
 
         # Old key no longer triggers restart
         on_restart.reset_mock()
         listener._handle_press("cmd")
+        time.sleep(0.05)
         on_restart.assert_not_called()
 
     def test_set_cancel_key(self):
@@ -725,12 +878,16 @@ class TestMultiHotkeyThreadSafety:
 
     def test_concurrent_press_fires_once(self):
         """Rapid concurrent presses should only fire on_press once."""
+        import time
+
         call_count = 0
+        count_lock = threading.Lock()
         barrier = threading.Barrier(10)
 
         def on_press(key_name):
             nonlocal call_count
-            call_count += 1
+            with count_lock:
+                call_count += 1
 
         listener = MultiHotkeyListener(["fn"], on_press, MagicMock())
 
@@ -744,4 +901,12 @@ class TestMultiHotkeyThreadSafety:
         for t in threads:
             t.join()
 
-        assert call_count == 1
+        # Wait for the background dispatch thread to complete
+        for _ in range(50):
+            with count_lock:
+                if call_count >= 1:
+                    break
+            time.sleep(0.01)
+
+        with count_lock:
+            assert call_count == 1

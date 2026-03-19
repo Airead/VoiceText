@@ -206,6 +206,28 @@ class _QuartzAllKeysListener:
                 logger.warning("CGEventTap disabled by timeout, re-enabling")
                 if self._tap is not None:
                     Quartz.CGEventTapEnable(self._tap, True)
+                # Re-sync modifier flags: if a modifier key was released
+                # while the tap was disabled, the release event is lost
+                # forever.  Poll the current system flags and fire synthetic
+                # releases for any modifiers that went away.
+                try:
+                    new_flags = Quartz.CGEventSourceFlagsState(
+                        Quartz.kCGEventSourceStateCombinedSessionState
+                    )
+                    seen_masks: set = set()
+                    for _name, (_vk, _mask) in _MOD_VK.items():
+                        if _mask in seen_masks:
+                            continue
+                        seen_masks.add(_mask)
+                        if (self._mod_flags_prev & _mask) and not (new_flags & _mask):
+                            self._on_release(_name)
+                    if (self._mod_flags_prev & _FN_FLAG) and not (new_flags & _FN_FLAG):
+                        self._on_release("fn")
+                    self._mod_flags_prev = new_flags
+                except Exception:
+                    logger.warning(
+                        "Failed to re-sync modifier flags", exc_info=True
+                    )
                 return event
 
             keycode = Quartz.CGEventGetIntegerValueField(
@@ -730,15 +752,23 @@ class MultiHotkeyListener:
                     return False
 
             if action == "press":
-                try:
-                    self._on_press(name)
-                except Exception as e:
-                    logger.error("on_press callback error: %s", e)
+                # Dispatch to a background thread so heavy work
+                # (e.g. Recorder.start with PortAudio re-init) cannot
+                # block the CGEventTap callback and cause a timeout.
+                def _run_press(n=name):
+                    try:
+                        self._on_press(n)
+                    except Exception as e:
+                        logger.error("on_press callback error: %s", e)
+                threading.Thread(target=_run_press, daemon=True).start()
             elif action == "restart":
-                try:
-                    self._on_restart()
-                except Exception as e:
-                    logger.error("on_restart callback error: %s", e)
+                # Dispatch to background thread (same rationale as press)
+                def _run_restart():
+                    try:
+                        self._on_restart()
+                    except Exception as e:
+                        logger.error("on_restart callback error: %s", e)
+                threading.Thread(target=_run_restart, daemon=True).start()
                 return True  # swallow the restart key event
             elif action == "cancel":
                 self._cancel_requested = True

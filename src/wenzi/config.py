@@ -256,6 +256,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "device": None,
         "max_session_bytes": 20971520,
         "silence_rms": 20,
+        "max_recording_seconds": 120,
     },
     "asr": {
         "backend": "funasr",

@@ -28,6 +28,11 @@ class RecordingController:
         self._saved_mode: Optional[tuple] = None  # (enhance_mode, enhancer_mode, enhancer_enabled)
         # Set by on_cancel_recording to abort a pending _delayed_start
         self._cancel_delayed = threading.Event()
+        # Watchdog timer: auto-stop recording if hotkey release event is lost
+        self._recording_watchdog: Optional[threading.Timer] = None
+        # Guard against watchdog + normal release racing into on_hotkey_release
+        self._release_lock = threading.Lock()
+        self._release_done = False
 
     def _fire_scripting_event(self, event_name: str, **kwargs) -> None:
         """Fire a scripting event if the script engine is available."""
@@ -39,6 +44,39 @@ class RecordingController:
         except Exception:
             logger.debug("Failed to fire scripting event %s", event_name)
 
+    # ------------------------------------------------------------------
+    # Recording watchdog — auto-stop if hotkey release event is lost
+    # ------------------------------------------------------------------
+
+    def _start_recording_watchdog(self) -> None:
+        """Start a watchdog timer that auto-stops recording after max seconds."""
+        self._cancel_recording_watchdog()
+        max_sec = self._app._config.get("audio", {}).get(
+            "max_recording_seconds", 120
+        )
+        if max_sec and max_sec > 0:
+            self._recording_watchdog = threading.Timer(
+                max_sec, self._on_recording_timeout
+            )
+            self._recording_watchdog.daemon = True
+            self._recording_watchdog.start()
+
+    def _cancel_recording_watchdog(self) -> None:
+        """Cancel the watchdog timer if running."""
+        if self._recording_watchdog is not None:
+            self._recording_watchdog.cancel()
+            self._recording_watchdog = None
+
+    def _on_recording_timeout(self) -> None:
+        """Called when recording exceeds the maximum allowed duration."""
+        if not self._app._recorder.is_recording:
+            return
+        logger.warning(
+            "Recording watchdog triggered — auto-stopping "
+            "(possible missed hotkey release)"
+        )
+        self.on_hotkey_release()
+
     def on_hotkey_press(self, key_name: str = "") -> None:
         """Called when hotkey is pressed down - start recording."""
         app = self._app
@@ -48,6 +86,9 @@ class RecordingController:
             return
         if app._busy:
             return
+
+        # Allow on_hotkey_release to proceed (reset from previous cycle)
+        self._release_done = False
 
         # Restore previous override before applying a new one
         self._restore_mode()
@@ -91,6 +132,8 @@ class RecordingController:
             # No sound delay — start recording first, then show in active state
             self._start_recording_and_update_indicator(show_active=True)
             app._recording_started.set()
+
+        self._start_recording_watchdog()
 
     def _apply_prefer_mode(self, mode: str) -> None:
         """Temporarily override the enhance mode for this recording session."""
@@ -242,6 +285,9 @@ class RecordingController:
 
     def on_restart_recording(self) -> None:
         """Called when restart key (space) is pressed during recording."""
+        self._cancel_recording_watchdog()
+        with self._release_lock:
+            self._release_done = False
         app = self._app
         if not app._recorder.is_recording:
             return
@@ -292,6 +338,8 @@ class RecordingController:
             self._start_recording_and_update_indicator(show_active=True)
             app._recording_started.set()
 
+        self._start_recording_watchdog()
+
     def on_preview_history(self) -> None:
         """Called when preview_history_key is pressed during recording — cancel and show history."""
         self.on_cancel_recording()
@@ -300,6 +348,7 @@ class RecordingController:
 
     def on_cancel_recording(self) -> None:
         """Called when cancel key (cmd) is pressed during recording — discard and stop."""
+        self._cancel_recording_watchdog()
         app = self._app
         if not app._recorder.is_recording:
             # Recording hasn't started yet (e.g. still in sound feedback
@@ -340,6 +389,13 @@ class RecordingController:
 
     def on_hotkey_release(self, key_name: str = "") -> None:
         """Called when hotkey is released - stop recording and transcribe."""
+        self._cancel_recording_watchdog()
+        # Ensure only one thread enters the stop-and-transcribe path
+        # (guards against watchdog timer + normal release racing)
+        with self._release_lock:
+            if self._release_done:
+                return
+            self._release_done = True
         app = self._app
         # Wait for delayed start to finish (if sound feedback caused a delay)
         if not app._recording_started.wait(timeout=1.0):
