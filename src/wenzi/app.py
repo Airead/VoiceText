@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import logging.handlers
+import os
 import sys
 import threading
 from pathlib import Path
@@ -14,6 +15,7 @@ from CoreFoundation import kCFBooleanTrue
 
 from .enhance.auto_vocab_builder import AutoVocabBuilder
 from .config import (
+    DEFAULT_LOG_DIR,
     load_config,
     migrate_legacy_paths,
     migrate_xdg_paths,
@@ -65,7 +67,7 @@ from .ui_helpers import (
 logger = logging.getLogger(__name__)
 
 
-LOG_DIR = Path.home() / "Library" / "Logs" / "WenZi"
+LOG_DIR = Path(os.path.expanduser(DEFAULT_LOG_DIR))
 LOG_FILE = LOG_DIR / "wenzi.log"
 
 # Map status strings to SF Symbol names for menu bar icons
