@@ -816,8 +816,7 @@ class TestEventLoopCleanup:
         """_run_direct_single_stream closes the event loop on exception."""
         async def failing_stream(text):
             raise RuntimeError("stream error")
-            yield  # make it an async generator  # noqa: E501
-
+            yield  # make it an async generator
         mock_app._enhancer.enhance_stream = failing_stream
         cancel = threading.Event()
 
@@ -843,8 +842,7 @@ class TestEventLoopCleanup:
         """_run_direct_chain_stream closes the event loop on exception."""
         async def failing_stream(text):
             raise RuntimeError("chain error")
-            yield  # noqa: E501
-
+            yield
         mock_app._enhancer.enhance_stream = failing_stream
         mock_app._enhancer.get_mode_definition.return_value = MagicMock(label="test")
         cancel = threading.Event()
