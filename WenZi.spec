@@ -94,6 +94,7 @@ a = Analysis(
         'wenzi.controllers.preview_controller',
         'wenzi.controllers.update_controller',
         'wenzi.controllers.menu_builder',
+        'wenzi.updater',
         # wenzi.scripting
         'wenzi.scripting',
         'wenzi.scripting.engine',
