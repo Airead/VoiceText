@@ -188,3 +188,18 @@ class TestPreviewHistoryStore:
         store = PreviewHistoryStore()
         store.add(_make_record())
         assert store.get(0).token_usage is None
+
+    def test_hotwords_detail_stored(self):
+        from wenzi.enhance.vocabulary import HotwordDetail, LAYER_BASE
+
+        details = [HotwordDetail(term="API", layer=LAYER_BASE, frequency=5, score=5.0)]
+        store = PreviewHistoryStore()
+        store.add(_make_record(hotwords_detail=details))
+        rec = store.get(0)
+        assert len(rec.hotwords_detail) == 1
+        assert rec.hotwords_detail[0].term == "API"
+
+    def test_hotwords_detail_defaults_empty(self):
+        store = PreviewHistoryStore()
+        store.add(_make_record())
+        assert store.get(0).hotwords_detail == []

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,7 @@ class PreviewRecord:
     system_prompt: str = ""
     thinking_text: str = ""
     token_usage: dict | None = None
+    hotwords_detail: list = field(default_factory=list)  # List[HotwordDetail]
 
 
 class PreviewHistoryStore:

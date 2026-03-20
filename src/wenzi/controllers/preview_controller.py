@@ -174,6 +174,7 @@ class PreviewController:
             system_prompt=result_holder.get("system_prompt", ""),
             thinking_text=result_holder.get("thinking_text", ""),
             token_usage=result_holder.get("token_usage"),
+            hotwords_detail=list(app._preview_panel.hotwords_detail),
         )
         self._preview_history.add(record)
 
@@ -235,6 +236,7 @@ class PreviewController:
         if record.audio_duration > 0:
             asr_info = f"{record.audio_duration:.1f}s"
 
+        app._preview_panel.set_hotwords(record.hotwords_detail)
         app._preview_panel.load_history_record(
             asr_text=record.asr_text,
             enhanced_text=record.enhanced_text,
