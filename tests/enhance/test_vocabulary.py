@@ -197,35 +197,37 @@ class TestExactSearch:
         terms = [r.term for r in results]
         assert "Python" in terms
 
-    def test_term_in_text(self, tmp_path):
+    def test_term_only_in_text_not_matched(self, tmp_path):
+        """Term-only match is filtered out — ASR already correct."""
         idx = _write_vocab(tmp_path, _sample_entries())
         results = idx.retrieve("I use Python for coding")
         terms = [r.term for r in results]
-        assert "Python" in terms
+        assert "Python" not in terms
 
     def test_case_insensitive(self, tmp_path):
-        idx = _write_vocab(tmp_path, _sample_entries())
-        results = idx.retrieve("i use python for coding")
+        """Case-insensitive variant matching still works."""
+        entries = [
+            {"term": "FunASR", "variants": ["fanASR", "FanASR"], "frequency": 3},
+        ]
+        idx = _write_vocab(tmp_path, entries)
+        results = idx.retrieve("I tried fanasr today")
         terms = [r.term for r in results]
-        assert "Python" in terms
+        assert "FunASR" in terms
 
     def test_min_length_filtering(self, tmp_path):
         """Single-character variants are not indexed."""
         entries = [
-            {"term": "AI", "variants": ["A"], "frequency": 1},
+            {"term": "AI", "variants": ["A", "人工智能"], "frequency": 1},
         ]
         idx = _write_vocab(tmp_path, entries)
-        # "A" (1 char) should not be indexed, but "AI" (2 chars) should
+        # "A" (1 char) should not be indexed; "AI" is term-only → filtered
         results = idx.retrieve("I like AI")
-        terms = [r.term for r in results]
-        assert "AI" in terms
+        assert results == []
 
-        # Single-char variant should NOT match
-        results2 = idx.retrieve("I got an A on my test")
-        # "AI" should not appear since "A" is too short to index
-        # and "AI" does not appear in text
+        # Variant "人工智能" should match
+        results2 = idx.retrieve("人工智能很厉害")
         terms2 = [r.term for r in results2]
-        assert "AI" not in terms2
+        assert "AI" in terms2
 
     def test_no_match(self, tmp_path):
         idx = _write_vocab(tmp_path, _sample_entries())
@@ -348,15 +350,31 @@ class TestRetrieve:
         # Should be sorted by frequency desc
         assert results[0].frequency >= results[1].frequency >= results[2].frequency
 
-    def test_entries_without_variants(self, tmp_path):
-        """Entries with no variants can still be matched by term."""
+    def test_entries_without_variants_not_matched(self, tmp_path):
+        """Entries with no variants are not returned by retrieve().
+
+        Term-only matches indicate the ASR already produced the correct
+        form, so no correction hint is needed.
+        """
         entries = [
             {"term": "Docker", "variants": [], "context": "容器", "frequency": 2},
         ]
         idx = _write_vocab(tmp_path, entries)
         results = idx.retrieve("I use Docker for deployment")
+        assert results == []
+
+    def test_term_match_filtered_variant_match_kept(self, tmp_path):
+        """retrieve() returns only variant-matched entries, not term-matched."""
+        entries = [
+            {"term": "Kubernetes", "variants": ["库伯尼特斯"], "frequency": 5},
+            {"term": "Docker", "variants": [], "frequency": 3},
+        ]
+        idx = _write_vocab(tmp_path, entries)
+        # Text contains variant "库伯尼特斯" AND term "Docker"
+        results = idx.retrieve("库伯尼特斯和Docker都很好用")
         terms = [r.term for r in results]
-        assert "Docker" in terms
+        assert "Kubernetes" in terms
+        assert "Docker" not in terms
 
 
 # --- Reload tests ---

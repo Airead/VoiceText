@@ -7,7 +7,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
     from wenzi.enhance.conversation_history import ConversationHistory
@@ -152,6 +152,10 @@ class VocabularyIndex:
     def retrieve(self, text: str, top_k: int = 5) -> List[VocabularyEntry]:
         """Retrieve relevant vocabulary entries for *text*.
 
+        Only entries matched via a **variant** (ASR misrecognition) are
+        returned.  Term-only matches are filtered out because they indicate
+        the ASR already produced the correct form — no correction needed.
+
         Layer 1 (exact substring match) runs first.  If it already yields
         *top_k* or more results the pinyin layer is skipped entirely.
         """
@@ -160,12 +164,32 @@ class VocabularyIndex:
             return []
 
         try:
-            exact_indices = self._exact_search(text)
+            text_lower = text.lower()
+
+            exact_indices = self._exact_search(text, text_lower=text_lower)
+            exact_indices = self._filter_variant_matched(
+                exact_indices,
+                lambda v: len(v) >= _MIN_INDEX_LENGTH and v.lower() in text_lower,
+            )
 
             if len(exact_indices) >= top_k:
                 return self._rank(exact_indices, set(), top_k)
 
-            pinyin_indices = self._pinyin_search(text, exact_indices)
+            text_py = self._to_pinyin(text)
+            pinyin_indices = self._pinyin_search(
+                text, exact_indices, text_py=text_py
+            )
+            if pinyin_indices:
+
+                def _variant_pinyin_match(v: str) -> bool:
+                    if not _has_cjk(v):
+                        return False
+                    py = self._to_pinyin(v)
+                    return bool(py) and py in text_py
+
+                pinyin_indices = self._filter_variant_matched(
+                    pinyin_indices, _variant_pinyin_match
+                )
             return self._rank(exact_indices, pinyin_indices, top_k)
         except Exception as e:
             logger.warning("Vocabulary retrieval failed: %s", e)
@@ -281,9 +305,12 @@ class VocabularyIndex:
     # Search layers
     # ------------------------------------------------------------------
 
-    def _exact_search(self, text: str) -> Set[int]:
+    def _exact_search(
+        self, text: str, *, text_lower: str | None = None
+    ) -> Set[int]:
         """Sliding-window exact substring match, returns matched entry indices."""
-        text_lower = text.lower()
+        if text_lower is None:
+            text_lower = text.lower()
         matched: Set[int] = set()
 
         for length, bucket in self._variants_by_length.items():
@@ -297,9 +324,12 @@ class VocabularyIndex:
 
         return matched
 
-    def _pinyin_search(self, text: str, exclude: Set[int]) -> Set[int]:
+    def _pinyin_search(
+        self, text: str, exclude: Set[int], *, text_py: str | None = None
+    ) -> Set[int]:
         """Pinyin substring match on *text*, excluding already-found indices."""
-        text_py = self._to_pinyin(text)
+        if text_py is None:
+            text_py = self._to_pinyin(text)
         if not text_py:
             return set()
 
@@ -333,6 +363,24 @@ class VocabularyIndex:
         pinyin_sorted = sorted(pinyin_indices, key=_score)
         combined = exact_sorted + pinyin_sorted
         return [self._entries[i] for i in combined[:top_k]]
+
+    # ------------------------------------------------------------------
+    # Variant-only filtering
+    # ------------------------------------------------------------------
+
+    def _filter_variant_matched(
+        self,
+        indices: Set[int],
+        predicate: Callable[[str], bool],
+    ) -> Set[int]:
+        """Keep only entries where at least one variant satisfies *predicate*."""
+        result: Set[int] = set()
+        for i in indices:
+            for v in self._entries[i].variants:
+                if predicate(v):
+                    result.add(i)
+                    break
+        return result
 
     # ------------------------------------------------------------------
     # Pinyin helpers
