@@ -7,7 +7,10 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from wenzi.input_context import InputContext
 
 from .mode_loader import (
     MODE_OFF,
@@ -30,6 +33,7 @@ class _ModeHistoryCache:
     last_ts: str = ""
     total_chars: int = 0
     last_log_count: int = 0
+    last_context_level: str = "off"
 
 
 # Appended to system prompt when thinking mode is enabled to keep reasoning concise
@@ -211,6 +215,7 @@ class TextEnhancer:
         self._max_retries = config.get("max_retries", 2)
         self._max_output_tokens = config.get("max_output_tokens", 4096)
         self._thinking = config.get("thinking", False)
+        self._input_context_level: str = config.get("input_context", "basic")
         self._config_dir = config_dir
         self._data_dir = data_dir
         self._cache_dir = cache_dir
@@ -607,7 +612,10 @@ class TextEnhancer:
             result.update(provider_extra_body)
         return result
 
-    def _build_system_content(self, text: str, mode_def: "ModeDefinition") -> str:
+    def _build_system_content(
+        self, text: str, mode_def: "ModeDefinition",
+        input_context: "InputContext | None" = None,
+    ) -> str:
         """Build system prompt with vocabulary and history context.
 
         Components are ordered by stability (most stable first) so that
@@ -629,6 +637,12 @@ class TextEnhancer:
         context_section = self._build_context_section(text)
         if context_section:
             system_content = f"{system_content}\n\n{context_section}"
+
+        # 3. Input context at the tail (dynamic per request)
+        if input_context is not None:
+            env_line = input_context.format_for_prompt(self._input_context_level)
+            if env_line:
+                system_content = f"{system_content}\n\n{env_line}"
 
         return system_content
 
@@ -717,6 +731,11 @@ class TextEnhancer:
         ch = self._conversation_history
         mc = self._get_mode_cache()
 
+        # Invalidate cache if context level changed
+        if mc.last_context_level != self._input_context_level:
+            mc.entry_lines = []
+            mc.last_context_level = self._input_context_level
+
         # Fast path: no new log() calls since last build — return cached.
         # last_log_count is per-mode so that one mode's update does not
         # cause another mode to skip its own new entries.
@@ -772,7 +791,7 @@ class TextEnhancer:
         new_entries.reverse()
 
         # Pre-check: would appending exceed thresholds?
-        new_lines = [ch.format_entry_line(e) for e in new_entries]
+        new_lines = [ch.format_entry_line(e, context_level=self._input_context_level) for e in new_entries]
         # Each new line adds: 1 separator (\n) + line length
         new_chars = sum(len(line) + 1 for line in new_lines)
         projected_count = len(mc.entry_lines) + len(new_lines)
@@ -813,7 +832,7 @@ class TextEnhancer:
         ch = self._conversation_history
         mc = self._get_mode_cache()
         base = entries[-self._history_max_entries:]
-        mc.entry_lines = [ch.format_entry_line(e) for e in base]
+        mc.entry_lines = [ch.format_entry_line(e, context_level=self._input_context_level) for e in base]
         # Total chars of "\n".join(lines): sum of line lengths + (N-1) separators
         n = len(mc.entry_lines)
         mc.total_chars = (
@@ -902,7 +921,9 @@ class TextEnhancer:
 
         return kwargs
 
-    async def enhance(self, text: str) -> Tuple[str, Optional[Dict[str, int]]]:
+    async def enhance(
+        self, text: str, input_context: "InputContext | None" = None,
+    ) -> Tuple[str, Optional[Dict[str, int]]]:
         """Enhance text using LLM.
 
         Returns (enhanced_text, usage) where usage is a dict with
@@ -921,7 +942,7 @@ class TextEnhancer:
             return text, None
 
         try:
-            system_content = self._build_system_content(text, mode_def)
+            system_content = self._build_system_content(text, mode_def, input_context=input_context)
             kwargs = self._build_request_kwargs(text, system_content)
             client, _, _ = self._providers[self._active_provider]
 
@@ -965,7 +986,7 @@ class TextEnhancer:
         self._cancel_event.set()
 
     async def enhance_stream(
-        self, text: str
+        self, text: str, input_context: "InputContext | None" = None,
     ) -> AsyncIterator[Tuple[str, Optional[Dict[str, int]], bool]]:
         """Stream-enhance text using LLM.
 
@@ -989,7 +1010,7 @@ class TextEnhancer:
             return
 
         try:
-            system_content = self._build_system_content(text, mode_def)
+            system_content = self._build_system_content(text, mode_def, input_context=input_context)
             kwargs = self._build_request_kwargs(
                 text, system_content,
                 stream=True,
