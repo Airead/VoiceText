@@ -784,6 +784,7 @@ class TestRecordingWatchdog:
         ctrl.on_restart_recording()
         assert ctrl._recording_watchdog is not None
         assert ctrl._recording_watchdog is not first_watchdog
+        first_watchdog.join(timeout=1.0)
         assert not first_watchdog.is_alive()
         ctrl._cancel_recording_watchdog()
 
