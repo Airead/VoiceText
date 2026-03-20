@@ -52,6 +52,7 @@ class PreviewController:
         # Track the history record currently being viewed (None = normal mode)
         self._viewing_history_index: int | None = None
         self._result_holder: dict | None = None
+        self._input_context = None
 
     # ------------------------------------------------------------------
     # Preview history helpers
@@ -130,6 +131,7 @@ class PreviewController:
             llm_model=app._current_llm_model(),
             user_corrected=bool(result_holder.get("user_corrected")),
             audio_duration=audio_duration,
+            input_context=self._input_context,
         )
 
     def _save_to_preview_history(
@@ -175,6 +177,7 @@ class PreviewController:
             thinking_text=result_holder.get("thinking_text", ""),
             token_usage=result_holder.get("token_usage"),
             hotwords_detail=list(app._preview_panel.hotwords_detail),
+            input_context=self._input_context,
         )
         self._preview_history.add(record)
 
@@ -214,6 +217,7 @@ class PreviewController:
             return
 
         self._viewing_history_index = index
+        self._input_context = record.input_context
         app = self._app
 
         # Update internal state so confirm uses the correct ASR text
@@ -352,6 +356,7 @@ class PreviewController:
         # Save the frontmost app before we steal focus with the preview panel.
         # Used later to reactivate only the focused window (not all windows).
         previous_app = get_frontmost_app()
+        self._input_context = app._recording_controller._input_context
 
         try:
             app._usage_stats.record_transcription(
@@ -524,7 +529,8 @@ class PreviewController:
                     app._preview_panel.set_enhance_loading()
                     app._preview_panel.enhance_request_id += 1
                     app._enhance_controller.run(
-                        asr_text, app._preview_panel.enhance_request_id, result_holder
+                        asr_text, app._preview_panel.enhance_request_id, result_holder,
+                        input_context=self._input_context,
                     )
 
             if indicator_frame is not None:
@@ -575,6 +581,7 @@ class PreviewController:
                         app._enhance_controller.run(
                             stt_text, app._preview_panel.enhance_request_id,
                             result_holder,
+                            input_context=self._input_context,
                         )
                     elif use_enhance:
                         # Empty text — clear enhance loading
@@ -861,7 +868,8 @@ class PreviewController:
             if use_enhance:
                 app._preview_panel.enhance_request_id += 1
                 app._enhance_controller.run(
-                    clipboard_text, app._preview_panel.enhance_request_id, result_holder
+                    clipboard_text, app._preview_panel.enhance_request_id, result_holder,
+                    input_context=None,
                 )
 
         AppHelper.callAfter(_show)
@@ -1028,7 +1036,8 @@ class PreviewController:
             if app._preview_panel.enhance_request_id != request_id:
                 return
             asr_text = getattr(app, "_current_preview_asr_text", "")
-            app._enhance_controller.run(asr_text, request_id, self._result_holder)
+            app._enhance_controller.run(asr_text, request_id, self._result_holder,
+                                       input_context=self._input_context)
 
         self._enhance_debounce_timer = threading.Timer(
             self._ENHANCE_DEBOUNCE_SECONDS, _fire_enhance,
@@ -1155,6 +1164,7 @@ class PreviewController:
                         app._enhance_controller.run(
                             new_text, app._preview_panel.enhance_request_id,
                             self._result_holder,
+                            input_context=self._input_context,
                         )
 
                 AppHelper.callAfter(_on_success)
@@ -1229,6 +1239,7 @@ class PreviewController:
                 app._enhance_controller.run(
                     asr_text, app._preview_panel.enhance_request_id,
                     self._result_holder,
+                    input_context=self._input_context,
                 )
 
     def on_preview_punc_toggle(self, enabled: bool) -> None:
@@ -1267,6 +1278,7 @@ class PreviewController:
                         app._enhance_controller.run(
                             new_text, app._preview_panel.enhance_request_id,
                             self._result_holder,
+                            input_context=self._input_context,
                         )
 
                 AppHelper.callAfter(_on_done)
@@ -1325,4 +1337,5 @@ class PreviewController:
                 app._enhance_controller.run(
                     asr_text, app._preview_panel.enhance_request_id,
                     self._result_holder,
+                    input_context=self._input_context,
                 )
