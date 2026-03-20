@@ -1315,18 +1315,19 @@ class TestInputContextStorage:
         from wenzi.enhance.conversation_history import ConversationHistory
         entry = {"asr_text": "KC", "final_text": "k8s", "input_context": {"app_name": "Terminal"}}
         line = ConversationHistory.format_entry_line(entry, context_level="basic")
-        assert "(Terminal)" in line
+        assert line.startswith("- Terminal - ")
+        assert "k8s" in line
 
     def test_format_entry_line_no_context(self):
         from wenzi.enhance.conversation_history import ConversationHistory
         entry = {"asr_text": "hello", "final_text": "hello"}
         line = ConversationHistory.format_entry_line(entry, context_level="basic")
-        assert "(" not in line
+        assert line == "- hello"
 
-    def test_format_entry_line_detailed_tag(self):
+    def test_format_entry_line_detailed_only_app_name(self):
         from wenzi.enhance.conversation_history import ConversationHistory
         entry = {"asr_text": "hello", "final_text": "hello",
                  "input_context": {"app_name": "Chrome", "browser_domain": "github.com"}}
         line = ConversationHistory.format_entry_line(entry, context_level="detailed")
-        assert "Chrome" in line
-        assert "github.com" in line
+        assert line.startswith("- Chrome - ")
+        assert "github.com" not in line

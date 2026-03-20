@@ -884,16 +884,28 @@ class TextEnhancer:
         lines = ["---", "以下是辅助纠错的参考上下文："]
 
         if self._history_enabled:
-            lines.append(
+            hist_hint = (
                 "- 对话记录（优先参考）：反映用户真实的纠错偏好和话题上下文，"
                 "差异部分以[误→正]标注，无标注表示该部分无需纠错。"
             )
+            if self._input_context_level != "off":
+                hist_hint += (
+                    "每条记录前的应用名称表示该条是在哪个应用中输入的，"
+                    "这是系统自动采集的元数据，不是用户输入的内容。"
+                )
+            lines.append(hist_hint)
 
         if self._vocab_enabled:
             lines.append(
                 "- 词库（仅供辅助）：以下专有名词 ASR 常误写为同音近音词，"
                 "仅当输入中确实存在对应误写时才替换，不要强行套用。"
                 "当词库与对话记录冲突时，以对话记录为准。"
+            )
+
+        if self._input_context_level != "off":
+            lines.append(
+                "- 当前输入环境：标注用户正在使用的应用和窗口信息，"
+                "这是系统自动采集的元数据，不是用户输入的内容。"
             )
 
         return "\n".join(lines)

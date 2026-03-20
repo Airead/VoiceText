@@ -86,17 +86,11 @@ class InputContext:
         """Format a short tag for conversation history entries.
 
         Returns None if level is "off" or no useful info.
+        Always returns only app_name regardless of level (basic or detailed),
+        to keep history entries concise.
         """
         if level == "off" or not self.app_name:
             return None
-
-        if level == "basic":
-            return self.app_name
-
-        # detailed: prefer domain for browsers, else window_title
-        suffix = self.browser_domain or self.window_title
-        if suffix:
-            return f"{self.app_name} \u2014 {suffix}"
         return self.app_name
 
     def to_dict(self) -> Dict[str, Any]:

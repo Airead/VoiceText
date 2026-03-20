@@ -80,7 +80,7 @@ class TestInputContext:
         result = ctx.format_for_history_tag("basic")
         assert result == "Terminal"
 
-    def test_format_for_history_tag_detailed_with_domain(self):
+    def test_format_for_history_tag_detailed_only_app_name(self):
         from wenzi.input_context import InputContext
         ctx = InputContext(
             app_name="Chrome",
@@ -88,18 +88,16 @@ class TestInputContext:
             window_title="GitHub - Some Page",
         )
         result = ctx.format_for_history_tag("detailed")
-        assert "Chrome" in result
-        assert "github.com" in result
+        assert result == "Chrome"
 
-    def test_format_for_history_tag_detailed_with_title(self):
+    def test_format_for_history_tag_detailed_no_extras(self):
         from wenzi.input_context import InputContext
         ctx = InputContext(
             app_name="VS Code",
             window_title="main.py - MyProject",
         )
         result = ctx.format_for_history_tag("detailed")
-        assert "VS Code" in result
-        assert "main.py - MyProject" in result
+        assert result == "VS Code"
 
     def test_to_dict_omits_none(self):
         from wenzi.input_context import InputContext

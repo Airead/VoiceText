@@ -2296,8 +2296,10 @@ class TestInputContextInjection:
 
         result = enhancer._build_system_content("hello", mode_def, input_context=ctx)
 
-        # The environment line must come after the context section (--- marker)
-        env_pos = result.find("\u5f53\u524d\u8f93\u5165\u73af\u5883")
+        # The injected environment line (with app name) must come after
+        # the context section closing --- marker.
+        env_line = "\u5f53\u524d\u8f93\u5165\u73af\u5883\uff1aVSCode"
+        env_pos = result.find(env_line)
         section_end = result.rfind("---")
         assert env_pos > section_end, (
             f"Input context (pos={env_pos}) should appear after "

@@ -711,7 +711,7 @@ class ConversationHistory:
         """
         asr = entry.get("asr_text", "").replace("\n", "\u23ce")
         final = entry.get("final_text", "").replace("\n", "\u23ce")
-        line = f"- {inline_diff(asr, final)}"
+        diff = inline_diff(asr, final)
         if context_level != "off":
             ic_data = entry.get("input_context")
             if ic_data:
@@ -719,8 +719,8 @@ class ConversationHistory:
                 if ic:
                     tag = ic.format_for_history_tag(context_level)
                     if tag:
-                        line = f"{line} ({tag})"
-        return line
+                        return f"- {tag} - {diff}"
+        return f"- {diff}"
 
     def format_for_prompt(
         self, entries: List[Dict[str, Any]], max_chars: int = 0
