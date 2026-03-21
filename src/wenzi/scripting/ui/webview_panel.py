@@ -198,6 +198,9 @@ class WebViewPanel:
         self._call_handlers: Dict[str, Callable] = {}
         self._pending_calls: Dict[str, Any] = {}
 
+        # Close callbacks
+        self._on_close_callbacks: list = []
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -223,6 +226,13 @@ class WebViewPanel:
             return
 
         self._open = False
+
+        # Fire on_close callbacks
+        for cb in self._on_close_callbacks:
+            try:
+                cb()
+            except Exception:
+                logger.exception("Error in on_close callback")
 
         # Reject all pending JS calls
         self._reject_all_pending("Panel closed")
@@ -264,6 +274,10 @@ class WebViewPanel:
             return fn
         return decorator
 
+    def on_close(self, callback: Callable) -> None:
+        """Register a callback to be called when the panel is closed."""
+        self._on_close_callbacks.append(callback)
+
     # ------------------------------------------------------------------
     # JS message routing
     # ------------------------------------------------------------------
@@ -285,7 +299,11 @@ class WebViewPanel:
         elif msg_type == "call":
             call_id = body.get("callId", "")
             if name in self._call_handlers:
-                self._run_call_handler(name, data, call_id)
+                threading.Thread(
+                    target=self._run_call_handler,
+                    args=(name, data, call_id),
+                    daemon=True,
+                ).start()
             else:
                 self._reject_call(call_id, f"No handler registered for '{name}'")
 
@@ -302,15 +320,39 @@ class WebViewPanel:
             self._reject_call(call_id, str(exc))
 
     def _resolve_call(self, call_id: str, result: Any) -> None:
-        """Send a success response back to JS."""
-        payload = json.dumps(result, ensure_ascii=False)
-        js = f"wz._resolve({json.dumps(call_id)}, {payload})"
-        self.eval_js(js)
+        """Send a success response back to JS (dispatched to main thread)."""
+        if not self._open:
+            return
+
+        def _do():
+            payload = json.dumps(
+                result if result is not None else None, ensure_ascii=False
+            )
+            self.eval_js(f"wz._resolve({json.dumps(call_id)}, {payload})")
+
+        try:
+            from PyObjCTools import AppHelper
+
+            AppHelper.callAfter(_do)
+        except Exception:
+            pass
 
     def _reject_call(self, call_id: str, error: str) -> None:
-        """Send an error response back to JS."""
-        js = f"wz._reject({json.dumps(call_id)}, {json.dumps(error)})"
-        self.eval_js(js)
+        """Send an error response back to JS (dispatched to main thread)."""
+        if not self._open:
+            return
+
+        def _do():
+            self.eval_js(
+                f"wz._reject({json.dumps(call_id)}, {json.dumps(error)})"
+            )
+
+        try:
+            from PyObjCTools import AppHelper
+
+            AppHelper.callAfter(_do)
+        except Exception:
+            pass
 
     def _reject_all_pending(self, reason: str) -> None:
         """Reject all pending calls and clear the dict."""

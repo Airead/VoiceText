@@ -107,17 +107,25 @@ class TestWebViewPanelBridge:
         # Should not raise
         panel._handle_js_message({"type": "event", "name": "unknown", "data": None})
 
-    def test_handle_js_message_routes_call(self):
+    @patch("wenzi.scripting.ui.webview_panel.threading.Thread")
+    def test_handle_js_message_routes_call(self, mock_thread_cls):
         """Call messages should dispatch to _run_call_handler on a background thread."""
         panel = _make_panel()
         handler = MagicMock(return_value="result")
         panel._call_handlers["greet"] = handler
 
-        with patch.object(panel, "_run_call_handler") as mock_run:
-            panel._handle_js_message(
-                {"type": "call", "name": "greet", "data": "hello", "callId": "c1"}
-            )
-            mock_run.assert_called_once_with("greet", "hello", "c1")
+        mock_thread = MagicMock()
+        mock_thread_cls.return_value = mock_thread
+
+        panel._handle_js_message(
+            {"type": "call", "name": "greet", "data": "hello", "callId": "c1"}
+        )
+        mock_thread_cls.assert_called_once()
+        call_kwargs = mock_thread_cls.call_args
+        assert call_kwargs[1]["target"] == panel._run_call_handler
+        assert call_kwargs[1]["args"] == ("greet", "hello", "c1")
+        assert call_kwargs[1]["daemon"] is True
+        mock_thread.start.assert_called_once()
 
     def test_handle_js_message_call_no_handler_rejects(self):
         """Call with no registered handler should resolve with error."""
@@ -181,18 +189,38 @@ class TestWebViewPanelBridge:
             assert "c6" == mock_reject.call_args[0][0]
             assert "boom" in mock_reject.call_args[0][1]
 
-    def test_resolve_call_evals_js(self):
+    def test_resolve_call_dispatches_via_apphelper(self):
         panel = _make_panel()
-        panel._resolve_call("c10", {"msg": "done"})
+        mock_apphelper = MagicMock()
+        mock_apphelper.callAfter.side_effect = lambda fn: fn()
+
+        mock_pyobjctools = MagicMock()
+        mock_pyobjctools.AppHelper = mock_apphelper
+
+        with patch.dict("sys.modules", {
+            "PyObjCTools": mock_pyobjctools,
+            "PyObjCTools.AppHelper": mock_apphelper,
+        }):
+            panel._resolve_call("c10", {"msg": "done"})
 
         panel._webview.evaluateJavaScript_completionHandler_.assert_called_once()
         js_code = panel._webview.evaluateJavaScript_completionHandler_.call_args[0][0]
         assert "c10" in js_code
         assert "_resolve" in js_code
 
-    def test_reject_call_evals_js(self):
+    def test_reject_call_dispatches_via_apphelper(self):
         panel = _make_panel()
-        panel._reject_call("c11", "something failed")
+        mock_apphelper = MagicMock()
+        mock_apphelper.callAfter.side_effect = lambda fn: fn()
+
+        mock_pyobjctools = MagicMock()
+        mock_pyobjctools.AppHelper = mock_apphelper
+
+        with patch.dict("sys.modules", {
+            "PyObjCTools": mock_pyobjctools,
+            "PyObjCTools.AppHelper": mock_apphelper,
+        }):
+            panel._reject_call("c11", "something failed")
 
         panel._webview.evaluateJavaScript_completionHandler_.assert_called_once()
         js_code = panel._webview.evaluateJavaScript_completionHandler_.call_args[0][0]
@@ -238,3 +266,57 @@ class TestWebViewPanelLifecycle:
 
         # After close, pending calls dict should be cleared
         assert len(panel._pending_calls) == 0
+
+    def test_on_close_callback_called(self):
+        panel = WebViewPanel(title="T", html="<p>hi</p>")
+        called = []
+        panel.on_close(lambda: called.append(True))
+        panel._panel = None  # no real NSPanel
+        panel._open = True
+        panel.close()
+        assert called == [True]
+
+    def test_on_close_not_called_on_double_close(self):
+        panel = WebViewPanel(title="T", html="<p>hi</p>")
+        called = []
+        panel.on_close(lambda: called.append(1))
+        panel._panel = None
+        panel._open = True
+        panel.close()
+        panel.close()
+        assert called == [1]  # only called once
+
+    @patch("wenzi.scripting.ui.webview_panel.threading.Thread")
+    def test_call_dispatches_to_background_thread(self, mock_thread_cls):
+        panel = WebViewPanel(title="T", html="<p>hi</p>")
+        panel._open = True
+
+        @panel.handle("compute")
+        def compute(data):
+            return 42
+
+        mock_thread = MagicMock()
+        mock_thread_cls.return_value = mock_thread
+
+        panel._handle_js_message({
+            "type": "call",
+            "name": "compute",
+            "data": {"n": 1},
+            "callId": "req-1",
+        })
+        mock_thread_cls.assert_called_once()
+        mock_thread.start.assert_called_once()
+
+    def test_resolve_call_skipped_when_closed(self):
+        """_resolve_call should be a no-op when panel is closed."""
+        panel = _make_panel()
+        panel._open = False
+        panel._resolve_call("c20", "result")
+        panel._webview.evaluateJavaScript_completionHandler_.assert_not_called()
+
+    def test_reject_call_skipped_when_closed(self):
+        """_reject_call should be a no-op when panel is closed."""
+        panel = _make_panel()
+        panel._open = False
+        panel._reject_call("c21", "error")
+        panel._webview.evaluateJavaScript_completionHandler_.assert_not_called()
