@@ -1,7 +1,5 @@
 """Tests for plugin metadata loading."""
 
-import tomllib
-
 from wenzi.scripting.plugin_meta import PluginMeta, load_plugin_meta
 
 
