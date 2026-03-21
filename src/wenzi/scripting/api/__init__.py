@@ -34,9 +34,10 @@ class _WZNamespace:
         self.snippets = SnippetsAPI()
         self.timer = TimerAPI(registry)
         self.store = StoreAPI()
-        # HotkeyAPI and ChooserAPI are created lazily to avoid circular imports
+        # HotkeyAPI, ChooserAPI, and UIAPI are created lazily to avoid circular imports
         self._hotkey_api = None
         self._chooser_api = None
+        self._ui_api = None
         self._reload_callback: Optional[Callable] = None
 
     @property
@@ -56,6 +57,15 @@ class _WZNamespace:
 
             self._chooser_api = ChooserAPI()
         return self._chooser_api
+
+    @property
+    def ui(self):
+        """Access the UI API (lazy init)."""
+        if self._ui_api is None:
+            from .ui import UIAPI
+
+            self._ui_api = UIAPI()
+        return self._ui_api
 
     def leader(
         self,
