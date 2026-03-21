@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -825,6 +826,124 @@ class TestRecordingWatchdog:
         ctrl.on_hotkey_press()
         assert ctrl._recording_watchdog is not None
         assert ctrl._recording_watchdog.interval == 120
+        ctrl._cancel_recording_watchdog()
+
+
+class TestCancelRaceCondition:
+    """Tests for the cancel / delayed-start race condition fix."""
+
+    @patch("PyObjCTools.AppHelper")
+    def test_cancel_waits_for_recording_started(self, mock_apphelper, ctrl, mock_app):
+        """Cancel should wait for recording_started before checking is_recording."""
+        mock_apphelper.callAfter = lambda fn, *a, **kw: fn(*a, **kw)
+        # recording_started not yet set — simulates being inside _delayed_start
+        mock_app._recording_started = threading.Event()
+        mock_app._recorder.is_recording = False
+
+        # Set recording_started from another thread after a short delay
+        def _set_later():
+            time.sleep(0.05)
+            mock_app._recording_started.set()
+
+        threading.Thread(target=_set_later, daemon=True).start()
+        ctrl.on_cancel_recording()
+
+        # Cancel should have waited and then taken the clean-exit path
+        mock_app._set_status.assert_called_with("WZ")
+
+    @patch("PyObjCTools.AppHelper")
+    def test_cancel_stops_recording_after_race(self, mock_apphelper, ctrl, mock_app):
+        """If recorder starts during cancel wait, cancel should take full path."""
+        mock_apphelper.callAfter = lambda fn, *a, **kw: fn(*a, **kw)
+        mock_app._recording_started = threading.Event()
+        # Recorder is NOT recording initially; it becomes recording when set
+        mock_app._recorder.is_recording = False
+
+        def _start_and_signal():
+            time.sleep(0.05)
+            mock_app._recorder.is_recording = True
+            mock_app._recording_started.set()
+
+        threading.Thread(target=_start_and_signal, daemon=True).start()
+        ctrl.on_cancel_recording()
+
+        # Cancel should detect is_recording=True and stop the recorder
+        mock_app._recorder.stop.assert_called_once()
+
+    @patch("PyObjCTools.AppHelper")
+    def test_cancel_aborts_if_new_cycle_starts(self, mock_apphelper, ctrl, mock_app):
+        """Cancel should abort if a new recording cycle clears _cancel_delayed."""
+        mock_apphelper.callAfter = lambda fn, *a, **kw: fn(*a, **kw)
+        mock_app._recording_started = threading.Event()
+        mock_app._recorder.is_recording = True
+
+        def _new_cycle():
+            time.sleep(0.05)
+            # Simulate on_hotkey_press clearing _cancel_delayed
+            ctrl._cancel_delayed.clear()
+            mock_app._recording_started.set()
+
+        threading.Thread(target=_new_cycle, daemon=True).start()
+        ctrl.on_cancel_recording()
+
+        # Cancel should detect stale _cancel_delayed and NOT stop the recorder
+        mock_app._recorder.stop.assert_not_called()
+
+    def test_cancel_timeout_cleans_up(self, ctrl, mock_app):
+        """Cancel should clean up on timeout if recording_started never fires."""
+        mock_app._recording_started = threading.Event()  # never set
+        mock_app._recorder.is_recording = False
+
+        # Use a very short timeout by patching wait
+        original_wait = mock_app._recording_started.wait
+        mock_app._recording_started.wait = lambda timeout=None: original_wait(0.01)
+
+        ctrl.on_cancel_recording()
+
+        mock_app._set_status.assert_called_with("WZ")
+
+
+class TestRestartWatchdogSafety:
+    """Restart during sound delay should not orphan the watchdog."""
+
+    def test_restart_not_recording_preserves_watchdog(self, ctrl, mock_app):
+        """Restart while is_recording=False should not cancel the watchdog."""
+        mock_app._sound_manager.enabled = False
+        ctrl.on_hotkey_press()
+        watchdog = ctrl._recording_watchdog
+        assert watchdog is not None
+
+        # Simulate restart arriving when is_recording happens to be False
+        mock_app._recorder.is_recording = False
+        ctrl.on_restart_recording()
+
+        # Watchdog must NOT have been cancelled
+        assert ctrl._recording_watchdog is watchdog
+
+
+class TestDelayedStartExceptionSafety:
+    """_delayed_start must set recording_started even if start raises."""
+
+    @pytest.mark.filterwarnings(
+        "ignore::pytest.PytestUnhandledThreadExceptionWarning"
+    )
+    @patch("PyObjCTools.AppHelper")
+    def test_recording_started_set_on_start_exception(
+        self, mock_apphelper, ctrl, mock_app
+    ):
+        """recording_started is set via finally even when start raises."""
+        mock_apphelper.callAfter = lambda fn, *a, **kw: fn(*a, **kw)
+
+        mock_app._sound_manager.enabled = True
+        mock_app._recording_started.clear()
+        mock_app._recorder.start.side_effect = RuntimeError("device error")
+
+        ctrl.on_hotkey_press()
+        # Wait for _delayed_start to complete (350ms sleep + start attempt)
+        time.sleep(0.6)
+
+        # recording_started must be set despite the exception (via finally)
+        assert mock_app._recording_started.is_set()
         ctrl._cancel_recording_watchdog()
 
 
