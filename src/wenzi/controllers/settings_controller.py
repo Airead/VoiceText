@@ -767,7 +767,7 @@ class SettingsController:
         bm = vocab_cfg.get("build_model", "")
         if bp and bm:
             # Verify the pair still exists in available models
-            for provider, model, _ in llm_models:
+            for provider, model, *_ in llm_models:
                 if provider == bp and model == bm:
                     return (bp, bm)
         return None
