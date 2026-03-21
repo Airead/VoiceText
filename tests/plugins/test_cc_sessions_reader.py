@@ -114,3 +114,24 @@ class TestReadSessionDetail:
         ])
         detail = read_session_detail(jsonl, max_turns=6)
         assert detail["turns"][0]["text"] == "Part one Part two"
+
+    def test_skips_noise_user_messages(self, tmp_path: Path):
+        """Skips system-injected noise messages in conversation turns."""
+        jsonl = self._write_jsonl(tmp_path / "cleared.jsonl", [
+            {"type": "user", "timestamp": "2026-01-01T00:00:00Z",
+             "message": {"role": "user",
+                         "content": "<local-command-caveat>Caveat: noise</local-command-caveat>"}},
+            {"type": "user", "timestamp": "2026-01-01T00:00:01Z",
+             "message": {"role": "user",
+                         "content": "<command-name>/clear</command-name>"}},
+            {"type": "user", "timestamp": "2026-01-01T00:00:02Z",
+             "message": {"role": "user", "content": "The real question"}},
+            {"type": "assistant", "timestamp": "2026-01-01T00:00:03Z",
+             "message": {"role": "assistant",
+                         "content": [{"type": "text", "text": "The answer"}],
+                         "usage": {"input_tokens": 10, "output_tokens": 5}}},
+        ])
+        detail = read_session_detail(jsonl, max_turns=6)
+        assert len(detail["turns"]) == 2
+        assert detail["turns"][0] == {"role": "user", "text": "The real question"}
+        assert detail["turns"][1] == {"role": "assistant", "text": "The answer"}

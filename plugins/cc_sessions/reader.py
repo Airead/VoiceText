@@ -7,6 +7,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from .scanner import is_noise_message
+
 logger = logging.getLogger(__name__)
 
 _ASSISTANT_TEXT_TRUNCATE = 200
@@ -14,7 +16,7 @@ _ASSISTANT_TEXT_TRUNCATE = 200
 
 def read_session_detail(
     jsonl_path: Path,
-    max_turns: int = 6,
+    max_turns: int = 10,
 ) -> dict[str, Any]:
     """Read a session JSONL and extract conversation turns + token totals.
 
@@ -65,6 +67,8 @@ def read_session_detail(
             if msg_type == "user":
                 text = _extract_user_text(message.get("content", ""))
                 if text:
+                    if is_noise_message(text):
+                        continue
                     result["turns"].append({"role": "user", "text": text})
                     turns_collected += 1
             elif msg_type == "assistant":
@@ -85,8 +89,10 @@ def _extract_user_text(content: Any) -> str:
     if isinstance(content, list):
         parts = []
         for p in content:
-            if isinstance(p, dict) and p.get("type") == "text":
-                parts.append(p.get("text", ""))
+            if isinstance(p, dict):
+                # Accept dicts with "type":"text" or plain {"text": "..."} dicts
+                if p.get("type", "text") == "text":
+                    parts.append(p.get("text", ""))
             elif isinstance(p, str):
                 parts.append(p)
         return " ".join(t for t in parts if t)

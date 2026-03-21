@@ -169,10 +169,12 @@ def register(wz) -> None:
             if s.get("git_branch"):
                 subtitle_parts.append(s["git_branch"])
 
+            msg_count = s.get("message_count", 0)
             items.append({
                 "title": s["title"],
                 "subtitle": " \u00b7 ".join(subtitle_parts),
                 "icon": icon_url,
+                "icon_badge": str(msg_count) if msg_count else "",
                 "item_id": f"cc-{s['session_id']}",
                 "action": lambda sess=s: _open_viewer(sess),
                 "secondary_action": lambda sess=s: _copy_resume_command(sess),

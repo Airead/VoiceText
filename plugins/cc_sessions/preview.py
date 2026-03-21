@@ -48,12 +48,13 @@ def build_preview_html(session: dict[str, Any], detail: dict[str, Any]) -> str:
         for turn in turns:
             role = turn["role"]
             text = escape(turn["text"])
+            truncate = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
             if role == "user":
                 parts.append(
                     f'<div style="margin-bottom:6px">'
                     f'<span style="font-size:10px;font-weight:600;color:var(--accent)">'
                     f"USER</span>"
-                    f'<div style="font-size:12px;margin-top:2px">{text}</div>'
+                    f'<div style="font-size:12px;margin-top:2px;{truncate}">{text}</div>'
                     f"</div>"
                 )
             else:
@@ -61,7 +62,7 @@ def build_preview_html(session: dict[str, Any], detail: dict[str, Any]) -> str:
                     f'<div style="margin-bottom:6px">'
                     f'<span style="font-size:10px;font-weight:600;color:var(--secondary)">'
                     f"CLAUDE</span>"
-                    f'<div style="font-size:12px;margin-top:2px;color:var(--secondary)">'
+                    f'<div style="font-size:12px;margin-top:2px;color:var(--secondary);{truncate}">'
                     f"{text}</div>"
                     f"</div>"
                 )
