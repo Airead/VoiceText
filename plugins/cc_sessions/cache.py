@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -31,37 +31,21 @@ class SessionCache:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._load()
 
-    # ── Public API ────────────────────────────────────────────────
-
-    def get(self, file_path: str) -> Optional[tuple[float, dict[str, Any]]]:
+    def get(self, file_path: str) -> tuple[float, dict[str, Any]] | None:
         """Return ``(mtime, session_data)`` or ``None``."""
-        entry = self._sessions.get(file_path)
-        if entry is None:
-            return None
-        try:
-            return entry["mtime"], entry["data"]
-        except (KeyError, TypeError):
-            return None
+        return self._get_entry(self._sessions, file_path)
 
     def put(self, file_path: str, mtime: float, data: dict[str, Any]) -> None:
         """Store or update a session entry."""
-        self._sessions[file_path] = {"mtime": mtime, "data": data}
-        self._dirty = True
+        self._put_entry(self._sessions, file_path, mtime, data)
 
-    def get_index(self, index_path: str) -> Optional[tuple[float, list[dict[str, Any]]]]:
+    def get_index(self, index_path: str) -> tuple[float, list[dict[str, Any]]] | None:
         """Return ``(mtime, sessions_list)`` or ``None``."""
-        entry = self._indexes.get(index_path)
-        if entry is None:
-            return None
-        try:
-            return entry["mtime"], entry["data"]
-        except (KeyError, TypeError):
-            return None
+        return self._get_entry(self._indexes, index_path)
 
     def put_index(self, index_path: str, mtime: float, sessions: list[dict[str, Any]]) -> None:
         """Store or update an index entry."""
-        self._indexes[index_path] = {"mtime": mtime, "data": sessions}
-        self._dirty = True
+        self._put_entry(self._indexes, index_path, mtime, sessions)
 
     def prune(
         self,
@@ -83,7 +67,7 @@ class SessionCache:
                 self._dirty = True
 
     def save(self) -> None:
-        """Write cache to disk if modified."""
+        """Write cache to disk if modified, using atomic rename."""
         if not self._dirty:
             return
         data = {
@@ -92,13 +76,26 @@ class SessionCache:
             "indexes": self._indexes,
         }
         try:
-            self._path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            tmp = self._path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(self._path)
             self._dirty = False
             logger.debug("Session cache saved to %s", self._path)
         except OSError:
             logger.warning("Failed to save session cache", exc_info=True)
 
-    # ── Internal ──────────────────────────────────────────────────
+    def _get_entry(self, store: dict[str, dict[str, Any]], key: str) -> tuple[float, Any] | None:
+        entry = store.get(key)
+        if entry is None:
+            return None
+        try:
+            return entry["mtime"], entry["data"]
+        except (KeyError, TypeError):
+            return None
+
+    def _put_entry(self, store: dict[str, dict[str, Any]], key: str, mtime: float, data: Any) -> None:
+        store[key] = {"mtime": mtime, "data": data}
+        self._dirty = True
 
     def _load(self) -> None:
         """Load cache from disk. Silently starts empty on any error."""

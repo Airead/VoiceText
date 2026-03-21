@@ -257,15 +257,14 @@ class SessionScanner:
                 continue
             project_name = _project_name_from_dir(proj_entry.name)
 
-            # Fast path: sessions-index.json
             index_path = proj_entry / "sessions-index.json"
-            if index_path.exists():
+            try:
+                mtime = index_path.stat().st_mtime
+            except OSError:
+                mtime = None
+            if mtime is not None:
                 cache_key = str(index_path)
                 live_index_paths.add(cache_key)
-                try:
-                    mtime = index_path.stat().st_mtime
-                except OSError:
-                    continue
 
                 cached = self._cache.get_index(cache_key) if self._cache else None
                 if cached and cached[0] == mtime:
