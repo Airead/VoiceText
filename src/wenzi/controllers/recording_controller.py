@@ -179,9 +179,11 @@ class RecordingController:
         def _delayed_start():
             import time
             time.sleep(0.35)
-            if not app._busy and not self._cancel_delayed.is_set():
-                self._start_recording_and_update_indicator()
-            app._recording_started.set()
+            try:
+                if not app._busy and not self._cancel_delayed.is_set():
+                    self._start_recording_and_update_indicator()
+            finally:
+                app._recording_started.set()
 
         if app._sound_manager.enabled:
             # Show indicator immediately in grayscale while sound plays
@@ -349,12 +351,15 @@ class RecordingController:
 
     def on_restart_recording(self) -> None:
         """Called when restart key (space) is pressed during recording."""
-        self._cancel_recording_watchdog()
         with self._release_lock:
             self._release_done = False
         app = self._app
         if not app._recorder.is_recording:
             return
+        # Only cancel the watchdog after confirming recording is active,
+        # so a restart during the sound-feedback delay doesn't orphan the
+        # watchdog while recorder.start() is still in progress.
+        self._cancel_recording_watchdog()
         logger.info("Restart key pressed, restarting recording")
 
         # Stop streaming if active
@@ -386,9 +391,11 @@ class RecordingController:
         def _delayed_start():
             import time
             time.sleep(0.35)
-            if not app._busy and not self._cancel_delayed.is_set():
-                self._start_recording_and_update_indicator()
-            app._recording_started.set()
+            try:
+                if not app._busy and not self._cancel_delayed.is_set():
+                    self._start_recording_and_update_indicator()
+            finally:
+                app._recording_started.set()
 
         if app._sound_manager.enabled:
             initial_dev = app._recorder.last_device_name if app._recording_indicator.show_device_name else None
@@ -410,20 +417,35 @@ class RecordingController:
         # Show last preview history record
         self._app._preview_controller.on_show_last_preview()
 
+    def _reset_to_idle(self) -> None:
+        """Common cleanup: hide overlays/indicator and restore idle status."""
+        self._hide_live_overlay()
+        self.stop_recording_indicator()
+        self._app._set_status("WZ")
+        self._restore_mode()
+
     def on_cancel_recording(self) -> None:
         """Called when cancel key (cmd) is pressed during recording — discard and stop."""
-        self._cancel_recording_watchdog()
+        self._cancel_delayed.set()
         app = self._app
+
+        # Wait for _delayed_start to finish so is_recording reflects the
+        # true final state — prevents a race where cancel sees
+        # is_recording=False while recorder.start() is still blocking,
+        # cancels the watchdog, and leaves the recording orphaned.
+        if not app._recording_started.wait(timeout=1.0):  # 1s > 350ms delay + start()
+            self._cancel_recording_watchdog()
+            self._reset_to_idle()
+            return
+
+        # A new recording cycle clears _cancel_delayed; if so, this
+        # cancel is stale — abandon it so we don't kill the new recording.
+        if not self._cancel_delayed.is_set():
+            return
+
+        self._cancel_recording_watchdog()
         if not app._recorder.is_recording:
-            # Recording hasn't started yet (e.g. still in sound feedback
-            # delay).  Signal _delayed_start to skip recorder.start(),
-            # then clean up indicator and overlays.
-            self._cancel_delayed.set()
-            self._hide_live_overlay()
-            self.stop_recording_indicator()
-            app._recording_started.set()
-            app._set_status("WZ")
-            self._restore_mode()
+            self._reset_to_idle()
             return
         logger.info("Cancel key pressed, cancelling recording")
 
