@@ -36,7 +36,8 @@ class TestShowModelLoadErrorAlert:
 
         mock_alert.assert_called_once()
         call_kwargs = mock_alert.call_args
-        assert "Clear Cache & Retry" in str(call_kwargs)
+        # ok button uses the i18n key for "Clear Cache & Retry"
+        assert "app.model_error.cache_retry" in str(call_kwargs)
         mock_restore.assert_called_once()
 
     @patch("wenzi.app.restore_accessory")
@@ -50,7 +51,7 @@ class TestShowModelLoadErrorAlert:
         mock_alert.assert_called_once()
         call_kwargs = mock_alert.call_args
         # Should NOT offer cache clear for apple backend
-        assert "Clear Cache & Retry" not in str(call_kwargs)
+        assert "app.model_error.cache_retry" not in str(call_kwargs)
         mock_restore.assert_called_once()
 
     @patch("wenzi.app.restore_accessory")
@@ -63,7 +64,7 @@ class TestShowModelLoadErrorAlert:
 
         mock_alert.assert_called_once()
         call_kwargs = mock_alert.call_args
-        assert "Clear Cache & Retry" not in str(call_kwargs)
+        assert "app.model_error.cache_retry" not in str(call_kwargs)
 
     @patch("wenzi.app.restore_accessory")
     @patch("wenzi.app.topmost_alert", return_value=1)
@@ -88,7 +89,7 @@ class TestShowModelLoadErrorAlert:
 
         mock_alert.assert_called_once()
         call_kwargs = mock_alert.call_args
-        assert "Clear Cache & Retry" in str(call_kwargs)
+        assert "app.model_error.cache_retry" in str(call_kwargs)
 
     @patch("wenzi.app.restore_accessory")
     @patch("wenzi.app.topmost_alert", return_value=0)

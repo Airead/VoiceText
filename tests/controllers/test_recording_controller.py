@@ -67,7 +67,7 @@ class TestOnHotkeyPress:
         mock_app._sound_manager.enabled = False
         ctrl.on_hotkey_press()
 
-        mock_app._set_status.assert_called_with("Recording...")
+        mock_app._set_status.assert_called_with("statusbar.status.recording")
         mock_app._sound_manager.play.assert_called_with("start")
         mock_app._recorder.start.assert_called_once()
         assert mock_app._recording_started.is_set()
@@ -82,7 +82,7 @@ class TestOnHotkeyRelease:
     def test_empty_audio_resets(self, ctrl, mock_app):
         mock_app._recorder.stop.return_value = None
         ctrl.on_hotkey_release()
-        mock_app._set_status.assert_called_with("WZ")
+        mock_app._set_status.assert_called_with("statusbar.status.ready")
 
     def test_timeout_returns(self, ctrl, mock_app):
         mock_app._recording_started = threading.Event()  # Not set
@@ -280,7 +280,7 @@ class TestOnRestartRecording:
 
         ctrl.on_restart_recording()
 
-        mock_app._set_status.assert_called_with("Recording...")
+        mock_app._set_status.assert_called_with("statusbar.status.recording")
 
     @patch("PyObjCTools.AppHelper")
     def test_restart_records_sound_feedback_stat(self, mock_apphelper, ctrl, mock_app):
@@ -307,7 +307,7 @@ class TestOnCancelRecording:
 
         mock_app._recorder.stop.assert_called_once()
         mock_app._recording_indicator.hide.assert_called_once()
-        mock_app._set_status.assert_called_with("WZ")
+        mock_app._set_status.assert_called_with("statusbar.status.ready")
         assert mock_app._busy is False
 
     @patch("PyObjCTools.AppHelper")
@@ -849,7 +849,7 @@ class TestCancelRaceCondition:
         ctrl.on_cancel_recording()
 
         # Cancel should have waited and then taken the clean-exit path
-        mock_app._set_status.assert_called_with("WZ")
+        mock_app._set_status.assert_called_with("statusbar.status.ready")
 
     @patch("PyObjCTools.AppHelper")
     def test_cancel_stops_recording_after_race(self, mock_apphelper, ctrl, mock_app):
@@ -900,7 +900,7 @@ class TestCancelRaceCondition:
 
         ctrl.on_cancel_recording()
 
-        mock_app._set_status.assert_called_with("WZ")
+        mock_app._set_status.assert_called_with("statusbar.status.ready")
 
 
 class TestRestartWatchdogSafety:

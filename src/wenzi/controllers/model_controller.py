@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from wenzi.app import WenZiApp
 
 from wenzi.config import save_config
+from wenzi.i18n import t
 from wenzi.transcription.model_registry import (
     PRESET_BY_ID,
     ModelPreset,
@@ -310,9 +311,9 @@ models:
 
         if app._busy:
             send_notification(
-                "WenZi",
-                "Cannot switch model",
-                "Please wait for current operation to finish.",
+                t("app.name"),
+                t("notification.model.cannot_switch"),
+                t("notification.model.cannot_switch.subtitle"),
             )
             return
 
@@ -339,7 +340,7 @@ models:
                         prompt_enable_siri,
                     )
 
-                    app._set_status("Checking...")
+                    app._set_status("statusbar.status.checking")
                     ok, err = check_siri_available(
                         language=preset.language
                         or app._config.get("asr", {}).get("language", "zh"),
@@ -348,10 +349,10 @@ models:
                     if not ok:
                         logger.warning("Apple Speech preflight failed: %s", err)
                         prompt_enable_siri()
-                        app._set_status("WZ")
+                        app._set_status("statusbar.status.ready")
                         return
 
-                app._set_status("Unloading...")
+                app._set_status("statusbar.status.unloading")
                 old_transcriber.cleanup()
 
                 cached = is_model_cached(preset)
@@ -364,7 +365,7 @@ models:
                     )
                     monitor_thread.start()
                 else:
-                    app._set_status("Loading...")
+                    app._set_status("statusbar.status.loading")
 
                 asr_cfg = app._config["asr"]
                 new_transcriber = create_transcriber(
@@ -395,13 +396,13 @@ models:
                 app._config["asr"]["default_model"] = None
                 save_config(app._config, app._config_path)
 
-                app._set_status("WZ")
+                app._set_status("statusbar.status.ready")
                 logger.info("Switched to model: %s", preset.display_name)
                 try:
                     send_notification(
-                        "WenZi",
-                        "Model switched",
-                        f"Now using: {preset.display_name}",
+                        t("app.name"),
+                        t("notification.model.switched"),
+                        t("notification.model.switched.subtitle", name=preset.display_name),
                     )
                 except Exception:
                     logger.debug("Notification unavailable, skipping")
@@ -412,21 +413,16 @@ models:
                     monitor_thread.join(timeout=2)
 
                 logger.error("Model switch failed: %s", e)
-                app._set_status("Error")
+                app._set_status("statusbar.status.error")
 
                 can_clear = preset.backend not in ("apple", "whisper-api")
                 if can_clear:
                     result = topmost_alert(
-                        title="Model Switch Failed",
-                        message=(
-                            f"Failed to load model: {preset.display_name}\n\n"
-                            f"Error: {str(e)[:200]}\n\n"
-                            "This may be caused by corrupted cache files. "
-                            "Click 'Clear Cache & Retry' to delete cached "
-                            "files and try again."
-                        ),
-                        ok="Clear Cache & Retry",
-                        cancel="Close",
+                        title=t("alert.model.switch_failed.title"),
+                        message=t("alert.model.switch_failed.cache_message",
+                                  name=preset.display_name, error=str(e)[:200]),
+                        ok=t("alert.model.cache_retry"),
+                        cancel=t("common.close"),
                     )
                     restore_accessory()
                     if result == 1:
@@ -436,11 +432,9 @@ models:
                         return
                 else:
                     topmost_alert(
-                        title="Model Switch Failed",
-                        message=(
-                            f"Failed to load model: {preset.display_name}\n\n"
-                            f"Error: {str(e)[:200]}"
-                        ),
+                        title=t("alert.model.switch_failed.title"),
+                        message=t("alert.model.switch_failed.message",
+                                  name=preset.display_name, error=str(e)[:200]),
                     )
                     restore_accessory()
 
@@ -491,7 +485,7 @@ models:
         """
         app = self._app
         if monitor_args is None:
-            app._set_status("Downloading...")
+            app._set_status("statusbar.status.downloading")
             stop_event.wait()
             return
 
@@ -532,7 +526,7 @@ models:
         old_preset = PRESET_BY_ID[old_preset_id]
         try:
             logger.info("Restoring previous model: %s", old_preset.display_name)
-            app._set_status("Restoring...")
+            app._set_status("statusbar.status.restoring")
             asr_cfg = app._config["asr"]
             restored = create_transcriber(
                 backend=old_preset.backend,
@@ -547,11 +541,11 @@ models:
             app._transcriber = restored
             app._current_preset_id = old_preset_id
             app._menu_builder.update_model_checkmarks()
-            app._set_status("WZ")
+            app._set_status("statusbar.status.ready")
             logger.info("Previous model restored")
         except Exception as e2:
             logger.error("Failed to restore previous model: %s", e2)
-            app._set_status("Error")
+            app._set_status("statusbar.status.error")
 
     def _clear_cache_and_retry_switch(
         self, preset: ModelPreset, old_preset_id
@@ -561,7 +555,7 @@ models:
         stop_event = threading.Event()
         monitor_thread = None
         try:
-            app._set_status("Clearing...")
+            app._set_status("statusbar.status.clearing")
             clear_model_cache(preset)
 
             monitor_args = self._make_download_monitor_args(preset)
@@ -600,21 +594,17 @@ models:
             app._config["asr"]["default_model"] = None
             save_config(app._config, app._config_path)
 
-            app._set_status("WZ")
+            app._set_status("statusbar.status.ready")
             logger.info("Model switched after cache clear: %s", preset.display_name)
         except Exception as e2:
             stop_event.set()
             if monitor_thread:
                 monitor_thread.join(timeout=2)
             logger.error("Retry after cache clear failed: %s", e2)
-            app._set_status("Error")
+            app._set_status("statusbar.status.error")
             topmost_alert(
-                title="Model Switch Failed",
-                message=(
-                    f"Retry failed.\n\n"
-                    f"Error: {str(e2)[:200]}\n\n"
-                    "Please check your network connection and try again."
-                ),
+                title=t("alert.model.switch_failed.title"),
+                message=t("alert.model.switch_failed.retry_message", error=str(e2)[:200]),
             )
             restore_accessory()
             self._try_restore_previous_model(old_preset_id)
@@ -640,9 +630,9 @@ models:
 
         if app._busy:
             send_notification(
-                "WenZi",
-                "Cannot switch model",
-                "Please wait for current operation to finish.",
+                t("app.name"),
+                t("notification.model.cannot_switch"),
+                t("notification.model.cannot_switch.subtitle"),
             )
             return
 
@@ -651,7 +641,7 @@ models:
 
         def _do_switch():
             try:
-                app._set_status("Switching...")
+                app._set_status("statusbar.status.switching")
                 old_transcriber.cleanup()
 
                 asr_cfg = app._config["asr"]
@@ -675,24 +665,24 @@ models:
                 app._config["asr"]["default_model"] = rm.model
                 save_config(app._config, app._config_path)
 
-                app._set_status("WZ")
+                app._set_status("statusbar.status.ready")
                 logger.info("Switched to remote ASR: %s", rm.display_name)
                 try:
                     send_notification(
-                        "WenZi",
-                        "Model switched",
-                        f"Now using: {rm.display_name}",
+                        t("app.name"),
+                        t("notification.model.switched"),
+                        t("notification.model.switched.subtitle", name=rm.display_name),
                     )
                 except Exception:
                     logger.debug("Notification unavailable, skipping")
 
             except Exception as e:
                 logger.error("Remote ASR switch failed: %s", e)
-                app._set_status("Error")
+                app._set_status("statusbar.status.error")
                 try:
                     send_notification(
-                        "WenZi",
-                        "Model switch failed",
+                        t("app.name"),
+                        t("notification.model.switch_failed"),
                         str(e)[:100],
                     )
                 except Exception:
@@ -748,15 +738,10 @@ models:
         template = self._load_asr_provider_draft()
         while True:
             resp = run_multiline_window(
-                title="Add ASR Provider",
-                message=(
-                    "name       — unique provider name\n"
-                    "base_url   — OpenAI-compatible ASR endpoint\n"
-                    "api_key    — authentication key\n"
-                    "models     — one model per line (indented)"
-                ),
+                title=t("alert.provider.add_asr.title"),
+                message=t("alert.provider.add_asr.message"),
                 default_text=template,
-                ok="Verify",
+                ok=t("alert.provider.verify"),
                 dimensions=(380, 140),
             )
             if resp is None:
@@ -766,7 +751,7 @@ models:
             parsed = parse_asr_provider_text(resp.text)
             if isinstance(parsed, str):
                 activate_for_dialog()
-                topmost_alert("Validation Error", parsed)
+                topmost_alert(t("alert.provider.validation_error"), parsed)
                 template = resp.text
                 self._save_asr_provider_draft(resp.text)
                 continue
@@ -776,15 +761,15 @@ models:
             providers = app._config.get("asr", {}).get("providers", {})
             if name in providers:
                 activate_for_dialog()
-                topmost_alert("Error", f"ASR provider '{name}' already exists.")
+                topmost_alert(t("alert.provider.error"), t("alert.provider.already_exists", name=name))
                 template = resp.text
                 self._save_asr_provider_draft(resp.text)
                 continue
 
             activate_for_dialog()
             topmost_alert(
-                "Verifying...",
-                f"Testing connection to {base_url}\nModel: {models[0]}",
+                t("alert.provider.verify_title"),
+                t("alert.provider.verify_message", url=base_url, model=models[0]),
             )
 
             from wenzi.transcription.whisper_api import WhisperAPITranscriber
@@ -794,10 +779,10 @@ models:
             if err:
                 activate_for_dialog()
                 result = topmost_alert(
-                    title="Verification Failed",
-                    message=f"{err}\n\nEdit and retry?",
-                    ok="Edit",
-                    cancel="Cancel",
+                    title=t("alert.provider.verify_failed.title"),
+                    message=t("alert.provider.verify_failed.message", error=err),
+                    ok=t("common.edit"),
+                    cancel=t("common.cancel"),
                 )
                 if result != 1:
                     self._save_asr_provider_draft(resp.text)
@@ -808,15 +793,11 @@ models:
 
             activate_for_dialog()
             result = topmost_alert(
-                title="Verification Passed",
-                message=(
-                    f"Provider: {name}\n"
-                    f"URL: {base_url}\n"
-                    f"Models: {', '.join(models)}\n\n"
-                    "Save this provider?"
-                ),
-                ok="Save",
-                cancel="Cancel",
+                title=t("alert.provider.verify_passed.title"),
+                message=t("alert.provider.verify_passed.message",
+                           name=name, url=base_url, models=", ".join(models)),
+                ok=t("common.save"),
+                cancel=t("common.cancel"),
             )
             if result != 1:
                 self._save_asr_provider_draft(resp.text)
@@ -835,7 +816,7 @@ models:
             app._menu_builder.build_model_menu()
 
             send_notification(
-                "WenZi", "ASR Provider added", f"{name} ({', '.join(models)})"
+                t("app.name"), t("notification.provider.asr_added"), f"{name} ({', '.join(models)})"
             )
             logger.info("Added ASR provider: %s", name)
             return
@@ -848,10 +829,10 @@ models:
 
             activate_for_dialog()
             result = topmost_alert(
-                title="Remove ASR Provider",
-                message=f"Remove ASR provider '{pname}' and all its models?",
-                ok="Remove",
-                cancel="Cancel",
+                title=t("alert.provider.remove_asr.title"),
+                message=t("alert.provider.remove_asr.message", name=pname),
+                ok=t("common.remove"),
+                cancel=t("common.cancel"),
             )
             if result != 1:
                 return
@@ -883,7 +864,7 @@ models:
             app._menu_builder.build_model_menu()
             app._menu_builder.update_model_checkmarks()
 
-            send_notification("WenZi", "ASR Provider removed", pname)
+            send_notification(t("app.name"), t("notification.provider.asr_removed"), pname)
             logger.info("Removed ASR provider: %s", pname)
         except Exception as e:
             logger.error("Remove ASR provider failed: %s", e, exc_info=True)
@@ -910,22 +891,16 @@ models:
         app = self._app
         if not app._enhancer:
             activate_for_dialog()
-            topmost_alert("Error", "AI enhancer is not initialized.")
+            topmost_alert(t("alert.provider.error"), t("alert.provider.llm_not_initialized"))
             return
 
         template = self._load_provider_draft()
         while True:
             resp = run_multiline_window(
-                title="Add AI Provider",
-                message=(
-                    "name       — unique provider name\n"
-                    "base_url   — OpenAI-compatible API endpoint\n"
-                    "api_key    — authentication key\n"
-                    "models     — one model per line (indented)\n"
-                    "extra_body — optional, extra JSON for request body"
-                ),
+                title=t("alert.provider.add_llm.title"),
+                message=t("alert.provider.add_llm.message"),
                 default_text=template,
-                ok="Verify",
+                ok=t("alert.provider.verify"),
                 dimensions=(380, 180),
             )
             if resp is None:
@@ -935,7 +910,7 @@ models:
             parsed = parse_provider_text(resp.text)
             if isinstance(parsed, str):
                 activate_for_dialog()
-                topmost_alert("Validation Error", parsed)
+                topmost_alert(t("alert.provider.validation_error"), parsed)
                 template = resp.text
                 self._save_provider_draft(resp.text)
                 continue
@@ -944,13 +919,13 @@ models:
 
             if name in app._enhancer.provider_names:
                 activate_for_dialog()
-                topmost_alert("Error", f"Provider '{name}' already exists.")
+                topmost_alert(t("alert.provider.error"), t("alert.provider.llm_already_exists", name=name))
                 template = resp.text
                 self._save_provider_draft(resp.text)
                 continue
 
             activate_for_dialog()
-            topmost_alert("Verifying...", f"Testing connection to {base_url}\nModel: {models[0]}")
+            topmost_alert(t("alert.provider.verify_title"), t("alert.provider.verify_message", url=base_url, model=models[0]))
 
             import asyncio
             loop = asyncio.new_event_loop()
@@ -967,10 +942,10 @@ models:
             if err:
                 activate_for_dialog()
                 result = topmost_alert(
-                    title="Verification Failed",
-                    message=f"{err}\n\nEdit and retry?",
-                    ok="Edit",
-                    cancel="Cancel",
+                    title=t("alert.provider.verify_failed.title"),
+                    message=t("alert.provider.verify_failed.message", error=err),
+                    ok=t("common.edit"),
+                    cancel=t("common.cancel"),
                 )
                 if result != 1:
                     self._save_provider_draft(resp.text)
@@ -981,15 +956,11 @@ models:
 
             activate_for_dialog()
             result = topmost_alert(
-                title="Verification Passed",
-                message=(
-                    f"Provider: {name}\n"
-                    f"URL: {base_url}\n"
-                    f"Models: {', '.join(models)}\n\n"
-                    "Save this provider?"
-                ),
-                ok="Save",
-                cancel="Cancel",
+                title=t("alert.provider.verify_passed.title"),
+                message=t("alert.provider.verify_passed.message",
+                           name=name, url=base_url, models=", ".join(models)),
+                ok=t("common.save"),
+                cancel=t("common.cancel"),
             )
             if result != 1:
                 self._save_provider_draft(resp.text)
@@ -1001,9 +972,8 @@ models:
             if not success:
                 activate_for_dialog()
                 topmost_alert(
-                    "Error",
-                    "Failed to initialize provider. "
-                    "Check that the openai package is installed.",
+                    t("alert.provider.error"),
+                    t("alert.provider.init_failed"),
                 )
                 return
 
@@ -1023,7 +993,7 @@ models:
             app._menu_builder.build_llm_model_menu()
 
             send_notification(
-                "WenZi", "Provider added", f"{name} ({', '.join(models)})"
+                t("app.name"), t("notification.provider.added"), f"{name} ({', '.join(models)})"
             )
             logger.info("Added AI provider: %s", name)
             return
@@ -1039,10 +1009,10 @@ models:
             activate_for_dialog()
 
             result = topmost_alert(
-                title="Remove Provider",
-                message=f"Remove provider '{pname}' and all its models?",
-                ok="Remove",
-                cancel="Cancel",
+                title=t("alert.provider.remove_llm.title"),
+                message=t("alert.provider.remove_llm.message", name=pname),
+                ok=t("common.remove"),
+                cancel=t("common.cancel"),
             )
             if result != 1:
                 return
@@ -1058,7 +1028,7 @@ models:
 
             app._menu_builder.build_llm_model_menu()
 
-            send_notification("WenZi", "Provider removed", pname)
+            send_notification(t("app.name"), t("notification.provider.removed"), pname)
             logger.info("Removed AI provider: %s", pname)
         except Exception as e:
             logger.error("Remove provider failed: %s", e, exc_info=True)

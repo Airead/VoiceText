@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from wenzi.app import WenZiApp
 
 from wenzi.config import load_config, save_config
+from wenzi.i18n import t
 from wenzi.statusbar import send_notification
 from wenzi.transcription.model_registry import PRESET_BY_ID
 from wenzi.ui_helpers import (
@@ -158,7 +159,7 @@ class ConfigController:
         activate_for_dialog()
 
         alert = NSAlert.alloc().init()
-        alert.setMessageText_("Current Configuration")
+        alert.setMessageText_(t("alert.config.current_title"))
         alert.addButtonWithTitle_("OK")
         alert.setAlertStyle_(0)
 
@@ -189,12 +190,12 @@ class ConfigController:
             new_config, config_error = load_config(app._config_path)
         except Exception as e:
             logger.error("Failed to reload config: %s", e)
-            send_notification("WenZi", "Reload Failed", str(e))
+            send_notification(t("app.name"), t("notification.config.reload_failed"), str(e))
             return
 
         if config_error is not None:
             logger.error("Config reload error: %s", config_error)
-            send_notification("WenZi", "Config Error", config_error.message)
+            send_notification(t("app.name"), t("notification.config.error"), config_error.message)
             return
 
         app._config = new_config
@@ -283,7 +284,7 @@ class ConfigController:
                 app._clipboard_hotkey_listener.start()
 
         logger.info("Configuration reloaded successfully")
-        send_notification("WenZi", "Config Reloaded", "Configuration has been reloaded.")
+        send_notification(t("app.name"), t("notification.config.reloaded"), t("notification.config.reloaded.subtitle"))
 
     def on_browse_history(self, _=None) -> None:
         """Open the conversation history browser panel."""
@@ -315,5 +316,5 @@ class ConfigController:
         from wenzi._build_info import BUILD_DATE, GIT_HASH
 
         message = f"Version: {__version__}\nBuild:   {GIT_HASH}\nDate:    {BUILD_DATE}"
-        topmost_alert(title="WenZi", message=message)
+        topmost_alert(title=t("alert.about.title"), message=message)
         restore_accessory()

@@ -491,8 +491,10 @@ class TestJsCallQueue:
 
         assert panel._page_loaded is True
         assert len(panel._pending_js) == 0
-        panel._webview.evaluateJavaScript_completionHandler_.assert_called_once()
-        combined = panel._webview.evaluateJavaScript_completionHandler_.call_args[0][0]
+        # Called twice: once for i18n injection, once for pending JS flush
+        assert panel._webview.evaluateJavaScript_completionHandler_.call_count == 2
+        # Second call should contain the combined pending JS
+        combined = panel._webview.evaluateJavaScript_completionHandler_.call_args_list[1][0][0]
         assert "setRecords" in combined
         assert "setTagOptions" in combined
 

@@ -17,6 +17,8 @@ import logging
 import os
 from typing import Callable, Optional
 
+from wenzi.i18n import t
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -137,7 +139,7 @@ class SnippetEditorPanel:
 
         # Validate name
         if not name_raw:
-            self._show_error("Name cannot be empty")
+            self._show_error(t("snippet_editor.error.name_empty"))
             self._panel.makeFirstResponder_(self._name_field)
             return
 
@@ -149,19 +151,19 @@ class SnippetEditorPanel:
             category = parts[0].strip()
             name = parts[1].strip()
             if not name:
-                self._show_error("Name cannot be empty after '/'")
+                self._show_error(t("snippet_editor.error.name_empty_after_slash"))
                 self._focus_name_end()
                 return
 
         # Check if file already exists
         if self._store.file_exists(name, category):
-            self._show_error(f"File already exists: {name}")
+            self._show_error(t("snippet_editor.error.file_exists", name=name))
             self._focus_name_end()
             return
 
         # Check keyword uniqueness
         if keyword and self._store.find_by_keyword(keyword) is not None:
-            self._show_error(f"Keyword '{keyword}' already exists")
+            self._show_error(t("snippet_editor.error.keyword_exists", keyword=keyword))
             self._panel.makeFirstResponder_(self._keyword_field)
             return
 
@@ -170,7 +172,7 @@ class SnippetEditorPanel:
             dup = self._store.find_by_content(content)
             if dup is not None:
                 self._show_error(
-                    f'Content duplicates "{self._dup_label(dup)}"',
+                    t("snippet_editor.error.content_duplicates", label=self._dup_label(dup)),
                 )
                 return
 
@@ -179,7 +181,7 @@ class SnippetEditorPanel:
             name=name, keyword=keyword, content=content, category=category,
         )
         if not ok:
-            self._show_error("Failed to save snippet")
+            self._show_error(t("snippet_editor.error.save_failed"))
             return
 
         # Remember category for next time
@@ -197,7 +199,7 @@ class SnippetEditorPanel:
 
             # Use path relative to home for brevity
             display_path = saved_path.replace(os.path.expanduser("~"), "~")
-            show_hud(f"Saved\n{display_path}")
+            show_hud(t("snippet_editor.hud.saved", path=display_path))
 
         AppHelper.callAfter(_show_hud)
 
@@ -218,7 +220,7 @@ class SnippetEditorPanel:
         if keyword:
             existing = self._store.find_by_keyword(keyword)
             if existing is not None:
-                self._show_error(f"Keyword '{keyword}' already exists")
+                self._show_error(t("snippet_editor.error.keyword_exists", keyword=keyword))
                 return
 
         content = str(self._content_view.string()) if self._content_view else ""
@@ -226,7 +228,7 @@ class SnippetEditorPanel:
             dup = self._store.find_by_content(content)
             if dup is not None:
                 self._show_error(
-                    f'Content duplicates "{self._dup_label(dup)}"',
+                    t("snippet_editor.error.content_duplicates", label=self._dup_label(dup)),
                 )
 
     @staticmethod
@@ -363,7 +365,7 @@ class SnippetEditorPanel:
             NSBackingStoreBuffered,
             False,
         )
-        panel.setTitle_("New Snippet")
+        panel.setTitle_(t("snippet_editor.title"))
         panel.setLevel_(NSStatusWindowLevel)
         panel.setFloatingPanel_(True)
         panel.setHidesOnDeactivate_(False)
@@ -405,7 +407,7 @@ class SnippetEditorPanel:
                 self._BUTTON_HEIGHT,
             )
         )
-        cancel_btn.setTitle_("Cancel [ESC]")
+        cancel_btn.setTitle_(t("snippet_editor.btn.cancel"))
         cancel_btn.setBezelStyle_(1)
         cancel_btn.setKeyEquivalent_("\x1b")  # Esc
         cancel_btn.setTarget_(self)
@@ -420,7 +422,7 @@ class SnippetEditorPanel:
                 self._BUTTON_HEIGHT,
             )
         )
-        save_btn.setTitle_("Save [\u23ce]")
+        save_btn.setTitle_(t("snippet_editor.btn.save"))
         save_btn.setBezelStyle_(1)
         save_btn.setTarget_(self)
         save_btn.setAction_(b"saveClicked:")
@@ -472,7 +474,7 @@ class SnippetEditorPanel:
 
         y += self._CONTENT_HEIGHT
 
-        content_label = NSTextField.labelWithString_("Content")
+        content_label = NSTextField.labelWithString_(t("snippet_editor.label.content"))
         content_label.setFrame_(NSMakeRect(P, y, inner_w, self._LABEL_HEIGHT))
         content_label.setFont_(NSFont.systemFontOfSize_(11))
         content_label.setTextColor_(NSColor.secondaryLabelColor())
@@ -485,7 +487,7 @@ class SnippetEditorPanel:
             NSMakeRect(P, y, inner_w, self._FIELD_HEIGHT)
         )
         keyword_field.setFont_(NSFont.systemFontOfSize_(13))
-        keyword_field.setPlaceholderString_("Optional")
+        keyword_field.setPlaceholderString_(t("snippet_editor.placeholder.optional"))
         keyword_field.setStringValue_(initial_query)
         keyword_field.setTarget_(self)
         keyword_field.setAction_(b"fieldEnterPressed:")
@@ -494,7 +496,7 @@ class SnippetEditorPanel:
 
         y += self._FIELD_HEIGHT
 
-        keyword_label = NSTextField.labelWithString_("Keyword")
+        keyword_label = NSTextField.labelWithString_(t("snippet_editor.label.keyword"))
         keyword_label.setFrame_(NSMakeRect(P, y, inner_w, self._LABEL_HEIGHT))
         keyword_label.setFont_(NSFont.systemFontOfSize_(11))
         keyword_label.setTextColor_(NSColor.secondaryLabelColor())
@@ -513,7 +515,7 @@ class SnippetEditorPanel:
             NSMakeRect(P, y, inner_w, self._FIELD_HEIGHT)
         )
         name_field.setFont_(NSFont.systemFontOfSize_(13))
-        name_field.setPlaceholderString_("category/name or just name")
+        name_field.setPlaceholderString_(t("snippet_editor.placeholder.category"))
         name_field.setStringValue_(default_name)
         name_field.setTarget_(self)
         name_field.setAction_(b"fieldEnterPressed:")
@@ -522,7 +524,7 @@ class SnippetEditorPanel:
 
         y += self._FIELD_HEIGHT
 
-        name_label = NSTextField.labelWithString_("Name")
+        name_label = NSTextField.labelWithString_(t("snippet_editor.label.name"))
         name_label.setFrame_(NSMakeRect(P, y, inner_w, self._LABEL_HEIGHT))
         name_label.setFont_(NSFont.systemFontOfSize_(11))
         name_label.setTextColor_(NSColor.secondaryLabelColor())

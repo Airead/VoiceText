@@ -88,6 +88,7 @@ def _relative_time(iso_str: str) -> str:
 def _build_hotwords_html(details: List[HotwordDetail]) -> str:
     """Build an HTML page with a styled table of hotword details."""
     from wenzi.enhance.vocabulary import LAYER_CONTEXT
+    from wenzi.i18n import t
 
     rows: list[str] = []
     for d in details:
@@ -121,6 +122,15 @@ def _build_hotwords_html(details: List[HotwordDetail]) -> str:
         )
 
     tbody = "\n".join(rows)
+    th_layer = html.escape(t("preview.hotwords_table.layer"))
+    th_term = html.escape(t("preview.hotwords_table.term"))
+    th_cat = html.escape(t("preview.hotwords_table.cat"))
+    th_freq = html.escape(t("preview.hotwords_table.freq"))
+    th_score = html.escape(t("preview.hotwords_table.score"))
+    th_bonus = html.escape(t("preview.hotwords_table.bonus"))
+    th_last_seen = html.escape(t("preview.hotwords_table.last_seen"))
+    th_variants = html.escape(t("preview.hotwords_table.variants"))
+    th_context = html.escape(t("preview.hotwords_table.context"))
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -182,9 +192,9 @@ tr.layer-base {{ background: var(--base-bg); }}
 <table>
 <thead>
 <tr>
-    <th>Layer</th><th>Term</th><th>Cat</th>
-    <th>Freq</th><th>Score</th><th>Bonus</th>
-    <th>Last Seen</th><th>Variants</th><th>Context</th>
+    <th>{th_layer}</th><th>{th_term}</th><th>{th_cat}</th>
+    <th>{th_freq}</th><th>{th_score}</th><th>{th_bonus}</th>
+    <th>{th_last_seen}</th><th>{th_variants}</th><th>{th_context}</th>
 </tr>
 </thead>
 <tbody>
@@ -382,13 +392,13 @@ select {
             <span class="section-info" id="asr-info"></span>
         </div>
         <div class="right">
-            <button class="btn hidden" id="hotwords-btn" onclick="postAction('showHotwords')">Hotwords</button>
+            <button class="btn hidden" id="hotwords-btn" onclick="postAction('showHotwords')"></button>
             <label class="checkbox-wrap" id="punc-wrap">
                 <input type="checkbox" id="punc-cb" checked>
-                <span>Punc</span>
+                <span id="punc-label"></span>
             </label>
-            <button class="btn hidden" id="play-btn" onclick="postAction('toggleAudio')">Play ▶</button>
-            <button class="btn hidden" id="save-btn" onclick="postAction('saveAudio')">Save</button>
+            <button class="btn hidden" id="play-btn" onclick="postAction('toggleAudio')"></button>
+            <button class="btn hidden" id="save-btn" onclick="postAction('saveAudio')"></button>
         </div>
     </div>
     <div class="text-area asr-bg" id="asr-text"></div>
@@ -401,7 +411,7 @@ select {
 <div class="section expand hidden" id="enhance-section">
     <div class="section-header">
         <div class="left">
-            <span class="section-title">AI</span>
+            <span class="section-title" id="ai-title"></span>
             <select id="llm-select" class="hidden"></select>
             <span class="section-info" id="enhance-info"></span>
         </div>
@@ -409,7 +419,7 @@ select {
             <input type="checkbox" id="thinking-cb" style="width:14px;height:14px;cursor:pointer;">
             <button class="btn disabled" id="thinking-btn" onclick="postAction('showThinking')"
                 style="opacity:0.3;">🧠</button>
-            <button class="btn disabled" id="prompt-btn" onclick="postAction('showPrompt')">Prompt ⓘ</button>
+            <button class="btn disabled" id="prompt-btn" onclick="postAction('showPrompt')"></button>
             <button class="btn disabled" id="context-btn" onclick="postAction('showContext')"
                 style="opacity:0.3;">📍</button>
         </div>
@@ -421,10 +431,10 @@ select {
 <div class="section expand">
     <div class="section-header">
         <div class="left">
-            <span class="section-title">Final Result (editable)</span>
+            <span class="section-title" id="final-title"></span>
         </div>
         <div class="right">
-            <button class="btn" id="translate-btn" onclick="doTranslate()">Translate ↗</button>
+            <button class="btn" id="translate-btn" onclick="doTranslate()"></button>
         </div>
     </div>
     <textarea class="final-area" id="final-text"></textarea>
@@ -433,29 +443,44 @@ select {
 <!-- Button Bar -->
 <div class="button-bar">
     <div class="left-group" id="history-dropdown-wrap" style="position:relative;">
-        <button class="bar-btn" id="history-btn" onclick="toggleHistoryDropdown()" style="display:none;">History</button>
+        <button class="bar-btn" id="history-btn" onclick="toggleHistoryDropdown()" style="display:none;"></button>
         <div id="history-dropdown" style="display:none; position:absolute; bottom:100%; left:0; margin-bottom:4px;
             min-width:280px; max-width:360px; max-height:240px; overflow-y:auto;
             background:var(--card-bg); border:1px solid var(--border); border-radius:8px;
             box-shadow:0 4px 16px var(--shadow); z-index:100;">
         </div>
     </div>
-    <button class="bar-btn" id="cancel-btn" onclick="postAction('cancel')">Cancel</button>
-    <button class="bar-btn primary" id="confirm-btn" onclick="doConfirm(false)">Confirm ⏎</button>
+    <button class="bar-btn" id="cancel-btn" onclick="postAction('cancel')"></button>
+    <button class="bar-btn primary" id="confirm-btn" onclick="doConfirm(false)"></button>
 </div>
 
 <script>
-// --- State ---
+// --- i18n ---
 const CONFIG = __CONFIG__;
+function i18n(key) { return (CONFIG.i18n && CONFIG.i18n[key]) || key; }
+
+// --- State ---
 let userEdited = false;
 let cmdHeld = false;
 
 // --- Init ---
 function init() {
+    // i18n: set button/label text from translations
+    document.getElementById('hotwords-btn').textContent = i18n('btn.hotwords');
+    document.getElementById('punc-label').textContent = i18n('btn.punc');
+    document.getElementById('play-btn').textContent = i18n('btn.play');
+    document.getElementById('save-btn').textContent = i18n('btn.save_audio');
+    document.getElementById('ai-title').textContent = i18n('section.ai');
+    document.getElementById('prompt-btn').textContent = i18n('btn.prompt');
+    document.getElementById('final-title').textContent = i18n('section.final');
+    document.getElementById('translate-btn').textContent = i18n('btn.translate');
+    document.getElementById('cancel-btn').textContent = i18n('btn.cancel');
+    document.getElementById('confirm-btn').textContent = i18n('btn.confirm');
+
     // ASR title
     document.getElementById('asr-title').textContent = CONFIG.asrTitle;
     if (CONFIG.asrLoading) {
-        document.getElementById('asr-text').innerHTML = '<span class="loading">⏳ Transcribing...</span>';
+        document.getElementById('asr-text').innerHTML = '<span class="loading">' + i18n('loading.transcribing') + '</span>';
     } else {
         document.getElementById('asr-text').textContent = CONFIG.asrText;
     }
@@ -520,9 +545,9 @@ function init() {
     if (CONFIG.showEnhance || CONFIG.modes.length > 0) {
         document.getElementById('enhance-section').classList.remove('hidden');
         if (CONFIG.showEnhance) {
-            document.getElementById('enhance-info').textContent = '⏳ Processing...';
+            document.getElementById('enhance-info').textContent = i18n('loading.processing');
         } else {
-            document.getElementById('enhance-info').textContent = 'Off';
+            document.getElementById('enhance-info').textContent = i18n('enhance.off');
         }
     }
 
@@ -552,7 +577,7 @@ function init() {
     if (CONFIG.previewHistory && CONFIG.previewHistory.length > 0) {
         const btn = document.getElementById('history-btn');
         btn.style.display = '';
-        btn.textContent = 'History (' + CONFIG.previewHistory.length + ')';
+        btn.textContent = i18n('btn.history') + ' (' + CONFIG.previewHistory.length + ')';
         buildHistoryDropdown(CONFIG.previewHistory);
     }
 
@@ -646,13 +671,13 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Meta' && !cmdHeld) {
         cmdHeld = true;
-        document.getElementById('confirm-btn').textContent = 'Copy ⌘⏎';
+        document.getElementById('confirm-btn').textContent = i18n('btn.copy');
     }
 });
 document.addEventListener('keyup', (e) => {
     if (e.key === 'Meta' && cmdHeld) {
         cmdHeld = false;
-        document.getElementById('confirm-btn').textContent = 'Confirm ⏎';
+        document.getElementById('confirm-btn').textContent = i18n('btn.confirm');
     }
 });
 
@@ -663,7 +688,7 @@ function setAsrText(text) {
 }
 
 function setAsrLoading() {
-    document.getElementById('asr-text').innerHTML = '<span class="loading">⏳ Re-transcribing...</span>';
+    document.getElementById('asr-text').innerHTML = '<span class="loading">' + i18n('loading.retranscribing') + '</span>';
     const sel = document.getElementById('stt-select');
     if (sel) sel.disabled = true;
 }
@@ -684,7 +709,7 @@ function setSttPopupIndex(index) {
 function setHotwordsCount(n) {
     const btn = document.getElementById('hotwords-btn');
     if (n > 0) {
-        btn.textContent = 'Hotwords (' + n + ')';
+        btn.textContent = i18n('btn.hotwords') + ' (' + n + ')';
         btn.classList.remove('hidden');
     } else {
         btn.classList.add('hidden');
@@ -729,7 +754,7 @@ function setEnhanceInfo(text) {
 function setEnhanceLoading() {
     document.getElementById('enhance-section').classList.remove('hidden');
     document.getElementById('enhance-text').innerHTML = '';
-    document.getElementById('enhance-info').textContent = '⏳ Processing...';
+    document.getElementById('enhance-info').textContent = i18n('loading.processing');
     const _tb = document.getElementById('thinking-btn');
     _tb.classList.add('disabled'); _tb.style.opacity = '0.3';
     const _cb = document.getElementById('context-btn');
@@ -738,7 +763,7 @@ function setEnhanceLoading() {
 }
 
 function setEnhanceOff() {
-    document.getElementById('enhance-info').textContent = 'Off';
+    document.getElementById('enhance-info').textContent = i18n('enhance.off');
     document.getElementById('enhance-text').innerHTML = '';
     const _pb = document.getElementById('prompt-btn');
     _pb.classList.add('disabled'); _pb.style.opacity = '0.3';
@@ -799,7 +824,7 @@ function replayCachedResult(displayText, info, hasThinking, finalText) {
 function updateLoadingTimer(seconds) {
     const info = document.getElementById('enhance-info');
     if (info.textContent.startsWith('⏳')) {
-        info.textContent = '⏳ Processing... ' + seconds + 's';
+        info.textContent = i18n('loading.processing') + ' ' + seconds + 's';
     }
 }
 
@@ -1870,7 +1895,13 @@ class ResultPreviewPanel:
             self._message_handler = handler
             self._navigation_delegate = nav_delegate
 
-        panel_title = "Enhance Clipboard" if self._source == "clipboard" else "Preview"
+        from wenzi.i18n import get_translations_for_prefix, t
+
+        panel_title = (
+            t("preview.title.enhance_clipboard")
+            if self._source == "clipboard"
+            else t("preview.title.preview")
+        )
         panel.setTitle_(panel_title)
 
         # Center on screen
@@ -1890,7 +1921,11 @@ class ResultPreviewPanel:
         # Build config JSON and load HTML
         asr_loading = self._asr_text == "" and self._source != "clipboard"
         config_data = {
-            "asrTitle": "Clipboard Text" if self._source == "clipboard" else "ASR",
+            "asrTitle": (
+                t("preview.asr_title.clipboard")
+                if self._source == "clipboard"
+                else t("preview.asr_title.asr")
+            ),
             "asrText": self._asr_text,
             "asrInfo": self._asr_info,
             "asrLoading": asr_loading,
@@ -1907,6 +1942,7 @@ class ResultPreviewPanel:
             "thinkingEnabled": self._thinking_enabled,
             "hasAudio": self._asr_wav_data is not None,
             "previewHistory": self._preview_history_items,
+            "i18n": get_translations_for_prefix("preview."),
         }
         html = _HTML_TEMPLATE.replace(
             "__CONFIG__", json.dumps(config_data, ensure_ascii=False)
@@ -1960,7 +1996,7 @@ class ResultPreviewPanel:
             self._asr_sound = None
         if had_playback:
             self._eval_js(
-                "document.getElementById('play-btn').textContent = 'Play \\u25b6'"
+                "document.getElementById('play-btn').textContent = i18n('btn.play')"
             )
 
     def _play_wav(self, wav_data: bytes) -> None:
@@ -1974,7 +2010,7 @@ class ResultPreviewPanel:
             sound.play()
             self._asr_sound = sound
             self._eval_js(
-                "document.getElementById('play-btn').textContent = 'Stop \\u25a0'"
+                "document.getElementById('play-btn').textContent = i18n('btn.pause')"
             )
             self._playback_timer = (
                 NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(

@@ -55,7 +55,7 @@ class TestHandleNoVoiceBackend:
             WenZiApp._handle_no_voice_backend(app)
 
         assert app._voice_input_available is False
-        assert app._set_status.call_args[0][0] == "WZ"
+        assert app._set_status.call_args[0][0] == "statusbar.status.ready"
 
     def test_user_chooses_open_settings(self):
         """Open Settings: opens URL, voice input disabled, hotkeys stay."""
@@ -72,7 +72,7 @@ class TestHandleNoVoiceBackend:
 
         mock_popen.assert_called_once()
         assert app._voice_input_available is False
-        assert app._set_status.call_args[0][0] == "WZ"
+        assert app._set_status.call_args[0][0] == "statusbar.status.ready"
 
     def test_user_chooses_later(self):
         """Set Up Later: voice input disabled, hotkeys stay, no save."""

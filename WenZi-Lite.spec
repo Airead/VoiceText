@@ -24,6 +24,7 @@ a = Analysis(
     datas=[
         (os.path.join(_spec_dir, 'src/wenzi/audio/sounds'), 'wenzi/audio/sounds'),
         (os.path.join(_spec_dir, 'src/wenzi/enhance/data'), 'wenzi/enhance/data'),
+        (os.path.join(_spec_dir, 'src/wenzi/locales'), 'wenzi/locales'),
     ],
     hiddenimports=[
         # wenzi core

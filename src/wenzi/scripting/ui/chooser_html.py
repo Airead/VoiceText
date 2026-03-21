@@ -235,10 +235,10 @@ body { display: flex; flex-direction: column; }
 <div class="search-bar">
     <span class="search-icon">&#128269;</span>
     <input class="search-input" id="search-input"
-           type="text" placeholder="Search..." autocomplete="off"
+           type="text" placeholder="" autocomplete="off"
            autocorrect="off" autocapitalize="off" spellcheck="false">
     <span class="create-group" id="create-group">
-        <button class="create-btn" id="create-btn" title="New...">+</button>
+        <button class="create-btn" id="create-btn" title="">+</button>
         <span class="create-hint">&#8984;N</span>
     </span>
 </div>
@@ -246,13 +246,9 @@ body { display: flex; flex-direction: column; }
 <div class="main-content">
     <div class="left-panel full-width">
         <div class="result-list" id="result-list"></div>
-        <div class="empty-state" id="empty-state" style="display:none;">
-            Type to search
-        </div>
+        <div class="empty-state" id="empty-state" style="display:none;"></div>
     </div>
-    <div class="preview-panel empty hidden" id="preview-panel">
-        Select an item to preview
-    </div>
+    <div class="preview-panel empty hidden" id="preview-panel"></div>
 </div>
 
 <div class="footer" id="footer">
@@ -261,6 +257,10 @@ body { display: flex; flex-direction: column; }
 </div>
 
 <script>
+// --- i18n ---
+window._i18n = window._i18n || {};
+function i18n(key) { return window._i18n[key] || key; }
+
 // --- State ---
 var items = [];
 var selectedIndex = -1;
@@ -368,7 +368,7 @@ function renderItems() {
         resultList.style.display = 'none';
         emptyState.style.display = 'flex';
         emptyState.textContent = searchInput.value.trim()
-            ? 'No results' : 'Type to search';
+            ? i18n('empty.no_results') : i18n('empty.type_to_search');
         setPreview(null);
         return;
     }
@@ -501,7 +501,7 @@ function updatePreview() {
 function setPreview(data) {
     if (!data) {
         previewPanel.className = 'preview-panel empty';
-        previewPanel.textContent = 'Select an item to preview';
+        previewPanel.textContent = i18n('preview.select_item');
         return;
     }
     previewPanel.className = 'preview-panel';
@@ -794,7 +794,7 @@ function setModifierSubtitle(index, subtitle) {
 }
 
 function setPlaceholder(text) {
-    searchInput.placeholder = text || 'Search...';
+    searchInput.placeholder = text || i18n('placeholder');
 }
 
 function focusInput() {
@@ -835,7 +835,7 @@ function exitHistoryMode() {
 
 // --- Action hints (dynamic per source) ---
 function setActionHints(hints) {
-    var parts = ['<kbd>\u2191\u2193</kbd> Navigate'];
+    var parts = ['<kbd>\u2191\u2193</kbd> ' + i18n('footer.navigate')];
     if (hints.enter) {
         parts.push('<kbd>\u21b5</kbd> ' + hints.enter);
     }
@@ -854,7 +854,7 @@ function setActionHints(hints) {
     if (hints.tab) {
         parts.push('<kbd>\u21e5</kbd> ' + hints.tab);
     }
-    parts.push('<kbd>Esc</kbd> Close');
+    parts.push('<kbd>Esc</kbd> ' + i18n('footer.close'));
     footerLeft.innerHTML = parts.join('  ');
 }
 
@@ -884,7 +884,7 @@ function triggerDelete(index, btn) {
     clearDeleteConfirm();
     _deleteConfirmIndex = index;
     btn.classList.add('confirm');
-    btn.textContent = 'Delete?';
+    btn.textContent = i18n('delete_confirm');
     _deleteConfirmTimer = setTimeout(function() {
         clearDeleteConfirm();
         _renderVisibleRows();
@@ -916,6 +916,15 @@ function setCreateButton(visible) {
         createGroup.classList.remove('visible');
     }
 }
+
+// --- i18n: populate static labels ---
+function _initI18nLabels() {
+    searchInput.placeholder = i18n('placeholder');
+    document.getElementById('create-btn').title = i18n('create_title');
+    emptyState.textContent = i18n('empty.type_to_search');
+    previewPanel.textContent = i18n('preview.select_item');
+}
+_initI18nLabels();
 
 // --- Init ---
 setActionHints({ enter: 'Open', cmd_enter: 'Reveal' });

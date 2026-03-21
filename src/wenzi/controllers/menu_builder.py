@@ -190,15 +190,15 @@ class MenuBuilder:
     def on_help_click(self, sender) -> None:
         """Open the user guide on GitHub Pages in the default browser.
 
-        Automatically selects the Chinese version when the system locale
-        starts with ``zh``, otherwise defaults to English.
+        Automatically selects the Chinese version when the current locale
+        is ``zh``, otherwise defaults to English.
         """
-        import locale
         import webbrowser
 
+        from wenzi.i18n import get_locale
+
         base_url = "https://airead.github.io/WenZi"
-        current_locale = locale.getlocale()[0] or ""
-        if current_locale.startswith("zh"):
+        if get_locale() == "zh":
             url = f"{base_url}/zh/docs/user-guide.html"
         else:
             url = f"{base_url}/docs/user-guide.html"

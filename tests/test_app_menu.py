@@ -128,7 +128,7 @@ class TestHelpMenu:
     """Tests for the help menu functionality."""
 
     @patch("webbrowser.open")
-    @patch("locale.getlocale", return_value=("zh_CN", "UTF-8"))
+    @patch("wenzi.i18n.get_locale", return_value="zh")
     def test_help_click_chinese_locale(self, mock_locale, mock_open):
         app = MagicMock()
         builder = MenuBuilder(app)
@@ -139,7 +139,7 @@ class TestHelpMenu:
         assert url == "https://airead.github.io/WenZi/zh/docs/user-guide.html"
 
     @patch("webbrowser.open")
-    @patch("locale.getlocale", return_value=("zh_TW", "UTF-8"))
+    @patch("wenzi.i18n.get_locale", return_value="zh")
     def test_help_click_chinese_traditional_locale(self, mock_locale, mock_open):
         app = MagicMock()
         builder = MenuBuilder(app)
@@ -150,7 +150,7 @@ class TestHelpMenu:
         assert url == "https://airead.github.io/WenZi/zh/docs/user-guide.html"
 
     @patch("webbrowser.open")
-    @patch("locale.getlocale", return_value=("en_US", "UTF-8"))
+    @patch("wenzi.i18n.get_locale", return_value="en")
     def test_help_click_english_locale(self, mock_locale, mock_open):
         app = MagicMock()
         builder = MenuBuilder(app)
@@ -161,7 +161,7 @@ class TestHelpMenu:
         assert url == "https://airead.github.io/WenZi/docs/user-guide.html"
 
     @patch("webbrowser.open")
-    @patch("locale.getlocale", return_value=(None, None))
+    @patch("wenzi.i18n.get_locale", return_value="en")
     def test_help_click_no_locale(self, mock_locale, mock_open):
         app = MagicMock()
         builder = MenuBuilder(app)

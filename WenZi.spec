@@ -32,6 +32,7 @@ a = Analysis(
     datas=mlx_datas + mlx_whisper_datas + sherpa_datas + librosa_datas + [
         (os.path.join(_spec_dir, 'src/wenzi/audio/sounds'), 'wenzi/audio/sounds'),
         (os.path.join(_spec_dir, 'src/wenzi/enhance/data'), 'wenzi/enhance/data'),
+        (os.path.join(_spec_dir, 'src/wenzi/locales'), 'wenzi/locales'),
     ],
     hiddenimports=mlx_hiddenimports + mlx_whisper_hiddenimports + sherpa_hiddenimports + librosa_hiddenimports + [
         # wenzi core

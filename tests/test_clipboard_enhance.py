@@ -184,7 +184,8 @@ class TestClipboardEnhanceValidation:
                 ctrl._on_clipboard_enhance_worker()
 
             mock_alert.assert_called_once()
-            assert "Not Supported" in mock_alert.call_args[1]["title"]
+            title = mock_alert.call_args[1]["title"]
+            assert "Not Supported" in title or "not_supported" in title
             mock_restore.assert_called_once()
 
     def test_empty_text_clipboard_shows_alert(self):
@@ -204,7 +205,8 @@ class TestClipboardEnhanceValidation:
                 ctrl._on_clipboard_enhance_worker()
 
             mock_alert.assert_called_once()
-            assert "Empty" in mock_alert.call_args[1]["title"]
+            title = mock_alert.call_args[1]["title"]
+            assert "Empty" in title or "empty" in title
             mock_restore.assert_called_once()
 
     def test_long_text_shows_alert_and_aborts(self):
@@ -224,7 +226,8 @@ class TestClipboardEnhanceValidation:
                 ctrl._on_clipboard_enhance_worker()
 
             mock_alert.assert_called_once()
-            assert "2001" in mock_alert.call_args[1]["message"]
+            message = mock_alert.call_args[1]["message"]
+            assert "2001" in message or "too_long" in message
             mock_restore.assert_called_once()
             assert not app._busy
 

@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 from wenzi.config import save_config
 from wenzi.enhance.enhancer import MODE_OFF
+from wenzi.i18n import t
 from wenzi.transcription.model_registry import (
     PRESET_BY_ID,
     PRESETS,
@@ -186,6 +187,7 @@ class SettingsController:
             "on_launcher_source_hotkey_clear": self.launcher_source_hotkey_clear,
             "on_new_snippet_hotkey_record": self.new_snippet_hotkey_record,
             "on_new_snippet_hotkey_clear": self.new_snippet_hotkey_clear,
+            "on_language_change": self.language_change,
             "_reopen": lambda: self.on_open_settings(None),
         }
 
@@ -279,6 +281,17 @@ class SettingsController:
             app._hotkey_listener.set_cancel_key(key_name)
         logger.info("Cancel key set to: %s (from settings)", key_name)
 
+    def language_change(self, lang_value: str) -> None:
+        """Handle language change from settings UI."""
+        app = self._app
+        app._config["language"] = lang_value
+        save_config(app._config, app._config_path)
+        topmost_alert(
+            title=t("settings.general_tab.language_restart_title"),
+            message=t("settings.general_tab.language_restart_message"),
+        )
+        restore_accessory()
+
     def scripting_toggle(self, enabled: bool) -> None:
         """Handle scripting toggle from Settings panel."""
         app = self._app
@@ -334,8 +347,8 @@ class SettingsController:
             return
         if app._busy:
             topmost_alert(
-                "Cannot switch model",
-                "Please wait for current operation to finish.",
+                t("alert.settings.cannot_switch"),
+                t("alert.settings.cannot_switch.message"),
             )
             restore_accessory()
             return
@@ -360,7 +373,7 @@ class SettingsController:
                         prompt_enable_siri,
                     )
 
-                    app._set_status("Checking...")
+                    app._set_status("statusbar.status.checking")
                     ok, err = check_siri_available(
                         language=preset.language
                         or app._config.get("asr", {}).get("language", "zh"),
@@ -377,10 +390,10 @@ class SettingsController:
                             old_preset_id,
                             app._current_remote_asr,
                         )
-                        app._set_status("WZ")
+                        app._set_status("statusbar.status.ready")
                         return
 
-                app._set_status("Unloading...")
+                app._set_status("statusbar.status.unloading")
                 old_transcriber.cleanup()
 
                 cached = is_model_cached(preset)
@@ -393,7 +406,7 @@ class SettingsController:
                     )
                     monitor_thread.start()
                 else:
-                    app._set_status("Loading...")
+                    app._set_status("statusbar.status.loading")
 
                 asr_cfg = app._config["asr"]
                 new_transcriber = create_transcriber(
@@ -424,11 +437,11 @@ class SettingsController:
                 app._config["asr"]["default_model"] = None
                 self._save_and_reload()
 
-                app._set_status("WZ")
+                app._set_status("statusbar.status.ready")
                 logger.info("Switched to model: %s (from settings)", preset.display_name)
                 try:
-                    send_notification("WenZi", "Model switched",
-                                      f"Now using: {preset.display_name}")
+                    send_notification(t("app.name"), t("notification.model.switched"),
+                                      t("notification.model.switched.subtitle", name=preset.display_name))
                 except Exception:
                     logger.debug("Notification unavailable, skipping")
 
@@ -437,21 +450,16 @@ class SettingsController:
                 if monitor_thread:
                     monitor_thread.join(timeout=2)
                 logger.error("Model switch failed: %s", e)
-                app._set_status("Error")
+                app._set_status("statusbar.status.error")
 
                 can_clear = preset.backend not in ("apple", "whisper-api")
                 if can_clear:
                     result = topmost_alert(
-                        title="Model Switch Failed",
-                        message=(
-                            f"Failed to load model: {preset.display_name}\n\n"
-                            f"Error: {str(e)[:200]}\n\n"
-                            "This may be caused by corrupted cache files. "
-                            "Click 'Clear Cache & Retry' to delete cached "
-                            "files and try again."
-                        ),
-                        ok="Clear Cache & Retry",
-                        cancel="Close",
+                        title=t("alert.model.switch_failed.title"),
+                        message=t("alert.model.switch_failed.cache_message",
+                                  name=preset.display_name, error=str(e)[:200]),
+                        ok=t("alert.model.cache_retry"),
+                        cancel=t("common.close"),
                     )
                     restore_accessory()
                     if result == 1:
@@ -461,11 +469,9 @@ class SettingsController:
                         return
                 else:
                     topmost_alert(
-                        title="Model Switch Failed",
-                        message=(
-                            f"Failed to load model: {preset.display_name}\n\n"
-                            f"Error: {str(e)[:200]}"
-                        ),
+                        title=t("alert.model.switch_failed.title"),
+                        message=t("alert.model.switch_failed.message",
+                                  name=preset.display_name, error=str(e)[:200]),
                     )
                     restore_accessory()
 
@@ -483,7 +489,7 @@ class SettingsController:
         stop_event = threading.Event()
         monitor_thread = None
         try:
-            app._set_status("Clearing...")
+            app._set_status("statusbar.status.clearing")
             clear_model_cache(preset)
 
             monitor_args = app._model_controller._make_download_monitor_args(preset)
@@ -522,7 +528,7 @@ class SettingsController:
             app._config["asr"]["default_model"] = None
             self._save_and_reload()
 
-            app._set_status("WZ")
+            app._set_status("statusbar.status.ready")
             logger.info(
                 "Model switched after cache clear: %s (from settings)",
                 preset.display_name,
@@ -532,14 +538,10 @@ class SettingsController:
             if monitor_thread:
                 monitor_thread.join(timeout=2)
             logger.error("Retry after cache clear failed: %s", e2)
-            app._set_status("Error")
+            app._set_status("statusbar.status.error")
             topmost_alert(
-                title="Model Switch Failed",
-                message=(
-                    f"Retry failed.\n\n"
-                    f"Error: {str(e2)[:200]}\n\n"
-                    "Please check your network connection and try again."
-                ),
+                title=t("alert.model.switch_failed.title"),
+                message=t("alert.model.switch_failed.retry_message", error=str(e2)[:200]),
             )
             restore_accessory()
             app._model_controller._try_restore_previous_model(old_preset_id)
@@ -566,8 +568,8 @@ class SettingsController:
             return
         if app._busy:
             topmost_alert(
-                "Cannot switch model",
-                "Please wait for current operation to finish.",
+                t("alert.settings.cannot_switch"),
+                t("alert.settings.cannot_switch.message"),
             )
             restore_accessory()
             return
@@ -585,7 +587,7 @@ class SettingsController:
 
         def _do_switch():
             try:
-                app._set_status("Switching...")
+                app._set_status("statusbar.status.switching")
                 old_transcriber.cleanup()
 
                 new_transcriber = create_transcriber(
@@ -608,12 +610,12 @@ class SettingsController:
                 app._config["asr"]["default_model"] = model
                 self._save_and_reload()
 
-                app._set_status("WZ")
+                app._set_status("statusbar.status.ready")
                 logger.info("Switched to remote ASR: %s / %s (from settings)",
                             provider, model)
             except Exception as e:
                 logger.error("Remote ASR switch failed: %s", e)
-                app._set_status("Error")
+                app._set_status("statusbar.status.error")
             finally:
                 app._busy = False
 
@@ -895,10 +897,10 @@ class SettingsController:
         self._app._settings_panel.close()
 
         result = topmost_alert(
-            title="Restart Required",
+            title=t("alert.settings.restart_required.title"),
             message=message,
-            ok="Restart Now",
-            cancel="Later",
+            ok=t("alert.update.restart_now"),
+            cancel=t("common.later"),
         )
         restore_accessory()
         if result:
@@ -1088,9 +1090,8 @@ class SettingsController:
                 logger.debug("Could not trigger app rescan", exc_info=True)
 
         topmost_alert(
-            title="Icon Cache Cleared",
-            message="App and browser icon caches have been cleared. "
-            "Icons will be re-extracted on next search.",
+            title=t("alert.settings.icon_cache_cleared.title"),
+            message=t("alert.settings.icon_cache_cleared.message"),
         )
         restore_accessory()
         logger.info("Icon cache refresh completed")

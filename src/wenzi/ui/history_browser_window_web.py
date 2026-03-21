@@ -271,17 +271,17 @@ body {
 <body>
 
 <div class="search-bar">
-    <input type="text" class="search-input" id="search" placeholder="Search history...">
+    <input type="text" class="search-input" id="search" placeholder="">
     <select class="time-select" id="time-range">
-        <option value="all">All Time</option>
-        <option value="today">Today</option>
-        <option value="7d" selected>Last 7 Days</option>
-        <option value="30d">Last 30 Days</option>
+        <option value="all"></option>
+        <option value="today"></option>
+        <option value="7d" selected></option>
+        <option value="30d"></option>
     </select>
     <label class="archive-toggle" title="Include archived history">
-        <input type="checkbox" id="archive-cb"> Archived
+        <input type="checkbox" id="archive-cb"> <span id="archived-label"></span>
     </label>
-    <button class="btn" id="clear-btn">Clear</button>
+    <button class="btn" id="clear-btn"></button>
 </div>
 
 <div class="tag-row" id="tag-row"></div>
@@ -290,31 +290,31 @@ body {
 
 <div class="table-wrap">
     <div class="table-header">
-        <div class="col col-time">Time ↓</div>
-        <div class="col col-mode">Mode</div>
-        <div class="col col-content">Content</div>
-        <div class="col col-tags">Tags</div>
+        <div class="col col-time" id="col-time-header"></div>
+        <div class="col col-mode" id="col-mode-header"></div>
+        <div class="col col-content" id="col-content-header"></div>
+        <div class="col col-tags" id="col-tags-header"></div>
     </div>
     <div class="table-body" id="table-body"></div>
 </div>
 
 <div class="pager" id="pager" style="display:none">
-    <button class="pager-btn" id="pager-prev" disabled>&laquo; Prev</button>
+    <button class="pager-btn" id="pager-prev" disabled></button>
     <span class="pager-info" id="pager-info"></span>
-    <button class="pager-btn" id="pager-next" disabled>Next &raquo;</button>
+    <button class="pager-btn" id="pager-next" disabled></button>
 </div>
 
 <div class="detail" id="detail" style="display:none">
     <div class="detail-row">
-        <div class="detail-label" id="asr-label">ASR:</div>
+        <div class="detail-label" id="asr-label"></div>
         <div class="detail-text" id="asr-text"></div>
     </div>
     <div class="detail-row">
-        <div class="detail-label" id="enhanced-label">Enhanced:</div>
+        <div class="detail-label" id="enhanced-label"></div>
         <div class="detail-text" id="enhanced-text"></div>
     </div>
     <div class="detail-row">
-        <div class="detail-label">Final:</div>
+        <div class="detail-label" id="final-label"></div>
         <input type="text" class="final-input" id="final-input" disabled>
     </div>
     <div class="detail-info">
@@ -324,15 +324,19 @@ body {
 </div>
 
 <div class="btn-row">
-    <button class="btn btn-danger" id="delete-btn" disabled>Delete</button>
+    <button class="btn btn-danger" id="delete-btn" disabled></button>
     <span style="flex:1"></span>
-    <button class="btn btn-primary" id="save-btn" disabled>Save</button>
-    <button class="btn" id="close-btn">Close</button>
+    <button class="btn btn-primary" id="save-btn" disabled></button>
+    <button class="btn" id="close-btn"></button>
 </div>
 
 <div id="tooltip"></div>
 
 <script>
+// --- i18n ---
+window._i18n = window._i18n || {};
+function i18n(key) { return window._i18n[key] || key; }
+
 const tooltipEl = document.getElementById('tooltip');
 const tableBody = document.getElementById('table-body');
 const detail = document.getElementById('detail');
@@ -390,6 +394,35 @@ function tagBgColor(tag, group) {
 function post(msg) {
     window.webkit.messageHandlers.action.postMessage(msg);
 }
+
+/* --- Tag group labels (declared early so _initI18nLabels can update it) --- */
+var GROUP_LABELS = {mode: 'Mode', stt: 'STT', llm: 'LLM', special: ''};
+
+/* --- i18n: populate static labels --- */
+function _initI18nLabels() {
+    searchEl.placeholder = i18n('search_placeholder');
+    const opts = timeRange.options;
+    opts[0].textContent = i18n('time.all');
+    opts[1].textContent = i18n('time.today');
+    opts[2].textContent = i18n('time.7d');
+    opts[3].textContent = i18n('time.30d');
+    document.getElementById('archived-label').textContent = i18n('archived');
+    clearBtn.textContent = i18n('btn.clear');
+    document.getElementById('col-time-header').textContent = i18n('column.time');
+    document.getElementById('col-mode-header').textContent = i18n('column.mode');
+    document.getElementById('col-content-header').textContent = i18n('column.content');
+    document.getElementById('col-tags-header').textContent = i18n('column.tags');
+    pagerPrev.textContent = i18n('pager.prev');
+    pagerNext.textContent = i18n('pager.next');
+    asrLabel.textContent = i18n('label.asr');
+    enhancedLabel.textContent = i18n('label.enhanced');
+    document.getElementById('final-label').textContent = i18n('label.final');
+    deleteBtn.textContent = i18n('btn.delete');
+    saveBtn.textContent = i18n('btn.save');
+    closeBtn.textContent = i18n('btn.close');
+    GROUP_LABELS = {mode: i18n('group.mode'), stt: i18n('group.stt'), llm: i18n('group.llm'), special: ''};
+}
+_initI18nLabels();
 
 /* --- Search bar (auto-query with debounce) --- */
 let searchTimer = null;
@@ -485,9 +518,11 @@ function setRecords(records, totalCount, page, numPages, filteredCount) {
 
     /* Stats */
     if (totalCount !== totalFiltered) {
-        statsLine.innerHTML = `Total ${totalCount} records<span class="filtered"> (${totalFiltered} filtered)</span>`;
+        var s = i18n('stats.total').replace('{count}', totalCount);
+        s += '<span class="filtered"> ' + i18n('stats.filtered').replace('{count}', totalFiltered) + '</span>';
+        statsLine.innerHTML = s;
     } else {
-        statsLine.textContent = `Total ${totalCount} records`;
+        statsLine.textContent = i18n('stats.total').replace('{count}', totalCount);
     }
 
     /* Pager */
@@ -495,14 +530,14 @@ function setRecords(records, totalCount, page, numPages, filteredCount) {
         pagerEl.style.display = 'flex';
         pagerPrev.disabled = (currentPage <= 0);
         pagerNext.disabled = (currentPage >= totalPages - 1);
-        pagerInfo.textContent = `Page ${currentPage + 1} / ${totalPages}`;
+        pagerInfo.textContent = i18n('pager.info').replace('{current}', currentPage + 1).replace('{total}', totalPages);
     } else {
         pagerEl.style.display = 'none';
     }
 
     /* Table rows */
     if (records.length === 0) {
-        tableBody.innerHTML = '<div class="empty-msg">No records found.</div>';
+        tableBody.innerHTML = '<div class="empty-msg">' + i18n('empty') + '</div>';
         return;
     }
     let html = '';
@@ -516,7 +551,7 @@ function setRecords(records, totalCount, page, numPages, filteredCount) {
         if (preview.length > 80) preview = preview.substring(0, 80) + '\u2026';
         /* Mini tags: Corr first (with placeholder), then STT, LLM */
         let tags = '';
-        if (r._corrected) tags += miniTag('Corr', 'corrected', 'User corrected', 'mini-corr');
+        if (r._corrected) tags += miniTag(i18n('tag.corr'), 'corrected', i18n('tag.corr_tooltip'), 'mini-corr');
         else tags += '<span class="mini-tag-placeholder"></span>';
         if (stt) tags += miniTag(abbr(stt), 'stt', 'STT: ' + stt);
         if (llm) tags += miniTag(abbr(llm), 'llm', 'LLM: ' + llm);
@@ -543,7 +578,7 @@ function setRecords(records, totalCount, page, numPages, filteredCount) {
     });
 }
 
-const GROUP_LABELS = {mode: 'Mode', stt: 'STT', llm: 'LLM', special: ''};
+/* GROUP_LABELS declared earlier, before _initI18nLabels() */
 function setTagOptions(tags) {
     /* tags = [{name, count, group}, ...] where group is 'mode'|'stt'|'llm'|'special' */
     tagRow.innerHTML = '';
@@ -587,18 +622,18 @@ function renderTagPills() {
 function showDetail(record) {
     detail.style.display = 'block';
     const stt = record.stt_model || '';
-    asrLabel.textContent = stt ? `ASR (${stt}):` : 'ASR:';
+    asrLabel.textContent = stt ? `${i18n('label.asr').replace(/:$/, '')} (${stt}):` : i18n('label.asr');
     asrText.textContent = record.asr_text || '';
     const llm = record.llm_model || '';
-    enhancedLabel.textContent = llm ? `Enhanced (${llm}):` : 'Enhanced:';
+    enhancedLabel.textContent = llm ? `${i18n('label.enhanced').replace(/:$/, '')} (${llm}):` : i18n('label.enhanced');
     enhancedText.textContent = record.enhanced_text || '';
     finalInput.value = record.final_text || '';
     finalInput.disabled = false;
     originalFinalText = record.final_text || '';
-    modeInfo.textContent = `Mode: ${record.enhance_mode || 'off'}`;
+    modeInfo.textContent = i18n('detail.mode').replace('{mode}', record.enhance_mode || 'off');
     let ts = fmtTs(record.timestamp || '');
-    let label = `Time: ${ts}`;
-    if (record.edited_at) label += `  (edited: ${fmtTs(record.edited_at)})`;
+    let label = i18n('detail.time').replace('{time}', ts);
+    if (record.edited_at) label += '  ' + i18n('detail.edited').replace('{time}', fmtTs(record.edited_at));
     timeInfo.textContent = label;
     saveBtn.disabled = true;
     deleteBtn.disabled = false;
@@ -1142,12 +1177,21 @@ class HistoryBrowserPanel:
 
     def _on_page_loaded(self) -> None:
         """Flush pending JS calls atomically when page finishes loading."""
+        # Inject i18n translations before flushing pending JS
+        self._inject_i18n()
+
         pending = self._pending_js[:]
         self._pending_js.clear()
         self._page_loaded = True
         if pending and self._webview is not None:
             combined = ";".join(pending)
             self._webview.evaluateJavaScript_completionHandler_(combined, None)
+
+    def _inject_i18n(self) -> None:
+        """Inject i18n translations into the webview JS context."""
+        from wenzi.i18n import inject_i18n_into_webview
+
+        inject_i18n_into_webview(self._webview, "history_web.")
 
     # ------------------------------------------------------------------
     # Panel construction

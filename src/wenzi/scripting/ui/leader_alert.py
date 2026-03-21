@@ -9,6 +9,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from wenzi.i18n import t
+
 if TYPE_CHECKING:
     from wenzi.scripting.registry import LeaderMapping
 
@@ -124,7 +126,7 @@ class LeaderAlertPanel:
         # Title
         y = panel_height - padding - title_height
         title_font = NSFont.boldSystemFontOfSize_(15.0)
-        title = NSTextField.labelWithString_(f"Leader: {trigger_key}")
+        title = NSTextField.labelWithString_(t("leader_alert.title", key=trigger_key))
         title.setFrame_(NSMakeRect(padding, y, panel_width - padding * 2, title_height))
         title.setFont_(title_font)
         title.setTextColor_(_dynamic_title_color())
@@ -140,7 +142,7 @@ class LeaderAlertPanel:
 
         for i, m in enumerate(mappings):
             y = panel_height - padding - title_height - (i + 1) * line_height
-            desc = m.desc or m.app or m.exec_cmd or "action"
+            desc = m.desc or m.app or m.exec_cmd or t("leader_alert.default_action")
             line_text = f"  [{m.key}]  {desc}"
 
             label = NSTextField.labelWithString_(line_text)

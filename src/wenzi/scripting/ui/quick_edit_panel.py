@@ -14,6 +14,8 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from wenzi.i18n import t
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -163,7 +165,7 @@ class QuickEditPanel:
             preview = text.replace("\n", " ").strip()
             if len(preview) > 40:
                 preview = preview[:37] + "..."
-            show_hud(f"Copied\n{preview}")
+            show_hud(t("quick_edit.hud.copied", preview=preview))
 
         AppHelper.callAfter(_hud)
 
@@ -186,7 +188,7 @@ class QuickEditPanel:
             from wenzi.ui.hud import show_hud
 
             display = path.replace(os.path.expanduser("~"), "~")
-            show_hud(f"Path Copied\n{display}")
+            show_hud(t("quick_edit.hud.path_copied", display=display))
 
         AppHelper.callAfter(_hud)
 
@@ -303,7 +305,7 @@ class QuickEditPanel:
             NSBackingStoreBuffered,
             False,
         )
-        panel.setTitle_("Quick Edit")
+        panel.setTitle_(t("quick_edit.title"))
         panel.setLevel_(NSStatusWindowLevel)
         panel.setFloatingPanel_(True)
         panel.setHidesOnDeactivate_(False)
@@ -346,7 +348,7 @@ class QuickEditPanel:
                 _BUTTON_HEIGHT,
             )
         )
-        copy_btn.setTitle_("Copy [\u2325\u21b5]")
+        copy_btn.setTitle_(t("quick_edit.btn.copy"))
         copy_btn.setBezelStyle_(1)
         copy_btn.setTarget_(self)
         copy_btn.setAction_(b"copyClicked:")
@@ -362,7 +364,7 @@ class QuickEditPanel:
                 _BUTTON_HEIGHT,
             )
         )
-        cancel_btn.setTitle_("Cancel")
+        cancel_btn.setTitle_(t("common.cancel"))
         cancel_btn.setBezelStyle_(1)
         cancel_btn.setKeyEquivalent_("\x1b")  # Esc
         cancel_btn.setTarget_(self)
@@ -377,7 +379,7 @@ class QuickEditPanel:
             path_btn = NSButton.alloc().initWithFrame_(
                 NSMakeRect(P, y, path_btn_w, _BUTTON_HEIGHT)
             )
-            path_btn.setTitle_("Copy Path [\u2318\u21b5]")
+            path_btn.setTitle_(t("quick_edit.btn.copy_path"))
             path_btn.setBezelStyle_(1)
             path_btn.setKeyEquivalent_("\r")
             from AppKit import NSCommandKeyMask

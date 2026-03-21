@@ -59,6 +59,7 @@ from .controllers.config_controller import ConfigController
 from .controllers.enhance_mode_controller import EnhanceModeController
 from .controllers.update_controller import UpdateController
 from .transcription.base import create_transcriber
+from .i18n import t
 from .ui_helpers import (
     activate_for_dialog,
     restore_accessory,
@@ -107,22 +108,25 @@ def get_build_type() -> str:
 LOG_DIR = Path(os.path.expanduser(DEFAULT_LOG_DIR))
 LOG_FILE = LOG_DIR / "wenzi.log"
 
-# Map status strings to SF Symbol names for menu bar icons
+# Map status i18n keys to SF Symbol names for menu bar icons.
+# _set_status() receives a key from this dict (or a dynamic string like "DL 50%").
 _STATUS_ICONS: Dict[str, str] = {
-    "WZ": "mic.fill",
-    "Recording...": "waveform",
-    "Transcribing...": "text.bubble",
-    "Enhancing...": "sparkles",
-    "Preview...": "eye",
-    "(empty)": "mic.slash",
-    "Error": "exclamationmark.triangle",
-    "Config Error": "exclamationmark.triangle",
-    "Switching...": "arrow.triangle.2.circlepath",
-    "Loading...": "cpu",
-    "Unloading...": "arrow.up.circle",
-    "Downloading...": "arrow.down.circle",
-    "Restoring...": "arrow.counterclockwise",
-    "VT \u23f3": "book.fill",
+    "statusbar.status.ready": "mic.fill",
+    "statusbar.status.recording": "waveform",
+    "statusbar.status.transcribing": "text.bubble",
+    "statusbar.status.enhancing": "sparkles",
+    "statusbar.status.preview": "eye",
+    "statusbar.status.empty": "mic.slash",
+    "statusbar.status.error": "exclamationmark.triangle",
+    "statusbar.status.config_error": "exclamationmark.triangle",
+    "statusbar.status.switching": "arrow.triangle.2.circlepath",
+    "statusbar.status.loading": "cpu",
+    "statusbar.status.unloading": "arrow.up.circle",
+    "statusbar.status.downloading": "arrow.down.circle",
+    "statusbar.status.restoring": "arrow.counterclockwise",
+    "statusbar.status.checking": "cpu",
+    "statusbar.status.clearing": "arrow.counterclockwise",
+    "statusbar.status.vocab_building": "book.fill",
 }
 
 # Cache for SF Symbol NSImage objects
@@ -176,16 +180,10 @@ class WenZiApp(StatusBarApp):
     """Menubar app: hold hotkey to record, release to transcribe and type."""
 
     def __init__(self, config_dir: Optional[str] = None) -> None:
-        super().__init__("WenZi", icon=None, title="WZ")
-        self._current_status = "WZ"
-
-        # Seed the SF Symbol icon so the first render shows an icon, not text
-        nsimage = self._sf_symbol_image("mic.fill", "WenZi")
-        if nsimage is not None:
-            self._icon_nsimage = nsimage
-            self._title = None  # clear text; icon takes over
-
+        # Load config and init i18n BEFORE super().__init__() so t() is available
         import os
+        from wenzi.i18n import init_i18n
+
         migrate_legacy_paths()
         migrate_xdg_paths()
         self._config_dir = resolve_config_dir(config_dir)
@@ -197,6 +195,17 @@ class WenZiApp(StatusBarApp):
         self._config_degraded = config_error is not None
         if self._config_degraded:
             set_config_readonly(True)
+
+        init_i18n(locale=self._config.get("language"))
+
+        super().__init__(t("app.name"), icon=None, title=t("statusbar.status.ready"))
+        self._current_status = "statusbar.status.ready"
+
+        # Seed the SF Symbol icon so the first render shows an icon, not text
+        nsimage = self._sf_symbol_image("mic.fill", t("app.name"))
+        if nsimage is not None:
+            self._icon_nsimage = nsimage
+            self._title = None  # clear text; icon takes over
         self._setup_logging()
 
         audio_cfg = self._config["audio"]
@@ -286,13 +295,13 @@ class WenZiApp(StatusBarApp):
                 )
 
         # Menu items
-        self._status_item = StatusMenuItem("Ready")
+        self._status_item = StatusMenuItem(t("statusbar.status.ready"))
         self._status_item.set_callback(None)
         # Hotkey submenu
-        self._hotkey_menu = StatusMenuItem("Hotkey")
+        self._hotkey_menu = StatusMenuItem(t("menu.hotkey"))
         self._hotkey_menu_items: Dict[str, StatusMenuItem] = {}
         self._hotkey_record_item = StatusMenuItem(
-            "Record Hotkey...", callback=self._on_record_hotkey
+            t("menu.record_hotkey"), callback=self._on_record_hotkey
         )
         self._menu_builder = MenuBuilder(self)
         self._model_controller = ModelController(self)
@@ -304,13 +313,13 @@ class WenZiApp(StatusBarApp):
         self._menu_builder.build_hotkey_menu()
 
         # STT Model submenu
-        self._model_menu = StatusMenuItem("STT Model")
+        self._model_menu = StatusMenuItem(t("menu.stt_model"))
         self._model_menu_items: Dict[str, StatusMenuItem] = {}
         self._remote_asr_menu_items: Dict[Tuple[str, str], StatusMenuItem] = {}
         self._asr_add_provider_item = StatusMenuItem(
-            "Add ASR Provider...", callback=self._model_controller.on_asr_add_provider
+            t("menu.asr_add_provider"), callback=self._model_controller.on_asr_add_provider
         )
-        self._asr_remove_provider_menu = StatusMenuItem("Remove ASR Provider")
+        self._asr_remove_provider_menu = StatusMenuItem(t("menu.asr_remove_provider"))
         self._asr_remove_provider_items: Dict[str, StatusMenuItem] = {}
         self._menu_builder.build_model_menu()
 
@@ -350,11 +359,11 @@ class WenZiApp(StatusBarApp):
             self._auto_vocab_builder.set_enhancer(self._enhancer)
 
         # AI Enhance submenu (mode selection only)
-        self._enhance_menu = StatusMenuItem("AI Enhance")
+        self._enhance_menu = StatusMenuItem(t("menu.ai_enhance"))
         self._enhance_menu_items: Dict[str, StatusMenuItem] = {}
 
         # Fixed "Off" item
-        off_item = StatusMenuItem("Off")
+        off_item = StatusMenuItem(t("menu.ai_enhance.off"))
         off_item._enhance_mode = MODE_OFF
         off_item.set_callback(self._on_enhance_mode_select)
         if self._enhance_mode == MODE_OFF:
@@ -376,44 +385,44 @@ class WenZiApp(StatusBarApp):
         # Add Mode item
         self._enhance_menu.add(None)
         self._enhance_add_mode_item = StatusMenuItem(
-            "Add Mode...", callback=self._on_enhance_add_mode
+            t("menu.ai_enhance.add_mode"), callback=self._on_enhance_add_mode
         )
         self._enhance_menu.add(self._enhance_add_mode_item)
 
         # Top-level toggle items (promoted from AI Enhance)
         vocab_enabled = ai_cfg.get("vocabulary", {}).get("enabled", False)
         self._enhance_vocab_item = StatusMenuItem(
-            "Vocabulary", callback=self._on_vocab_toggle
+            t("menu.vocabulary"), callback=self._on_vocab_toggle
         )
         self._enhance_vocab_item.state = 1 if vocab_enabled else 0
         self._update_vocab_title()
 
         history_enabled = ai_cfg.get("conversation_history", {}).get("enabled", False)
         self._enhance_history_item = StatusMenuItem(
-            "Conversation History", callback=self._on_history_toggle
+            t("menu.conversation_history"), callback=self._on_history_toggle
         )
         self._enhance_history_item.state = 1 if history_enabled else 0
 
         self._browse_history_item = StatusMenuItem(
-            "Browse History...", callback=self._on_browse_history
+            t("menu.browse_history"), callback=self._on_browse_history
         )
 
         # LLM Model top-level submenu
-        self._llm_model_menu = StatusMenuItem("LLM Model")
+        self._llm_model_menu = StatusMenuItem(t("menu.llm_model"))
         self._llm_model_menu_items: Dict[Tuple[str, str], StatusMenuItem] = {}
         self._llm_add_provider_item = StatusMenuItem(
-            "Add Provider...", callback=self._model_controller.on_enhance_add_provider
+            t("menu.llm_add_provider"), callback=self._model_controller.on_enhance_add_provider
         )
-        self._llm_remove_provider_menu = StatusMenuItem("Remove Provider")
+        self._llm_remove_provider_menu = StatusMenuItem(t("menu.llm_remove_provider"))
         self._llm_remove_provider_items: Dict[str, StatusMenuItem] = {}
         self._menu_builder.build_llm_model_menu()
 
         # AI Settings submenu (low-frequency AI configuration)
-        self._ai_settings_menu = StatusMenuItem("AI Settings")
+        self._ai_settings_menu = StatusMenuItem(t("menu.ai_settings"))
 
         # Thinking toggle
         self._enhance_thinking_item = StatusMenuItem(
-            "Thinking", callback=self._on_enhance_thinking_toggle
+            t("menu.ai_settings.thinking"), callback=self._on_enhance_thinking_toggle
         )
         if self._enhancer and self._enhancer.thinking:
             self._enhance_thinking_item.state = 1
@@ -422,65 +431,65 @@ class WenZiApp(StatusBarApp):
         # Build vocabulary action
         self._ai_settings_menu.add(None)
         self._enhance_vocab_build_item = StatusMenuItem(
-            "Build Vocabulary...", callback=self._on_vocab_build
+            t("menu.ai_settings.build_vocab"), callback=self._on_vocab_build
         )
         self._ai_settings_menu.add(self._enhance_vocab_build_item)
 
         self._enhance_auto_build_item = StatusMenuItem(
-            "Auto Build Vocabulary", callback=self._on_auto_build_toggle
+            t("menu.ai_settings.auto_build_vocab"), callback=self._on_auto_build_toggle
         )
         self._enhance_auto_build_item.state = 1 if vocab_cfg.get("auto_build", True) else 0
         self._ai_settings_menu.add(self._enhance_auto_build_item)
 
         self._ai_settings_menu.add(None)
         self._enhance_edit_config_item = StatusMenuItem(
-            "Edit Config...", callback=self._on_enhance_edit_config
+            t("menu.ai_settings.edit_config"), callback=self._on_enhance_edit_config
         )
         self._ai_settings_menu.add(self._enhance_edit_config_item)
 
         self._preview_item = StatusMenuItem(
-            "Preview", callback=self._on_preview_toggle
+            t("menu.preview"), callback=self._on_preview_toggle
         )
         self._preview_item.state = 1 if self._preview_enabled else 0
 
         self._clipboard_enhance_item = StatusMenuItem(
-            "Enhance Clipboard", callback=self._preview_controller.on_clipboard_enhance
+            t("menu.enhance_clipboard"), callback=self._preview_controller.on_clipboard_enhance
         )
 
         # Feedback toggle items
         self._sound_feedback_item = StatusMenuItem(
-            "Sound Feedback", callback=self._recording_controller.on_sound_feedback_toggle
+            t("menu.sound_feedback"), callback=self._recording_controller.on_sound_feedback_toggle
         )
         self._sound_feedback_item.state = 1 if self._sound_manager.enabled else 0
 
         self._visual_indicator_item = StatusMenuItem(
-            "Visual Indicator", callback=self._recording_controller.on_visual_indicator_toggle
+            t("menu.visual_indicator"), callback=self._recording_controller.on_visual_indicator_toggle
         )
         self._visual_indicator_item.state = 1 if self._recording_indicator.enabled else 0
 
         # View Logs top-level item (replaces Debug submenu)
         self._view_logs_item = StatusMenuItem(
-            "View Logs...", callback=self._on_view_logs
+            t("menu.view_logs"), callback=self._on_view_logs
         )
 
         # Show Config / Reload Config items
         self._show_config_item = StatusMenuItem(
-            "Show Config...", callback=self._on_show_config
+            t("menu.show_config"), callback=self._on_show_config
         )
         self._reload_config_item = StatusMenuItem(
-            "Reload Config", callback=self._on_reload_config
+            t("menu.reload_config"), callback=self._on_reload_config
         )
 
         # Usage Stats item
         self._usage_stats_item = StatusMenuItem(
-            "Usage Stats", callback=self._on_show_usage_stats
+            t("menu.usage_stats"), callback=self._on_show_usage_stats
         )
 
         # Restart / About / Help items
-        self._restart_item = StatusMenuItem("Restart", callback=self._on_restart)
-        self._about_item = StatusMenuItem("About WenZi", callback=self._on_about)
+        self._restart_item = StatusMenuItem(t("menu.restart"), callback=self._on_restart)
+        self._about_item = StatusMenuItem(t("menu.about"), callback=self._on_about)
         self._help_item = StatusMenuItem(
-            "Help", callback=self._menu_builder.on_help_click
+            t("menu.help"), callback=self._menu_builder.on_help_click
         )
 
         # History browser (lazy-created)
@@ -489,12 +498,12 @@ class WenZiApp(StatusBarApp):
         # Settings panel
         self._settings_panel = SettingsPanel()
         self._settings_item = StatusMenuItem(
-            "Settings...", callback=self._on_open_settings
+            t("menu.settings"), callback=self._on_open_settings
         )
 
         if self._config_degraded:
             self._config_error_item = StatusMenuItem(
-                "Config Error...", callback=lambda _: self._show_config_error_alert()
+                t("menu.config_error"), callback=lambda _: self._show_config_error_alert()
             )
             self.menu = [
                 self._config_error_item,
@@ -642,37 +651,44 @@ class WenZiApp(StatusBarApp):
         terms = [d.term for d in details]
         return (terms if terms else None), details
 
-    def _set_status(self, text: str) -> None:
-        """Update menu bar icon/title and status menu item (thread-safe)."""
+    def _set_status(self, status_key: str) -> None:
+        """Update menu bar icon/title and status menu item (thread-safe).
+
+        ``status_key`` is either an i18n key (e.g. "statusbar.status.ready")
+        that exists in ``_STATUS_ICONS``, or a dynamic string like "DL 50%"
+        or "VB +3".  The translated text is derived via ``t()`` and shown in
+        the dropdown menu; the icon is resolved from ``_STATUS_ICONS``.
+        """
         import Foundation
         if not Foundation.NSThread.isMainThread():
             from PyObjCTools import AppHelper
-            AppHelper.callAfter(self._set_status, text)
+            AppHelper.callAfter(self._set_status, status_key)
             return
 
-        self._current_status = text
-        self._status_item.title = text  # dropdown menu always shows text
+        self._current_status = status_key
+        display_text = t(status_key)
+        self._status_item.title = display_text  # dropdown menu always shows text
 
         # Resolve SF Symbol
-        symbol_name = _STATUS_ICONS.get(text)
+        symbol_name = _STATUS_ICONS.get(status_key)
         bar_title = None
         if symbol_name is None:
-            if text.startswith("DL "):
+            if status_key.startswith("DL "):
                 symbol_name = "arrow.down.circle"
-                bar_title = text[3:]  # show "X%" next to icon
-            elif text.startswith("VB "):
+                bar_title = status_key[3:]  # show "X%" next to icon
+            elif status_key.startswith("VB "):
                 symbol_name = "book.fill"
-                bar_title = text[3:]  # show "+N" next to icon
+                bar_title = status_key[3:]  # show "+N" next to icon
             else:
                 symbol_name = "mic.fill"  # safe fallback
 
-        nsimage = self._sf_symbol_image(symbol_name, text)
+        nsimage = self._sf_symbol_image(symbol_name, display_text)
         if nsimage is not None:
             self._icon_nsimage = nsimage
             self._update_status_bar_icon()
             self.title = bar_title  # clear text when icon is set
         else:
-            self.title = text  # fallback to text-only if SF Symbols unavailable
+            self.title = display_text  # fallback to text-only if SF Symbols unavailable
 
     def _start_recording_indicator(self) -> None:
         self._recording_controller.start_recording_indicator()
@@ -718,14 +734,14 @@ class WenZiApp(StatusBarApp):
 
         activate_for_dialog()
         alert = NSAlert.alloc().init()
-        alert.setMessageText_(f"Hotkey: {key_name}")
-        state_text = "enabled" if enabled else "disabled"
-        toggle_text = "Disable" if enabled else "Enable"
-        alert.setInformativeText_(f'"{key_name}" is currently {state_text}.')
-        alert.addButtonWithTitle_("Cancel")
+        alert.setMessageText_(t("app.hotkey_dialog.title", key=key_name))
+        state_text = t("app.hotkey_dialog.enabled") if enabled else t("app.hotkey_dialog.disabled")
+        toggle_text = t("app.hotkey_dialog.disable") if enabled else t("app.hotkey_dialog.enable")
+        alert.setInformativeText_(t("app.hotkey_dialog.info", key=key_name, state=state_text))
+        alert.addButtonWithTitle_(t("common.cancel"))
         alert.addButtonWithTitle_(toggle_text)
         if not is_fn:
-            alert.addButtonWithTitle_("Delete")
+            alert.addButtonWithTitle_(t("common.delete"))
 
         alert.setAlertStyle_(0)
         alert.window().setLevel_(NSStatusWindowLevel)
@@ -777,9 +793,9 @@ class WenZiApp(StatusBarApp):
 
         activate_for_dialog()
         alert = NSAlert.alloc().init()
-        alert.setMessageText_("Record Hotkey")
-        alert.setInformativeText_("Press any key to register it as a hotkey...")
-        alert.addButtonWithTitle_("Cancel")
+        alert.setMessageText_(t("app.hotkey_dialog.record_title"))
+        alert.setInformativeText_(t("app.hotkey_dialog.record_message"))
+        alert.addButtonWithTitle_(t("common.cancel"))
         alert.setAlertStyle_(0)
         alert.window().setLevel_(NSStatusWindowLevel)
 
@@ -834,10 +850,12 @@ class WenZiApp(StatusBarApp):
 
         activate_for_dialog()
         alert = NSAlert.alloc().init()
-        alert.setMessageText_("Record Hotkey Combo")
-        alert.setInformativeText_("Press a key combination...\n\n"
-                                  "Enter = confirm | ESC = cancel | Delete = reset")
-        alert.addButtonWithTitle_("Cancel")
+        alert.setMessageText_(t("app.hotkey_dialog.combo_title"))
+        alert.setInformativeText_(
+            t("app.hotkey_dialog.combo_message") + "\n\n"
+            + t("app.hotkey_dialog.combo_instructions")
+        )
+        alert.addButtonWithTitle_(t("common.cancel"))
         alert.setAlertStyle_(0)
         alert.window().setLevel_(NSStatusWindowLevel)
 
@@ -850,13 +868,13 @@ class WenZiApp(StatusBarApp):
             mods = set(combo_modifiers)
             trigger = combo_trigger[0]
             if not mods and not trigger:
-                text = "Press a key combination..."
+                text = t("app.hotkey_dialog.combo_message")
             elif mods and not trigger:
                 text = format_combo_display(mods, None)
             else:
                 text = format_combo_display(mods, trigger)
-                text += "\n(Press Enter to confirm)"
-            text += "\n\nEnter = confirm | ESC = cancel | Delete = reset"
+                text += "\n" + t("app.hotkey_dialog.combo_confirm_hint")
+            text += "\n\n" + t("app.hotkey_dialog.combo_instructions")
 
             def _do():
                 alert.setInformativeText_(text)
@@ -983,7 +1001,7 @@ class WenZiApp(StatusBarApp):
             self._set_status(status)
         else:
             # Build finished — restore previous status
-            old = self._auto_vocab_build_old_status or "WZ"
+            old = self._auto_vocab_build_old_status or "statusbar.status.ready"
             self._auto_vocab_build_old_status = None
             self._set_status(old)
 
@@ -1105,7 +1123,7 @@ class WenZiApp(StatusBarApp):
         """Show config error alert if config loading failed."""
         if self._config_error is None:
             return
-        self._set_status("Config Error")
+        self._set_status("statusbar.status.config_error")
         self._show_config_error_alert()
 
     def _show_config_error_alert(self) -> None:
@@ -1113,15 +1131,14 @@ class WenZiApp(StatusBarApp):
         if self._config_error is None:
             return
         result = topmost_alert(
-            title="Configuration Error",
-            message=(
-                f"Failed to load {self._config_error.path}\n\n"
-                f"{self._config_error.message}\n\n"
-                "The app is running with default settings and will not "
-                "save any changes. Please fix the config file and restart."
+            title=t("app.config_error.title"),
+            message=t(
+                "app.config_error.message",
+                path=self._config_error.path,
+                error=self._config_error.message,
             ),
-            ok="Show in Finder",
-            cancel="Close",
+            ok=t("app.config_error.show_finder"),
+            cancel=t("common.close"),
         )
         restore_accessory()
         if result:
@@ -1171,12 +1188,12 @@ class WenZiApp(StatusBarApp):
             logger.info("Voice input disabled by user preference")
             self._voice_input_available = False
             self._stop_voice_hotkeys()
-            self._set_status("WZ")
+            self._set_status("statusbar.status.ready")
             return
 
         choice = prompt_siri_setup()
         self._handle_dictation_setup_choice(choice)
-        self._set_status("WZ")
+        self._set_status("statusbar.status.ready")
         logger.info("Voice input not available, app running without ASR")
 
     def _handle_dictation_setup_choice(self, choice: str) -> None:
@@ -1225,28 +1242,18 @@ class WenZiApp(StatusBarApp):
 
         if can_clear:
             result = topmost_alert(
-                title="Model Load Failed",
-                message=(
-                    f"Failed to initialize model.\n\n"
-                    f"Error: {str(error)[:200]}\n\n"
-                    "This may be caused by corrupted cache files from an "
-                    "interrupted download. Click 'Clear Cache & Retry' to "
-                    "delete cached files and try again."
-                ),
-                ok="Clear Cache & Retry",
-                cancel="Close",
+                title=t("app.model_error.title"),
+                message=t("app.model_error.cache_message", error=str(error)[:200]),
+                ok=t("app.model_error.cache_retry"),
+                cancel=t("common.close"),
             )
             restore_accessory()
             if result == 1:
                 self._clear_cache_and_reinitialize(preset)
         else:
             topmost_alert(
-                title="Model Load Failed",
-                message=(
-                    f"Failed to initialize model.\n\n"
-                    f"Error: {str(error)[:200]}\n\n"
-                    "Please check the log file for details."
-                ),
+                title=t("app.model_error.title"),
+                message=t("app.model_error.generic_message", error=str(error)[:200]),
             )
             restore_accessory()
 
@@ -1256,7 +1263,7 @@ class WenZiApp(StatusBarApp):
             stop_event = threading.Event()
             monitor_thread = None
             try:
-                self._set_status("Clearing...")
+                self._set_status("statusbar.status.clearing")
                 clear_model_cache(preset)
                 monitor_args = self._model_controller._make_download_monitor_args(preset)
                 monitor_thread = threading.Thread(
@@ -1279,22 +1286,17 @@ class WenZiApp(StatusBarApp):
                 self._transcriber.initialize()
                 stop_event.set()
                 monitor_thread.join(timeout=2)
-                self._set_status("WZ")
+                self._set_status("statusbar.status.ready")
                 logger.info("Model reinitialized after cache clear")
             except Exception as e2:
                 stop_event.set()
                 if monitor_thread:
                     monitor_thread.join(timeout=2)
                 logger.error("Retry after cache clear failed: %s", e2)
-                self._set_status("Error")
+                self._set_status("statusbar.status.error")
                 topmost_alert(
-                    title="Model Load Failed",
-                    message=(
-                        f"Retry failed.\n\n"
-                        f"Error: {str(e2)[:200]}\n\n"
-                        "Please check your network connection and try "
-                        "switching models from the menu."
-                    ),
+                    title=t("app.model_error.title"),
+                    message=t("app.model_error.retry_message", error=str(e2)[:200]),
                 )
                 restore_accessory()
 
@@ -1333,7 +1335,7 @@ class WenZiApp(StatusBarApp):
                 ):
                     from .transcription.apple import check_siri_available
 
-                    self._set_status("Checking...")
+                    self._set_status("statusbar.status.checking")
                     siri_ok, _ = check_siri_available(
                         language=asr_cfg.get("language") or "zh",
                         on_device=(preset.model == "on-device"),
@@ -1368,7 +1370,7 @@ class WenZiApp(StatusBarApp):
                     )
                     monitor_thread.start()
                 elif not self._config_degraded:
-                    self._set_status("Loading...")
+                    self._set_status("statusbar.status.loading")
 
                 self._transcriber.initialize()
 
@@ -1376,7 +1378,7 @@ class WenZiApp(StatusBarApp):
                 if monitor_thread:
                     monitor_thread.join(timeout=2)
                 if not self._config_degraded:
-                    self._set_status("WZ")
+                    self._set_status("statusbar.status.ready")
                 logger.info("Models loaded, app ready")
             except Exception as e:
                 stop_event.set()
@@ -1384,7 +1386,7 @@ class WenZiApp(StatusBarApp):
                     monitor_thread.join(timeout=2)
                 logger.error("Model initialization failed: %s", e)
                 if not self._config_degraded:
-                    self._set_status("Error")
+                    self._set_status("statusbar.status.error")
                 self._show_model_load_error_alert(e)
 
         threading.Thread(target=_init_models, daemon=True).start()

@@ -20,6 +20,23 @@ MODIFIER_KEY_CHOICES = [
 ]
 _VALID_MODIFIER_KEYS = {k for k, _ in MODIFIER_KEY_CHOICES}
 
+
+def get_modifier_key_choices():
+    """Return modifier key choices with translated display labels."""
+    from wenzi.i18n import t
+    return [
+        ("space", t("config.modifier_key.space")),
+        ("cmd", t("config.modifier_key.cmd")),
+        ("cmd_r", t("config.modifier_key.cmd_r")),
+        ("ctrl", t("config.modifier_key.ctrl")),
+        ("ctrl_r", t("config.modifier_key.ctrl_r")),
+        ("alt", t("config.modifier_key.alt")),
+        ("alt_r", t("config.modifier_key.alt_r")),
+        ("shift", t("config.modifier_key.shift")),
+        ("shift_r", t("config.modifier_key.shift_r")),
+        ("esc", t("config.modifier_key.esc")),
+    ]
+
 # XDG Base Directory paths
 DEFAULT_CONFIG_DIR = os.path.join("~", ".config", "WenZi")
 DEFAULT_DATA_DIR = os.path.join("~", ".local", "share", "WenZi")
@@ -249,6 +266,7 @@ def migrate_xdg_paths() -> None:
 
 
 DEFAULT_CONFIG: Dict[str, Any] = {
+    "language": "auto",
     "hotkeys": {"fn": True},
     "audio": {
         "sample_rate": 16000,
@@ -500,6 +518,7 @@ def validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """
     rules = [
         # (dotted_path, expected_type, constraint, default_value)
+        ("language", str, lambda v: v in {"auto", "en", "zh"}, DEFAULT_CONFIG["language"]),
         ("audio.sample_rate", int, lambda v: v > 0, DEFAULT_CONFIG["audio"]["sample_rate"]),
         ("audio.block_ms", int, lambda v: v > 0, DEFAULT_CONFIG["audio"]["block_ms"]),
         ("audio.max_session_bytes", int, lambda v: v > 0, DEFAULT_CONFIG["audio"]["max_session_bytes"]),

@@ -590,3 +590,25 @@ def test_validate_input_context_valid_values():
         config = {"ai_enhance": {"input_context": level}}
         result = validate_config(config)
         assert result["ai_enhance"]["input_context"] == level
+
+
+def test_default_config_has_language():
+    assert DEFAULT_CONFIG["language"] == "auto"
+
+
+def test_validate_config_language_valid():
+    import copy
+
+    config = copy.deepcopy(DEFAULT_CONFIG)
+    config["language"] = "zh"
+    result = validate_config(config)
+    assert result["language"] == "zh"
+
+
+def test_validate_config_language_invalid_resets():
+    import copy
+
+    config = copy.deepcopy(DEFAULT_CONFIG)
+    config["language"] = "invalid"
+    result = validate_config(config)
+    assert result["language"] == "auto"

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from wenzi.app import WenZiApp
 
 from wenzi.config import save_config
+from wenzi.i18n import t
 from wenzi.statusbar import send_notification
 from wenzi.enhance.vocabulary import get_vocab_entry_count
 from wenzi.ui_helpers import (
@@ -88,15 +89,10 @@ Output only the processed text without any explanation."""
         from wenzi.enhance.mode_loader import DEFAULT_MODES_DIR, parse_mode_file
 
         resp = run_multiline_window(
-            title="Add Enhancement Mode",
-            message=(
-                "Edit the template below, then click Save.\n\n"
-                "  label  – display name in menu\n"
-                "  order  – sort weight (smaller = higher)\n"
-                "  body   – system prompt for the LLM"
-            ),
+            title=t("alert.enhance_mode.add.title"),
+            message=t("alert.enhance_mode.add.message"),
             default_text=self._ADD_MODE_TEMPLATE,
-            ok="Save",
+            ok=t("common.save"),
             dimensions=(420, 220),
         )
         if resp is None:
@@ -104,11 +100,8 @@ Output only the processed text without any explanation."""
 
         # Ask for filename (mode ID)
         name_resp = run_window(
-            title="Mode ID",
-            message=(
-                "Enter a short ID for this mode (used as filename).\n"
-                "Only letters, numbers, hyphens, and underscores."
-            ),
+            title=t("alert.enhance_mode.id.title"),
+            message=t("alert.enhance_mode.id.message"),
             default_text="my_mode",
         )
         if name_resp is None:
@@ -119,8 +112,8 @@ Output only the processed text without any explanation."""
         if not mode_id or not re.match(r"^[A-Za-z0-9_-]+$", mode_id):
             activate_for_dialog()
             topmost_alert(
-                "Invalid ID",
-                "Mode ID must contain only letters, numbers, hyphens, or underscores.",
+                t("alert.enhance_mode.invalid_id.title"),
+                t("alert.enhance_mode.invalid_id.message"),
             )
             return
 
@@ -131,9 +124,8 @@ Output only the processed text without any explanation."""
         if os.path.exists(file_path):
             activate_for_dialog()
             topmost_alert(
-                "Already Exists",
-                f"A mode file '{mode_id}.md' already exists.\n"
-                "Edit it directly or choose a different ID.",
+                t("alert.enhance_mode.already_exists.title"),
+                t("alert.enhance_mode.already_exists.message", id=mode_id),
             )
             return
 
@@ -153,7 +145,7 @@ Output only the processed text without any explanation."""
 
         if mode_def is None or not mode_def.prompt.strip():
             activate_for_dialog()
-            topmost_alert("Invalid Content", "The mode file has no prompt content.")
+            topmost_alert(t("alert.enhance_mode.invalid_content.title"), t("alert.enhance_mode.invalid_content.message"))
             return
 
         # Save the file
@@ -170,7 +162,7 @@ Output only the processed text without any explanation."""
             app._menu_builder.rebuild_enhance_mode_menu()
 
         activate_for_dialog()
-        topmost_alert("Mode Added", f"Enhancement mode '{mode_id}' has been added.")
+        topmost_alert(t("alert.enhance_mode.added.title"), t("alert.enhance_mode.added.message", id=mode_id))
 
     def on_enhance_thinking_toggle(self, sender) -> None:
         """Toggle AI thinking mode."""
@@ -255,11 +247,11 @@ Output only the processed text without any explanation."""
         """Build vocabulary from correction logs in a background thread."""
         app = self._app
         if not app._enhancer:
-            topmost_alert("AI Enhance is not configured.")
+            topmost_alert(t("alert.vocab.not_configured"))
             return
 
         if app._auto_vocab_builder.is_building():
-            topmost_alert("Vocabulary is being auto-built. Please wait.")
+            topmost_alert(t("alert.vocab.auto_building"))
             return
 
         logger.info("Starting vocabulary build...")
@@ -318,7 +310,7 @@ Output only the processed text without any explanation."""
             )
 
             old_status = app._current_status
-            app._set_status("VT \u23f3")
+            app._set_status("statusbar.status.vocab_building")
             try:
                 loop = _asyncio.new_event_loop()
                 summary = loop.run_until_complete(
@@ -342,7 +334,7 @@ Output only the processed text without any explanation."""
                 )
                 progress_panel.update_status(f"{status}: {msg}")
                 try:
-                    send_notification("WenZi", f"Vocabulary {status}", msg)
+                    send_notification(t("app.name"), t("notification.vocab.status", status=status), msg)
                 except Exception:
                     logger.debug("Notification center unavailable, skipping notification")
             except Exception as e:
@@ -350,16 +342,16 @@ Output only the processed text without any explanation."""
                 progress_panel.update_status(f"Failed: {e}")
                 try:
                     send_notification(
-                        "WenZi", "Vocabulary Build Failed", str(e)
+                        t("app.name"), t("notification.vocab.build_failed"), str(e)
                     )
                 except Exception:
                     logger.debug("Notification center unavailable, skipping notification")
             finally:
-                app._set_status(old_status or "WZ")
+                app._set_status(old_status or "statusbar.status.ready")
                 progress_panel.close()
 
-        t = threading.Thread(target=_build, daemon=True)
-        t.start()
+        build_thread = threading.Thread(target=_build, daemon=True)
+        build_thread.start()
 
     def on_preview_toggle(self, sender) -> None:
         """Toggle preview window on/off."""

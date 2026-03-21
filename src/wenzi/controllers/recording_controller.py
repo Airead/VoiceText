@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from wenzi.app import WenZiApp
 
 from wenzi.config import save_config
+from wenzi.i18n import t
 from wenzi.input import type_text
 from wenzi.input_context import capture_input_context
 
@@ -112,7 +113,7 @@ class RecordingController:
 
                 app._transcriber.initialize()
                 app._voice_input_available = True
-                app._set_status("WZ")
+                app._set_status("statusbar.status.ready")
                 logger.info("Voice input enabled after deferred initialization")
             except Exception:
                 logger.debug("Deferred voice init failed, prompting user")
@@ -168,7 +169,7 @@ class RecordingController:
 
         logger.info("Hotkey pressed, starting recording")
         self._fire_scripting_event("recording_start")
-        app._set_status("Recording...")
+        app._set_status("statusbar.status.recording")
         app._sound_manager.play("start")
         if app._sound_manager.enabled:
             app._usage_stats.record_sound_feedback()
@@ -383,7 +384,7 @@ class RecordingController:
         self._cancel_delayed.clear()
 
         # Replay prompt sound and restart recording
-        app._set_status("Recording...")
+        app._set_status("statusbar.status.recording")
         app._sound_manager.play("start")
         if app._sound_manager.enabled:
             app._usage_stats.record_sound_feedback()
@@ -421,7 +422,7 @@ class RecordingController:
         """Common cleanup: hide overlays/indicator and restore idle status."""
         self._hide_live_overlay()
         self.stop_recording_indicator()
-        self._app._set_status("WZ")
+        self._app._set_status("statusbar.status.ready")
         self._restore_mode()
 
     def on_cancel_recording(self) -> None:
@@ -471,7 +472,7 @@ class RecordingController:
         # Reset state
         app._recording_started.clear()
         app._busy = False
-        app._set_status("WZ")
+        app._set_status("statusbar.status.ready")
         self._restore_mode()
 
     def on_hotkey_release(self, key_name: str = "") -> None:
@@ -539,13 +540,13 @@ class RecordingController:
                             self.do_transcribe_direct(asr_text, use_enhance)
                     else:
                         AppHelper.callAfter(app._recording_indicator.hide)
-                        app._set_status("(empty)")
+                        app._set_status("statusbar.status.empty")
                         logger.warning("Streaming transcription returned empty text")
                 except Exception as e:
                     logger.error("Streaming stop failed: %s", e)
                     self._hide_live_overlay()
                     AppHelper.callAfter(app._recording_indicator.hide)
-                    app._set_status("Error")
+                    app._set_status("statusbar.status.error")
                 finally:
                     app._busy = False
 
@@ -555,7 +556,7 @@ class RecordingController:
         # Non-streaming (batch) path
         if not wav_data:
             self.stop_recording_indicator()
-            app._set_status("WZ")
+            app._set_status("statusbar.status.ready")
             return
         use_enhance = bool(app._enhancer and app._enhancer.is_active)
         # Always keep indicator alive for animate-out: preview mode animates
@@ -566,7 +567,7 @@ class RecordingController:
         app._busy = True
 
         if app._preview_enabled:
-            app._set_status("Transcribing...")
+            app._set_status("statusbar.status.transcribing")
             # Show preview immediately, transcribe in background
             def _do_preview():
                 try:
@@ -578,12 +579,12 @@ class RecordingController:
                     )
                 except Exception as e:
                     logger.error("Preview transcription failed: %s", e)
-                    app._set_status("Error")
+                    app._set_status("statusbar.status.error")
                     app._busy = False
 
             threading.Thread(target=_do_preview, daemon=True).start()
         else:
-            app._set_status("Transcribing...")
+            app._set_status("statusbar.status.transcribing")
             # Show overlay immediately so user knows recording has ended;
             # register cancel_event so ESC can abort transcription too
             stt_info = app._current_stt_model()
@@ -594,7 +595,7 @@ class RecordingController:
 
             def _on_esc_cancel():
                 app._busy = False
-                app._set_status("WZ")
+                app._set_status("statusbar.status.ready")
 
             def _show_direct_overlay():
                 app._recording_indicator.hide()
@@ -633,20 +634,16 @@ class RecordingController:
                         )
                     else:
                         AppHelper.callAfter(app._streaming_overlay.close)
-                        app._set_status("(empty)")
+                        app._set_status("statusbar.status.empty")
                         logger.warning("Transcription returned empty text")
                 except Exception as e:
                     logger.error("Transcription failed: %s", e)
                     AppHelper.callAfter(app._streaming_overlay.close)
-                    app._set_status("Error")
+                    app._set_status("statusbar.status.error")
                     from wenzi.ui_helpers import topmost_alert, restore_accessory
                     topmost_alert(
-                        title="Transcription Failed",
-                        message=(
-                            f"Error: {str(e)[:200]}\n\n"
-                            "Please check the log or try switching to "
-                            "a different model."
-                        ),
+                        title=t("alert.transcription.failed.title"),
+                        message=t("alert.transcription.failed.message", error=str(e)[:200]),
                     )
                     restore_accessory()
                 finally:
@@ -810,7 +807,7 @@ class RecordingController:
         cancel_event = threading.Event()
 
         if use_enhance:
-            app._set_status("Enhancing...")
+            app._set_status("statusbar.status.enhancing")
 
             if overlay_already_shown:
                 # Overlay already visible — update ASR text and register
@@ -877,7 +874,7 @@ class RecordingController:
                 app._streaming_overlay.close_with_delay()
 
         if cancel_event.is_set():
-            app._set_status("WZ")
+            app._set_status("statusbar.status.ready")
             return
 
         self._fire_scripting_event("output_text", final_text=text.strip())
@@ -887,7 +884,7 @@ class RecordingController:
             append_newline=app._append_newline,
             method=app._output_method,
         )
-        app._set_status("WZ")
+        app._set_status("statusbar.status.ready")
 
         try:
             app._usage_stats.record_confirm(modified=False)

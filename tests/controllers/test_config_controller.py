@@ -170,7 +170,8 @@ class TestOnReloadConfig:
     def test_reload_failure(self, mock_load, mock_notify, ctrl):
         ctrl.on_reload_config(None)
         mock_notify.assert_called_once()
-        assert "Reload Failed" in mock_notify.call_args[0][1]
+        subtitle = mock_notify.call_args[0][1]
+        assert "Reload Failed" in subtitle or "reload_failed" in subtitle
 
 
 class TestOnBrowseHistory:

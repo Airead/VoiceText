@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Callable, Dict, Optional, Tuple
 
+from wenzi.i18n import get_locale, t
+
 logger = logging.getLogger(__name__)
 
 
@@ -107,6 +109,7 @@ class SettingsPanel:
         self._vocab_build_model_popup = None
         self._history_check = None
         self._config_dir_field = None
+        self._language_popup = None
 
         # Launcher tab controls
         self._launcher_source_checks: Dict[str, object] = {}
@@ -230,7 +233,7 @@ class SettingsPanel:
         )
         panel.setMinSize_(NSMakeSize(self._PANEL_WIDTH, self._PANEL_HEIGHT))
         panel.setMaxSize_(NSMakeSize(self._PANEL_WIDTH, self._PANEL_HEIGHT))
-        panel.setTitle_("Settings")
+        panel.setTitle_(t("settings.title"))
         panel.setLevel_(NSStatusWindowLevel)
         panel.setFloatingPanel_(True)
         panel.setHidesOnDeactivate_(False)
@@ -255,7 +258,7 @@ class SettingsPanel:
         reveal_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(pad, y, btn_w * 2 + btn_gap, btn_h)
         )
-        reveal_btn.setTitle_("Reveal Config Folder")
+        reveal_btn.setTitle_(t("settings.btn.reveal_config"))
         reveal_btn.setBezelStyle_(1)  # NSRoundedBezelStyle
         reveal_btn.setTarget_(self)
         reveal_btn.setAction_(b"revealConfigFolderClicked:")
@@ -271,27 +274,27 @@ class SettingsPanel:
 
         # Build tabs
         general_tab = NSTabViewItem.alloc().initWithIdentifier_("general")
-        general_tab.setLabel_("General")
+        general_tab.setLabel_(t("settings.general_tab.title"))
         self._build_general_tab(general_tab, state, inner_w)
         tab_view.addTabViewItem_(general_tab)
 
         stt_tab = NSTabViewItem.alloc().initWithIdentifier_("stt")
-        stt_tab.setLabel_("STT")
+        stt_tab.setLabel_(t("settings.stt_tab.title"))
         self._build_stt_tab(stt_tab, state, inner_w)
         tab_view.addTabViewItem_(stt_tab)
 
         llm_tab = NSTabViewItem.alloc().initWithIdentifier_("llm")
-        llm_tab.setLabel_("LLM")
+        llm_tab.setLabel_(t("settings.llm_tab.title"))
         self._build_llm_tab(llm_tab, state, inner_w)
         tab_view.addTabViewItem_(llm_tab)
 
         ai_tab = NSTabViewItem.alloc().initWithIdentifier_("ai")
-        ai_tab.setLabel_("AI")
+        ai_tab.setLabel_(t("settings.ai_tab.title"))
         self._build_ai_tab(ai_tab, state, inner_w)
         tab_view.addTabViewItem_(ai_tab)
 
         launcher_tab = NSTabViewItem.alloc().initWithIdentifier_("launcher")
-        launcher_tab.setLabel_("Launcher")
+        launcher_tab.setLabel_(t("settings.launcher_tab.title"))
         self._build_launcher_tab(launcher_tab, state, inner_w)
         tab_view.addTabViewItem_(launcher_tab)
 
@@ -305,10 +308,11 @@ class SettingsPanel:
     # ── Tab builders ─────────────────────────────────────────────────
 
     def _build_general_tab(self, tab_item, state: Dict, tab_width: float) -> None:
-        """Build the General tab: Hotkeys, Feedback, Output."""
+        """Build the General tab: Language, Hotkeys, Feedback, Output."""
         from AppKit import (
             NSButton,
             NSFont,
+            NSPopUpButton,
             NSScrollView,
             NSView,
             NSSwitchButton,
@@ -339,9 +343,35 @@ class SettingsPanel:
         )
         y = total_h - pad
 
+        # --- Language section ---
+        y -= self._LABEL_HEIGHT
+        lang_label = self._make_label(
+            t("settings.general_tab.language_label"), pad, y, content_w, label_font,
+        )
+        doc_view.addSubview_(lang_label)
+
+        y -= (self._CONTROL_HEIGHT + self._ROW_GAP + 4)
+        self._language_popup = NSPopUpButton.alloc().initWithFrame_pullsDown_(
+            NSMakeRect(pad + 12, y, 200, self._CONTROL_HEIGHT + 4), False,
+        )
+        self._language_popup.setFont_(small_font)
+        self._language_popup.addItemsWithTitles_([
+            t("settings.general_tab.language_auto"),
+            "English",
+            "\u4e2d\u6587",
+        ])
+        lang = state.get("language", "auto")
+        lang_index = {"auto": 0, "en": 1, "zh": 2}.get(lang, 0)
+        self._language_popup.selectItemAtIndex_(lang_index)
+        self._language_popup.setTarget_(self)
+        self._language_popup.setAction_(b"languageChanged:")
+        doc_view.addSubview_(self._language_popup)
+
+        y -= self._SECTION_GAP
+
         # --- Hotkeys section ---
         y -= self._LABEL_HEIGHT
-        hotkey_label = self._make_label("Hotkeys", pad, y, content_w, label_font)
+        hotkey_label = self._make_label(t("settings.general_tab.hotkeys_section"), pad, y, content_w, label_font)
         doc_view.addSubview_(hotkey_label)
         self._add_doc_link(hotkey_label, "user-guide.html#your-first-transcription", doc_view)
 
@@ -381,10 +411,10 @@ class SettingsPanel:
             mode_popup.setFont_(small_font)
 
             # Build items: Default AI Mode, Off, [modes...], separator, Delete
-            mode_popup.addItemWithTitle_("Default AI Mode")
+            mode_popup.addItemWithTitle_(t("settings.general_tab.default_ai_mode"))
             mode_popup.lastItem().setRepresentedObject_("_default")
 
-            mode_popup.addItemWithTitle_("Off")
+            mode_popup.addItemWithTitle_(t("settings.general_tab.off"))
             mode_popup.lastItem().setRepresentedObject_("off")
 
             for mode_id, mode_label, _order in enhance_modes:
@@ -393,7 +423,7 @@ class SettingsPanel:
 
             if not is_fn:
                 mode_popup.menu().addItem_(NSMenuItem.separatorItem())
-                mode_popup.addItemWithTitle_("Delete Hotkey")
+                mode_popup.addItemWithTitle_(t("settings.general_tab.delete_hotkey"))
                 mode_popup.lastItem().setRepresentedObject_("_delete")
 
             # Select current value
@@ -415,7 +445,7 @@ class SettingsPanel:
         record_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(pad + 12, y, 140, 28)
         )
-        record_btn.setTitle_("Record Hotkey...")
+        record_btn.setTitle_(t("settings.general_tab.record_hotkey"))
         record_btn.setBezelStyle_(1)
         record_btn.setFont_(small_font)
         record_btn.setTarget_(self)
@@ -423,14 +453,14 @@ class SettingsPanel:
         doc_view.addSubview_(record_btn)
 
         # Restart / Cancel key dropdowns
-        from wenzi.config import MODIFIER_KEY_CHOICES
-        _key_choices = MODIFIER_KEY_CHOICES
+        from wenzi.config import get_modifier_key_choices
+        _key_choices = get_modifier_key_choices()
         label_w = 80
         popup_w = 140
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP + 6)
         restart_label = self._make_label(
-            "Restart Key", pad + 12, y, label_w, small_font
+            t("settings.general_tab.restart_key"), pad + 12, y, label_w, small_font
         )
         doc_view.addSubview_(restart_label)
         self._restart_key_popup = self._make_popup(
@@ -441,7 +471,7 @@ class SettingsPanel:
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP + 4)
         cancel_label = self._make_label(
-            "Cancel Key", pad + 12, y, label_w, small_font
+            t("settings.general_tab.cancel_key"), pad + 12, y, label_w, small_font
         )
         doc_view.addSubview_(cancel_label)
         self._cancel_key_popup = self._make_popup(
@@ -451,7 +481,7 @@ class SettingsPanel:
         )
 
         y = self._add_hint(
-            "Hold hotkey + press key to restart or cancel recording",
+            t("settings.general_tab.restart_cancel_hint"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -459,40 +489,40 @@ class SettingsPanel:
 
         # --- Feedback section ---
         y -= self._LABEL_HEIGHT
-        fb_label = self._make_label("Feedback", pad, y, content_w, label_font)
+        fb_label = self._make_label(t("settings.general_tab.feedback_section"), pad, y, content_w, label_font)
         doc_view.addSubview_(fb_label)
         self._add_doc_link(fb_label, "user-guide.html#recording-feedback", doc_view)
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         self._sound_check = self._make_switch(
-            "Sound Feedback", pad + 12, y, content_w - 24,
+            t("settings.general_tab.sound_feedback"), pad + 12, y, content_w - 24,
             state.get("sound_enabled", True), small_font,
             b"soundCheckChanged:", doc_view,
         )
         y = self._add_hint(
-            "Adds ~350ms delay before recording to avoid capturing the sound",
+            t("settings.general_tab.sound_feedback_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         self._visual_check = self._make_switch(
-            "Visual Indicator", pad + 12, y, content_w - 24,
+            t("settings.general_tab.visual_indicator"), pad + 12, y, content_w - 24,
             state.get("visual_indicator", True), small_font,
             b"visualCheckChanged:", doc_view,
         )
         y = self._add_hint(
-            "Show a floating indicator while recording",
+            t("settings.general_tab.visual_indicator_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         self._device_name_check = self._make_switch(
-            "Show Device Name", pad + 12, y, content_w - 24,
+            t("settings.general_tab.show_device_name"), pad + 12, y, content_w - 24,
             state.get("show_device_name", False), small_font,
             b"deviceNameCheckChanged:", doc_view,
         )
         y = self._add_hint(
-            "Show the input device name on the recording indicator",
+            t("settings.general_tab.show_device_name_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -500,18 +530,18 @@ class SettingsPanel:
 
         # --- Output section ---
         y -= self._LABEL_HEIGHT
-        out_label = self._make_label("Output", pad, y, content_w, label_font)
+        out_label = self._make_label(t("settings.general_tab.output_section"), pad, y, content_w, label_font)
         doc_view.addSubview_(out_label)
         self._add_doc_link(out_label, "user-guide.html#preview-mode-vs-direct-mode", doc_view)
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         self._preview_check = self._make_switch(
-            "Preview", pad + 12, y, content_w - 24,
+            t("settings.general_tab.preview"), pad + 12, y, content_w - 24,
             state.get("preview", True), small_font,
             b"previewCheckChanged:", doc_view,
         )
         y = self._add_hint(
-            "Show a preview panel before inserting text, allowing edits",
+            t("settings.general_tab.preview_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -519,19 +549,18 @@ class SettingsPanel:
 
         # --- Scripting section ---
         y -= self._LABEL_HEIGHT
-        scripting_label = self._make_label("Scripting", pad, y, content_w, label_font)
+        scripting_label = self._make_label(t("settings.general_tab.scripting_section"), pad, y, content_w, label_font)
         doc_view.addSubview_(scripting_label)
         self._add_doc_link(scripting_label, "scripting.html#quick-start", doc_view)
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         self._scripting_check = self._make_switch(
-            "Enable Scripting", pad + 12, y, content_w - 24,
+            t("settings.general_tab.enable_scripting"), pad + 12, y, content_w - 24,
             state.get("scripting_enabled", False), small_font,
             b"scriptingCheckChanged:", doc_view,
         )
         y = self._add_hint(
-            "Load user scripts from ~/.config/WenZi/scripts/init.py "
-            "(requires app restart)",
+            t("settings.general_tab.enable_scripting_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -539,7 +568,7 @@ class SettingsPanel:
 
         # --- Config Directory section ---
         y -= self._LABEL_HEIGHT
-        cfg_label = self._make_label("Config Directory", pad, y, content_w, label_font)
+        cfg_label = self._make_label(t("settings.general_tab.config_dir_section"), pad, y, content_w, label_font)
         doc_view.addSubview_(cfg_label)
         self._add_doc_link(cfg_label, "configuration.html#config-directory-resolution", doc_view)
 
@@ -555,7 +584,7 @@ class SettingsPanel:
         browse_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(bx, y, 100, 28)
         )
-        browse_btn.setTitle_("Browse...")
+        browse_btn.setTitle_(t("settings.general_tab.browse"))
         browse_btn.setBezelStyle_(1)
         browse_btn.setFont_(small_font)
         browse_btn.setTarget_(self)
@@ -566,7 +595,7 @@ class SettingsPanel:
         reset_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(bx, y, 80, 28)
         )
-        reset_btn.setTitle_("Reset")
+        reset_btn.setTitle_(t("settings.general_tab.reset"))
         reset_btn.setBezelStyle_(1)
         reset_btn.setFont_(small_font)
         reset_btn.setTarget_(self)
@@ -574,7 +603,7 @@ class SettingsPanel:
         doc_view.addSubview_(reset_btn)
 
         y = self._add_hint(
-            "Changes require app restart to take effect",
+            t("settings.general_tab.config_dir_hint"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -624,11 +653,11 @@ class SettingsPanel:
 
         # --- Local presets ---
         y -= self._LABEL_HEIGHT
-        local_label = self._make_label("Local", pad, y, content_w, label_font)
+        local_label = self._make_label(t("settings.stt_tab.local_section"), pad, y, content_w, label_font)
         doc_view.addSubview_(local_label)
         self._add_doc_link(local_label, "provider-model-guide.html#asr-model-selection", doc_view)
         y = self._add_hint(
-            "Speech recognition models running on your device",
+            t("settings.stt_tab.local_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -663,11 +692,11 @@ class SettingsPanel:
         # --- Remote providers ---
         y -= self._SECTION_GAP
         y -= self._LABEL_HEIGHT
-        remote_label = self._make_label("Remote", pad, y, content_w, label_font)
+        remote_label = self._make_label(t("settings.stt_tab.remote_section"), pad, y, content_w, label_font)
         doc_view.addSubview_(remote_label)
         self._add_doc_link(remote_label, "provider-model-guide.html#remote-asr-providers", doc_view)
         y = self._add_hint(
-            "Cloud-based speech recognition services",
+            t("settings.stt_tab.remote_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -691,7 +720,7 @@ class SettingsPanel:
         add_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(bx, y, 120, 28)
         )
-        add_btn.setTitle_("Add Provider...")
+        add_btn.setTitle_(t("settings.stt_tab.add_provider"))
         add_btn.setBezelStyle_(1)
         add_btn.setFont_(small_font)
         add_btn.setTarget_(self)
@@ -702,7 +731,7 @@ class SettingsPanel:
         remove_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(bx, y, 100, 28)
         )
-        remove_btn.setTitle_("Remove...")
+        remove_btn.setTitle_(t("settings.stt_tab.remove_provider"))
         remove_btn.setBezelStyle_(1)
         remove_btn.setFont_(small_font)
         remove_btn.setTarget_(self)
@@ -742,11 +771,11 @@ class SettingsPanel:
         y = total_h - pad
 
         y -= self._LABEL_HEIGHT
-        pm_label = self._make_label("Provider / Model", pad, y, content_w, label_font)
+        pm_label = self._make_label(t("settings.llm_tab.provider_model"), pad, y, content_w, label_font)
         doc_view.addSubview_(pm_label)
         self._add_doc_link(pm_label, "provider-model-guide.html#ai-llm-provider-configuration", doc_view)
         y = self._add_hint(
-            "Language model used for AI enhancement features",
+            t("settings.llm_tab.provider_model_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -770,7 +799,7 @@ class SettingsPanel:
         add_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(bx, y, 120, 28)
         )
-        add_btn.setTitle_("Add Provider...")
+        add_btn.setTitle_(t("settings.llm_tab.add_provider"))
         add_btn.setBezelStyle_(1)
         add_btn.setFont_(small_font)
         add_btn.setTarget_(self)
@@ -781,7 +810,7 @@ class SettingsPanel:
         remove_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(bx, y, 100, 28)
         )
-        remove_btn.setTitle_("Remove...")
+        remove_btn.setTitle_(t("settings.llm_tab.remove_provider"))
         remove_btn.setBezelStyle_(1)
         remove_btn.setFont_(small_font)
         remove_btn.setTarget_(self)
@@ -791,7 +820,7 @@ class SettingsPanel:
         # --- Model Timeout section ---
         y -= self._SECTION_GAP
         y -= self._LABEL_HEIGHT
-        timeout_label = self._make_label("Model Timeout", pad, y, content_w, label_font)
+        timeout_label = self._make_label(t("settings.llm_tab.model_timeout"), pad, y, content_w, label_font)
         doc_view.addSubview_(timeout_label)
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
@@ -803,7 +832,7 @@ class SettingsPanel:
             b"modelTimeoutChanged:", doc_view,
         )
         y = self._add_hint(
-            "Maximum time to wait for a model response before giving up",
+            t("settings.llm_tab.model_timeout_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -844,11 +873,11 @@ class SettingsPanel:
 
         # --- Enhance Mode section ---
         y -= self._LABEL_HEIGHT
-        mode_label = self._make_label("Enhance Mode", pad, y, content_w, label_font)
+        mode_label = self._make_label(t("settings.ai_tab.enhance_mode"), pad, y, content_w, label_font)
         doc_view.addSubview_(mode_label)
         self._add_doc_link(mode_label, "enhance-modes.html#how-it-works", doc_view)
         y = self._add_hint(
-            "AI post-processing mode applied to transcribed text",
+            t("settings.ai_tab.enhance_mode_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -859,7 +888,7 @@ class SettingsPanel:
         # Always include "Off"
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         off_btn = self._make_radio(
-            "Off", pad + 12, y, content_w - 24,
+            t("settings.ai_tab.off"), pad + 12, y, content_w - 24,
             current_mode == "off", small_font, doc_view,
         )
         off_btn.setTarget_(self)
@@ -885,7 +914,7 @@ class SettingsPanel:
             edit_btn = NSButton.alloc().initWithFrame_(
                 NSMakeRect(edit_x, y, edit_btn_w, self._CONTROL_HEIGHT)
             )
-            edit_btn.setTitle_("Edit")
+            edit_btn.setTitle_(t("settings.ai_tab.edit"))
             edit_btn.setBezelStyle_(1)
             edit_btn.setFont_(edit_font)
             edit_btn.setTarget_(self)
@@ -899,7 +928,7 @@ class SettingsPanel:
         add_mode_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(pad + 12, y, 120, 28)
         )
-        add_mode_btn.setTitle_("Add Mode...")
+        add_mode_btn.setTitle_(t("settings.ai_tab.add_mode"))
         add_mode_btn.setBezelStyle_(1)
         add_mode_btn.setFont_(small_font)
         add_mode_btn.setTarget_(self)
@@ -910,31 +939,31 @@ class SettingsPanel:
 
         # --- Options section ---
         y -= self._LABEL_HEIGHT
-        opt_label = self._make_label("Options", pad, y, content_w, label_font)
+        opt_label = self._make_label(t("settings.ai_tab.options_section"), pad, y, content_w, label_font)
         doc_view.addSubview_(opt_label)
         self._add_doc_link(opt_label, "configuration.html#ai-enhancement", doc_view)
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         self._auto_build_check = self._make_switch(
-            "Auto Build Vocabulary", pad + 12, y, content_w - 24,
+            t("settings.ai_tab.auto_build_vocab"), pad + 12, y, content_w - 24,
             state.get("auto_build", True), small_font,
             b"autoBuildCheckChanged:", doc_view,
         )
         y = self._add_hint(
-            "Automatically update vocabulary from your text input history",
+            t("settings.ai_tab.auto_build_vocab_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
         # Vocab build model popup
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         bm_label = self._make_label(
-            "Build Model", pad + 28, y, 90, small_font,
+            t("settings.ai_tab.build_model"), pad + 28, y, 90, small_font,
         )
         doc_view.addSubview_(bm_label)
 
         llm_models = state.get("llm_models", [])
         current_build_model = state.get("vocab_build_model")  # (provider, model) or None
-        bm_items = [(("", ""), "Default")]
+        bm_items = [(("", ""), t("settings.ai_tab.build_model_default"))]
         for provider, model, display_name in sorted(llm_models, key=lambda x: x[2]):
             bm_items.append(((provider, model), display_name))
 
@@ -944,18 +973,18 @@ class SettingsPanel:
             b"vocabBuildModelChanged:", doc_view,
         )
         y = self._add_hint(
-            "LLM used for vocabulary extraction (Default = same as AI enhance)",
+            t("settings.ai_tab.build_model_desc"),
             pad + 28, y, content_w - 40, doc_view,
         )
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         self._history_check = self._make_switch(
-            "Conversation History", pad + 12, y, content_w - 24,
+            t("settings.ai_tab.conversation_history"), pad + 12, y, content_w - 24,
             state.get("history_enabled", False), small_font,
             b"historyCheckChanged:", doc_view,
         )
         y = self._add_hint(
-            "Include recent conversation context for better AI enhancement",
+            t("settings.ai_tab.conversation_history_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -965,7 +994,7 @@ class SettingsPanel:
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
 
         base_label = self._make_label(
-            "Base entries", label_x, y, 90, small_font,
+            t("settings.ai_tab.base_entries"), label_x, y, 90, small_font,
         )
         doc_view.addSubview_(base_label)
 
@@ -978,7 +1007,7 @@ class SettingsPanel:
         )
 
         max_label = self._make_label(
-            "Max entries", label_x + 90 + popup_w + 16, y, 90, small_font,
+            t("settings.ai_tab.max_entries"), label_x + 90 + popup_w + 16, y, 90, small_font,
         )
         doc_view.addSubview_(max_label)
 
@@ -990,32 +1019,32 @@ class SettingsPanel:
             b"historyMaxChanged:", doc_view,
         )
         y = self._add_hint(
-            "Base: entries kept after rebuild. Max: triggers a rebuild for cache optimization.",
+            t("settings.ai_tab.history_hint"),
             pad + 28, y, content_w - 40, doc_view,
         )
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         self._thinking_check = self._make_switch(
-            "Thinking", pad + 12, y, content_w - 24,
+            t("settings.ai_tab.thinking"), pad + 12, y, content_w - 24,
             state.get("thinking", False), small_font,
             b"thinkingCheckChanged:", doc_view,
         )
         y = self._add_hint(
-            "Enable extended thinking for more accurate AI processing (slower)",
+            t("settings.ai_tab.thinking_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
         # Input Context level
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         ic_label = self._make_label(
-            "Input Context", pad + 12, y, 110, small_font,
+            t("settings.ai_tab.input_context"), pad + 12, y, 110, small_font,
         )
         doc_view.addSubview_(ic_label)
 
         ic_items = [
-            ("off", "Off"),
-            ("basic", "Basic"),
-            ("detailed", "Detailed"),
+            ("off", t("settings.ai_tab.input_context_off")),
+            ("basic", t("settings.ai_tab.input_context_basic")),
+            ("detailed", t("settings.ai_tab.input_context_detailed")),
         ]
         current_ic = state.get("input_context_level", "basic")
         self._input_context_popup = self._make_popup(
@@ -1025,9 +1054,9 @@ class SettingsPanel:
         )
 
         _ic_hints = {
-            "off": "No app info is sent to the AI model.",
-            "basic": "App name is sent to help the AI adapt to your context.",
-            "detailed": "App name, window title, and other details are sent for better accuracy. May include sensitive info.",
+            "off": t("settings.ai_tab.input_context_hint_off"),
+            "basic": t("settings.ai_tab.input_context_hint_basic"),
+            "detailed": t("settings.ai_tab.input_context_hint_detailed"),
         }
         y = self._add_hint(
             _ic_hints.get(current_ic, _ic_hints["basic"]),
@@ -1038,7 +1067,11 @@ class SettingsPanel:
         self._ic_hints = _ic_hints
 
         vocab_count = state.get("vocab_count", 0)
-        vocab_title = f"Vocabulary ({vocab_count})" if vocab_count > 0 else "Vocabulary"
+        vocab_title = (
+            t("settings.ai_tab.vocabulary_count", count=vocab_count)
+            if vocab_count > 0
+            else t("settings.ai_tab.vocabulary")
+        )
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         self._vocab_check = self._make_switch(
             vocab_title, pad + 12, y, content_w - 24,
@@ -1046,7 +1079,7 @@ class SettingsPanel:
             b"vocabCheckChanged:", doc_view,
         )
         y = self._add_hint(
-            "Use a custom vocabulary to improve recognition of domain-specific terms",
+            t("settings.ai_tab.vocabulary_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -1055,7 +1088,7 @@ class SettingsPanel:
         build_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(pad + 12, y, 160, 28)
         )
-        build_btn.setTitle_("Build Vocabulary...")
+        build_btn.setTitle_(t("settings.ai_tab.build_vocabulary"))
         build_btn.setBezelStyle_(1)
         build_btn.setFont_(small_font)
         build_btn.setTarget_(self)
@@ -1105,8 +1138,7 @@ class SettingsPanel:
         if not state.get("scripting_enabled", False):
             y -= (self._HINT_HEIGHT + self._HINT_GAP)
             warn = self._make_hint(
-                "\u26a0 Launcher requires Scripting to be enabled "
-                "(General \u2192 Scripting)",
+                t("settings.launcher_tab.scripting_warning"),
                 pad, y, content_w - 24,
             )
             from AppKit import NSColor
@@ -1116,12 +1148,12 @@ class SettingsPanel:
         # --- Enable Launcher toggle ---
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         self._launcher_enabled_check = self._make_switch(
-            "Enable Launcher", pad, y, content_w - 24,
+            t("settings.launcher_tab.enable_launcher"), pad, y, content_w - 24,
             launcher_state.get("enabled", True), label_font,
             b"launcherEnabledToggled:", doc_view,
         )
         y = self._add_hint(
-            "Disable to skip launcher registration and hotkey binding",
+            t("settings.launcher_tab.enable_launcher_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -1129,22 +1161,22 @@ class SettingsPanel:
 
         # --- Hotkey section ---
         y -= self._LABEL_HEIGHT
-        hk_label = self._make_label("Hotkey", pad, y, content_w, label_font)
+        hk_label = self._make_label(t("settings.launcher_tab.hotkey_section"), pad, y, content_w, label_font)
         doc_view.addSubview_(hk_label)
         self._add_doc_link(hk_label, "scripting.html#activation", doc_view)
         y = self._add_hint(
-            "Global hotkey to toggle the launcher panel",
+            t("settings.launcher_tab.hotkey_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         hotkey_val = launcher_state.get("hotkey", "")
         hotkey_title_label = self._make_label(
-            "Hotkey:", pad + 12, y, 60, small_font,
+            t("settings.launcher_tab.hotkey_label"), pad + 12, y, 60, small_font,
         )
         doc_view.addSubview_(hotkey_title_label)
 
-        hk_display = NSTextField.labelWithString_(hotkey_val or "None")
+        hk_display = NSTextField.labelWithString_(hotkey_val or t("settings.launcher_tab.none"))
         hk_display.setFrame_(
             NSMakeRect(pad + 105, y + 2, 120, self._CONTROL_HEIGHT)
         )
@@ -1154,10 +1186,10 @@ class SettingsPanel:
         self._launcher_hotkey_label = hk_display
 
         if hotkey_val:
-            hk_btn_title = "Clear"
+            hk_btn_title = t("settings.launcher_tab.clear")
             hk_btn_action = b"launcherHotkeyClear:"
         else:
-            hk_btn_title = "Record"
+            hk_btn_title = t("settings.launcher_tab.record")
             hk_btn_action = b"launcherHotkeyRecord:"
         hk_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(pad + 230, y - 1, 60, 22)
@@ -1174,10 +1206,10 @@ class SettingsPanel:
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         new_sn_hotkey = launcher_state.get("new_snippet_hotkey", "")
         doc_view.addSubview_(self._make_label(
-            "New Snippet:", pad + 12, y, 80, small_font,
+            t("settings.launcher_tab.new_snippet_label"), pad + 12, y, 80, small_font,
         ))
 
-        new_sn_hk_label = NSTextField.labelWithString_(new_sn_hotkey or "None")
+        new_sn_hk_label = NSTextField.labelWithString_(new_sn_hotkey or t("settings.launcher_tab.none"))
         new_sn_hk_label.setFrame_(
             NSMakeRect(pad + 105, y + 2, 120, self._CONTROL_HEIGHT)
         )
@@ -1187,10 +1219,10 @@ class SettingsPanel:
         self._new_snippet_hotkey_label = new_sn_hk_label
 
         if new_sn_hotkey:
-            btn_title = "Clear"
+            btn_title = t("settings.launcher_tab.clear")
             btn_action = b"newSnippetHotkeyClear:"
         else:
-            btn_title = "Record"
+            btn_title = t("settings.launcher_tab.record")
             btn_action = b"newSnippetHotkeyRecord:"
         new_sn_hk_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(pad + 230, y - 1, 60, 22)
@@ -1207,20 +1239,20 @@ class SettingsPanel:
 
         # --- Data Sources section ---
         y -= self._LABEL_HEIGHT
-        ds_label = self._make_label("Data Sources", pad, y, content_w, label_font)
+        ds_label = self._make_label(t("settings.launcher_tab.data_sources_section"), pad, y, content_w, label_font)
         doc_view.addSubview_(ds_label)
         self._add_doc_link(ds_label, "scripting.html#built-in-data-sources", doc_view)
         y = self._add_hint(
-            "Enable/disable sources and customize their prefix triggers",
+            t("settings.launcher_tab.data_sources_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
         sources = [
-            ("app_search", "Applications", None),
-            ("clipboard_history", "Clipboard History", "clipboard"),
-            ("file_search", "File Search", "files"),
-            ("snippets", "Snippets", "snippets"),
-            ("bookmarks", "Bookmarks", "bookmarks"),
+            ("app_search", t("settings.launcher_tab.source.applications"), None),
+            ("clipboard_history", t("settings.launcher_tab.source.clipboard_history"), "clipboard"),
+            ("file_search", t("settings.launcher_tab.source.file_search"), "files"),
+            ("snippets", t("settings.launcher_tab.source.snippets"), "snippets"),
+            ("bookmarks", t("settings.launcher_tab.source.bookmarks"), "bookmarks"),
         ]
 
         self._launcher_source_checks.clear()
@@ -1250,7 +1282,7 @@ class SettingsPanel:
             # Prefix input field (only for sources that have prefixes)
             if prefix_key:
                 prefix_label = self._make_label(
-                    "Prefix:", pad + 155, y + 2, prefix_label_w, small_font,
+                    t("settings.launcher_tab.prefix"), pad + 155, y + 2, prefix_label_w, small_font,
                 )
                 doc_view.addSubview_(prefix_label)
 
@@ -1280,7 +1312,7 @@ class SettingsPanel:
                 hotkey_val = source_hotkeys.get(prefix_key, "")
                 hk_x = pad + 155 + prefix_label_w + 4 + prefix_field_w + 8
 
-                hk_label = NSTextField.labelWithString_(hotkey_val or "None")
+                hk_label = NSTextField.labelWithString_(hotkey_val or t("settings.launcher_tab.none"))
                 hk_label.setFrame_(
                     NSMakeRect(hk_x, y + 2, 90, self._CONTROL_HEIGHT)
                 )
@@ -1291,10 +1323,10 @@ class SettingsPanel:
 
                 btn_x = hk_x + 94
                 if hotkey_val:
-                    btn_title = "Clear"
+                    btn_title = t("settings.launcher_tab.clear")
                     btn_action = b"launcherSourceHotkeyClear:"
                 else:
-                    btn_title = "Record"
+                    btn_title = t("settings.launcher_tab.record")
                     btn_action = b"launcherSourceHotkeyRecord:"
                 hk_btn = NSButton.alloc().initWithFrame_(
                     NSMakeRect(btn_x, y - 1, 60, 22)
@@ -1310,8 +1342,7 @@ class SettingsPanel:
 
             if config_key == "clipboard_history":
                 y = self._add_warning(
-                    "\u26a0 Not fully verified \u2014 may record sensitive data "
-                    "such as passwords and keys.",
+                    t("settings.launcher_tab.clipboard_warning"),
                     pad + 12, y, content_w - 24, doc_view,
                 )
 
@@ -1320,28 +1351,28 @@ class SettingsPanel:
         # --- Options section ---
         y -= self._LABEL_HEIGHT
         doc_view.addSubview_(
-            self._make_label("Options", pad, y, content_w, label_font)
+            self._make_label(t("settings.launcher_tab.options_section"), pad, y, content_w, label_font)
         )
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         self._launcher_usage_learning_check = self._make_switch(
-            "Usage Learning", pad + 12, y, content_w - 24,
+            t("settings.launcher_tab.usage_learning"), pad + 12, y, content_w - 24,
             launcher_state.get("usage_learning", True), small_font,
             b"launcherUsageLearningToggled:", doc_view,
         )
         y = self._add_hint(
-            "Learn from your selections to rank frequently used items higher",
+            t("settings.launcher_tab.usage_learning_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
         y -= (self._CONTROL_HEIGHT + self._ROW_GAP)
         self._launcher_switch_english_check = self._make_switch(
-            "Switch to English when open", pad + 12, y, content_w - 24,
+            t("settings.launcher_tab.switch_english"), pad + 12, y, content_w - 24,
             launcher_state.get("switch_to_english", True), small_font,
             b"launcherSwitchEnglishToggled:", doc_view,
         )
         y = self._add_hint(
-            "Auto-switch to English input on open, restore previous IME on close",
+            t("settings.launcher_tab.switch_english_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -1350,7 +1381,7 @@ class SettingsPanel:
         # --- Maintenance section ---
         y -= self._LABEL_HEIGHT
         doc_view.addSubview_(
-            self._make_label("Maintenance", pad, y, content_w, label_font)
+            self._make_label(t("settings.launcher_tab.maintenance_section"), pad, y, content_w, label_font)
         )
 
         from AppKit import NSButton
@@ -1359,14 +1390,14 @@ class SettingsPanel:
         refresh_btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(pad + 12, y, 180, 28)
         )
-        refresh_btn.setTitle_("Refresh Icon Cache")
+        refresh_btn.setTitle_(t("settings.launcher_tab.refresh_icon_cache"))
         refresh_btn.setBezelStyle_(1)
         refresh_btn.setFont_(small_font)
         refresh_btn.setTarget_(self)
         refresh_btn.setAction_(b"launcherRefreshIconsClicked:")
         doc_view.addSubview_(refresh_btn)
         y = self._add_hint(
-            "Clear cached app and browser icons and re-extract them",
+            t("settings.launcher_tab.refresh_icon_cache_desc"),
             pad + 12, y, content_w - 24, doc_view,
         )
 
@@ -1489,10 +1520,7 @@ class SettingsPanel:
 
         *path* should be relative, e.g. ``"enhance-modes.html#how-it-works"``.
         """
-        import locale
-
-        current_locale = locale.getlocale()[0] or ""
-        if current_locale.startswith("zh"):
+        if get_locale() == "zh":
             return f"{SettingsPanel._DOCS_BASE_URL}/zh/docs/{path}"
         return f"{SettingsPanel._DOCS_BASE_URL}/docs/{path}"
 
@@ -1512,7 +1540,7 @@ class SettingsPanel:
         btn = NSButton.alloc().initWithFrame_(
             NSMakeRect(btn_x, btn_y, 80, self._LABEL_HEIGHT)
         )
-        btn.setTitle_("Learn more")
+        btn.setTitle_(t("settings.doc_link.learn_more"))
         btn.setBezelStyle_(NSBezelStyleInline)
         btn.setFont_(NSFont.systemFontOfSize_(11.0))
         btn.setContentTintColor_(NSColor.linkColor())
@@ -1688,6 +1716,11 @@ class SettingsPanel:
         self.close()
         # The panel will be rebuilt when on_open_settings is called
         self._callbacks.get("_reopen", lambda: None)()
+
+    def languageChanged_(self, sender):
+        index = sender.indexOfSelectedItem()
+        lang_value = {0: "auto", 1: "en", 2: "zh"}[index]
+        self._call("on_language_change", lang_value)
 
     def recordHotkeyClicked_(self, sender):
         self._call("on_record_hotkey")
@@ -1932,13 +1965,13 @@ class SettingsPanel:
     ) -> None:
         """Update a hotkey label + Record/Clear button pair."""
         if label:
-            label.setStringValue_(hotkey or "None")
+            label.setStringValue_(hotkey or t("settings.launcher_tab.none"))
         if btn:
             if hotkey:
-                btn.setTitle_("Clear")
+                btn.setTitle_(t("settings.launcher_tab.clear"))
                 btn.setAction_(clear_action)
             else:
-                btn.setTitle_("Record")
+                btn.setTitle_(t("settings.launcher_tab.record"))
                 btn.setAction_(record_action)
 
     def update_launcher_hotkey(self, hotkey: str) -> None:

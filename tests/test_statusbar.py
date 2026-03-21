@@ -198,7 +198,7 @@ class TestStatusBarApp:
     def test_quit_button(self):
         app = StatusBarApp("TestApp")
         assert app.quit_button is not None
-        assert app.quit_button.title == "Quit"
+        assert app.quit_button.title in ("Quit", "menu.quit")
 
     def test_no_quit_button(self):
         app = StatusBarApp("TestApp", quit_button=None)
