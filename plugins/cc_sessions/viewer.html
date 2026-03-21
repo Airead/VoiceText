@@ -526,13 +526,13 @@ async function loadSession(info) {
 
   // Setup copy-resume button
   document.getElementById("btn-copy-resume").addEventListener("click", () => {
-    const cmd = `cd ${info.cwd || "."} && claude --resume ${info.session_id || ""}`;
-    navigator.clipboard.writeText(cmd).then(() => {
-      const btn = document.getElementById("btn-copy-resume");
-      const orig = btn.textContent;
-      btn.textContent = "\u2713 Copied!";
-      setTimeout(() => { btn.textContent = orig; }, 1500);
-    }).catch(() => {});
+    const cwd = (info.cwd || ".").replace(/'/g, "'\\''");
+    const cmd = `cd '${cwd}' && claude --resume ${info.session_id || ""}`;
+    wz.send("copy_resume", { text: cmd });
+    const btn = document.getElementById("btn-copy-resume");
+    const orig = btn.textContent;
+    btn.textContent = "\u2713 Copied!";
+    setTimeout(() => { btn.textContent = orig; }, 1500);
   });
 
   // Fetch JSONL
@@ -736,9 +736,6 @@ function createToolSingle(call, result) {
 
   const headerEl = document.createElement("div");
   headerEl.className = "tool-header";
-
-  // For Grep, show "searches" in label
-  const labelSuffix = call.name === "Grep" ? " search" : "";
 
   headerEl.innerHTML = `
     <span class="tool-icon">${meta.icon}</span>

@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 import os
+import shlex
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
 
-def _parse_query(query: str) -> Tuple[Optional[str], str]:
+def _parse_query(query: str) -> Tuple[str | None, str]:
     """Parse '@project rest' syntax. Returns (project_filter, remaining_query)."""
     query = query.strip()
     if query.startswith("@"):
@@ -46,10 +47,10 @@ def _time_ago(iso_timestamp: str) -> str:
 
 
 def _filter_sessions(
-    sessions: List[Dict[str, Any]],
-    project_filter: Optional[str],
+    sessions: list[Dict[str, Any]],
+    project_filter: str | None,
     query: str,
-) -> List[Dict[str, Any]]:
+) -> list[Dict[str, Any]]:
     """Filter sessions by project name and/or title fuzzy match."""
     from wenzi.scripting.sources import fuzzy_match
 
@@ -115,15 +116,21 @@ def register(wz) -> None:
                 "version": session.get("version", ""),
             }
 
-        from PyObjCTools import AppHelper
+        def _copy_text(text: str) -> None:
+            from wenzi.scripting.sources import copy_to_clipboard
 
-        AppHelper.callAfter(panel.show)
+            copy_to_clipboard(text)
+
+        panel.on("copy_resume", lambda data: _copy_text(data.get("text", "")))
+
+        panel.show()
 
     def _copy_resume_command(session: Dict[str, Any]) -> None:
         """Copy cd + claude --resume command to clipboard."""
         from wenzi.scripting.sources import copy_to_clipboard
 
-        cmd = f"cd {session['cwd']} && claude --resume {session['session_id']}"
+        cwd = shlex.quote(session["cwd"])
+        cmd = f"cd {cwd} && claude --resume {session['session_id']}"
         copy_to_clipboard(cmd)
 
     def _make_preview(session: Dict[str, Any]) -> dict:

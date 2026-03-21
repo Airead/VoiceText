@@ -113,6 +113,7 @@ class TestScriptEngine:
         }
         engine = ScriptEngine(
             script_dir="/tmp/nonexistent_vt_scripts",
+            plugins_dir="/tmp/nonexistent_vt_plugins",
             config=config,
         )
         engine.start()

@@ -5,7 +5,36 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
+
+
+def _make_session(
+    session_id: str,
+    file_path: str,
+    project: str,
+    cwd: str = "",
+    title: str = "",
+    first_prompt: str = "",
+    git_branch: str = "",
+    created: str = "",
+    modified: str = "",
+    message_count: Optional[int] = None,
+    version: str = "",
+) -> dict[str, Any]:
+    """Build a session metadata dict."""
+    return {
+        "session_id": session_id,
+        "file_path": file_path,
+        "project": project,
+        "cwd": cwd,
+        "title": title or _choose_title(None, None, first_prompt),
+        "first_prompt": first_prompt,
+        "git_branch": git_branch,
+        "created": created,
+        "modified": modified,
+        "message_count": message_count,
+        "version": version,
+    }
 
 
 def _project_name_from_dir(dirname: str) -> str:
@@ -69,19 +98,19 @@ def _scan_project_with_index(
             entry.get("firstPrompt"),
         )
 
-        results.append({
-            "session_id": session_id,
-            "file_path": full_path,
-            "project": project_name,
-            "cwd": entry.get("projectPath", ""),
-            "title": title,
-            "first_prompt": entry.get("firstPrompt", ""),
-            "git_branch": entry.get("gitBranch", ""),
-            "created": entry.get("created", ""),
-            "modified": entry.get("modified", ""),
-            "message_count": entry.get("messageCount", 0),
-            "version": entry.get("version", ""),
-        })
+        results.append(_make_session(
+            session_id=session_id,
+            file_path=full_path,
+            project=project_name,
+            cwd=entry.get("projectPath", ""),
+            title=title,
+            first_prompt=entry.get("firstPrompt", ""),
+            git_branch=entry.get("gitBranch", ""),
+            created=entry.get("created", ""),
+            modified=entry.get("modified", ""),
+            message_count=entry.get("messageCount", 0),
+            version=entry.get("version", ""),
+        ))
 
     return results
 
@@ -161,19 +190,19 @@ def _scan_session_jsonl(
 
     title = _choose_title(None, None, first_user_message)
 
-    return {
-        "session_id": session_id,
-        "file_path": str(jsonl_path),
-        "project": project_name,
-        "cwd": cwd,
-        "title": title,
-        "first_prompt": first_user_message or "",
-        "git_branch": git_branch,
-        "created": first_timestamp or "",
-        "modified": last_timestamp or file_modified,
-        "message_count": 0,
-        "version": version,
-    }
+    return _make_session(
+        session_id=session_id,
+        file_path=str(jsonl_path),
+        project=project_name,
+        cwd=cwd,
+        title=title,
+        first_prompt=first_user_message or "",
+        git_branch=git_branch,
+        created=first_timestamp or "",
+        modified=last_timestamp or file_modified,
+        message_count=0,
+        version=version,
+    )
 
 
 def _read_head(path: Path, max_lines: int = 30) -> list[str]:
@@ -211,12 +240,24 @@ class SessionScanner:
             project_name = _project_name_from_dir(proj_entry.name)
 
             # Fast path: sessions-index.json
-            index_sessions = _scan_project_with_index(proj_entry, project_name)
-            if index_sessions:
-                for s in index_sessions:
-                    seen_ids.add(s["session_id"])
-                    sessions.append(s)
-                continue
+            index_path = proj_entry / "sessions-index.json"
+            if index_path.exists():
+                cache_key = str(index_path)
+                try:
+                    mtime = index_path.stat().st_mtime
+                except OSError:
+                    continue
+                cached = self._cache.get(cache_key)
+                if cached and cached[0] == mtime:
+                    index_sessions = cached[1]
+                else:
+                    index_sessions = _scan_project_with_index(proj_entry, project_name)
+                    self._cache[cache_key] = (mtime, index_sessions)
+                if index_sessions:
+                    for s in index_sessions:
+                        seen_ids.add(s["session_id"])
+                        sessions.append(s)
+                    continue
 
             # Fallback: scan individual JSONL files
             for jsonl_file in proj_entry.glob("*.jsonl"):

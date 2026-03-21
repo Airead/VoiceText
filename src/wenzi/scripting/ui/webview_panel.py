@@ -210,7 +210,13 @@ class WebViewPanel:
     # ------------------------------------------------------------------
 
     def show(self) -> None:
-        """Show the panel, creating it if needed."""
+        """Show the panel, creating it if needed. Safe to call from any thread."""
+        if threading.current_thread() is not threading.main_thread():
+            from PyObjCTools import AppHelper
+
+            AppHelper.callAfter(self.show)
+            return
+
         from AppKit import NSApp
 
         NSApp.setActivationPolicy_(0)  # Regular (foreground)
@@ -411,6 +417,11 @@ class WebViewPanel:
         panel.setFloatingPanel_(True)
         panel.setHidesOnDeactivate_(False)
         panel.center()
+
+        # Ensure Edit menu for Cmd+C/V/A support in WKWebView
+        from wenzi.ui.result_window_web import _ensure_edit_menu
+
+        _ensure_edit_menu()
 
         # Close delegate
         delegate_cls = _get_close_delegate_class()
