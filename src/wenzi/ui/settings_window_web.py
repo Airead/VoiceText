@@ -416,23 +416,23 @@ input[type="range"] {
   <div class="sidebar">
     <div class="sidebar-item active" data-tab="general" onclick="switchTab('general')">
       <div class="sidebar-icon" style="background:linear-gradient(135deg,#52a3fc,#007aff);">&#x2699;</div>
-      General
+      <span data-i18n="general_tab.title">General</span>
     </div>
     <div class="sidebar-item" data-tab="speech" onclick="switchTab('speech')">
       <div class="sidebar-icon" style="background:linear-gradient(135deg,#ff6b6b,#ee5a24);">&#x1f3a4;</div>
-      Speech
+      <span data-i18n="stt_tab.title">Speech</span>
     </div>
     <div class="sidebar-item" data-tab="llm" onclick="switchTab('llm')">
       <div class="sidebar-icon" style="background:linear-gradient(135deg,#a29bfe,#6c5ce7);">&#x1f9e0;</div>
-      LLM
+      <span data-i18n="llm_tab.title">LLM</span>
     </div>
     <div class="sidebar-item" data-tab="ai" onclick="switchTab('ai')">
       <div class="sidebar-icon" style="background:linear-gradient(135deg,#55efc4,#00b894);">&#x2728;</div>
-      AI
+      <span data-i18n="ai_tab.title">AI</span>
     </div>
     <div class="sidebar-item" data-tab="launcher" onclick="switchTab('launcher')">
       <div class="sidebar-icon" style="background:linear-gradient(135deg,#fdcb6e,#e17055);">&#x1f680;</div>
-      Launcher
+      <span data-i18n="launcher_tab.title">Launcher</span>
     </div>
   </div>
 
@@ -440,34 +440,35 @@ input[type="range"] {
   <div class="content">
     <!-- General Tab -->
     <div id="tab-general" class="tab-content active">
-      <div class="content-title">General</div>
+      <div class="content-title" data-i18n="general_tab.title">General</div>
 
-      <div class="group-title">Language</div>
+      <div class="group-title" data-i18n="general_tab.language_label">Language</div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Interface Language</div>
+            <div class="setting-label" data-i18n="general_tab.language_label">Language</div>
           </div>
           <div class="setting-right">
             <select id="ctl-language" onchange="postCallback('on_language_change', this.value)">
-              <option value="auto">Auto</option>
+              <option value="auto" data-i18n="general_tab.language_auto">Auto</option>
               <option value="en">English</option>
-              <option value="zh">Chinese</option>
+              <option value="zh">&#x4e2d;&#x6587;</option>
             </select>
           </div>
         </div>
       </div>
 
-      <div class="group-title">Hotkeys</div>
+      <div class="group-title" data-i18n="general_tab.hotkeys_section">Hotkeys</div>
       <div class="setting-group" id="hotkeys-group">
         <!-- Dynamically populated by renderHotkeys() -->
       </div>
 
-      <div class="group-title">Feedback</div>
+      <div class="group-title" data-i18n="general_tab.feedback_section">Feedback</div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Sound Effects</div>
+            <div class="setting-label" data-i18n="general_tab.sound_feedback">Sound Feedback</div>
+            <div class="setting-desc" data-i18n="general_tab.sound_feedback_desc">Adds ~350ms delay before recording to avoid capturing the sound</div>
           </div>
           <div class="setting-right">
             <div id="ctl-sound" class="toggle" onclick="toggleClick(this, 'on_sound_toggle')"></div>
@@ -475,17 +476,8 @@ input[type="range"] {
         </div>
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Volume</div>
-          </div>
-          <div class="setting-right">
-            <input id="ctl-volume" type="range" min="0" max="100" value="70" style="width:100px;"
-                   oninput="postCallback('on_volume_change', parseInt(this.value))">
-          </div>
-        </div>
-        <div class="setting-row">
-          <div class="setting-left">
-            <div class="setting-label">Visual Indicator</div>
-            <div class="setting-desc">Show floating indicator while recording</div>
+            <div class="setting-label" data-i18n="general_tab.visual_indicator">Visual Indicator</div>
+            <div class="setting-desc" data-i18n="general_tab.visual_indicator_desc">Show floating indicator while recording</div>
           </div>
           <div class="setting-right">
             <div id="ctl-visual" class="toggle" onclick="toggleClick(this, 'on_visual_toggle')"></div>
@@ -493,7 +485,8 @@ input[type="range"] {
         </div>
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Show Device Name</div>
+            <div class="setting-label" data-i18n="general_tab.show_device_name">Show Device Name</div>
+            <div class="setting-desc" data-i18n="general_tab.show_device_name_desc">Show the input device name on the recording indicator</div>
           </div>
           <div class="setting-right">
             <div id="ctl-device-name" class="toggle" onclick="toggleClick(this, 'on_device_name_toggle')"></div>
@@ -501,12 +494,12 @@ input[type="range"] {
         </div>
       </div>
 
-      <div class="group-title">Output</div>
+      <div class="group-title" data-i18n="general_tab.output_section">Output</div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Preview Before Output</div>
-            <div class="setting-desc">Show transcription result for review</div>
+            <div class="setting-label" data-i18n="general_tab.preview">Preview</div>
+            <div class="setting-desc" data-i18n="general_tab.preview_desc">Show a preview panel before inserting text, allowing edits</div>
           </div>
           <div class="setting-right">
             <div id="ctl-preview" class="toggle" onclick="toggleClick(this, 'on_preview_toggle')"></div>
@@ -514,12 +507,12 @@ input[type="range"] {
         </div>
       </div>
 
-      <div class="group-title">Advanced</div>
+      <div class="group-title" data-i18n="general_tab.scripting_section">Advanced</div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Scripting</div>
-            <div class="setting-desc">Enable plugin scripting engine</div>
+            <div class="setting-label" data-i18n="general_tab.enable_scripting">Scripting</div>
+            <div class="setting-desc" data-i18n="general_tab.enable_scripting_desc">Enable plugin scripting engine</div>
           </div>
           <div class="setting-right">
             <div id="ctl-scripting" class="toggle" onclick="toggleClick(this, 'on_scripting_toggle')"></div>
@@ -527,18 +520,30 @@ input[type="range"] {
         </div>
       </div>
 
+      <div class="group-title" data-i18n="general_tab.config_dir_section">Config Directory</div>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-left">
+            <div id="config-dir-display" class="config-path"></div>
+            <div class="setting-desc" data-i18n="general_tab.config_dir_hint">Changes require app restart to take effect</div>
+          </div>
+          <div class="setting-right">
+            <button class="btn-small" data-i18n="general_tab.browse" onclick="postCallback('on_config_dir_browse')">Browse...</button>
+            <button class="btn-small danger" data-i18n="general_tab.reset" onclick="postCallback('on_config_dir_reset')">Reset</button>
+          </div>
+        </div>
+      </div>
+
       <div class="bottom-bar">
         <div style="display:flex; gap:16px; align-items:center;">
-          <button class="toolbar-btn" onclick="postCallback('on_reveal_config_folder')">Reveal Config Folder</button>
+          <button class="toolbar-btn" data-i18n="btn.reveal_config" onclick="postCallback('on_reveal_config_folder')">Reveal Config Folder</button>
         </div>
-        <div id="config-dir-display" class="config-path"></div>
       </div>
     </div>
 
     <!-- Speech Tab -->
     <div id="tab-speech" class="tab-content">
-      <div class="content-title">Speech Recognition</div>
-      <div class="group-title">Select Engine</div>
+      <div class="content-title" data-i18n="stt_tab.title">Speech Recognition</div>
       <div class="setting-group" id="stt-model-list">
         <!-- Dynamically populated by renderSttTab() -->
       </div>
@@ -546,16 +551,16 @@ input[type="range"] {
 
     <!-- LLM Tab -->
     <div id="tab-llm" class="tab-content">
-      <div class="content-title">LLM</div>
-      <div class="group-title">Select Model</div>
+      <div class="content-title" data-i18n="llm_tab.title">LLM</div>
       <div class="setting-group" id="llm-model-list">
         <!-- Dynamically populated by renderLlmTab() -->
       </div>
-      <div class="group-title">Connection</div>
+      <div class="group-title" data-i18n="llm_tab.model_timeout">Connection</div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Timeout</div>
+            <div class="setting-label" data-i18n="llm_tab.model_timeout">Timeout</div>
+            <div class="setting-desc" data-i18n="llm_tab.model_timeout_desc">Maximum time to wait for a model response</div>
           </div>
           <div class="setting-right">
             <input id="ctl-model-timeout" type="number" value="10" style="width:60px;"
@@ -568,19 +573,19 @@ input[type="range"] {
 
     <!-- AI Tab -->
     <div id="tab-ai" class="tab-content">
-      <div class="content-title">AI Enhancement</div>
+      <div class="content-title" data-i18n="ai_tab.title">AI Enhancement</div>
 
-      <div class="group-title">Mode</div>
+      <div class="group-title" data-i18n="ai_tab.enhance_mode">Mode</div>
       <div class="setting-group" id="ai-modes-group">
         <!-- Dynamically populated by renderAiModes() -->
       </div>
 
-      <div class="group-title">Thinking</div>
+      <div class="group-title" data-i18n="ai_tab.options_section">Options</div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Enable Thinking</div>
-            <div class="setting-desc">Let the model reason step-by-step</div>
+            <div class="setting-label" data-i18n="ai_tab.thinking">Thinking</div>
+            <div class="setting-desc" data-i18n="ai_tab.thinking_desc">Enable extended thinking for more accurate AI processing (slower)</div>
           </div>
           <div class="setting-right">
             <div id="ctl-thinking" class="toggle" onclick="toggleClick(this, 'on_thinking_toggle')"></div>
@@ -588,20 +593,22 @@ input[type="range"] {
         </div>
       </div>
 
-      <div class="group-title">Vocabulary</div>
+      <div class="group-title" data-i18n="ai_tab.vocabulary">Vocabulary</div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Enable Vocabulary</div>
+            <div class="setting-label" data-i18n="ai_tab.vocabulary">Vocabulary</div>
+            <div class="setting-desc" data-i18n="ai_tab.vocabulary_desc">Use a custom vocabulary to improve recognition of domain-specific terms</div>
           </div>
           <div class="setting-right">
+            <span id="ctl-vocab-count" style="color:#86868b;font-size:12px;margin-right:8px;">0</span>
             <div id="ctl-vocab" class="toggle" onclick="toggleClick(this, 'on_vocab_toggle')"></div>
           </div>
         </div>
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Auto-build</div>
-            <div class="setting-desc">Automatically extract new terms</div>
+            <div class="setting-label" data-i18n="ai_tab.auto_build_vocab">Auto Build</div>
+            <div class="setting-desc" data-i18n="ai_tab.auto_build_vocab_desc">Automatically update vocabulary from your text input history</div>
           </div>
           <div class="setting-right">
             <div id="ctl-auto-build" class="toggle" onclick="toggleClick(this, 'on_auto_build_toggle')"></div>
@@ -609,15 +616,8 @@ input[type="range"] {
         </div>
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Vocabulary Count</div>
-          </div>
-          <div class="setting-right">
-            <span id="ctl-vocab-count" style="color:#86868b;font-size:12px;">0</span>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div class="setting-left">
-            <div class="setting-label">Build Model</div>
+            <div class="setting-label" data-i18n="ai_tab.build_model">Build Model</div>
+            <div class="setting-desc" data-i18n="ai_tab.build_model_desc">LLM used for vocabulary extraction (Default = same as AI enhance)</div>
           </div>
           <div class="setting-right">
             <select id="ctl-vocab-build-model"
@@ -626,16 +626,16 @@ input[type="range"] {
           </div>
         </div>
         <div class="setting-row" style="justify-content:center; padding:8px;">
-          <button class="toolbar-btn" style="font-size:13px;" onclick="postCallback('on_vocab_build')">Build Vocabulary</button>
+          <button class="toolbar-btn" style="font-size:13px;" data-i18n="ai_tab.build_vocabulary" onclick="postCallback('on_vocab_build')">Build Vocabulary...</button>
         </div>
       </div>
 
-      <div class="group-title">Context</div>
+      <div class="group-title" data-i18n="ai_tab.conversation_history">Context</div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Conversation History</div>
-            <div class="setting-desc">Include recent messages for context</div>
+            <div class="setting-label" data-i18n="ai_tab.conversation_history">Conversation History</div>
+            <div class="setting-desc" data-i18n="ai_tab.conversation_history_desc">Include recent conversation context for better AI enhancement</div>
           </div>
           <div class="setting-right">
             <div id="ctl-history" class="toggle" onclick="toggleClick(this, 'on_history_toggle')"></div>
@@ -643,7 +643,7 @@ input[type="range"] {
         </div>
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Max Entries</div>
+            <div class="setting-label" data-i18n="ai_tab.max_entries">Max Entries</div>
           </div>
           <div class="setting-right">
             <input id="ctl-history-max" type="number" value="100" style="width:60px;"
@@ -652,7 +652,7 @@ input[type="range"] {
         </div>
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Refresh Threshold</div>
+            <div class="setting-label" data-i18n="ai_tab.base_entries">Refresh Threshold</div>
           </div>
           <div class="setting-right">
             <input id="ctl-history-refresh" type="number" value="50" style="width:60px;"
@@ -661,14 +661,14 @@ input[type="range"] {
         </div>
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Input Context Level</div>
+            <div class="setting-label" data-i18n="ai_tab.input_context">Input Context</div>
           </div>
           <div class="setting-right">
             <select id="ctl-input-context"
                     onchange="postCallback('on_input_context_change', this.value)">
-              <option value="basic">Basic</option>
-              <option value="standard">Standard</option>
-              <option value="full">Full</option>
+              <option value="off" data-i18n="ai_tab.input_context_off">Off</option>
+              <option value="basic" data-i18n="ai_tab.input_context_basic">Basic</option>
+              <option value="standard" data-i18n="ai_tab.input_context_detailed">Detailed</option>
             </select>
           </div>
         </div>
@@ -677,32 +677,60 @@ input[type="range"] {
 
     <!-- Launcher Tab -->
     <div id="tab-launcher" class="tab-content">
-      <div class="content-title">Launcher</div>
+      <div class="content-title" data-i18n="launcher_tab.title">Launcher</div>
 
-      <div class="group-title">General</div>
+      <div id="launcher-scripting-warning" class="setting-group" style="display:none; margin-bottom:16px; padding:10px 14px; color:#e17055;">
+        <span data-i18n="launcher_tab.scripting_warning">&#x26a0; Launcher requires Scripting to be enabled (General &#x2192; Scripting)</span>
+      </div>
+
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Enable Launcher</div>
+            <div class="setting-label" data-i18n="launcher_tab.enable_launcher">Enable Launcher</div>
+            <div class="setting-desc" data-i18n="launcher_tab.enable_launcher_desc">Disable to skip launcher registration and hotkey binding</div>
           </div>
           <div class="setting-right">
             <div id="ctl-launcher-enabled" class="toggle" onclick="toggleClick(this, 'on_launcher_toggle')"></div>
           </div>
         </div>
+      </div>
+
+      <div class="group-title" data-i18n="launcher_tab.hotkey_section">Hotkey</div>
+      <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Hotkey</div>
+            <div class="setting-label" data-i18n="launcher_tab.hotkey_label">Hotkey</div>
+            <div class="setting-desc" data-i18n="launcher_tab.hotkey_desc">Global hotkey to toggle the launcher panel</div>
           </div>
           <div class="setting-right">
             <span id="ctl-launcher-hotkey" class="hotkey-badge">None</span>
-            <button class="btn-small" onclick="postCallback('on_launcher_hotkey_record')">Record</button>
-            <button class="btn-small danger" onclick="postCallback('on_launcher_hotkey_clear')">Clear</button>
+            <button class="btn-small" data-i18n="launcher_tab.record" onclick="postCallback('on_launcher_hotkey_record')">Record</button>
+            <button class="btn-small danger" data-i18n="launcher_tab.clear" onclick="postCallback('on_launcher_hotkey_clear')">Clear</button>
           </div>
         </div>
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Usage Learning</div>
-            <div class="setting-desc">Rank results based on your usage patterns</div>
+            <div class="setting-label" data-i18n="launcher_tab.new_snippet_label">New Snippet</div>
+          </div>
+          <div class="setting-right">
+            <span id="ctl-new-snippet-hotkey" class="hotkey-badge">None</span>
+            <button class="btn-small" data-i18n="launcher_tab.record" onclick="postCallback('on_new_snippet_hotkey_record')">Record</button>
+            <button class="btn-small danger" data-i18n="launcher_tab.clear" onclick="postCallback('on_new_snippet_hotkey_clear')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="group-title" data-i18n="launcher_tab.data_sources_section">Data Sources</div>
+      <div class="setting-group" id="launcher-sources-group">
+        <!-- Dynamically populated by renderLauncherSources() -->
+      </div>
+
+      <div class="group-title" data-i18n="launcher_tab.options_section">Options</div>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div class="setting-left">
+            <div class="setting-label" data-i18n="launcher_tab.usage_learning">Usage Learning</div>
+            <div class="setting-desc" data-i18n="launcher_tab.usage_learning_desc">Learn from your selections to rank frequently used items higher</div>
           </div>
           <div class="setting-right">
             <div id="ctl-launcher-usage-learning" class="toggle" onclick="toggleClick(this, 'on_launcher_usage_learning_toggle')"></div>
@@ -710,8 +738,8 @@ input[type="range"] {
         </div>
         <div class="setting-row">
           <div class="setting-left">
-            <div class="setting-label">Switch to English Input</div>
-            <div class="setting-desc">Automatically switch to English when launcher opens</div>
+            <div class="setting-label" data-i18n="launcher_tab.switch_english">Switch to English when open</div>
+            <div class="setting-desc" data-i18n="launcher_tab.switch_english_desc">Auto-switch to English input on open, restore previous IME on close</div>
           </div>
           <div class="setting-right">
             <div id="ctl-launcher-switch-english" class="toggle" onclick="toggleClick(this, 'on_launcher_switch_english_toggle')"></div>
@@ -719,33 +747,35 @@ input[type="range"] {
         </div>
       </div>
 
-      <div class="group-title">Sources</div>
-      <div class="setting-group" id="launcher-sources-group">
-        <!-- Dynamically populated by renderLauncherSources() -->
-      </div>
-
-      <div class="group-title">Snippets</div>
+      <div class="group-title" data-i18n="launcher_tab.maintenance_section">Maintenance</div>
       <div class="setting-group">
-        <div class="setting-row">
-          <div class="setting-left">
-            <div class="setting-label">New Snippet Hotkey</div>
-          </div>
-          <div class="setting-right">
-            <span id="ctl-new-snippet-hotkey" class="hotkey-badge">None</span>
-            <button class="btn-small" onclick="postCallback('on_new_snippet_hotkey_record')">Record</button>
-            <button class="btn-small danger" onclick="postCallback('on_new_snippet_hotkey_clear')">Clear</button>
-          </div>
+        <div class="setting-row" style="justify-content:center; padding:8px;">
+          <button class="toolbar-btn" style="font-size:13px;" data-i18n="launcher_tab.refresh_icon_cache" onclick="postCallback('on_launcher_refresh_icons')">Refresh Icon Cache</button>
         </div>
-      </div>
-
-      <div style="margin-top:12px;">
-        <button class="toolbar-btn" onclick="postCallback('on_launcher_refresh_icons')">Refresh Icons</button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
+/* ------------------------------------------------------------------ */
+/* i18n helper                                                         */
+/* ------------------------------------------------------------------ */
+
+var I18N = {};
+
+function _t(key, fallback) {
+  return I18N[key] || fallback || key;
+}
+
+function _initI18nLabels() {
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    var key = el.getAttribute('data-i18n');
+    var translated = I18N[key];
+    if (translated) el.textContent = translated;
+  });
+}
+
 /* ------------------------------------------------------------------ */
 /* Core helper functions                                               */
 /* ------------------------------------------------------------------ */
@@ -777,17 +807,15 @@ function switchTab(tabId) {
   postCallback('on_tab_change', tabId);
 }
 
-function formatHotkey(hk) {
-  if (!hk) return 'None';
-  var parts = [];
-  var mods = hk.modifiers || [];
-  if (mods.indexOf('command') >= 0) parts.push('\\u2318');
-  if (mods.indexOf('option') >= 0) parts.push('\\u2325');
-  if (mods.indexOf('control') >= 0) parts.push('\\u2303');
-  if (mods.indexOf('shift') >= 0) parts.push('\\u21e7');
-  var key = (hk.key || '').charAt(0).toUpperCase() + (hk.key || '').slice(1);
-  parts.push(key);
-  return parts.join(' ');
+/* ------------------------------------------------------------------ */
+/* HTML escaping                                                       */
+/* ------------------------------------------------------------------ */
+
+function _esc(s) {
+  if (s === null || s === undefined) return '';
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(String(s)));
+  return div.innerHTML;
 }
 
 /* ------------------------------------------------------------------ */
@@ -804,17 +832,25 @@ function renderHotkeys() {
     var key = keys[i];
     var hk = hotkeys[key];
     var enabled = hk.enabled !== undefined ? hk.enabled : true;
-    var mode = hk.mode || 'hold';
+    var mode = hk.mode || null;
     var label = hk.label || key;
     html += '<div class="setting-row">';
     html += '  <div class="setting-left">';
     html += '    <div class="setting-label">' + _esc(label) + '</div>';
-    if (hk.description) html += '    <div class="setting-desc">' + _esc(hk.description) + '</div>';
     html += '  </div>';
     html += '  <div class="setting-right">';
-    html += '    <select onchange="postCallback(\\x27on_hotkey_mode_select\\x27, \\x27' + _esc(key) + '\\x27, this.value)">';
-    html += '      <option value="hold"' + (mode === 'hold' ? ' selected' : '') + '>Hold to Record</option>';
-    html += '      <option value="toggle"' + (mode === 'toggle' ? ' selected' : '') + '>Toggle</option>';
+    // Mode dropdown: Default AI Mode, then available enhance modes
+    html += '    <select onchange="hotkeyModeChanged(\\x27' + _esc(key) + '\\x27, this.value)">';
+    html += '      <option value="_default"' + (!mode || mode === '_default' ? ' selected' : '') + '>' + _esc(_t('general_tab.default_ai_mode', 'Default AI Mode')) + '</option>';
+    html += '      <option value="off"' + (mode === 'off' ? ' selected' : '') + '>' + _esc(_t('general_tab.off', 'Off')) + '</option>';
+    var modes = CONFIG.enhance_modes || [];
+    for (var j = 0; j < modes.length; j++) {
+      html += '      <option value="' + _esc(modes[j].id) + '"' + (mode === modes[j].id ? ' selected' : '') + '>' + _esc(modes[j].name) + '</option>';
+    }
+    // Delete option for non-fn keys
+    if (key.toLowerCase() !== 'fn') {
+      html += '      <option value="_delete">' + _esc(_t('general_tab.delete_hotkey', 'Delete Hotkey')) + '</option>';
+    }
     html += '    </select>';
     html += '    <div class="toggle' + (enabled ? ' on' : '') + '" data-hotkey="' + _esc(key) + '"';
     html += '         onclick="this.classList.toggle(\\x27on\\x27); postCallback(\\x27on_hotkey_toggle\\x27, \\x27' + _esc(key) + '\\x27, this.classList.contains(\\x27on\\x27))"></div>';
@@ -823,22 +859,44 @@ function renderHotkeys() {
   }
   // Record hotkey button
   html += '<div class="setting-row" style="justify-content:center; padding:8px;">';
-  html += '  <button class="toolbar-btn" style="font-size:13px;" onclick="postCallback(\\x27on_record_hotkey\\x27)">Record Hotkey</button>';
+  html += '  <button class="toolbar-btn" style="font-size:13px;" onclick="postCallback(\\x27on_record_hotkey\\x27)">' + _esc(_t('general_tab.record_hotkey', 'Record Hotkey...')) + '</button>';
   html += '</div>';
   // Restart key select
+  var restartKey = CONFIG.restart_key || 'cmd';
   html += '<div class="setting-row">';
-  html += '  <div class="setting-left"><div class="setting-label">Restart Modifier</div></div>';
+  html += '  <div class="setting-left"><div class="setting-label">' + _esc(_t('general_tab.restart_key', 'Restart Key')) + '</div></div>';
   html += '  <div class="setting-right">';
-  var restartKey = CONFIG.restart_key || 'command';
   html += '    <select id="ctl-restart-key" onchange="postCallback(\\x27on_restart_key_select\\x27, this.value)">';
-  html += '      <option value="command"' + (restartKey === 'command' ? ' selected' : '') + '>\\u2318 Command</option>';
-  html += '      <option value="option"' + (restartKey === 'option' ? ' selected' : '') + '>\\u2325 Option</option>';
-  html += '      <option value="control"' + (restartKey === 'control' ? ' selected' : '') + '>\\u2303 Control</option>';
+  html += '      <option value="cmd"' + (restartKey === 'cmd' ? ' selected' : '') + '>\\u2318 Command</option>';
+  html += '      <option value="alt"' + (restartKey === 'alt' ? ' selected' : '') + '>\\u2325 Option</option>';
+  html += '      <option value="ctrl"' + (restartKey === 'ctrl' ? ' selected' : '') + '>\\u2303 Control</option>';
   html += '    </select>';
-  html += '    <button class="btn-small danger" onclick="postCallback(\\x27on_cancel_key_select\\x27, document.getElementById(\\x27ctl-restart-key\\x27).value)">Clear</button>';
   html += '  </div>';
   html += '</div>';
+  // Cancel key select
+  var cancelKey = CONFIG.cancel_key || 'space';
+  html += '<div class="setting-row">';
+  html += '  <div class="setting-left"><div class="setting-label">' + _esc(_t('general_tab.cancel_key', 'Cancel Key')) + '</div></div>';
+  html += '  <div class="setting-right">';
+  html += '    <select id="ctl-cancel-key" onchange="postCallback(\\x27on_cancel_key_select\\x27, this.value)">';
+  html += '      <option value="space"' + (cancelKey === 'space' ? ' selected' : '') + '>Space</option>';
+  html += '      <option value="esc"' + (cancelKey === 'esc' ? ' selected' : '') + '>Esc</option>';
+  html += '    </select>';
+  html += '  </div>';
+  html += '</div>';
+  // Hint
+  html += '<div class="setting-row"><div class="setting-left"><div class="setting-desc">' + _esc(_t('general_tab.restart_cancel_hint', 'Hold hotkey + press key to restart or cancel recording')) + '</div></div></div>';
   container.innerHTML = html;
+}
+
+function hotkeyModeChanged(keyName, value) {
+  if (value === '_delete') {
+    postCallback('on_hotkey_delete', keyName);
+  } else if (value === '_default') {
+    postCallback('on_hotkey_mode_select', keyName, null);
+  } else {
+    postCallback('on_hotkey_mode_select', keyName, value);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -851,19 +909,19 @@ function renderSttTab() {
   var presets = CONFIG.stt_presets || [];
   var remotes = CONFIG.stt_remote_models || [];
   var currentPreset = CONFIG.current_preset_id || '';
-  var currentRemote = CONFIG.current_remote_asr || '';
+  var currentRemote = CONFIG.current_remote_asr;
   var html = '';
 
   // Local engines
   if (presets.length > 0) {
     html += '<div class="provider-header">';
-    html += '  <span class="provider-name">Local</span>';
+    html += '  <span class="provider-name">' + _esc(_t('stt_tab.local_section', 'Local')) + '</span>';
     html += '  <span class="provider-badge local">On-device</span>';
     html += '</div>';
     for (var i = 0; i < presets.length; i++) {
       var p = presets[i];
       var sel = (!currentRemote && p.id === currentPreset) ? ' selected' : '';
-      html += '<div class="model-row' + sel + '" onclick="selectStt(\\x27preset\\x27, \\x27' + _esc(p.id) + '\\x27, this)">';
+      html += '<div class="model-row' + sel + '" onclick="selectStt(\\x27preset\\x27, \\x27' + _esc(p.id) + '\\x27, null, this)">';
       html += '  <div class="model-radio"></div>';
       html += '  <div class="model-info">';
       html += '    <div class="model-name">' + _esc(p.name) + '</div>';
@@ -880,20 +938,20 @@ function renderSttTab() {
   // Remote providers
   if (remotes.length > 0) {
     html += '<div class="provider-header">';
-    html += '  <span class="provider-name">Remote</span>';
+    html += '  <span class="provider-name">' + _esc(_t('stt_tab.remote_section', 'Remote')) + '</span>';
     html += '  <span class="provider-badge remote">Cloud</span>';
     html += '</div>';
     for (var j = 0; j < remotes.length; j++) {
       var r = remotes[j];
-      var rsel = (currentRemote === r.provider) ? ' selected' : '';
-      html += '<div class="model-row' + rsel + '" onclick="selectStt(\\x27remote\\x27, \\x27' + _esc(r.provider) + '\\x27, this)">';
+      // currentRemote is a [provider, model] pair or null
+      var rsel = (currentRemote && currentRemote[0] === r.provider && currentRemote[1] === r.model) ? ' selected' : '';
+      html += '<div class="model-row' + rsel + '" onclick="selectStt(\\x27remote\\x27, \\x27' + _esc(r.provider) + '\\x27, \\x27' + _esc(r.model) + '\\x27, this)">';
       html += '  <div class="model-radio"></div>';
       html += '  <div class="model-info">';
       html += '    <div class="model-name">' + _esc(r.display) + '</div>';
       html += '  </div>';
-      html += '  <div class="model-tag">API Key</div>';
       html += '  <div class="model-actions">';
-      html += '    <button class="btn-small danger" onclick="event.stopPropagation(); postCallback(\\x27on_stt_remove_provider\\x27, \\x27' + _esc(r.provider) + '\\x27)">Remove</button>';
+      html += '    <button class="btn-small danger" onclick="event.stopPropagation(); postCallback(\\x27on_stt_remove_provider\\x27, \\x27' + _esc(r.provider) + '\\x27)">' + _esc(_t('stt_tab.remove_provider', 'Remove...')) + '</button>';
       html += '  </div>';
       html += '</div>';
     }
@@ -901,21 +959,28 @@ function renderSttTab() {
 
   // Add provider button
   html += '<div class="add-row">';
-  html += '  <button class="toolbar-btn" style="font-size:13px;" onclick="postCallback(\\x27on_stt_add_provider\\x27)">+ Add Provider</button>';
+  html += '  <button class="toolbar-btn" style="font-size:13px;" onclick="postCallback(\\x27on_stt_add_provider\\x27)">' + _esc(_t('stt_tab.add_provider', 'Add Provider...')) + '</button>';
   html += '</div>';
 
   container.innerHTML = html;
 }
 
-function selectStt(type, id, row) {
+function selectStt(type, id, model, row) {
   var card = row.closest('.setting-group');
   card.querySelectorAll('.model-row').forEach(function(r) { r.classList.remove('selected'); });
   row.classList.add('selected');
   if (type === 'preset') {
     postCallback('on_stt_select', id);
   } else {
-    postCallback('on_stt_remote_select', id);
+    postCallback('on_stt_remote_select', id, model);
   }
+}
+
+function _updateSttSelection(data) {
+  // Update CONFIG and re-render speech tab
+  if (data.current_preset_id !== undefined) CONFIG.current_preset_id = data.current_preset_id;
+  if (data.current_remote_asr !== undefined) CONFIG.current_remote_asr = data.current_remote_asr;
+  renderSttTab();
 }
 
 /* ------------------------------------------------------------------ */
@@ -967,7 +1032,7 @@ function renderLlmTab() {
 
   // Add provider + remove
   html += '<div class="add-row">';
-  html += '  <button class="toolbar-btn" style="font-size:13px;" onclick="postCallback(\\x27on_llm_add_provider\\x27)">+ Add Provider</button>';
+  html += '  <button class="toolbar-btn" style="font-size:13px;" onclick="postCallback(\\x27on_llm_add_provider\\x27)">' + _esc(_t('llm_tab.add_provider', 'Add Provider...')) + '</button>';
   html += '</div>';
 
   container.innerHTML = html;
@@ -1000,13 +1065,13 @@ function renderAiModes() {
     html += '    <div class="model-name">' + _esc(m.name) + '</div>';
     html += '  </div>';
     html += '  <div class="model-actions">';
-    html += '    <button class="btn-small" onclick="event.stopPropagation(); postCallback(\\x27on_enhance_mode_edit\\x27, \\x27' + _esc(m.id) + '\\x27)">Edit</button>';
+    html += '    <button class="btn-small" onclick="event.stopPropagation(); postCallback(\\x27on_enhance_mode_edit\\x27, \\x27' + _esc(m.id) + '\\x27)">' + _esc(_t('ai_tab.edit', 'Edit')) + '</button>';
     html += '  </div>';
     html += '</div>';
   }
 
   html += '<div class="add-row">';
-  html += '  <button class="toolbar-btn" style="font-size:13px;" onclick="postCallback(\\x27on_enhance_add_mode\\x27)">+ Add Mode</button>';
+  html += '  <button class="toolbar-btn" style="font-size:13px;" onclick="postCallback(\\x27on_enhance_add_mode\\x27)">' + _esc(_t('ai_tab.add_mode', 'Add Mode...')) + '</button>';
   html += '</div>';
 
   container.innerHTML = html;
@@ -1027,32 +1092,46 @@ function renderLauncherSources() {
   var container = document.getElementById('launcher-sources-group');
   if (!container) return;
   var launcher = CONFIG.launcher || {};
-  var sources = launcher.sources || {};
-  var keys = Object.keys(sources);
+  var sources = launcher.sources || [];
   var html = '';
 
-  for (var i = 0; i < keys.length; i++) {
-    var src = keys[i];
-    var cfg = sources[src];
-    var enabled = cfg.enabled !== undefined ? cfg.enabled : true;
-    var prefix = cfg.prefix || '';
-    var hk = cfg.hotkey || null;
+  // Source label i18n map
+  var sourceLabelMap = {
+    'applications': _t('launcher_tab.source.applications', 'Applications'),
+    'clipboard_history': _t('launcher_tab.source.clipboard_history', 'Clipboard History'),
+    'file_search': _t('launcher_tab.source.file_search', 'File Search'),
+    'snippets': _t('launcher_tab.source.snippets', 'Snippets'),
+    'bookmarks': _t('launcher_tab.source.bookmarks', 'Bookmarks')
+  };
+
+  for (var i = 0; i < sources.length; i++) {
+    var src = sources[i];
+    var enabled = src.enabled !== undefined ? src.enabled : true;
+    var label = sourceLabelMap[src.label_key] || src.config_key;
     html += '<div class="setting-row">';
     html += '  <div class="setting-left">';
-    html += '    <div class="setting-label">' + _esc(src.charAt(0).toUpperCase() + src.slice(1)) + '</div>';
-    if (prefix) html += '    <div class="setting-desc">Prefix: ' + _esc(prefix) + '</div>';
+    html += '    <div class="setting-label">' + _esc(label) + '</div>';
+    if (src.prefix) {
+      html += '    <div class="setting-desc">' + _esc(_t('launcher_tab.prefix', 'Prefix:')) + ' <input type="text" value="' + _esc(src.prefix) + '" style="width:40px;font-size:11px;padding:1px 4px;" onchange="postCallback(\\x27on_launcher_prefix_change\\x27, \\x27' + _esc(src.prefix_key) + '\\x27, this.value)"></div>';
+    }
     html += '  </div>';
     html += '  <div class="setting-right">';
-    html += '    <span class="hotkey-badge">' + _esc(formatHotkey(hk)) + '</span>';
-    html += '    <button class="btn-small" onclick="postCallback(\\x27on_launcher_source_hotkey_record\\x27, \\x27' + _esc(src) + '\\x27)">Record</button>';
-    html += '    <button class="btn-small danger" onclick="postCallback(\\x27on_launcher_source_hotkey_clear\\x27, \\x27' + _esc(src) + '\\x27)">Clear</button>';
+    if (src.prefix_key) {
+      html += '    <span class="hotkey-badge" data-source-hotkey="' + _esc(src.prefix_key) + '">' + _esc(src.hotkey || _t('launcher_tab.none', 'None')) + '</span>';
+      html += '    <button class="btn-small" onclick="postCallback(\\x27on_launcher_source_hotkey_record\\x27, \\x27' + _esc(src.prefix_key) + '\\x27)">' + _esc(_t('launcher_tab.record', 'Record')) + '</button>';
+      html += '    <button class="btn-small danger" onclick="postCallback(\\x27on_launcher_source_hotkey_clear\\x27, \\x27' + _esc(src.prefix_key) + '\\x27)">' + _esc(_t('launcher_tab.clear', 'Clear')) + '</button>';
+    }
     html += '    <div class="toggle' + (enabled ? ' on' : '') + '"';
-    html += '         onclick="this.classList.toggle(\\x27on\\x27); postCallback(\\x27on_launcher_source_toggle\\x27, \\x27' + _esc(src) + '\\x27, this.classList.contains(\\x27on\\x27))"></div>';
+    html += '         onclick="this.classList.toggle(\\x27on\\x27); postCallback(\\x27on_launcher_source_toggle\\x27, \\x27' + _esc(src.config_key) + '\\x27, this.classList.contains(\\x27on\\x27))"></div>';
     html += '  </div>';
     html += '</div>';
+    // Clipboard warning
+    if (src.config_key === 'clipboard_history') {
+      html += '<div class="setting-row"><div class="setting-left"><div class="setting-desc" style="color:#e17055;">' + _esc(_t('launcher_tab.clipboard_warning', '')) + '</div></div></div>';
+    }
   }
 
-  if (keys.length === 0) {
+  if (sources.length === 0) {
     html += '<div class="setting-row"><div class="setting-left"><div class="setting-desc">No sources configured</div></div></div>';
   }
 
@@ -1060,31 +1139,22 @@ function renderLauncherSources() {
 }
 
 /* ------------------------------------------------------------------ */
-/* HTML escaping                                                       */
-/* ------------------------------------------------------------------ */
-
-function _esc(s) {
-  if (s === null || s === undefined) return '';
-  var div = document.createElement('div');
-  div.appendChild(document.createTextNode(String(s)));
-  return div.innerHTML;
-}
-
-/* ------------------------------------------------------------------ */
 /* Initialization                                                      */
 /* ------------------------------------------------------------------ */
 
 function _initState(config) {
+  // i18n
+  if (config.i18n) {
+    I18N = config.i18n;
+    _initI18nLabels();
+  }
+
   // Language
   var langSel = document.getElementById('ctl-language');
   if (langSel && config.language) langSel.value = config.language;
 
   // Feedback
   setToggle('ctl-sound', config.sound_enabled);
-  if (config.volume !== undefined) {
-    var vol = document.getElementById('ctl-volume');
-    if (vol) vol.value = config.volume;
-  }
   setToggle('ctl-visual', config.visual_indicator);
   setToggle('ctl-device-name', config.show_device_name);
 
@@ -1144,14 +1214,18 @@ function _initState(config) {
   setToggle('ctl-launcher-usage-learning', launcher.usage_learning);
   setToggle('ctl-launcher-switch-english', launcher.switch_english);
   var launcherHk = document.getElementById('ctl-launcher-hotkey');
-  if (launcherHk) launcherHk.textContent = formatHotkey(launcher.hotkey);
+  if (launcherHk) launcherHk.textContent = launcher.hotkey || _t('launcher_tab.none', 'None');
   renderLauncherSources();
+
+  // Scripting warning for launcher
+  var scriptingWarning = document.getElementById('launcher-scripting-warning');
+  if (scriptingWarning) {
+    scriptingWarning.style.display = config.scripting_enabled ? 'none' : 'block';
+  }
 
   // Snippets hotkey
   var snippetHk = document.getElementById('ctl-new-snippet-hotkey');
-  if (snippetHk && launcher.new_snippet_hotkey) {
-    snippetHk.textContent = formatHotkey(launcher.new_snippet_hotkey);
-  }
+  if (snippetHk) snippetHk.textContent = launcher.new_snippet_hotkey || _t('launcher_tab.none', 'None');
 
   // Restore last tab
   if (config.last_tab && config.last_tab !== 'general') {
@@ -1175,7 +1249,11 @@ function _updateState(state) {
   if (state.visual_indicator !== undefined) setToggle('ctl-visual', state.visual_indicator);
   if (state.show_device_name !== undefined) setToggle('ctl-device-name', state.show_device_name);
   if (state.preview !== undefined) setToggle('ctl-preview', state.preview);
-  if (state.scripting_enabled !== undefined) setToggle('ctl-scripting', state.scripting_enabled);
+  if (state.scripting_enabled !== undefined) {
+    setToggle('ctl-scripting', state.scripting_enabled);
+    var sw = document.getElementById('launcher-scripting-warning');
+    if (sw) sw.style.display = state.scripting_enabled ? 'none' : 'block';
+  }
   if (state.thinking !== undefined) setToggle('ctl-thinking', state.thinking);
   if (state.vocab_enabled !== undefined) setToggle('ctl-vocab', state.vocab_enabled);
   if (state.auto_build !== undefined) setToggle('ctl-auto-build', state.auto_build);
@@ -1209,10 +1287,19 @@ function _updateState(state) {
     var cd = document.getElementById('config-dir-display');
     if (cd) cd.textContent = state.config_dir;
   }
+  if (state.restart_key !== undefined) {
+    var rk = document.getElementById('ctl-restart-key');
+    if (rk) rk.value = state.restart_key;
+  }
+  if (state.cancel_key !== undefined) {
+    var ck = document.getElementById('ctl-cancel-key');
+    if (ck) ck.value = state.cancel_key;
+  }
 
   // Re-render dynamic sections if their data changed
   if (state.hotkeys !== undefined) { CONFIG.hotkeys = state.hotkeys; renderHotkeys(); }
-  if (state.stt_presets !== undefined || state.stt_remote_models !== undefined) {
+  if (state.stt_presets !== undefined || state.stt_remote_models !== undefined ||
+      state.current_preset_id !== undefined || state.current_remote_asr !== undefined) {
     if (state.stt_presets !== undefined) CONFIG.stt_presets = state.stt_presets;
     if (state.stt_remote_models !== undefined) CONFIG.stt_remote_models = state.stt_remote_models;
     if (state.current_preset_id !== undefined) CONFIG.current_preset_id = state.current_preset_id;
@@ -1238,10 +1325,10 @@ function _updateState(state) {
     if (launcher.usage_learning !== undefined) setToggle('ctl-launcher-usage-learning', launcher.usage_learning);
     if (launcher.switch_english !== undefined) setToggle('ctl-launcher-switch-english', launcher.switch_english);
     var lhk = document.getElementById('ctl-launcher-hotkey');
-    if (lhk && launcher.hotkey !== undefined) lhk.textContent = formatHotkey(launcher.hotkey);
+    if (lhk && launcher.hotkey !== undefined) lhk.textContent = launcher.hotkey || _t('launcher_tab.none', 'None');
     renderLauncherSources();
     var snHk = document.getElementById('ctl-new-snippet-hotkey');
-    if (snHk && launcher.new_snippet_hotkey !== undefined) snHk.textContent = formatHotkey(launcher.new_snippet_hotkey);
+    if (snHk && launcher.new_snippet_hotkey !== undefined) snHk.textContent = launcher.new_snippet_hotkey || _t('launcher_tab.none', 'None');
   }
 }
 
@@ -1395,6 +1482,62 @@ class SettingsWebPanel:
             f"_updateState({payload})", None
         )
 
+    def update_stt_model(
+        self, preset_id, remote_asr
+    ) -> None:
+        """Update STT model selection in the webview."""
+        if self._webview is None or not self.is_visible:
+            return
+        payload = json.dumps(
+            {"current_preset_id": preset_id, "current_remote_asr": remote_asr},
+            ensure_ascii=False,
+        )
+        self._webview.evaluateJavaScript_completionHandler_(
+            f"_updateSttSelection({payload})", None
+        )
+
+    def update_config_dir(self, path: str) -> None:
+        """Update the config directory display."""
+        if self._webview is None or not self.is_visible:
+            return
+        escaped = json.dumps(path, ensure_ascii=False)
+        self._webview.evaluateJavaScript_completionHandler_(
+            f"document.getElementById('config-dir-display').textContent = {escaped};",
+            None,
+        )
+
+    def update_launcher_hotkey(self, hotkey: str) -> None:
+        """Update the launcher hotkey display."""
+        if self._webview is None or not self.is_visible:
+            return
+        escaped = json.dumps(hotkey or "None", ensure_ascii=False)
+        self._webview.evaluateJavaScript_completionHandler_(
+            f"document.getElementById('ctl-launcher-hotkey').textContent = {escaped};",
+            None,
+        )
+
+    def update_source_hotkey(self, source_key: str, hotkey: str) -> None:
+        """Update a launcher source hotkey display."""
+        if self._webview is None or not self.is_visible:
+            return
+        escaped = json.dumps(hotkey or "None", ensure_ascii=False)
+        key_escaped = json.dumps(source_key, ensure_ascii=False)
+        js = (
+            f"var el = document.querySelector('[data-source-hotkey=' + {key_escaped} + ']');"
+            f"if (el) el.textContent = {escaped};"
+        )
+        self._webview.evaluateJavaScript_completionHandler_(js, None)
+
+    def update_new_snippet_hotkey(self, hotkey: str) -> None:
+        """Update the new snippet hotkey display."""
+        if self._webview is None or not self.is_visible:
+            return
+        escaped = json.dumps(hotkey or "None", ensure_ascii=False)
+        self._webview.evaluateJavaScript_completionHandler_(
+            f"document.getElementById('ctl-new-snippet-hotkey').textContent = {escaped};",
+            None,
+        )
+
     # ------------------------------------------------------------------
     # Callbacks from JavaScript
     # ------------------------------------------------------------------
@@ -1463,6 +1606,36 @@ class SettingsWebPanel:
             ]
         if s.get("last_tab") == "models":
             s["last_tab"] = "speech"
+        # Convert current_remote_asr tuple to list for JSON
+        if "current_remote_asr" in s and isinstance(s["current_remote_asr"], tuple):
+            s["current_remote_asr"] = list(s["current_remote_asr"])
+        # Convert hotkeys from raw config to structured dicts for JS
+        if "hotkeys" in s:
+            raw = s["hotkeys"]
+            structured = {}
+            for key_name, value in raw.items():
+                enabled = bool(value)
+                mode = value.get("mode") if isinstance(value, dict) else None
+                structured[key_name] = {
+                    "enabled": enabled,
+                    "mode": mode,
+                    "label": key_name,
+                }
+            s["hotkeys"] = structured
+        # Convert vocab_build_model tuple to "provider/model" string
+        if "vocab_build_model" in s:
+            vbm = s["vocab_build_model"]
+            if isinstance(vbm, (tuple, list)) and len(vbm) == 2:
+                s["vocab_build_model"] = f"{vbm[0]}/{vbm[1]}"
+            elif vbm is None:
+                s["vocab_build_model"] = ""
+        # Inject i18n translations
+        if "i18n" not in s:
+            try:
+                from wenzi.i18n import get_translations_for_prefix
+                s["i18n"] = get_translations_for_prefix("settings.")
+            except Exception:
+                s["i18n"] = {}
         return s
 
     # ------------------------------------------------------------------

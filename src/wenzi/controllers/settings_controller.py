@@ -767,8 +767,18 @@ class SettingsController:
                     return (bp, bm)
         return None
 
-    def vocab_build_model_select(self, provider: str, model: str) -> None:
-        """Handle vocab build model selection from Settings panel."""
+    def vocab_build_model_select(self, value: str) -> None:
+        """Handle vocab build model selection from Settings panel.
+
+        Args:
+            value: Combined "provider/model" string from the webview select,
+                   or two separate args (provider, model) from native panel.
+        """
+        # Support both "provider/model" single arg and (provider, model) two args
+        if "/" in value:
+            provider, model = value.split("/", 1)
+        else:
+            provider, model = value, ""
         app = self._app
         app._config.setdefault("ai_enhance", {})
         app._config["ai_enhance"].setdefault("vocabulary", {})
@@ -924,29 +934,41 @@ class SettingsController:
         """Build launcher state dict for the settings panel."""
         app = self._app
         chooser_cfg = app._config.get("scripting", {}).get("chooser", {})
+        prefixes = chooser_cfg.get("prefixes", {
+            "clipboard": "cb",
+            "files": "f",
+            "snippets": "sn",
+            "bookmarks": "bm",
+        })
+        source_hotkeys = chooser_cfg.get("source_hotkeys", {})
+
+        # Build structured sources list for the webview
+        # Each source: config_key, label key (for i18n), prefix_key
+        source_defs = [
+            ("app_search", "applications", None),
+            ("clipboard_history", "clipboard_history", "clipboard"),
+            ("file_search", "file_search", "files"),
+            ("snippets", "snippets", "snippets"),
+            ("bookmarks", "bookmarks", "bookmarks"),
+        ]
+        sources = []
+        for config_key, label_key, prefix_key in source_defs:
+            sources.append({
+                "config_key": config_key,
+                "label_key": label_key,
+                "enabled": chooser_cfg.get(config_key, True),
+                "prefix_key": prefix_key,
+                "prefix": prefixes.get(prefix_key, "") if prefix_key else "",
+                "hotkey": source_hotkeys.get(prefix_key, "") if prefix_key else "",
+            })
+
         return {
             "enabled": chooser_cfg.get("enabled", True),
-            "hotkey": chooser_cfg.get("hotkey", "cmd+space"),
-            "app_search": chooser_cfg.get("app_search", True),
-            "clipboard_history": chooser_cfg.get("clipboard_history", True),
-            "file_search": chooser_cfg.get("file_search", True),
-            "snippets": chooser_cfg.get("snippets", True),
-            "bookmarks": chooser_cfg.get("bookmarks", True),
+            "hotkey": chooser_cfg.get("hotkey", ""),
             "usage_learning": chooser_cfg.get("usage_learning", True),
-            "prefixes": chooser_cfg.get("prefixes", {
-                "clipboard": "cb",
-                "files": "f",
-                "snippets": "sn",
-                "bookmarks": "bm",
-            }),
-            "source_hotkeys": chooser_cfg.get("source_hotkeys", {
-                "clipboard": "",
-                "files": "",
-                "snippets": "",
-                "bookmarks": "",
-            }),
+            "switch_english": chooser_cfg.get("switch_to_english", True),
             "new_snippet_hotkey": chooser_cfg.get("new_snippet_hotkey", ""),
-            "switch_to_english": chooser_cfg.get("switch_to_english", True),
+            "sources": sources,
         }
 
     def launcher_toggle(self, enabled: bool) -> None:

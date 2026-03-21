@@ -304,3 +304,108 @@ class TestUpdateState:
         })
         js_call = panel._webview.evaluateJavaScript_completionHandler_.call_args[0][0]
         assert '"id": "apple-speech"' in js_call
+
+
+class TestPrepareStateExtended:
+    """Tests for new _prepare_state transformations."""
+
+    def test_hotkeys_converted_to_structured(self):
+        from wenzi.ui.settings_window_web import SettingsWebPanel
+        state = {"hotkeys": {"fn": True, "right_command": False}}
+        prepared = SettingsWebPanel._prepare_state(state)
+        assert prepared["hotkeys"]["fn"] == {
+            "enabled": True, "mode": None, "label": "fn",
+        }
+        assert prepared["hotkeys"]["right_command"]["enabled"] is False
+
+    def test_hotkeys_dict_value_extracts_mode(self):
+        from wenzi.ui.settings_window_web import SettingsWebPanel
+        state = {"hotkeys": {"fn": {"mode": "toggle"}}}
+        prepared = SettingsWebPanel._prepare_state(state)
+        assert prepared["hotkeys"]["fn"]["mode"] == "toggle"
+        assert prepared["hotkeys"]["fn"]["enabled"] is True
+
+    def test_vocab_build_model_tuple_to_string(self):
+        from wenzi.ui.settings_window_web import SettingsWebPanel
+        state = {"vocab_build_model": ("ollama", "qwen2.5:7b")}
+        prepared = SettingsWebPanel._prepare_state(state)
+        assert prepared["vocab_build_model"] == "ollama/qwen2.5:7b"
+
+    def test_vocab_build_model_none_to_empty(self):
+        from wenzi.ui.settings_window_web import SettingsWebPanel
+        state = {"vocab_build_model": None}
+        prepared = SettingsWebPanel._prepare_state(state)
+        assert prepared["vocab_build_model"] == ""
+
+    def test_current_remote_asr_tuple_to_list(self):
+        from wenzi.ui.settings_window_web import SettingsWebPanel
+        state = {"current_remote_asr": ("openai", "whisper-1")}
+        prepared = SettingsWebPanel._prepare_state(state)
+        assert prepared["current_remote_asr"] == ["openai", "whisper-1"]
+
+    def test_current_remote_asr_none_preserved(self):
+        from wenzi.ui.settings_window_web import SettingsWebPanel
+        state = {"current_remote_asr": None}
+        prepared = SettingsWebPanel._prepare_state(state)
+        assert prepared["current_remote_asr"] is None
+
+    def test_i18n_injected(self):
+        from wenzi.ui.settings_window_web import SettingsWebPanel
+        state = {"sound_enabled": True}
+        prepared = SettingsWebPanel._prepare_state(state)
+        # Should have i18n key (even if empty dict due to test env)
+        assert "i18n" in prepared
+
+
+class TestUpdateMethods:
+    """Tests for update_stt_model, update_config_dir, etc."""
+
+    def _make_panel(self):
+        from wenzi.ui.settings_window_web import SettingsWebPanel
+        panel = SettingsWebPanel()
+        panel.show(_make_state(), _make_callbacks())
+        return panel
+
+    def test_update_stt_model(self):
+        panel = self._make_panel()
+        panel.update_stt_model("apple-speech", None)
+        panel._webview.evaluateJavaScript_completionHandler_.assert_called()
+        js_call = panel._webview.evaluateJavaScript_completionHandler_.call_args[0][0]
+        assert "_updateSttSelection(" in js_call
+        assert "apple-speech" in js_call
+
+    def test_update_config_dir(self):
+        panel = self._make_panel()
+        panel.update_config_dir("/new/path")
+        panel._webview.evaluateJavaScript_completionHandler_.assert_called()
+        js_call = panel._webview.evaluateJavaScript_completionHandler_.call_args[0][0]
+        assert "/new/path" in js_call
+
+    def test_update_launcher_hotkey(self):
+        panel = self._make_panel()
+        panel.update_launcher_hotkey("cmd+space")
+        panel._webview.evaluateJavaScript_completionHandler_.assert_called()
+        js_call = panel._webview.evaluateJavaScript_completionHandler_.call_args[0][0]
+        assert "cmd+space" in js_call
+
+    def test_update_source_hotkey(self):
+        panel = self._make_panel()
+        panel.update_source_hotkey("clipboard", "cmd+shift+v")
+        panel._webview.evaluateJavaScript_completionHandler_.assert_called()
+
+    def test_update_new_snippet_hotkey(self):
+        panel = self._make_panel()
+        panel.update_new_snippet_hotkey("cmd+shift+n")
+        panel._webview.evaluateJavaScript_completionHandler_.assert_called()
+        js_call = panel._webview.evaluateJavaScript_completionHandler_.call_args[0][0]
+        assert "cmd+shift+n" in js_call
+
+    def test_update_methods_noop_when_not_visible(self):
+        from wenzi.ui.settings_window_web import SettingsWebPanel
+        panel = SettingsWebPanel()
+        # Should not raise
+        panel.update_stt_model("x", None)
+        panel.update_config_dir("/x")
+        panel.update_launcher_hotkey("x")
+        panel.update_source_hotkey("x", "y")
+        panel.update_new_snippet_hotkey("x")
