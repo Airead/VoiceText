@@ -14,6 +14,7 @@ dependencies = [
     "pyobjc-framework-Speech>=10.0",
     "pyobjc-framework-webkit>=12.1",
     "pyobjc-framework-AVFoundation>=10.0",
+    "pyobjc-framework-Security>=10.0",
     "pyyaml>=6.0",
     "simpleeval>=1.0.5",
     "pint>=0.24",

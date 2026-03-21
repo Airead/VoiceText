@@ -6,14 +6,18 @@ import stat
 import tempfile
 from unittest.mock import MagicMock, patch
 
+import pytest
 
 from wenzi.config import (
     DEFAULT_CONFIG,
     ConfigError,
+    KEYCHAIN_SENTINEL,
     load_config,
     resolve_config_dir,
     save_config,
+    save_config_with_secrets,
     set_config_readonly,
+    sync_secrets_to_keychain,
     validate_config,
     _merge_dict,
     _strip_jsonc,
@@ -108,6 +112,12 @@ class TestStripJsonc:
 
 
 class TestLoadConfig:
+    @pytest.fixture(autouse=True)
+    def _mock_keychain(self):
+        """Prevent load_config from touching real macOS Keychain."""
+        with patch("wenzi.config.sync_secrets_to_keychain", return_value=False):
+            yield
+
     def test_default_config_creates_file(self, tmp_path):
         config_file = tmp_path / "config.json"
         config, error = load_config(str(config_file))
@@ -222,6 +232,12 @@ class TestLoadConfig:
 
 
 class TestSaveConfig:
+    @pytest.fixture(autouse=True)
+    def _mock_keychain(self):
+        """Prevent load_config from touching real macOS Keychain."""
+        with patch("wenzi.config.sync_secrets_to_keychain", return_value=False):
+            yield
+
     def test_save_and_reload(self, tmp_path):
         config_file = tmp_path / "config.json"
         config = dict(DEFAULT_CONFIG)
@@ -612,3 +628,225 @@ def test_validate_config_language_invalid_resets():
     config["language"] = "invalid"
     result = validate_config(config)
     assert result["language"] == "auto"
+
+
+class TestSyncSecretsToKeychain:
+    """Tests for sync_secrets_to_keychain."""
+
+    @patch("wenzi.config.keychain_set")
+    @patch("wenzi.config.keychain_get")
+    def test_plaintext_written_to_keychain_kept_in_memory(self, mock_get, mock_set):
+        """Plaintext values are written to Keychain but stay in memory."""
+        mock_set.return_value = True
+        config = {
+            "ai_enhance": {
+                "providers": {
+                    "openai": {
+                        "api_key": "sk-real-key",
+                        "base_url": "https://api.openai.com/v1",
+                        "models": ["gpt-4o"],
+                    }
+                }
+            },
+            "asr": {"providers": {}},
+        }
+        dirty = sync_secrets_to_keychain(config)
+        assert dirty is True
+        assert config["ai_enhance"]["providers"]["openai"]["api_key"] == "sk-real-key"
+        assert config["ai_enhance"]["providers"]["openai"]["base_url"] == "https://api.openai.com/v1"
+        assert config["ai_enhance"]["providers"]["openai"]["models"] == ["gpt-4o"]
+        mock_set.assert_any_call("ai_enhance.providers.openai.api_key", "sk-real-key")
+        mock_set.assert_any_call("ai_enhance.providers.openai.base_url", "https://api.openai.com/v1")
+
+    @patch("wenzi.config.keychain_set")
+    @patch("wenzi.config.keychain_get")
+    def test_sentinel_reads_from_keychain(self, mock_get, mock_set):
+        """@keychain sentinel triggers a Keychain read into memory."""
+        mock_get.return_value = "sk-from-keychain"
+        config = {
+            "ai_enhance": {
+                "providers": {
+                    "openai": {
+                        "api_key": KEYCHAIN_SENTINEL,
+                        "base_url": KEYCHAIN_SENTINEL,
+                        "models": ["gpt-4o"],
+                    }
+                }
+            },
+            "asr": {"providers": {}},
+        }
+        dirty = sync_secrets_to_keychain(config)
+        assert dirty is False
+        assert config["ai_enhance"]["providers"]["openai"]["api_key"] == "sk-from-keychain"
+        assert config["ai_enhance"]["providers"]["openai"]["base_url"] == "sk-from-keychain"
+        mock_set.assert_not_called()
+
+    @patch("wenzi.config.keychain_set")
+    @patch("wenzi.config.keychain_get")
+    def test_sentinel_with_empty_keychain_stays_sentinel(self, mock_get, mock_set):
+        """@keychain with no Keychain value stays as sentinel in memory."""
+        mock_get.return_value = None
+        config = {
+            "ai_enhance": {
+                "providers": {
+                    "openai": {"api_key": KEYCHAIN_SENTINEL}
+                }
+            },
+            "asr": {"providers": {}},
+        }
+        dirty = sync_secrets_to_keychain(config)
+        assert dirty is False
+        assert config["ai_enhance"]["providers"]["openai"]["api_key"] == KEYCHAIN_SENTINEL
+
+    @patch("wenzi.config.keychain_set")
+    @patch("wenzi.config.keychain_get")
+    def test_keychain_set_failure_keeps_plaintext_not_dirty(self, mock_get, mock_set):
+        """If keychain_set returns False, dirty remains False."""
+        mock_set.return_value = False
+        config = {
+            "ai_enhance": {
+                "providers": {
+                    "openai": {"api_key": "sk-real-key"}
+                }
+            },
+            "asr": {"providers": {}},
+        }
+        dirty = sync_secrets_to_keychain(config)
+        assert dirty is False
+        assert config["ai_enhance"]["providers"]["openai"]["api_key"] == "sk-real-key"
+
+    @patch("wenzi.config.keychain_set")
+    @patch("wenzi.config.keychain_get")
+    def test_no_providers_returns_not_dirty(self, mock_get, mock_set):
+        """Config with no providers should return dirty=False."""
+        config = {
+            "ai_enhance": {"providers": {}},
+            "asr": {"providers": {}},
+        }
+        dirty = sync_secrets_to_keychain(config)
+        assert dirty is False
+
+    @patch("wenzi.config.keychain_set")
+    @patch("wenzi.config.keychain_get")
+    def test_asr_providers_also_synced(self, mock_get, mock_set):
+        """ASR providers are synced just like AI enhance providers."""
+        mock_set.return_value = True
+        config = {
+            "ai_enhance": {"providers": {}},
+            "asr": {
+                "providers": {
+                    "groq": {
+                        "api_key": "gsk-xxx",
+                        "base_url": "https://api.groq.com/openai/v1",
+                    }
+                }
+            },
+        }
+        dirty = sync_secrets_to_keychain(config)
+        assert dirty is True
+        assert config["asr"]["providers"]["groq"]["api_key"] == "gsk-xxx"
+        mock_set.assert_any_call("asr.providers.groq.api_key", "gsk-xxx")
+
+    @patch("wenzi.config.keychain_set")
+    @patch("wenzi.config.keychain_get")
+    def test_non_secret_fields_untouched(self, mock_get, mock_set):
+        """Fields not in SECRET_FIELDS are not touched."""
+        mock_set.return_value = True
+        config = {
+            "ai_enhance": {
+                "providers": {
+                    "openai": {
+                        "api_key": "sk-xxx",
+                        "models": ["gpt-4o"],
+                        "extra_body": {"temperature": 0.5},
+                    }
+                }
+            },
+            "asr": {"providers": {}},
+        }
+        sync_secrets_to_keychain(config)
+        assert config["ai_enhance"]["providers"]["openai"]["models"] == ["gpt-4o"]
+        assert config["ai_enhance"]["providers"]["openai"]["extra_body"] == {"temperature": 0.5}
+
+
+class TestSaveConfigWithSecrets:
+    """Tests for save_config_with_secrets."""
+
+    @patch("wenzi.config.keychain_set", return_value=True)
+    def test_in_memory_config_not_mutated(self, mock_set, tmp_path):
+        """save_config_with_secrets must not modify the in-memory config dict."""
+        config = {
+            "ai_enhance": {
+                "providers": {
+                    "openai": {
+                        "api_key": "sk-real-key",
+                        "base_url": "https://api.openai.com/v1",
+                        "models": ["gpt-4o"],
+                    }
+                }
+            },
+            "asr": {"providers": {}},
+        }
+        save_config_with_secrets(config, str(tmp_path / "config.json"))
+        # In-memory must still have real values
+        assert config["ai_enhance"]["providers"]["openai"]["api_key"] == "sk-real-key"
+        assert config["ai_enhance"]["providers"]["openai"]["base_url"] == "https://api.openai.com/v1"
+
+    @patch("wenzi.config.keychain_set", return_value=True)
+    def test_on_disk_file_has_sentinels(self, mock_set, tmp_path):
+        """The saved file should have @keychain sentinels for secret fields."""
+        config = {
+            "ai_enhance": {
+                "providers": {
+                    "openai": {
+                        "api_key": "sk-real-key",
+                        "base_url": "https://api.openai.com/v1",
+                        "models": ["gpt-4o"],
+                    }
+                }
+            },
+            "asr": {"providers": {}},
+        }
+        path = str(tmp_path / "config.json")
+        save_config_with_secrets(config, path)
+        saved = json.loads(open(path).read())
+        assert saved["ai_enhance"]["providers"]["openai"]["api_key"] == KEYCHAIN_SENTINEL
+        assert saved["ai_enhance"]["providers"]["openai"]["base_url"] == KEYCHAIN_SENTINEL
+        assert saved["ai_enhance"]["providers"]["openai"]["models"] == ["gpt-4o"]
+
+    @patch("wenzi.config.keychain_set", return_value=False)
+    def test_keychain_set_failure_preserves_plaintext_on_disk(self, mock_set, tmp_path):
+        """If keychain_set fails, plaintext is preserved in the saved file."""
+        config = {
+            "ai_enhance": {
+                "providers": {
+                    "openai": {"api_key": "sk-real-key"}
+                }
+            },
+            "asr": {"providers": {}},
+        }
+        path = str(tmp_path / "config.json")
+        save_config_with_secrets(config, path)
+        saved = json.loads(open(path).read())
+        assert saved["ai_enhance"]["providers"]["openai"]["api_key"] == "sk-real-key"
+
+    @patch("wenzi.config.keychain_set", return_value=True)
+    def test_non_secret_fields_preserved(self, mock_set, tmp_path):
+        """Non-secret fields are saved as-is."""
+        config = {
+            "ai_enhance": {
+                "providers": {
+                    "openai": {
+                        "api_key": "sk-xxx",
+                        "models": ["gpt-4o"],
+                        "extra_body": {"temperature": 0.5},
+                    }
+                }
+            },
+            "asr": {"providers": {}},
+        }
+        path = str(tmp_path / "config.json")
+        save_config_with_secrets(config, path)
+        saved = json.loads(open(path).read())
+        assert saved["ai_enhance"]["providers"]["openai"]["models"] == ["gpt-4o"]
+        assert saved["ai_enhance"]["providers"]["openai"]["extra_body"] == {"temperature": 0.5}

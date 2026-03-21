@@ -186,6 +186,15 @@ class RecordingController:
             finally:
                 app._recording_started.set()
 
+            # If hotkey was released while blocked (e.g. mic permission dialog),
+            # stop the orphaned recording/streaming now.
+            if self._release_done and app._recorder.is_recording:
+                logger.info("Hotkey released during delayed start, stopping orphaned recording")
+                self._stop_streaming_if_active("orphan cleanup")
+                app._recorder.stop()
+                from PyObjCTools import AppHelper
+                AppHelper.callAfter(self._reset_to_idle)
+
         if app._sound_manager.enabled:
             # Show indicator immediately in grayscale while sound plays
             initial_dev = app._recorder.last_device_name if app._recording_indicator.show_device_name else None
@@ -364,14 +373,8 @@ class RecordingController:
         logger.info("Restart key pressed, restarting recording")
 
         # Stop streaming if active
-        if self._streaming_active:
-            app._recorder.clear_on_audio_chunk()
-            try:
-                app._transcriber.stop_streaming()
-            except Exception:
-                logger.exception("Failed to stop streaming during restart")
-            self._streaming_active = False
-            self._hide_live_overlay()
+        self._stop_streaming_if_active("restart")
+        self._hide_live_overlay()
 
         # Stop current recording and discard audio
         app._recorder.stop()
@@ -418,6 +421,23 @@ class RecordingController:
         # Show last preview history record
         self._app._preview_controller.on_show_last_preview()
 
+    def _stop_streaming_if_active(self, context: str = "") -> None:
+        """Stop streaming transcription if active, clear callback, reset flag.
+
+        Thread-safe: clears ``_streaming_active`` before calling
+        ``stop_streaming()`` so a concurrent caller will see ``False`` and
+        skip.
+        """
+        if not self._streaming_active:
+            return
+        # Clear flag first — prevents a concurrent thread from also entering.
+        self._streaming_active = False
+        self._app._recorder.clear_on_audio_chunk()
+        try:
+            self._app._transcriber.stop_streaming()
+        except Exception:
+            logger.exception("Failed to stop streaming%s", f" during {context}" if context else "")
+
     def _reset_to_idle(self) -> None:
         """Common cleanup: hide overlays/indicator and restore idle status."""
         self._hide_live_overlay()
@@ -451,13 +471,7 @@ class RecordingController:
         logger.info("Cancel key pressed, cancelling recording")
 
         # Stop streaming if active
-        if self._streaming_active:
-            app._recorder.clear_on_audio_chunk()
-            try:
-                app._transcriber.stop_streaming()
-            except Exception:
-                logger.exception("Failed to stop streaming during cancel")
-            self._streaming_active = False
+        self._stop_streaming_if_active("cancel")
 
         # Always hide live overlay (it may have been shown in faded state
         # before streaming actually started)
@@ -487,12 +501,17 @@ class RecordingController:
         app = self._app
         # Wait for delayed start to finish (if sound feedback caused a delay)
         if not app._recording_started.wait(timeout=1.0):
+            self._cancel_delayed.set()
+            self._reset_to_idle()
             return
         if not app._recorder.is_recording:
             return
         logger.info("Hotkey released, stopping recording")
 
+        # Capture and clear streaming flag atomically to prevent the orphan
+        # cleanup in _delayed_start from also calling stop_streaming().
         streaming_active = self._streaming_active
+        self._streaming_active = False
 
         # Disconnect audio chunk callback before stopping recorder
         app._recorder.clear_on_audio_chunk()
@@ -514,7 +533,6 @@ class RecordingController:
 
         if streaming_active:
             # Streaming path: get final text from the streaming session
-            self._streaming_active = False
             use_enhance = bool(app._enhancer and app._enhancer.is_active)
             self.stop_recording_indicator(
                 animate=app._preview_enabled or use_enhance

@@ -805,12 +805,13 @@ models:
 
             app._config.setdefault("asr", {})
             providers_cfg = app._config["asr"].setdefault("providers", {})
+            from wenzi.config import save_config_with_secrets
             providers_cfg[name] = {
                 "base_url": base_url,
                 "api_key": api_key,
                 "models": models,
             }
-            save_config(app._config, app._config_path)
+            save_config_with_secrets(app._config, app._config_path)
             self._remove_asr_provider_draft()
 
             app._menu_builder.build_model_menu()
@@ -859,6 +860,12 @@ models:
 
             providers_cfg = app._config.get("asr", {}).get("providers", {})
             providers_cfg.pop(pname, None)
+
+            # Clean up Keychain entries for this provider
+            from wenzi.keychain import keychain_delete, keychain_list
+            for account in keychain_list(f"asr.providers.{pname}."):
+                keychain_delete(account)
+
             save_config(app._config, app._config_path)
 
             app._menu_builder.build_model_menu()
@@ -979,6 +986,7 @@ models:
 
             app._config.setdefault("ai_enhance", {})
             providers_cfg = app._config["ai_enhance"].setdefault("providers", {})
+            from wenzi.config import save_config_with_secrets
             pcfg_save: Dict[str, Any] = {
                 "base_url": base_url,
                 "api_key": api_key,
@@ -987,7 +995,7 @@ models:
             if extra_body:
                 pcfg_save["extra_body"] = extra_body
             providers_cfg[name] = pcfg_save
-            save_config(app._config, app._config_path)
+            save_config_with_secrets(app._config, app._config_path)
             self._remove_provider_draft()
 
             app._menu_builder.build_llm_model_menu()
@@ -1022,6 +1030,12 @@ models:
             app._config.setdefault("ai_enhance", {})
             providers_cfg = app._config["ai_enhance"].get("providers", {})
             providers_cfg.pop(pname, None)
+
+            # Clean up Keychain entries for this provider
+            from wenzi.keychain import keychain_delete, keychain_list
+            for account in keychain_list(f"ai_enhance.providers.{pname}."):
+                keychain_delete(account)
+
             app._config["ai_enhance"]["default_provider"] = app._enhancer.provider_name
             app._config["ai_enhance"]["default_model"] = app._enhancer.model_name
             save_config(app._config, app._config_path)

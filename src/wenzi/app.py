@@ -1478,8 +1478,10 @@ def _get_multiline_panel_target_class():
 
 def main() -> None:
     """Entry point."""
+    import faulthandler
     import signal
 
+    faulthandler.enable()  # dump traceback on SIGSEGV/SIGABRT/SIGBUS
     signal.signal(signal.SIGINT, lambda *_: quit_application())
 
     config_dir = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("WENZI_CONFIG_DIR")

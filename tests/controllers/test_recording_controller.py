@@ -84,10 +84,41 @@ class TestOnHotkeyRelease:
         ctrl.on_hotkey_release()
         mock_app._set_status.assert_called_with("statusbar.status.ready")
 
-    def test_timeout_returns(self, ctrl, mock_app):
+    def test_timeout_cleans_up(self, ctrl, mock_app):
+        """When _recording_started times out, cancel delayed start and reset UI."""
         mock_app._recording_started = threading.Event()  # Not set
         ctrl.on_hotkey_release()
         mock_app._recorder.stop.assert_not_called()
+        assert ctrl._cancel_delayed.is_set()
+        mock_app._set_status.assert_called_with("statusbar.status.ready")
+
+    @patch("wenzi.controllers.recording_controller.capture_input_context", return_value=None)
+    @patch("PyObjCTools.AppHelper")
+    def test_delayed_start_stops_orphan_after_release(self, mock_apphelper, _mock_ic, ctrl, mock_app):
+        """If hotkey was released while _recorder.start() was blocking (e.g. mic
+        permission dialog), _delayed_start should stop the orphaned recording."""
+        mock_apphelper.callAfter = lambda fn, *a, **kw: fn(*a, **kw)
+        mock_app._sound_manager.enabled = True
+        mock_app._transcriber.supports_streaming = True
+        mock_app._voice_input_available = True
+        mock_app._recording_started = threading.Event()
+
+        # Simulate _release_done being set during the sleep (hotkey released
+        # while _delayed_start waits for the sound to finish).
+        def sleep_sets_release_done(_):
+            ctrl._release_done = True
+
+        with patch("time.sleep", side_effect=sleep_sets_release_done):
+            ctrl.on_hotkey_press()
+
+        # Let the _delayed_start thread complete (it's already started)
+        mock_app._recording_started.wait(timeout=5.0)
+
+        # Orphaned recording should have been stopped
+        mock_app._recorder.stop.assert_called_once()
+        mock_app._recorder.clear_on_audio_chunk.assert_called()
+        mock_app._transcriber.stop_streaming.assert_called_once()
+        mock_app._set_status.assert_called_with("statusbar.status.ready")
 
 
 class TestRecordingIndicator:

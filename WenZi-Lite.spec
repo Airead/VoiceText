@@ -39,6 +39,7 @@ a = Analysis(
         'wenzi.lru_cache',
         'wenzi.ui_helpers',
         'wenzi.input_source',
+        'wenzi.keychain',
         # wenzi.audio
         'wenzi.audio',
         'wenzi.audio.recorder',

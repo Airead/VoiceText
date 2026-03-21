@@ -7,6 +7,8 @@ import logging
 import os
 from typing import Any, Dict, Optional
 
+from wenzi.keychain import keychain_get, keychain_set
+
 logger = logging.getLogger(__name__)
 
 # Modifier key choices for restart/cancel key config.
@@ -606,6 +608,69 @@ def validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
     return config
 
 
+KEYCHAIN_SENTINEL = "@keychain"
+SECRET_SECTIONS = ["ai_enhance", "asr"]
+SECRET_FIELDS = {"api_key", "base_url"}
+
+
+
+def sync_secrets_to_keychain(config: Dict[str, Any]) -> bool:
+    """Sync sensitive provider fields with macOS Keychain.
+
+    - Plaintext values → write to Keychain (value stays in memory as-is)
+    - Sentinel values → read from Keychain, inject real value into memory
+
+    The in-memory config always holds real values, never sentinels.
+    Returns True if any plaintext was written to Keychain (caller should
+    re-save to disk via ``save_config_with_secrets``).
+    """
+    dirty = False
+    for section in SECRET_SECTIONS:
+        providers = config.get(section, {}).get("providers", {})
+        for name, pcfg in providers.items():
+            for field in SECRET_FIELDS:
+                if field not in pcfg:
+                    continue
+                value = pcfg[field]
+                account = f"{section}.providers.{name}.{field}"
+
+                if value == KEYCHAIN_SENTINEL:
+                    # Read real value from Keychain into memory
+                    secret = keychain_get(account)
+                    if secret:
+                        pcfg[field] = secret
+                else:
+                    # Write plaintext to Keychain; keep real value in memory
+                    if keychain_set(account, value):
+                        dirty = True
+                    else:
+                        logger.warning(
+                            "Failed to migrate %s to Keychain, keeping plaintext",
+                            account,
+                        )
+    return dirty
+
+
+def save_config_with_secrets(config: Dict[str, Any], path: Optional[str] = None) -> None:
+    """Save config to disk, writing secret fields to Keychain and replacing with sentinel.
+
+    The in-memory config dict is NOT modified — only the on-disk copy gets sentinels.
+    """
+    import copy
+
+    save_cfg = copy.deepcopy(config)
+    for section in SECRET_SECTIONS:
+        providers = save_cfg.get(section, {}).get("providers", {})
+        for name, pcfg in providers.items():
+            for field in SECRET_FIELDS:
+                if field not in pcfg or pcfg[field] == KEYCHAIN_SENTINEL:
+                    continue
+                account = f"{section}.providers.{name}.{field}"
+                if keychain_set(account, pcfg[field]):
+                    pcfg[field] = KEYCHAIN_SENTINEL
+    save_config(save_cfg, path)
+
+
 class ConfigError:
     """Describes a configuration loading error."""
 
@@ -676,4 +741,9 @@ def load_config(path: Optional[str] = None) -> tuple[Dict[str, Any], Optional[Co
             logger.info("Migrated hotkey %r → hotkeys dict", old)
 
     validate_config(config)
+
+    # Sync secrets with macOS Keychain
+    if sync_secrets_to_keychain(config):
+        save_config_with_secrets(config, path)
+
     return config, None
