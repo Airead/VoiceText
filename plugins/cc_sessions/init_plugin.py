@@ -125,6 +125,40 @@ def register(wz) -> None:
 
         panel.show()
 
+    def _delete_session(session: Dict[str, Any]) -> None:
+        """Move the session JSONL file to macOS Trash."""
+        file_path = session.get("file_path", "")
+        if not file_path:
+            return
+        try:
+            from Foundation import NSURL, NSFileManager
+
+            url = NSURL.fileURLWithPath_(file_path)
+            fm = NSFileManager.defaultManager()
+            ok, _, err = fm.trashItemAtURL_resultingItemURL_error_(url, None, None)
+            if not ok:
+                raise OSError(str(err) if err else "trashItemAtURL failed")
+        except ImportError:
+            try:
+                os.remove(file_path)
+            except OSError:
+                logger.warning("Failed to delete %s", file_path, exc_info=True)
+                return
+
+        try:
+            from PyObjCTools import AppHelper
+
+            home = os.path.expanduser("~")
+            display = file_path.replace(home, "~")
+
+            def _hud():
+                from wenzi.ui.hud import show_hud
+                show_hud(f"Trashed\n{display}")
+
+            AppHelper.callAfter(_hud)
+        except Exception:
+            logger.debug("HUD notification failed", exc_info=True)
+
     def _copy_resume_command(session: Dict[str, Any]) -> None:
         """Copy cd + claude --resume command to clipboard."""
         from wenzi.scripting.sources import copy_to_clipboard
@@ -183,5 +217,7 @@ def register(wz) -> None:
                 "action": lambda sess=s: _open_viewer(sess),
                 "secondary_action": lambda sess=s: _copy_resume_command(sess),
                 "preview": _make_preview(s),
+                "delete_action": lambda sess=s: _delete_session(sess),
+                "confirm_delete": True,
             })
         return items

@@ -43,6 +43,7 @@ def _dict_to_chooser_item(item: dict) -> ChooserItem:
         reveal_path=item.get("reveal_path"),
         modifiers=_parse_modifiers(item.get("modifiers")),
         delete_action=item.get("delete_action"),
+        confirm_delete=item.get("confirm_delete", False),
         preview=item.get("preview"),
         icon_badge=item.get("icon_badge", ""),
         icon_accessory=item.get("icon_accessory", ""),
