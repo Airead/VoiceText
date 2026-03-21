@@ -749,6 +749,8 @@ class ChooserPanel:
                 "title": item.title,
                 "subtitle": item.subtitle,
                 "icon": item.icon,
+                "icon_badge": item.icon_badge,
+                "icon_accessory": item.icon_accessory,
                 "badge": "",
                 "hasReveal": (
                     item.reveal_path is not None

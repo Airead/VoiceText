@@ -71,6 +71,8 @@ class ChooserItem:
     )  # key: "cmd", "alt", "ctrl", "shift"
     delete_action: Optional[Callable] = field(default=None, repr=False)
     confirm_delete: bool = False  # Two-step delete confirmation
+    icon_badge: str = ""  # Short text rendered as badge on icon corner
+    icon_accessory: str = ""  # Raw HTML injected into icon container
 
 
 @dataclass

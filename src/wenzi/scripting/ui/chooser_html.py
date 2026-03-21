@@ -161,6 +161,10 @@ body { display: flex; flex-direction: column; }
     box-sizing: border-box;
     overflow: hidden;
 }
+.icon-wrap {
+    position: relative; flex-shrink: 0;
+    width: 32px; height: 32px;
+}
 .result-item .icon {
     width: 32px; height: 32px; flex-shrink: 0;
     border-radius: 6px;
@@ -172,6 +176,15 @@ body { display: flex; flex-direction: column; }
     -webkit-mask-repeat: no-repeat;
     -webkit-mask-position: center;
     opacity: 0.35;
+}
+.icon-badge {
+    position: absolute; bottom: -3px; right: -3px;
+    background: var(--accent); color: #fff;
+    font-size: 9px; font-weight: 600;
+    min-width: 14px; height: 14px;
+    border-radius: 7px; padding: 0 3px;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
 }
 #placeholder-mask-style { display: none; }
 .result-item.selected { background: var(--item-selected); }
@@ -339,11 +352,20 @@ function _buildRowHtml(item, i) {
         '" style="position:absolute;top:', (i * h),
         'px;left:0;right:0;height:', h, 'px" data-idx="', i, '">'];
 
-    if (item.icon) {
-        parts.push('<img class="icon" draggable="false" src="',
-                   _escHtml(item.icon), '">');
-    } else if (hasAnyIcon) {
-        parts.push('<div class="icon icon-placeholder"></div>');
+    if (item.icon || hasAnyIcon) {
+        parts.push('<div class="icon-wrap">');
+        if (item.icon) {
+            parts.push('<img class="icon" draggable="false" src="',
+                       _escHtml(item.icon), '">');
+        } else {
+            parts.push('<div class="icon icon-placeholder"></div>');
+        }
+        if (item.icon_accessory) {
+            parts.push(item.icon_accessory);
+        } else if (item.icon_badge) {
+            parts.push('<span class="icon-badge">', _escHtml(item.icon_badge), '</span>');
+        }
+        parts.push('</div>');
     }
 
     parts.push('<div class="left"><div class="title">',
