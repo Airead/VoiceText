@@ -51,27 +51,19 @@ def check_siri_available(language="zh", on_device=True):
     """
     import Speech
     from Foundation import NSLocale
-    from CoreFoundation import CFRunLoopRunInMode, kCFRunLoopDefaultMode
 
-    # -- authorization (fast if already granted) --
-    auth_event = threading.Event()
-    auth_status = [None]
-
-    def _on_auth(status):
-        auth_status[0] = status
-        auth_event.set()
-
-    Speech.SFSpeechRecognizer.requestAuthorization_(_on_auth)
-
-    deadline = time.monotonic() + 5
-    while not auth_event.is_set() and time.monotonic() < deadline:
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, False)
-
-    if not auth_event.is_set():
-        return True, None  # can't determine — let initialize() handle it
-
-    if auth_status[0] != Speech.SFSpeechRecognizerAuthorizationStatusAuthorized:
+    # -- authorization check --
+    # Only call requestAuthorization_ if status is already determined.
+    # When status is notDetermined AND the process lacks
+    # NSSpeechRecognitionUsageDescription in Info.plist (e.g. running
+    # from terminal via `uv run`), requestAuthorization_ aborts the
+    # process with SIGABRT.  Skip it and let initialize() handle
+    # authorization in the proper app context.
+    auth_status = Speech.SFSpeechRecognizer.authorizationStatus()
+    if auth_status == Speech.SFSpeechRecognizerAuthorizationStatusDenied:
         return True, None  # not a Siri issue — let initialize() handle it
+    if auth_status == Speech.SFSpeechRecognizerAuthorizationStatusRestricted:
+        return True, None  # not a Siri issue
 
     # -- create recognizer --
     locale_id = _resolve_locale(language or "zh")
@@ -102,9 +94,7 @@ def check_siri_available(language="zh", on_device=True):
     request.endAudio()
 
     # Siri-disabled errors fire within milliseconds; 0.3 s is plenty.
-    deadline = time.monotonic() + 0.3
-    while not error_event.is_set() and time.monotonic() < deadline:
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, False)
+    error_event.wait(timeout=0.3)
 
     if task is not None:
         try:
@@ -288,33 +278,20 @@ class AppleSpeechTranscriber(BaseTranscriber):
         import Speech
         from Foundation import NSLocale
 
-        # Request authorization (blocking via threading.Event)
-        auth_event = threading.Event()
-        auth_status = [None]
-
-        def _on_auth(status):
-            auth_status[0] = status
-            auth_event.set()
-
-        Speech.SFSpeechRecognizer.requestAuthorization_(_on_auth)
-
-        # Drive the RunLoop so the callback fires on this thread
-        from CoreFoundation import CFRunLoopRunInMode, kCFRunLoopDefaultMode
-
-        deadline = time.monotonic() + 10
-        while not auth_event.is_set() and time.monotonic() < deadline:
-            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, False)
-
-        if not auth_event.is_set():
-            raise PermissionError(
-                "Apple Speech authorization timed out. "
-                "Grant access in System Settings > Privacy & Security > Speech Recognition."
-            )
-
-        if auth_status[0] != Speech.SFSpeechRecognizerAuthorizationStatusAuthorized:
+        # Check authorization status.  Do NOT call requestAuthorization_
+        # when status is notDetermined — it aborts the process with
+        # SIGABRT when running without NSSpeechRecognitionUsageDescription
+        # in Info.plist (e.g. `uv run` from terminal).  The recognizer
+        # itself works fine without explicit authorization.
+        auth_status = Speech.SFSpeechRecognizer.authorizationStatus()
+        if auth_status == Speech.SFSpeechRecognizerAuthorizationStatusDenied:
             raise PermissionError(
                 "Apple Speech recognition not authorized. "
                 "Grant access in System Settings > Privacy & Security > Speech Recognition."
+            )
+        if auth_status == Speech.SFSpeechRecognizerAuthorizationStatusRestricted:
+            raise PermissionError(
+                "Apple Speech recognition is restricted on this device."
             )
 
         locale = NSLocale.alloc().initWithLocaleIdentifier_(self._locale_id)
