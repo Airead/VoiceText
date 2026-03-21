@@ -129,18 +129,20 @@ def register(wz) -> None:
         cmd = f"cd {cwd} && claude --resume {session['session_id']}"
         copy_to_clipboard(cmd)
 
-    def _make_preview(session: Dict[str, Any]) -> dict:
-        """Build a text preview for the launcher right panel."""
-        lines = [f"Project: {session['project']}"]
-        if session.get("git_branch"):
-            lines.append(f"Branch: {session['git_branch']}")
-        if session.get("version"):
-            lines.append(f"Claude: {session['version']}")
-        if session.get("message_count"):
-            lines.append(f"Messages: {session['message_count']}")
-        lines.append("")
-        lines.append(session.get("first_prompt", ""))
-        return {"type": "text", "content": "\n".join(lines)}
+    def _make_preview(session: Dict[str, Any]):
+        """Return a lazy callable that builds HTML preview on demand."""
+        def _load():
+            from pathlib import Path
+            from .reader import read_session_detail
+            from .preview import build_preview_html
+
+            file_path = session.get("file_path", "")
+            detail = read_session_detail(Path(file_path)) if file_path else {
+                "turns": [], "total_input_tokens": 0, "total_output_tokens": 0,
+            }
+            html = build_preview_html(session, detail)
+            return {"type": "html", "content": html}
+        return _load
 
     @wz.chooser.source(
         "cc-sessions",
