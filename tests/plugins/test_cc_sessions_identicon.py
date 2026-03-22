@@ -5,10 +5,9 @@ import xml.etree.ElementTree as ET
 
 from cc_sessions.identicon import (
     COLORS,
-    GOOD_PATTERNS,
     generate,
     _djb2,
-    _bits_to_grid,
+    _get_initials,
 )
 
 
@@ -28,40 +27,40 @@ class TestDjb2:
         assert h > 0
 
 
-class TestGoodPatterns:
-    def test_min_popcount(self):
-        for bits in GOOD_PATTERNS:
-            assert bin(bits).count("1") >= 3
+class TestGetInitials:
+    def test_hyphen_separated(self):
+        assert _get_initials("claude-code") == "Cc"
+        assert _get_initials("api-server") == "As"
+        assert _get_initials("ml-pipeline") == "Mp"
 
-    def test_bottom_row_has_content(self):
-        for bits in GOOD_PATTERNS:
-            bottom_left = (bits >> 4) & 1
-            bottom_center = (bits >> 5) & 1
-            assert bottom_left or bottom_center
+    def test_underscore_separated(self):
+        assert _get_initials("my_project") == "Mp"
 
-    def test_not_all_filled(self):
-        assert 63 not in GOOD_PATTERNS
+    def test_camel_case(self):
+        assert _get_initials("VoiceText") == "Vt"
+        assert _get_initials("WenZi") == "Wz"
 
-    def test_vertical_connectivity(self):
-        for bits in GOOD_PATTERNS:
-            r0 = (bits & 0x03) != 0
-            r1 = (bits & 0x0C) != 0
-            r2 = (bits & 0x30) != 0
-            if r0 and r2:
-                assert r1, f"pattern {bits:06b} has gap in middle row"
+    def test_plain_word(self):
+        assert _get_initials("dotfiles") == "Do"
+        assert _get_initials("blog") == "Bl"
 
+    def test_single_char(self):
+        assert _get_initials("x") == "X"
 
-class TestBitsToGrid:
-    def test_symmetry(self):
-        for bits in GOOD_PATTERNS:
-            grid = _bits_to_grid(bits)
-            for row in grid:
-                assert row[0] == row[2], "left must mirror right"
+    def test_empty_string(self):
+        assert _get_initials("") == "?"
 
-    def test_dimensions(self):
-        grid = _bits_to_grid(GOOD_PATTERNS[0])
-        assert len(grid) == 3
-        assert all(len(row) == 3 for row in grid)
+    def test_multi_segment(self):
+        assert _get_initials("infra-terraform") == "It"
+        assert _get_initials("react-dashboard") == "Rd"
+
+    def test_first_upper_second_lower(self):
+        """First letter should be uppercase, second lowercase."""
+        for name in ["VoiceText", "claude-code", "dotfiles", "WenZi"]:
+            initials = _get_initials(name)
+            assert initials[0].isupper(), f"{name} -> {initials}: first should be upper"
+            if len(initials) > 1:
+                assert initials[1].islower(), f"{name} -> {initials}: second should be lower"
 
 
 class TestGenerate:
@@ -85,9 +84,19 @@ class TestGenerate:
         root = ET.fromstring(svg_bytes)
         assert root.tag == "{http://www.w3.org/2000/svg}svg"
 
+    def test_svg_contains_text_element(self):
+        uri = generate("VoiceText")
+        b64 = uri.split(",", 1)[1]
+        svg_str = base64.b64decode(b64).decode()
+        assert "<text " in svg_str
+        assert "Vt" in svg_str
+
     def test_empty_name(self):
         uri = generate("")
         assert uri.startswith("data:image/svg+xml;base64,")
+        b64 = uri.split(",", 1)[1]
+        svg_str = base64.b64decode(b64).decode()
+        assert "?" in svg_str
 
     def test_long_name(self):
         uri = generate("a" * 1000)
@@ -101,3 +110,16 @@ class TestGenerate:
             b64 = uri.split(",", 1)[1]
             svg_str = base64.b64decode(b64).decode()
             assert color in svg_str
+
+    def test_initials_in_svg(self):
+        """Verify the correct initials appear in the generated SVG."""
+        cases = [
+            ("claude-code", "Cc"),
+            ("VoiceText", "Vt"),
+            ("dotfiles", "Do"),
+        ]
+        for name, expected in cases:
+            uri = generate(name)
+            b64 = uri.split(",", 1)[1]
+            svg_str = base64.b64decode(b64).decode()
+            assert expected in svg_str, f"{name} should have '{expected}' in SVG"
