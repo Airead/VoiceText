@@ -302,7 +302,7 @@ class TestExtractBatch:
 
     def test_timeout(self):
         cfg = _make_config()
-        cfg["vocabulary"] = {"build_timeout": 1}
+        cfg["vocabulary"] = {"build_timeout": 0.1}
         builder = VocabularyBuilder(cfg)
         user_prompt = "asr_text: test\nfinal_text: test"
         messages = _mock_messages()

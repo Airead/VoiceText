@@ -3,10 +3,19 @@
 from __future__ import annotations
 
 import sys
+import time
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+
+
+def _wait_for_task(t, timeout=0.5):
+    """Wait for _stream_task to be assigned by the RunLoop thread."""
+    deadline = time.monotonic() + timeout
+    while t._stream_task is None and time.monotonic() < deadline:
+        time.sleep(0.005)
+    assert t._stream_task is not None, "timed out waiting for _stream_task"
 
 
 @pytest.fixture(autouse=True)
@@ -57,7 +66,7 @@ class TestAppleSpeechStreaming:
 
         assert t._stream_request is not None
         # Task is created on RunLoop thread; wait briefly for it
-        t._stream_runloop_thread.join(timeout=1.0)
+        _wait_for_task(t)
         assert t._stream_task is not None
         t._recognizer.recognitionTaskWithRequest_resultHandler_.assert_called_once()
 
@@ -119,7 +128,7 @@ class TestAppleSpeechStreaming:
 
         t.start_streaming(on_partial)
         # Wait for task to be created on RunLoop thread
-        t._stream_runloop_thread.join(timeout=1.0)
+        _wait_for_task(t)
         task = t._stream_task
 
         t.cancel_streaming()
@@ -147,7 +156,7 @@ class TestAppleSpeechStreaming:
 
         t.start_streaming(on_partial)
         # Wait for RunLoop thread to create task
-        t._stream_runloop_thread.join(timeout=1.0)
+        _wait_for_task(t)
         call_args = t._recognizer.recognitionTaskWithRequest_resultHandler_.call_args
         handler = call_args[0][1]
 
@@ -190,7 +199,7 @@ class TestAppleSpeechStreaming:
             partials.append((text, is_final))
 
         t.start_streaming(on_partial)
-        t._stream_runloop_thread.join(timeout=1.0)
+        _wait_for_task(t)
         call_args = t._recognizer.recognitionTaskWithRequest_resultHandler_.call_args
         handler = call_args[0][1]
 
@@ -241,7 +250,7 @@ class TestAppleSpeechStreaming:
         on_partial = MagicMock()
 
         t.start_streaming(on_partial)
-        t._stream_runloop_thread.join(timeout=1.0)
+        _wait_for_task(t)
         call_args = t._recognizer.recognitionTaskWithRequest_resultHandler_.call_args
         handler = call_args[0][1]
 
@@ -286,7 +295,7 @@ class TestAppleSpeechStreaming:
             partials.append((text, is_final))
 
         t.start_streaming(on_partial)
-        t._stream_runloop_thread.join(timeout=1.0)
+        _wait_for_task(t)
         call_args = t._recognizer.recognitionTaskWithRequest_resultHandler_.call_args
         handler = call_args[0][1]
 
@@ -325,7 +334,7 @@ class TestAppleSpeechStreaming:
             partials.append((text, is_final))
 
         t.start_streaming(on_partial)
-        t._stream_runloop_thread.join(timeout=1.0)
+        _wait_for_task(t)
         call_args = t._recognizer.recognitionTaskWithRequest_resultHandler_.call_args
         handler = call_args[0][1]
 
@@ -399,7 +408,7 @@ class TestAppleSpeechStreaming:
             partials.append((text, is_final))
 
         t.start_streaming(on_partial)
-        t._stream_runloop_thread.join(timeout=1.0)
+        _wait_for_task(t)
         call_args = t._recognizer.recognitionTaskWithRequest_resultHandler_.call_args
         handler = call_args[0][1]
 

@@ -47,9 +47,9 @@ class TestTimerAPI:
         api = TimerAPI(reg)
         result = []
 
-        timer_id = api.after(0.5, lambda: result.append(1))
+        timer_id = api.after(0.05, lambda: result.append(1))
         api.cancel(timer_id)
-        time.sleep(0.6)
+        time.sleep(0.1)
         assert result == []
         assert timer_id not in reg.timers
 

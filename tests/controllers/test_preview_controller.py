@@ -10,6 +10,16 @@ import pytest
 from wenzi.controllers.preview_controller import PreviewController
 from wenzi.enhance.preview_history import PreviewRecord
 
+_DEBOUNCE_POLL_INTERVAL = 0.005
+_DEBOUNCE_POLL_TIMEOUT = 0.5
+
+
+def _wait_for_debounce(ctrl, timeout=_DEBOUNCE_POLL_TIMEOUT):
+    """Wait for the debounce timer to fire (timer becomes None)."""
+    deadline = time.monotonic() + timeout
+    while ctrl._enhance_debounce_timer is not None and time.monotonic() < deadline:
+        time.sleep(_DEBOUNCE_POLL_INTERVAL)
+
 
 @pytest.fixture
 def mock_app():
@@ -51,8 +61,7 @@ class TestEnhanceModeDebounce:
         # A debounce timer should be active
         assert ctrl._enhance_debounce_timer is not None
 
-        # Wait for debounce to fire
-        time.sleep(0.3)
+        _wait_for_debounce(ctrl)
 
         mock_app._enhance_controller.run.assert_called_once()
 
@@ -70,8 +79,7 @@ class TestEnhanceModeDebounce:
         # Cancel should have been called for each switch
         assert mock_app._enhance_controller.cancel.call_count == 3
 
-        # Wait for debounce (generous margin for slow CI machines)
-        time.sleep(0.3)
+        _wait_for_debounce(ctrl)
 
         # Only one call should have fired (for the last mode)
         mock_app._enhance_controller.run.assert_called_once()
@@ -98,8 +106,8 @@ class TestEnhanceModeDebounce:
         ctrl.on_preview_mode_change("off")
         assert ctrl._enhance_debounce_timer is None
 
-        # Wait to ensure cancelled timer doesn't fire
-        time.sleep(0.3)
+        # Wait past debounce period to ensure cancelled timer doesn't fire
+        time.sleep(0.1)
         mock_app._enhance_controller.run.assert_not_called()
 
     @patch("wenzi.controllers.preview_controller.save_config")
@@ -135,7 +143,7 @@ class TestEnhanceModeDebounce:
         # Simulate another component bumping the request_id
         mock_app._preview_panel.enhance_request_id = 999
 
-        time.sleep(0.3)
+        _wait_for_debounce(ctrl)
 
         # Timer fired but guard prevented run()
         mock_app._enhance_controller.run.assert_not_called()

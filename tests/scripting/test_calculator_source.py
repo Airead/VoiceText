@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from unittest.mock import patch
 
 from wenzi.scripting.sources.calculator_source import (
     CalculatorSource,
@@ -14,7 +15,9 @@ from wenzi.scripting.sources.calculator_source import (
 
 @pytest.fixture()
 def calc():
-    return CalculatorSource()
+    # Prevent pint background initialization (not needed for math-only tests)
+    with patch("wenzi.scripting.sources.calculator_source.threading.Thread"):
+        return CalculatorSource()
 
 
 @pytest.fixture()

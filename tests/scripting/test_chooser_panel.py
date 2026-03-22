@@ -5,6 +5,7 @@ pure-Python logic: source registration, search dispatch, item execution.
 """
 
 import json
+import time
 from unittest.mock import MagicMock, patch
 
 from wenzi.scripting.sources import ChooserItem, ChooserSource, ModifierAction
@@ -250,7 +251,6 @@ class TestResultTruncation:
 
 class TestItemExecution:
     def test_execute_item(self):
-        import time
 
         called = []
         panel = _make_panel()
@@ -260,10 +260,10 @@ class TestItemExecution:
         ]
         # Mock close to avoid NSApp calls
         panel.close = MagicMock()
+        panel._DEFERRED_ACTION_DELAY = 0.01
         with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn, *a, **kw: fn(*a, **kw)):
             panel._execute_item(0)
-        # Action runs in a deferred thread with 0.15s delay
-        time.sleep(0.3)
+        time.sleep(0.05)
         assert called == ["safari"]
         panel.close.assert_called_once()
 
@@ -352,7 +352,6 @@ class TestJSMessageHandling:
             mock_call_after.assert_called_once()
 
     def test_execute_message(self):
-        import time
 
         called = []
         panel = _make_panel()
@@ -360,9 +359,10 @@ class TestJSMessageHandling:
             ChooserItem(title="Test", action=lambda: called.append(True))
         ]
         panel.close = MagicMock()
+        panel._DEFERRED_ACTION_DELAY = 0.01
         with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn, *a, **kw: fn(*a, **kw)):
             panel._handle_js_message({"type": "execute", "index": 0})
-        time.sleep(0.3)
+        time.sleep(0.05)
         assert called == [True]
 
     def test_request_preview_message(self):
@@ -804,7 +804,6 @@ class TestModifierActions:
         assert "Application" in call_args
 
     def test_execute_with_modifier(self):
-        import time
 
         called = []
         panel = _make_panel()
@@ -821,13 +820,13 @@ class TestModifierActions:
             ),
         ]
         panel.close = MagicMock()
+        panel._DEFERRED_ACTION_DELAY = 0.01
         with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn, *a, **kw: fn(*a, **kw)):
             panel._execute_item(0, modifier="alt")
-        time.sleep(0.3)
+        time.sleep(0.05)
         assert called == ["alt"]
 
     def test_execute_without_modifier(self):
-        import time
 
         called = []
         panel = _make_panel()
@@ -844,9 +843,10 @@ class TestModifierActions:
             ),
         ]
         panel.close = MagicMock()
+        panel._DEFERRED_ACTION_DELAY = 0.01
         with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn, *a, **kw: fn(*a, **kw)):
             panel._execute_item(0)
-        time.sleep(0.3)
+        time.sleep(0.05)
         assert called == ["default"]
 
 

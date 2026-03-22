@@ -84,9 +84,10 @@ class TestOnHotkeyRelease:
         ctrl.on_hotkey_release()
         mock_app._set_status.assert_called_with("statusbar.status.ready")
 
-    def test_timeout_cleans_up(self, ctrl, mock_app):
+    def test_timeout_cleans_up(self, ctrl, mock_app, monkeypatch):
         """When _recording_started times out, cancel delayed start and reset UI."""
         mock_app._recording_started = threading.Event()  # Not set
+        monkeypatch.setattr(RecordingController, "_RELEASE_WAIT_TIMEOUT", 0.05)
         ctrl.on_hotkey_release()
         mock_app._recorder.stop.assert_not_called()
         assert ctrl._cancel_delayed.is_set()
@@ -960,7 +961,7 @@ class TestDelayedStartExceptionSafety:
     )
     @patch("PyObjCTools.AppHelper")
     def test_recording_started_set_on_start_exception(
-        self, mock_apphelper, ctrl, mock_app
+        self, mock_apphelper, ctrl, mock_app, monkeypatch
     ):
         """recording_started is set via finally even when start raises."""
         mock_apphelper.callAfter = lambda fn, *a, **kw: fn(*a, **kw)
@@ -969,9 +970,12 @@ class TestDelayedStartExceptionSafety:
         mock_app._recording_started.clear()
         mock_app._recorder.start.side_effect = RuntimeError("device error")
 
+        monkeypatch.setattr(RecordingController, "_DELAYED_START_SECS", 0.01)
         ctrl.on_hotkey_press()
-        # Wait for _delayed_start to complete (350ms sleep + start attempt)
-        time.sleep(0.6)
+        # Wait for _delayed_start to complete — use event.wait() instead of
+        # time.sleep() for robustness against thread scheduling jitter.
+        mock_app._recording_started.wait(timeout=2.0)
+        ctrl._delayed_thread.join(timeout=1.0)
 
         # recording_started must be set despite the exception (via finally)
         assert mock_app._recording_started.is_set()

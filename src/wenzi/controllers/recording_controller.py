@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 class RecordingController:
     """Handles hotkey → recording → transcription → output flow."""
 
+    _RELEASE_WAIT_TIMEOUT = 1.0  # seconds to wait for delayed start to finish
+    _DELAYED_START_SECS = 0.35  # delay before starting recording (sound feedback)
+
     def __init__(self, app: WenZiApp) -> None:
         self._app = app
         self._streaming_active = False
@@ -36,6 +39,7 @@ class RecordingController:
         self._release_lock = threading.Lock()
         self._release_done = False
         self._input_context = None
+        self._delayed_thread: threading.Thread | None = None
 
     @property
     def input_context(self):
@@ -179,7 +183,7 @@ class RecordingController:
 
         def _delayed_start():
             import time
-            time.sleep(0.35)
+            time.sleep(self._DELAYED_START_SECS)
             try:
                 if not app._busy and not self._cancel_delayed.is_set():
                     self._start_recording_and_update_indicator()
@@ -203,7 +207,8 @@ class RecordingController:
             if app._transcriber.supports_streaming:
                 from PyObjCTools import AppHelper
                 AppHelper.callAfter(self._show_live_overlay, False)
-            threading.Thread(target=_delayed_start, daemon=True).start()
+            self._delayed_thread = threading.Thread(target=_delayed_start, daemon=True)
+            self._delayed_thread.start()
         else:
             # No sound delay — start recording first, then show in active state
             self._start_recording_and_update_indicator(show_active=True)
@@ -394,7 +399,7 @@ class RecordingController:
 
         def _delayed_start():
             import time
-            time.sleep(0.35)
+            time.sleep(self._DELAYED_START_SECS)
             try:
                 if not app._busy and not self._cancel_delayed.is_set():
                     self._start_recording_and_update_indicator()
@@ -408,7 +413,8 @@ class RecordingController:
             if app._transcriber.supports_streaming:
                 from PyObjCTools import AppHelper
                 AppHelper.callAfter(self._show_live_overlay, False)
-            threading.Thread(target=_delayed_start, daemon=True).start()
+            self._delayed_thread = threading.Thread(target=_delayed_start, daemon=True)
+            self._delayed_thread.start()
         else:
             self._start_recording_and_update_indicator(show_active=True)
             app._recording_started.set()
@@ -454,7 +460,7 @@ class RecordingController:
         # true final state — prevents a race where cancel sees
         # is_recording=False while recorder.start() is still blocking,
         # cancels the watchdog, and leaves the recording orphaned.
-        if not app._recording_started.wait(timeout=1.0):  # 1s > 350ms delay + start()
+        if not app._recording_started.wait(timeout=self._RELEASE_WAIT_TIMEOUT):
             self._cancel_recording_watchdog()
             self._reset_to_idle()
             return
@@ -500,7 +506,7 @@ class RecordingController:
             self._release_done = True
         app = self._app
         # Wait for delayed start to finish (if sound feedback caused a delay)
-        if not app._recording_started.wait(timeout=1.0):
+        if not app._recording_started.wait(timeout=self._RELEASE_WAIT_TIMEOUT):
             self._cancel_delayed.set()
             self._reset_to_idle()
             return

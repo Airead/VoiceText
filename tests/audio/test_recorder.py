@@ -167,8 +167,9 @@ class TestRecorder:
         r.stop()
 
     @patch("wenzi.audio.recorder.sd.RawInputStream")
-    def test_stop_returns_data_when_stream_close_hangs(self, mock_stream_cls):
+    def test_stop_returns_data_when_stream_close_hangs(self, mock_stream_cls, monkeypatch):
         """stop() should return audio data even if stream.stop() hangs."""
+        monkeypatch.setattr(Recorder, "_STREAM_CLOSE_TIMEOUT", 0.01)
         mock_stream = MagicMock()
         # Make stream.stop() block forever (simulating a hung PortAudio callback)
         hang_event = threading.Event()

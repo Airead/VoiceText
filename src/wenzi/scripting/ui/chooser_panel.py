@@ -161,6 +161,7 @@ class ChooserPanel:
     _INITIAL_WIDTH = 600
     _INITIAL_HEIGHT = 80  # bootstrap; JS updates after page load
     _MAX_TOTAL_RESULTS = 50
+    _DEFERRED_ACTION_DELAY = 0.15  # seconds to let previous app regain focus
 
     def __init__(self, usage_tracker=None) -> None:
         self._panel = None
@@ -961,7 +962,7 @@ class ChooserPanel:
 
                 def _deferred():
                     import time
-                    time.sleep(0.15)  # Let previous app regain focus
+                    time.sleep(self._DEFERRED_ACTION_DELAY)
                     try:
                         action()
                     except Exception:
