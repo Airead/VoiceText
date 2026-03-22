@@ -1175,7 +1175,7 @@ function extractResultText(result) {
   if (Array.isArray(c)) {
     return c.filter(p => p.type === "text").map(p => p.text || "").join("\n");
   }
-  return "";
+  return JSON.stringify(c, null, 2);
 }
 
 // ── Format tool result for display ──

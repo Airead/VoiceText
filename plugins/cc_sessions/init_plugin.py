@@ -84,6 +84,8 @@ def _parse_subagent_meta(jsonl_path: str) -> dict:
                     meta["version"] = msg["version"]
                 if not meta["git_branch"] and msg.get("git_branch"):
                     meta["git_branch"] = msg["git_branch"]
+                if not meta["project"] and msg.get("project"):
+                    meta["project"] = msg["project"]
     except OSError:
         pass
     return meta
