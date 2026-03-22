@@ -842,9 +842,11 @@ function renderConversation(messages) {
   activeOutlineIdx = -1;
   _lastRenderedTime = "";
 
-  // Filter: skip sidechain and non-conversation types
+  // Filter: skip non-conversation types; skip sidechain only for root sessions
+  // (subagent messages are ALL sidechain, so we must include them)
   const validTypes = new Set(["user", "assistant"]);
-  const turns = messages.filter(m => validTypes.has(m.type) && !m.isSidechain);
+  const isSubagent = sessionInfo && sessionInfo.is_subagent;
+  const turns = messages.filter(m => validTypes.has(m.type) && (isSubagent || !m.isSidechain));
 
   // Pre-process: extract tool_results from user messages into a global map
   // (Claude Code puts tool_result in the next user message, not in the assistant message)
@@ -1338,7 +1340,8 @@ function computeStats(messages) {
       lastTs = ts;
     }
 
-    if (msg.type === "user" && !msg.isSidechain) {
+    const isSubagentSession = sessionInfo && sessionInfo.is_subagent;
+    if (msg.type === "user" && (isSubagentSession || !msg.isSidechain)) {
       const content = msg.message?.content;
       if (typeof content === "string") userMsgCount++;
     }
