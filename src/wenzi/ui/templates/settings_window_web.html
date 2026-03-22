@@ -1770,6 +1770,25 @@ function confirmVersionInstall() {
   }
 }
 
+function showModal(bodyHtml, buttons) {
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  var actionsEl = document.getElementById('modal-actions');
+  actionsEl.innerHTML = '';
+  for (var i = 0; i < buttons.length; i++) {
+    var b = buttons[i];
+    var btn = document.createElement('button');
+    btn.className = 'btn ' + (b.cls || 'btn-secondary');
+    btn.textContent = b.label;
+    btn.onclick = b.action;
+    actionsEl.appendChild(btn);
+  }
+  document.getElementById('app-modal').classList.add('visible');
+}
+
+function closeModal() {
+  document.getElementById('app-modal').classList.remove('visible');
+}
+
 // Event delegation for plugin-list and registry-list
 (function() {
   var pluginList = document.getElementById('plugin-list');
@@ -1787,8 +1806,16 @@ function confirmVersionInstall() {
           postCallback('on_plugin_update', id); break;
         case 'plugin-uninstall':
           if (_altKeyHeld) { showVersionPopover(id, el); }
-          else if (confirm('Uninstall this plugin? This will delete all plugin files.')) {
-            postCallback('on_plugin_uninstall', id);
+          else {
+            (function(pid) {
+              showModal(
+                '<div class="modal-message">Uninstall this plugin? This will delete all plugin files.</div>',
+                [
+                  { label: 'Cancel', cls: 'btn-secondary', action: closeModal },
+                  { label: 'Uninstall', cls: 'btn-danger', action: function() { closeModal(); postCallback('on_plugin_uninstall', pid); } }
+                ]
+              );
+            })(id);
           }
           break;
         case 'plugin-toggle':
