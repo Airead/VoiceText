@@ -8,6 +8,7 @@ import re
 import shutil
 import tempfile
 import tomllib
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 from wenzi.scripting.plugin_meta import (
@@ -18,6 +19,8 @@ from wenzi.scripting.plugin_meta import (
 )
 
 logger = logging.getLogger(__name__)
+
+ProgressCallback = Callable[[int, int], None]  # (current, total)
 
 TEMP_DIR_PREFIX = "_tmp_"
 BACKUP_SUFFIX = ".bak"
@@ -82,35 +85,39 @@ class PluginInstaller:
     def __init__(self, plugins_dir: str):
         self._plugins_dir = plugins_dir
 
-    def install(self, source_url: str, pinned_ref: str | None = None) -> str:
+    def install(
+        self,
+        source_url: str,
+        pinned_ref: str | None = None,
+        progress: ProgressCallback | None = None,
+    ) -> str:
         """Install a plugin from a plugin.toml URL (remote or local path).
 
         Returns the install directory path. Rolls back on failure.
         If *pinned_ref* is given, it is persisted in install.toml so that
         future updates can preserve the pin.
+        If *progress* is given, it is called with (current, total) after each
+        file download.
         """
+        logger.info("Installing plugin from %s", source_url)
         raw, section = self._fetch_plugin_toml(source_url)
         plugin_id = section.get("id", "")
         if not plugin_id:
             raise ValueError("plugin.toml missing required 'id' field")
 
-        version = str(section.get("version", ""))
-        files = self._parse_files(section)
         install_dir = self._resolve_install_dir(plugin_id)
-        base_url = source_url.rsplit("/", 1)[0]
-
-        tempdir = self._download_to_temp(
-            base_url, files, raw, source_url, version, pinned_ref=pinned_ref,
+        self._fetch_and_replace(
+            source_url, raw, section, install_dir, plugin_id,
+            pinned_ref=pinned_ref, progress=progress,
         )
-        try:
-            self._atomic_replace(tempdir, install_dir)
-        except BaseException:
-            shutil.rmtree(tempdir, ignore_errors=True)
-            raise
+        logger.info("Plugin %s installed to %s", plugin_id, install_dir)
         return install_dir
 
-    def update(self, plugin_id: str) -> str:
+    def update(
+        self, plugin_id: str, progress: ProgressCallback | None = None,
+    ) -> str:
         """Update an installed plugin by re-downloading from its source URL."""
+        logger.info("Updating plugin %s", plugin_id)
         plugin_dir = find_plugin_dir(self._plugins_dir, plugin_id)
         if plugin_dir is None:
             raise ValueError(f"Plugin {plugin_id!r} not found")
@@ -124,31 +131,54 @@ class PluginInstaller:
         pinned_ref = info.get("pinned_ref") or None
 
         raw, section = self._fetch_plugin_toml(source_url)
-        version = str(section.get("version", ""))
-        files = self._parse_files(section)
-        base_url = source_url.rsplit("/", 1)[0]
-
-        tempdir = self._download_to_temp(
-            base_url, files, raw, source_url, version, pinned_ref=pinned_ref,
+        self._fetch_and_replace(
+            source_url, raw, section, plugin_dir, plugin_id,
+            pinned_ref=pinned_ref, progress=progress,
         )
-        try:
-            self._atomic_replace(tempdir, plugin_dir)
-        except BaseException:
-            shutil.rmtree(tempdir, ignore_errors=True)
-            raise
+        logger.info("Plugin %s updated", plugin_id)
         return plugin_dir
 
     def uninstall(self, plugin_id: str) -> None:
         """Remove a plugin directory entirely."""
+        logger.info("Uninstalling plugin %s", plugin_id)
         plugin_dir = find_plugin_dir(self._plugins_dir, plugin_id)
         if plugin_dir is None:
             raise ValueError(f"Plugin {plugin_id!r} not found")
         shutil.rmtree(plugin_dir)
+        logger.info("Plugin %s removed", plugin_id)
+
+    def _fetch_and_replace(
+        self,
+        source_url: str,
+        raw_toml: bytes,
+        section: dict,
+        target_dir: str,
+        plugin_id: str,
+        *,
+        pinned_ref: str | None = None,
+        progress: ProgressCallback | None = None,
+    ) -> None:
+        """Download files listed in *section* and atomically replace *target_dir*."""
+        version = str(section.get("version", ""))
+        files = self._parse_files(section)
+        base_url = source_url.rsplit("/", 1)[0]
+        logger.info("Plugin %s v%s — downloading %d files", plugin_id, version, len(files))
+
+        tempdir = self._download_to_temp(
+            base_url, files, raw_toml, source_url, version,
+            pinned_ref=pinned_ref, progress=progress,
+        )
+        try:
+            self._atomic_replace(tempdir, target_dir)
+        except BaseException:
+            shutil.rmtree(tempdir, ignore_errors=True)
+            raise
 
     def _download_to_temp(
         self, base_url: str, files: list[str], raw_toml: bytes,
         source_url: str, version: str,
         *, pinned_ref: str | None = None,
+        progress: ProgressCallback | None = None,
     ) -> str:
         """Download plugin files to a temp directory inside plugins_dir.
 
@@ -157,7 +187,7 @@ class PluginInstaller:
         os.makedirs(self._plugins_dir, exist_ok=True)
         tempdir = tempfile.mkdtemp(dir=self._plugins_dir, prefix=TEMP_DIR_PREFIX)
         try:
-            self._download_files(base_url, files, tempdir)
+            self._download_files(base_url, files, tempdir, progress=progress)
             with open(os.path.join(tempdir, "plugin.toml"), "wb") as f:
                 f.write(raw_toml)
             self._write_install_toml(
@@ -199,18 +229,26 @@ class PluginInstaller:
         return files
 
     @staticmethod
-    def _download_files(base_url: str, files: list[str], target_dir: str) -> None:
+    def _download_files(
+        base_url: str, files: list[str], target_dir: str,
+        *, progress: ProgressCallback | None = None,
+    ) -> None:
         abs_target = os.path.abspath(target_dir)
-        for fname in files:
+        total = len(files)
+        for i, fname in enumerate(files):
             file_path = os.path.normpath(os.path.join(target_dir, fname))
             if not os.path.abspath(file_path).startswith(abs_target + os.sep):
                 raise ValueError(f"Path traversal in files list: {fname!r}")
-            file_data = read_source(f"{base_url}/{fname}")
+            url = f"{base_url}/{fname}"
+            logger.debug("Downloading %s (%d/%d) from %s", fname, i + 1, total, url)
+            file_data = read_source(url)
             parent = os.path.dirname(file_path)
             if parent != abs_target:
                 os.makedirs(parent, exist_ok=True)
             with open(file_path, "wb") as f:
                 f.write(file_data)
+            if progress:
+                progress(i + 1, total)
 
     def _resolve_install_dir(self, plugin_id: str) -> str:
         dir_name = plugin_id.replace(".", "_").replace("-", "_")

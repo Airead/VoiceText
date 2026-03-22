@@ -247,9 +247,10 @@ class TestInstallByIdWithRef:
             ctrl._on_plugin_install_by_id("com.test.plugin")
             mock_thread.call_args[1]["target"]()
 
-        ctrl._plugin_installer.install.assert_called_once_with(
-            source, pinned_ref=None
-        )
+        ctrl._plugin_installer.install.assert_called_once()
+        call_args = ctrl._plugin_installer.install.call_args
+        assert call_args[0][0] == source
+        assert call_args[1]["pinned_ref"] is None
 
     def test_install_with_invalid_ref_shows_error(self, ctrl):
         """Short SHA ref shows error in settings panel."""

@@ -194,6 +194,52 @@ class TestInstall:
 
 
 # ---------------------------------------------------------------------------
+# TestProgressCallback
+# ---------------------------------------------------------------------------
+
+
+class TestProgressCallback:
+    def test_install_calls_progress(self, plugins_dir, serve_dir, http_server):
+        """install() calls progress callback with (current, total) for each file."""
+        (serve_dir / "prog").mkdir()
+        (serve_dir / "prog" / "a.py").write_bytes(b"# a")
+        (serve_dir / "prog" / "b.py").write_bytes(b"# b")
+        (serve_dir / "prog" / "c.py").write_bytes(b"# c")
+        (serve_dir / "prog" / "plugin.toml").write_text(
+            '[plugin]\n'
+            'id = "com.example.prog"\n'
+            'name = "Prog"\n'
+            'version = "1.0.0"\n'
+            'files = ["a.py", "b.py", "c.py"]\n'
+        )
+        calls = []
+        installer = PluginInstaller(plugins_dir)
+        installer.install(
+            f"{http_server}/prog/plugin.toml",
+            progress=lambda cur, tot: calls.append((cur, tot)),
+        )
+        assert calls == [(1, 3), (2, 3), (3, 3)]
+
+    def test_install_no_files_skips_progress(self, plugins_dir, serve_dir, http_server):
+        """install() with empty files list does not call progress."""
+        (serve_dir / "empty").mkdir()
+        (serve_dir / "empty" / "plugin.toml").write_text(
+            '[plugin]\n'
+            'id = "com.example.empty"\n'
+            'name = "Empty"\n'
+            'version = "1.0.0"\n'
+            'files = []\n'
+        )
+        calls = []
+        installer = PluginInstaller(plugins_dir)
+        installer.install(
+            f"{http_server}/empty/plugin.toml",
+            progress=lambda cur, tot: calls.append((cur, tot)),
+        )
+        assert calls == []
+
+
+# ---------------------------------------------------------------------------
 # TestPinnedInstall
 # ---------------------------------------------------------------------------
 

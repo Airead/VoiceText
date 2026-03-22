@@ -7,6 +7,7 @@ import os
 import subprocess
 import threading
 import webbrowser
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -1349,45 +1350,73 @@ class SettingsController:
                     {"plugins_error": f"Invalid ref: {e}"}
                 )
                 return
-            self._on_plugin_install_url(download_url, pinned_ref=ref)
+            self._on_plugin_install_url(download_url, pinned_ref=ref, plugin_id=plugin_id)
         else:
-            self._on_plugin_install_url(source_url)
+            self._on_plugin_install_url(source_url, plugin_id=plugin_id)
 
-    def _on_plugin_install_url(self, url: str, pinned_ref: str | None = None) -> None:
+    def _on_plugin_install_url(
+        self, url: str, pinned_ref: str | None = None, plugin_id: str = "",
+    ) -> None:
         """Install a plugin from a URL in background."""
-        from PyObjCTools import AppHelper
-
-        panel = self._app._settings_panel
-
-        def _do_install():
-            try:
-                self._plugin_installer.install(url, pinned_ref=pinned_ref)
-                self._needs_reload = True
-                AppHelper.callAfter(self._auto_reload_if_needed)
-            except Exception as e:
-                AppHelper.callAfter(
-                    panel.update_state, {"plugins_error": f"Install failed: {e}"}
-                )
-
-        threading.Thread(target=_do_install, daemon=True).start()
+        self._run_plugin_op(
+            plugin_id,
+            lambda progress: self._plugin_installer.install(
+                url, pinned_ref=pinned_ref, progress=progress,
+            ),
+            label="Install",
+        )
 
     def _on_plugin_update(self, plugin_id: str) -> None:
         """Update an installed plugin in background."""
+        self._run_plugin_op(
+            plugin_id,
+            lambda progress: self._plugin_installer.update(plugin_id, progress=progress),
+            label="Update",
+        )
+
+    def _run_plugin_op(
+        self,
+        plugin_id: str,
+        op: Callable[..., None],
+        label: str,
+    ) -> None:
+        """Run a plugin install/update operation in a background thread with progress."""
         from PyObjCTools import AppHelper
 
         panel = self._app._settings_panel
+        action = label.lower()  # "install" or "update"
 
-        def _do_update():
+        def _progress(current: int, total: int) -> None:
+            AppHelper.callAfter(
+                panel.update_state,
+                {"plugin_progress": {
+                    "id": plugin_id, "current": current,
+                    "total": total, "action": action,
+                }},
+            )
+
+        def _do_op():
             try:
-                self._plugin_installer.update(plugin_id)
+                AppHelper.callAfter(
+                    panel.update_state,
+                    {"plugin_progress": {
+                        "id": plugin_id, "current": 0,
+                        "total": 0, "action": action,
+                    }},
+                )
+                op(progress=_progress)
                 self._needs_reload = True
+                AppHelper.callAfter(
+                    panel.update_state, {"plugin_progress": None},
+                )
                 AppHelper.callAfter(self._auto_reload_if_needed)
             except Exception as e:
                 AppHelper.callAfter(
-                    panel.update_state, {"plugins_error": f"Update failed: {e}"}
+                    panel.update_state,
+                    {"plugins_error": f"{label} failed: {e}", "plugin_progress": None},
                 )
 
-        threading.Thread(target=_do_update, daemon=True).start()
+        threading.Thread(target=_do_op, daemon=True).start()
 
     def _on_plugin_uninstall(self, plugin_id: str) -> None:
         """Uninstall a plugin."""

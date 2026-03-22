@@ -178,6 +178,7 @@ body {
 }
 
 .toggle.on { background: #34c759; }
+.toggle.disabled { pointer-events: none; opacity: 0.4; }
 
 .toggle::after {
   content: '';
@@ -418,6 +419,9 @@ input[type="range"] {
 .badge-unverified { background:#fff3e0; color:#e65100; }
 .badge-pinned { background:#e3f2fd; color:#1565c0; }
 .plugin-actions { display:flex; gap:6px; align-items:center; flex-shrink:0; position:relative; }
+.plugin-progress { height:2px; background:#e0e0e0; border-radius:1px; margin-top:8px; overflow:hidden; display:none; }
+.plugin-progress.active { display:block; }
+.plugin-progress-bar { height:100%; background:#007aff; border-radius:1px; width:0%; transition:width 0.3s ease; }
 .plugin-error { font-size:12px; color:#d32f2f; margin-top:4px; }
 .plugin-card-error { border-color:#e57373; }
 .version-popover { position:absolute; top:100%; right:0; margin-top:4px; padding:10px; background:white; border:1px solid #d2d2d7; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:100; display:none; min-width:220px; }
@@ -485,6 +489,8 @@ input[type="range"] {
   .version-popover { background:#2a2a2a; border-color:#3a3a3a; box-shadow:0 4px 12px rgba(0,0,0,0.4); }
   .version-popover label { color:#98989d; }
   .version-popover input { background:#3a3a3a; color:#f5f5f7; border-color:#4a4a4a; }
+  .plugin-progress { background:#3a3a3a; }
+  .plugin-progress-bar { background:#6ca0f6; }
   .reload-banner { background: #2a2a2a; border-color: #3a3a3a; }
   .help-icon { border-color: #98989d; color: #98989d; }
   .help-icon:hover { color: #6ca0f6; border-color: #6ca0f6; }
@@ -1588,6 +1594,8 @@ var _pluginTracebacks = {};
 
 function renderPlugins() {
   _pluginTracebacks = {};
+  _activeProgressCard = null;
+  _activeProgressBar = null;
   var plugins = CONFIG.plugins || [];
   var list = document.getElementById('plugin-list');
   if (!list) return;
@@ -1638,7 +1646,7 @@ function renderPluginCard(p) {
   if (p.pinned_ref && p.version && p.installed_version && p.version !== p.installed_version) {
     versionHtml += '<span class="plugin-version"> (Latest: v' + _esc(p.version) + ')</span>';
   }
-  return '<div class="plugin-card' + (p.load_error ? ' plugin-card-error' : '') + '">'
+  return '<div class="plugin-card' + (p.load_error ? ' plugin-card-error' : '') + '" data-plugin-id="' + _esc(p.id) + '">'
     + '<div class="plugin-icon">&#x1F9E9;</div>'
     + '<div class="plugin-info">'
     + '<div><span class="plugin-name">' + _esc(p.name) + '</span>'
@@ -1647,6 +1655,7 @@ function renderPluginCard(p) {
     + '<div class="plugin-author">' + _esc(p.author) + ' \u00B7 ' + _esc(p.registry_name) + '</div>'
     + '<div class="plugin-desc">' + _esc(p.description) + '</div>'
     + errorHtml
+    + '<div class="plugin-progress"><div class="plugin-progress-bar"></div></div>'
     + '</div>'
     + '<div class="plugin-actions">' + actions + '</div>'
     + '</div>';
@@ -1852,6 +1861,53 @@ function showReloadBanner(show) {
   if (el) el.style.display = show ? 'flex' : 'none';
 }
 
+var _activeProgressId = null;
+var _activeProgressCard = null;
+var _activeProgressBar = null;
+
+function _clearPluginProgress() {
+  if (!_activeProgressCard) { _activeProgressId = null; return; }
+  if (_activeProgressBar) {
+    _activeProgressBar.classList.remove('active');
+    _activeProgressBar.querySelector('.plugin-progress-bar').style.width = '0%';
+  }
+  _activeProgressCard.querySelectorAll('.plugin-actions .btn[disabled]').forEach(function(btn) {
+    if (btn._origText) { btn.textContent = btn._origText; btn._origText = null; btn.disabled = false; }
+  });
+  _activeProgressCard.querySelectorAll('.plugin-actions .toggle.disabled').forEach(function(t) {
+    t.classList.remove('disabled');
+  });
+  _activeProgressId = null;
+  _activeProgressCard = null;
+  _activeProgressBar = null;
+}
+
+function updatePluginProgress(info) {
+  if (!info) { _clearPluginProgress(); return; }
+  // New plugin or first call — set up card
+  if (_activeProgressId !== info.id) {
+    _clearPluginProgress();
+    _activeProgressId = info.id;
+    _activeProgressCard = document.querySelector('[data-plugin-id="' + info.id + '"]');
+    if (!_activeProgressCard) return;
+    _activeProgressBar = _activeProgressCard.querySelector('.plugin-progress');
+    var label = (info.action === 'update') ? 'Updating\u2026' : 'Installing\u2026';
+    _activeProgressCard.querySelectorAll('.plugin-actions .btn').forEach(function(btn) {
+      btn._origText = btn.textContent;
+      btn.textContent = label;
+      btn.disabled = true;
+    });
+    _activeProgressCard.querySelectorAll('.plugin-actions .toggle').forEach(function(t) {
+      t.classList.add('disabled');
+    });
+  }
+  // Update progress bar width only (no DOM queries on hot path)
+  if (_activeProgressBar && info.total > 0) {
+    _activeProgressBar.classList.add('active');
+    _activeProgressBar.querySelector('.plugin-progress-bar').style.width = Math.round((info.current / info.total) * 100) + '%';
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Incremental state update (called from Python)                       */
 /* ------------------------------------------------------------------ */
@@ -1955,6 +2011,7 @@ function _updateState(state) {
   if (state.plugins_loading !== undefined) { showPluginsLoading(state.plugins_loading); }
   if (state.plugins_error !== undefined) { showPluginsError(state.plugins_error); }
   if (state.show_reload_banner !== undefined) { showReloadBanner(state.show_reload_banner); }
+  if (state.plugin_progress !== undefined) { updatePluginProgress(state.plugin_progress); }
 }
 
 /* ------------------------------------------------------------------ */
