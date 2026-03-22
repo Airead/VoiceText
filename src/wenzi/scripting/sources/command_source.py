@@ -58,7 +58,7 @@ class CommandSource:
         if not _VALID_NAME_RE.match(entry.name):
             raise ValueError(
                 f"Invalid command name {entry.name!r}: must be alphanumeric, "
-                "hyphens, or underscores (no spaces)."
+                "hyphens, underscores, or colons (no spaces)."
             )
         if entry.name in self._commands:
             logger.warning(
