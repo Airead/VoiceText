@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from wenzi.app import WenZiApp
 
-from wenzi.config import save_config
+from wenzi.config import BUILTIN_REGISTRY_URL, save_config
 from wenzi.enhance.enhancer import MODE_OFF
 from wenzi.i18n import t
 from wenzi.transcription.model_registry import (
@@ -22,6 +22,8 @@ from wenzi.transcription.model_registry import (
     is_backend_available,
     is_model_cached,
 )
+from wenzi.scripting.plugin_installer import PluginInstaller
+from wenzi.scripting.plugin_registry import PluginInfo, PluginRegistry
 from wenzi.statusbar import send_notification
 from wenzi.transcription.base import create_transcriber
 from wenzi.ui_helpers import restore_accessory, topmost_alert
@@ -43,6 +45,13 @@ class SettingsController:
 
     def __init__(self, app: WenZiApp) -> None:
         self._app = app
+        from wenzi.config import DEFAULT_PLUGINS_DIR
+
+        plugins_dir = os.path.expanduser(DEFAULT_PLUGINS_DIR)
+        self._plugin_registry = PluginRegistry(plugins_dir=plugins_dir)
+        self._plugin_installer = PluginInstaller(plugins_dir=plugins_dir)
+        self._needs_reload = False
+        self._last_plugin_infos: list[PluginInfo] = []
 
     def _save_and_reload(self) -> None:
         """Save config and refresh the Settings panel if visible."""
@@ -209,6 +218,15 @@ class SettingsController:
             "on_new_snippet_hotkey_record": self.new_snippet_hotkey_record,
             "on_new_snippet_hotkey_clear": self.new_snippet_hotkey_clear,
             "on_language_change": self.language_change,
+            "on_plugins_tab_open": self._on_plugins_tab_open,
+            "on_plugin_install_by_id": self._on_plugin_install_by_id,
+            "on_plugin_install_url": self._on_plugin_install_url,
+            "on_plugin_update": self._on_plugin_update,
+            "on_plugin_uninstall": self._on_plugin_uninstall,
+            "on_plugin_toggle": self._on_plugin_toggle,
+            "on_plugin_reload": self._on_plugin_reload,
+            "on_registry_add": self._on_registry_add,
+            "on_registry_remove": self._on_registry_remove,
             "_reopen": lambda: self.on_open_settings(None),
         }
 
@@ -1262,3 +1280,218 @@ class SettingsController:
             engine.wz.chooser._get_panel()._switch_english = enabled
 
         logger.info("Launcher switch-to-English set to: %s", enabled)
+
+    # ---------------------------------------------------------------------------
+    # Plugin management callbacks
+    # ---------------------------------------------------------------------------
+
+    def _on_plugins_tab_open(self) -> None:
+        """Fetch registries in background, update UI when done."""
+        from PyObjCTools import AppHelper
+
+        app = self._app
+        panel = app._settings_panel
+        panel.update_state({"plugins_loading": True, "plugins_error": None})
+        self._update_registries_state()
+
+        def _fetch():
+            try:
+                extra = app._config.get("plugins", {}).get("extra_registries", [])
+                import wenzi
+
+                current_ver = getattr(wenzi, "__version__", "dev")
+                infos = self._plugin_registry.merge_registries(
+                    official_source=BUILTIN_REGISTRY_URL,
+                    extra_sources=extra,
+                    current_wenzi_version=current_ver,
+                )
+                self._last_plugin_infos = infos
+                plugins_data = self._plugin_infos_to_state(infos)
+                AppHelper.callAfter(
+                    panel.update_state,
+                    {"plugins": plugins_data, "plugins_loading": False},
+                )
+            except Exception as e:
+                logger.error("Failed to fetch plugins", exc_info=True)
+                AppHelper.callAfter(
+                    panel.update_state,
+                    {"plugins_loading": False, "plugins_error": str(e)},
+                )
+
+        threading.Thread(target=_fetch, daemon=True).start()
+
+    def _on_plugin_install_by_id(self, plugin_id: str) -> None:
+        """Install a plugin by its registry ID."""
+        source_url = None
+        for info in self._last_plugin_infos:
+            if info.meta.id == plugin_id:
+                source_url = info.source_url
+                break
+        if not source_url:
+            self._app._settings_panel.update_state(
+                {"plugins_error": f"Plugin {plugin_id} not found in registries"}
+            )
+            return
+        self._on_plugin_install_url(source_url)
+
+    def _on_plugin_install_url(self, url: str) -> None:
+        """Install a plugin from a URL in background."""
+        from PyObjCTools import AppHelper
+
+        panel = self._app._settings_panel
+
+        def _do_install():
+            try:
+                self._plugin_installer.install(url)
+                self._needs_reload = True
+                AppHelper.callAfter(self._on_plugins_tab_open)
+                AppHelper.callAfter(panel.update_state, {"show_reload_banner": True})
+            except Exception as e:
+                AppHelper.callAfter(
+                    panel.update_state, {"plugins_error": f"Install failed: {e}"}
+                )
+
+        threading.Thread(target=_do_install, daemon=True).start()
+
+    def _on_plugin_update(self, plugin_id: str) -> None:
+        """Update an installed plugin in background."""
+        from PyObjCTools import AppHelper
+
+        panel = self._app._settings_panel
+
+        def _do_update():
+            try:
+                self._plugin_installer.update(plugin_id)
+                self._needs_reload = True
+                AppHelper.callAfter(self._on_plugins_tab_open)
+                AppHelper.callAfter(panel.update_state, {"show_reload_banner": True})
+            except Exception as e:
+                AppHelper.callAfter(
+                    panel.update_state, {"plugins_error": f"Update failed: {e}"}
+                )
+
+        threading.Thread(target=_do_update, daemon=True).start()
+
+    def _on_plugin_uninstall(self, plugin_id: str) -> None:
+        """Uninstall a plugin."""
+        try:
+            self._plugin_installer.uninstall(plugin_id)
+            self._needs_reload = True
+            self._on_plugins_tab_open()
+            self._app._settings_panel.update_state({"show_reload_banner": True})
+        except Exception as e:
+            self._app._settings_panel.update_state(
+                {"plugins_error": f"Uninstall failed: {e}"}
+            )
+
+    def _on_plugin_toggle(self, plugin_id: str, enabled: bool) -> None:
+        """Enable or disable a plugin."""
+        disabled = list(self._app._config.get("disabled_plugins", []))
+        if enabled and plugin_id in disabled:
+            disabled.remove(plugin_id)
+        elif not enabled and plugin_id not in disabled:
+            disabled.append(plugin_id)
+        self._app._config["disabled_plugins"] = disabled
+        self._save_and_reload()
+        self._needs_reload = True
+        self._app._settings_panel.update_state({"show_reload_banner": True})
+
+    def _on_plugin_reload(self) -> None:
+        """Reload all plugins in the script engine."""
+        app = self._app
+        engine = getattr(app, "_script_engine", None)
+        if engine is not None:
+            engine.reload()
+        self._needs_reload = False
+        app._settings_panel.update_state({"show_reload_banner": False})
+        self._on_plugins_tab_open()
+
+    def _on_registry_add(self, url: str) -> None:
+        """Add an extra plugin registry URL."""
+        plugins_cfg = self._app._config.setdefault("plugins", {})
+        extra = plugins_cfg.setdefault("extra_registries", [])
+        if url not in extra:
+            extra.append(url)
+            self._save_and_reload()
+        self._update_registries_state()
+        self._on_plugins_tab_open()
+
+    def _on_registry_remove(self, index: int) -> None:
+        """Remove an extra plugin registry by index."""
+        extra = self._app._config.get("plugins", {}).get("extra_registries", [])
+        # index may be passed as float from JS, convert to int
+        index = int(index)
+        if 0 <= index < len(extra):
+            extra.pop(index)
+            self._save_and_reload()
+        self._update_registries_state()
+        self._on_plugins_tab_open()
+
+    def _update_registries_state(self) -> None:
+        """Push current registry list to the settings panel."""
+        extra = self._app._config.get("plugins", {}).get("extra_registries", [])
+        registries = [{"name": "WenZi Official", "removable": False}]
+        for url in extra:
+            registries.append({"name": url, "removable": True})
+        self._app._settings_panel.update_state({"registries": registries})
+
+    def _plugin_infos_to_state(self, infos: list[PluginInfo]) -> list[dict]:
+        """Convert PluginInfo list to serialisable state dicts for the UI."""
+        disabled = set(self._app._config.get("disabled_plugins", []))
+        result = []
+        for info in infos:
+            pid = info.meta.id
+            is_enabled = pid not in disabled and info.meta.name not in disabled
+            result.append(
+                {
+                    "id": pid,
+                    "name": info.meta.name,
+                    "version": info.meta.version,
+                    "author": info.meta.author,
+                    "description": info.meta.description,
+                    "min_wenzi_version": info.meta.min_wenzi_version,
+                    "source_url": info.source_url,
+                    "registry_name": info.registry_name,
+                    "status": info.status.value,
+                    "installed_version": info.installed_version or "",
+                    "is_official": info.is_official,
+                    "enabled": is_enabled,
+                }
+            )
+        self._add_local_only_plugins(result, disabled)
+        return result
+
+    def _add_local_only_plugins(self, result: list[dict], disabled: set) -> None:
+        """Append locally-installed plugins that don't appear in any registry."""
+        from wenzi.scripting.plugin_meta import load_plugin_meta
+
+        known_ids = {p["id"] for p in result}
+        plugins_dir = self._plugin_registry._plugins_dir
+        if not os.path.isdir(plugins_dir):
+            return
+        for entry in os.listdir(plugins_dir):
+            entry_path = os.path.join(plugins_dir, entry)
+            if not os.path.isdir(entry_path):
+                continue
+            meta = load_plugin_meta(entry_path)
+            pid = meta.id or entry
+            if pid in known_ids:
+                continue
+            is_enabled = pid not in disabled and entry not in disabled
+            has_install = os.path.isfile(os.path.join(entry_path, "install.toml"))
+            result.append(
+                {
+                    "id": pid,
+                    "name": meta.name,
+                    "version": meta.version,
+                    "author": meta.author,
+                    "description": meta.description,
+                    "min_wenzi_version": meta.min_wenzi_version,
+                    "source_url": "",
+                    "registry_name": "Local",
+                    "status": "installed" if has_install else "manually_placed",
+                    "installed_version": meta.version,
+                    "is_official": False,
+                    "enabled": is_enabled,
+                }
+            )
