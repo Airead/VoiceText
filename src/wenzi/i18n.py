@@ -129,6 +129,20 @@ def get_locale() -> str:
     return _current_locale
 
 
+_DOCS_BASE_URL = "https://airead.github.io/WenZi"
+
+
+def build_doc_url(path: str) -> str:
+    """Build a full documentation URL with locale-aware prefix.
+
+    *path* should be relative, e.g. ``"enhance-modes.html#how-it-works"``.
+    """
+    locale = get_locale()
+    if locale.startswith("zh"):
+        return f"{_DOCS_BASE_URL}/zh/docs/{path}"
+    return f"{_DOCS_BASE_URL}/docs/{path}"
+
+
 def inject_i18n_into_webview(
     webview: Any, prefix: str, call_init: bool = True
 ) -> None:

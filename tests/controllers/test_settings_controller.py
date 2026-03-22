@@ -457,3 +457,18 @@ class TestHotkeyToggleWithMode:
         mock_app._config["hotkeys"]["ctrl"] = False
         ctrl.hotkey_toggle("ctrl", True)
         assert mock_app._config["hotkeys"]["ctrl"] is True
+
+
+class TestOpenDocLink:
+    @patch("wenzi.controllers.settings_controller.webbrowser")
+    @patch("wenzi.controllers.settings_controller.build_doc_url", return_value="https://example.com/docs/test")
+    def test_opens_url(self, mock_build, mock_wb, ctrl):
+        ctrl.open_doc_link("user-guide.html#hotkeys")
+        mock_build.assert_called_once_with("user-guide.html#hotkeys")
+        mock_wb.open.assert_called_once_with("https://example.com/docs/test")
+
+    @patch("wenzi.controllers.settings_controller.webbrowser")
+    @patch("wenzi.controllers.settings_controller.build_doc_url", return_value="https://example.com/docs/test")
+    def test_catches_exception(self, mock_build, mock_wb, ctrl):
+        mock_wb.open.side_effect = OSError("browser not found")
+        ctrl.open_doc_link("user-guide.html#hotkeys")  # should not raise

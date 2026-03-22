@@ -195,16 +195,10 @@ class MenuBuilder:
         """
         import webbrowser
 
-        from wenzi.i18n import get_locale
-
-        base_url = "https://airead.github.io/WenZi"
-        if get_locale() == "zh":
-            url = f"{base_url}/zh/docs/user-guide.html"
-        else:
-            url = f"{base_url}/docs/user-guide.html"
+        from wenzi.i18n import build_doc_url
 
         try:
-            webbrowser.open(url)
+            webbrowser.open(build_doc_url("user-guide.html"))
         except Exception as e:
             logger.error("Failed to open help URL: %s", e)
 

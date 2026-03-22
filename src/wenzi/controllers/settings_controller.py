@@ -6,6 +6,7 @@ import logging
 import os
 import subprocess
 import threading
+import webbrowser
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
 
 from wenzi.config import BUILTIN_REGISTRY_URL, save_config
 from wenzi.enhance.enhancer import MODE_OFF
-from wenzi.i18n import t
+from wenzi.i18n import build_doc_url, t
 from wenzi.transcription.model_registry import (
     PRESET_BY_ID,
     PRESETS,
@@ -227,6 +228,7 @@ class SettingsController:
             "on_plugin_reload": self._on_plugin_reload,
             "on_registry_add": self._on_registry_add,
             "on_registry_remove": self._on_registry_remove,
+            "on_open_doc": self.open_doc_link,
             "_reopen": lambda: self.on_open_settings(None),
         }
 
@@ -878,6 +880,13 @@ class SettingsController:
         app._config["ai_enhance"]["conversation_history"]["refresh_threshold"] = value
         self._save_and_reload()
         logger.info("History refresh_threshold set to: %d (from settings)", value)
+
+    def open_doc_link(self, path: str) -> None:
+        """Open a documentation page in the default browser."""
+        try:
+            webbrowser.open(build_doc_url(path))
+        except Exception as e:
+            logger.error("Failed to open doc URL: %s", e)
 
     def reveal_config_folder(self) -> None:
         """Open the config directory in Finder."""

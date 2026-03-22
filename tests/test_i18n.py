@@ -147,3 +147,21 @@ class TestGetTranslationsForPrefix:
         init_i18n(locale="en", locales_dir=locale_dir)
         result = get_translations_for_prefix("nonexistent.")
         assert result == {}
+
+
+class TestBuildDocUrl:
+    def test_english_locale(self, locale_dir):
+        from wenzi.i18n import build_doc_url, init_i18n
+
+        init_i18n(locale="en", locales_dir=locale_dir)
+        assert build_doc_url("user-guide.html#hotkeys") == (
+            "https://airead.github.io/WenZi/docs/user-guide.html#hotkeys"
+        )
+
+    def test_chinese_locale(self, locale_dir):
+        from wenzi.i18n import build_doc_url, init_i18n
+
+        init_i18n(locale="zh", locales_dir=locale_dir)
+        assert build_doc_url("enhance-modes.html#how-it-works") == (
+            "https://airead.github.io/WenZi/zh/docs/enhance-modes.html#how-it-works"
+        )

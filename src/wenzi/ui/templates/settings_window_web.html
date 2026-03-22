@@ -93,6 +93,47 @@ body {
 
 .group-title:first-of-type { margin-top: 0; }
 
+.group-title-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.content-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.content-title-row .content-title {
+  margin-bottom: 0;
+}
+
+.help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1.2px solid #86868b;
+  color: #86868b;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+  -webkit-user-select: none;
+  user-select: none;
+  line-height: 1;
+}
+
+.help-icon:hover {
+  color: #007aff;
+  border-color: #007aff;
+}
+
 .setting-group {
   background: white;
   border-radius: 10px;
@@ -248,6 +289,7 @@ input[type="range"] {
 }
 
 .provider-name { font-size: 12px; font-weight: 600; color: #1d1d1f; }
+.provider-header .help-icon { margin-left: 4px; margin-right: auto; }
 
 .provider-badge {
   font-size: 10px;
@@ -432,6 +474,8 @@ input[type="range"] {
   .badge-official { background:#1b5e20; color:#a5d6a7; }
   .badge-unverified { background:#bf360c; color:#ffcc80; }
   .reload-banner { background: #2a2a2a; border-color: #3a3a3a; }
+  .help-icon { border-color: #98989d; color: #98989d; }
+  .help-icon:hover { color: #6ca0f6; border-color: #6ca0f6; }
 }
 </style>
 </head>
@@ -487,12 +531,12 @@ input[type="range"] {
         </div>
       </div>
 
-      <div class="group-title" data-i18n="general_tab.hotkeys_section">Hotkeys</div>
+      <div class="group-title group-title-row"><span data-i18n="general_tab.hotkeys_section">Hotkeys</span><span class="help-icon" data-doc="user-guide.html#your-first-transcription">?</span></div>
       <div class="setting-group" id="hotkeys-group">
         <!-- Dynamically populated by renderHotkeys() -->
       </div>
 
-      <div class="group-title" data-i18n="general_tab.feedback_section">Feedback</div>
+      <div class="group-title group-title-row"><span data-i18n="general_tab.feedback_section">Feedback</span><span class="help-icon" data-doc="user-guide.html#recording-feedback">?</span></div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
@@ -523,7 +567,7 @@ input[type="range"] {
         </div>
       </div>
 
-      <div class="group-title" data-i18n="general_tab.output_section">Output</div>
+      <div class="group-title group-title-row"><span data-i18n="general_tab.output_section">Output</span><span class="help-icon" data-doc="user-guide.html#preview-mode-vs-direct-mode">?</span></div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
@@ -536,7 +580,7 @@ input[type="range"] {
         </div>
       </div>
 
-      <div class="group-title" data-i18n="general_tab.scripting_section">Advanced</div>
+      <div class="group-title group-title-row"><span data-i18n="general_tab.scripting_section">Advanced</span><span class="help-icon" data-doc="scripting.html#quick-start">?</span></div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
@@ -549,7 +593,7 @@ input[type="range"] {
         </div>
       </div>
 
-      <div class="group-title" data-i18n="general_tab.config_dir_section">Config Directory</div>
+      <div class="group-title group-title-row"><span data-i18n="general_tab.config_dir_section">Config Directory</span><span class="help-icon" data-doc="configuration.html#config-directory-resolution">?</span></div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
@@ -580,7 +624,7 @@ input[type="range"] {
 
     <!-- LLM Tab -->
     <div id="tab-llm" class="tab-content">
-      <div class="content-title" data-i18n="llm_tab.title">LLM</div>
+      <div class="content-title-row"><div class="content-title" data-i18n="llm_tab.title">LLM</div><span class="help-icon" data-doc="provider-model-guide.html#ai-llm-provider-configuration">?</span></div>
       <div class="setting-group" id="llm-model-list">
         <!-- Dynamically populated by renderLlmTab() -->
       </div>
@@ -604,12 +648,12 @@ input[type="range"] {
     <div id="tab-ai" class="tab-content">
       <div class="content-title" data-i18n="ai_tab.title">AI Enhancement</div>
 
-      <div class="group-title" data-i18n="ai_tab.enhance_mode">Mode</div>
+      <div class="group-title group-title-row"><span data-i18n="ai_tab.enhance_mode">Mode</span><span class="help-icon" data-doc="enhance-modes.html#how-it-works">?</span></div>
       <div class="setting-group" id="ai-modes-group">
         <!-- Dynamically populated by renderAiModes() -->
       </div>
 
-      <div class="group-title" data-i18n="ai_tab.options_section">Options</div>
+      <div class="group-title group-title-row"><span data-i18n="ai_tab.options_section">Options</span><span class="help-icon" data-doc="configuration.html#ai-enhancement">?</span></div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
@@ -725,7 +769,7 @@ input[type="range"] {
         </div>
       </div>
 
-      <div class="group-title" data-i18n="launcher_tab.hotkey_section">Hotkey</div>
+      <div class="group-title group-title-row"><span data-i18n="launcher_tab.hotkey_section">Hotkey</span><span class="help-icon" data-doc="scripting.html#activation">?</span></div>
       <div class="setting-group">
         <div class="setting-row">
           <div class="setting-left">
@@ -750,7 +794,7 @@ input[type="range"] {
         </div>
       </div>
 
-      <div class="group-title" data-i18n="launcher_tab.data_sources_section">Data Sources</div>
+      <div class="group-title group-title-row"><span data-i18n="launcher_tab.data_sources_section">Data Sources</span><span class="help-icon" data-doc="scripting.html#built-in-data-sources">?</span></div>
       <div class="setting-group" id="launcher-sources-group">
         <!-- Dynamically populated by renderLauncherSources() -->
       </div>
@@ -854,6 +898,14 @@ function postCallback(name) {
   var args = Array.prototype.slice.call(arguments, 1);
   window._postMessage({type: 'callback', name: name, args: args});
 }
+
+document.addEventListener('click', function(e) {
+  var icon = e.target.closest('.help-icon');
+  if (icon && icon.dataset.doc) {
+    e.stopPropagation();
+    postCallback('on_open_doc', icon.dataset.doc);
+  }
+});
 
 function toggleClick(el, callbackName) {
   el.classList.toggle('on');
@@ -985,6 +1037,7 @@ function renderSttTab() {
   if (presets.length > 0) {
     html += '<div class="provider-header">';
     html += '  <span class="provider-name">' + _esc(_t('stt_tab.local_section', 'Local')) + '</span>';
+    html += '  <span class="help-icon" data-doc="provider-model-guide.html#asr-model-selection">?</span>';
     html += '  <span class="provider-badge local">On-device</span>';
     html += '</div>';
     for (var i = 0; i < presets.length; i++) {
@@ -1008,6 +1061,7 @@ function renderSttTab() {
   if (remotes.length > 0) {
     html += '<div class="provider-header">';
     html += '  <span class="provider-name">' + _esc(_t('stt_tab.remote_section', 'Remote')) + '</span>';
+    html += '  <span class="help-icon" data-doc="provider-model-guide.html#remote-asr-providers">?</span>';
     html += '  <span class="provider-badge remote">Cloud</span>';
     html += '</div>';
     for (var j = 0; j < remotes.length; j++) {
