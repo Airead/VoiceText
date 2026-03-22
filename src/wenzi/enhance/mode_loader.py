@@ -26,6 +26,7 @@ class ModeDefinition:
     prompt: str
     order: int = 50
     steps: List[str] = None  # type: ignore[assignment]
+    track_corrections: bool = False
 
     def __post_init__(self) -> None:
         if self.steps is None:
@@ -59,6 +60,7 @@ _BUILTIN_MODES: Dict[str, ModeDefinition] = {
             "13. 直接输出修正后的文本，不要添加任何解释或说明"
         ),
         order=10,
+        track_corrections=True,
     ),
     "translate_en": ModeDefinition(
         mode_id="translate_en",
@@ -126,6 +128,7 @@ def parse_mode_file(file_path: str) -> Optional[ModeDefinition]:
     label = basename
     order = 50
     steps: List[str] = []
+    track_corrections = False
     prompt = content.strip()
 
     # Try to parse front matter delimited by ---
@@ -149,10 +152,15 @@ def parse_mode_file(file_path: str) -> Optional[ModeDefinition]:
         if steps_match:
             steps = [s.strip() for s in steps_match.group(1).split(",") if s.strip()]
 
+        # Extract track_corrections
+        tc_match = re.search(r"^track_corrections:\s*(true|false)$", front_matter, re.MULTILINE | re.IGNORECASE)
+        if tc_match:
+            track_corrections = tc_match.group(1).lower() == "true"
+
         if body:
             prompt = body
 
-    return ModeDefinition(mode_id=basename, label=label, prompt=prompt, order=order, steps=steps)
+    return ModeDefinition(mode_id=basename, label=label, prompt=prompt, order=order, steps=steps, track_corrections=track_corrections)
 
 
 def load_modes(modes_dir: Optional[str] = None) -> Dict[str, ModeDefinition]:
@@ -205,6 +213,8 @@ def ensure_default_modes(modes_dir: Optional[str] = None) -> str:
         ]
         if mode_def.steps:
             lines.append(f"steps: {', '.join(mode_def.steps)}")
+        if mode_def.track_corrections:
+            lines.append("track_corrections: true")
         lines.append("---")
         lines.append(mode_def.prompt)
         lines.append("")

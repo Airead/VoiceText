@@ -255,6 +255,48 @@ class TestBuiltinModes:
         assert mode.prompt == ""
 
 
+class TestTrackCorrections:
+    def test_mode_definition_track_corrections_default(self):
+        """track_corrections defaults to False."""
+        from wenzi.enhance.mode_loader import ModeDefinition
+
+        mode = ModeDefinition(mode_id="test", label="Test", prompt="p")
+        assert mode.track_corrections is False
+
+    def test_proofread_builtin_has_track_corrections(self):
+        """Builtin proofread mode has track_corrections=True."""
+        assert _BUILTIN_MODES["proofread"].track_corrections is True
+
+    def test_translate_builtin_no_track_corrections(self):
+        """Other builtin modes have track_corrections=False."""
+        assert _BUILTIN_MODES["translate_en"].track_corrections is False
+
+    def test_parse_mode_file_track_corrections(self, tmp_path):
+        """track_corrections is parsed from YAML front matter."""
+        mode_file = tmp_path / "custom.md"
+        mode_file.write_text(
+            "---\nlabel: Custom\ntrack_corrections: true\n---\nPrompt text"
+        )
+        mode = parse_mode_file(str(mode_file))
+        assert mode is not None
+        assert mode.track_corrections is True
+
+    def test_parse_mode_file_no_track_corrections(self, tmp_path):
+        """Missing track_corrections defaults to False."""
+        mode_file = tmp_path / "other.md"
+        mode_file.write_text("---\nlabel: Other\n---\nPrompt text")
+        mode = parse_mode_file(str(mode_file))
+        assert mode is not None
+        assert mode.track_corrections is False
+
+    def test_ensure_default_modes_writes_track_corrections(self, tmp_path):
+        """ensure_default_modes writes track_corrections to front matter."""
+        ensure_default_modes(str(tmp_path))
+        proofread_file = tmp_path / "proofread.md"
+        content = proofread_file.read_text()
+        assert "track_corrections: true" in content
+
+
 class TestAddModeTemplate:
     """Verify the add-mode template used in the UI is parseable."""
 
