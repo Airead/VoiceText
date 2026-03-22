@@ -12,6 +12,8 @@ _DEFAULT_MAX_REPLACE_TOKENS = 8
 
 _SCHEMA_VERSION = 1
 
+_MIN_LATIN_VARIANT_LENGTH = 4
+
 _DDL = """
 CREATE TABLE IF NOT EXISTS correction_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,7 +105,31 @@ class CorrectionTracker:
 
     def __init__(self, db_path: str) -> None:
         self._db_path = db_path
+        self._common_words: Optional[set] = None
         self._init_db()
+
+    def _get_common_words(self) -> set:
+        """Lazy-load and cache the common words set."""
+        if self._common_words is None:
+            from wenzi.enhance.vocabulary_builder import _load_common_words
+            self._common_words = _load_common_words()
+        return self._common_words
+
+    def _should_exclude(self, original: str, corrected: str) -> bool:
+        """Return True if a correction pair should be auto-excluded.
+
+        Exclusion rules (applied in order):
+        1. If ``corrected.lower()`` is in the common words set, the corrected
+           word is a generic common word — exclude it.
+        2. If the original word is a short (< _MIN_LATIN_VARIANT_LENGTH chars)
+           pure ASCII alphanumeric token, it is likely a trivial Latin variant —
+           exclude it.
+        """
+        if corrected.lower() in self._get_common_words():
+            return True
+        if _is_latin(original) and len(original) < _MIN_LATIN_VARIANT_LENGTH:
+            return True
+        return False
 
     def _get_conn(self) -> sqlite3.Connection:
         """Open a new connection with foreign keys enabled."""
@@ -187,14 +213,31 @@ class CorrectionTracker:
         app_bundle_id: str,
         timestamp: str,
     ) -> None:
-        """Insert or increment count for a correction pair."""
+        """Insert or increment count for a correction pair.
+
+        Auto-exclusion is applied only on first insert; subsequent upserts do not
+        change the excluded flag.
+        """
+        excluded_flag = int(self._should_exclude(original, corrected))
         conn.execute(
             """INSERT INTO correction_pairs
                (session_id, source, original_word, corrected_word, asr_model, llm_model,
                 app_bundle_id, count, first_seen, last_seen, excluded)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
                ON CONFLICT(source, original_word, corrected_word, asr_model, llm_model, app_bundle_id)
                DO UPDATE SET count = count + 1, last_seen = excluded.last_seen""",
             (session_id, source, original, corrected, asr_model, llm_model, app_bundle_id,
-             timestamp, timestamp),
+             timestamp, timestamp, excluded_flag),
         )
+
+    def mark_excluded(self, pair_id: int, excluded: bool = True) -> None:
+        """Manually set or clear the excluded flag for a correction pair."""
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                "UPDATE correction_pairs SET excluded = ? WHERE id = ?",
+                (int(excluded), pair_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()

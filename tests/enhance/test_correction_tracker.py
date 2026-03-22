@@ -138,3 +138,65 @@ def test_record_no_pairs_when_texts_identical(tmp_path):
     conn = sqlite3.connect(str(tmp_path / "t.db"))
     assert conn.execute("SELECT COUNT(*) FROM correction_pairs").fetchone()[0] == 0
     conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Task 4: Auto-exclusion filters
+# ---------------------------------------------------------------------------
+
+
+def test_mark_excluded_manual(tmp_path):
+    tracker = CorrectionTracker(db_path=str(tmp_path / "t.db"))
+    tracker.record(asr_text="我在用cloud做开发", enhanced_text="",
+        final_text="我在用claude做开发", asr_model="FunASR", llm_model="",
+        app_bundle_id="", enhance_mode="proofread", audio_duration=None, user_corrected=False)
+    conn = sqlite3.connect(str(tmp_path / "t.db"))
+    pair_id = conn.execute("SELECT id FROM correction_pairs LIMIT 1").fetchone()[0]
+    conn.close()
+    tracker.mark_excluded(pair_id, excluded=True)
+    conn = sqlite3.connect(str(tmp_path / "t.db"))
+    excluded = conn.execute("SELECT excluded FROM correction_pairs WHERE id=?", (pair_id,)).fetchone()[0]
+    conn.close()
+    assert excluded == 1
+
+
+def test_mark_excluded_unmark(tmp_path):
+    tracker = CorrectionTracker(db_path=str(tmp_path / "t.db"))
+    tracker.record(asr_text="我在用cloud做开发", enhanced_text="",
+        final_text="我在用claude做开发", asr_model="FunASR", llm_model="",
+        app_bundle_id="", enhance_mode="proofread", audio_duration=None, user_corrected=False)
+    conn = sqlite3.connect(str(tmp_path / "t.db"))
+    pair_id = conn.execute("SELECT id FROM correction_pairs LIMIT 1").fetchone()[0]
+    conn.close()
+    tracker.mark_excluded(pair_id, excluded=True)
+    tracker.mark_excluded(pair_id, excluded=False)
+    conn = sqlite3.connect(str(tmp_path / "t.db"))
+    excluded = conn.execute("SELECT excluded FROM correction_pairs WHERE id=?", (pair_id,)).fetchone()[0]
+    conn.close()
+    assert excluded == 0
+
+
+def test_short_latin_original_auto_excluded(tmp_path):
+    """Short Latin original_word (< 4 chars) gets excluded=1."""
+    tracker = CorrectionTracker(db_path=str(tmp_path / "t.db"))
+    tracker.record(asr_text="use set for config", enhanced_text="",
+        final_text="use STT for config", asr_model="FunASR", llm_model="",
+        app_bundle_id="", enhance_mode="proofread", audio_duration=None, user_corrected=False)
+    conn = sqlite3.connect(str(tmp_path / "t.db"))
+    row = conn.execute("SELECT excluded FROM correction_pairs WHERE original_word='set' AND corrected_word='STT'").fetchone()
+    conn.close()
+    if row:
+        assert row[0] == 1
+
+
+def test_normal_word_not_excluded(tmp_path):
+    """Technical corrections (e.g. cloud -> Kubernetes) should not be auto-excluded."""
+    tracker = CorrectionTracker(db_path=str(tmp_path / "t.db"))
+    tracker.record(asr_text="我在用cloud做开发", enhanced_text="",
+        final_text="我在用Kubernetes做开发", asr_model="FunASR", llm_model="",
+        app_bundle_id="", enhance_mode="proofread", audio_duration=None, user_corrected=False)
+    conn = sqlite3.connect(str(tmp_path / "t.db"))
+    row = conn.execute("SELECT excluded FROM correction_pairs WHERE corrected_word='Kubernetes'").fetchone()
+    conn.close()
+    assert row is not None
+    assert row[0] == 0
