@@ -12,6 +12,15 @@ import pytest
 from wenzi.enhance.vocabulary_builder import BuildCallbacks, VocabularyBuilder
 
 
+@pytest.fixture(autouse=True)
+def _fast_common_words(monkeypatch):
+    """Skip loading 8MB word list files — not needed for build logic tests."""
+    monkeypatch.setattr(
+        "wenzi.enhance.vocabulary_builder._load_common_words",
+        lambda: set(),
+    )
+
+
 def _make_config(**overrides):
     """Helper to create a valid builder config."""
     cfg = {

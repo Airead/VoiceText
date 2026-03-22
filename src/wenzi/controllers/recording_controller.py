@@ -39,6 +39,7 @@ class RecordingController:
         self._release_lock = threading.Lock()
         self._release_done = False
         self._input_context = None
+        self._delayed_thread: threading.Thread | None = None
 
     @property
     def input_context(self):
@@ -206,7 +207,8 @@ class RecordingController:
             if app._transcriber.supports_streaming:
                 from PyObjCTools import AppHelper
                 AppHelper.callAfter(self._show_live_overlay, False)
-            threading.Thread(target=_delayed_start, daemon=True).start()
+            self._delayed_thread = threading.Thread(target=_delayed_start, daemon=True)
+            self._delayed_thread.start()
         else:
             # No sound delay — start recording first, then show in active state
             self._start_recording_and_update_indicator(show_active=True)
@@ -411,7 +413,8 @@ class RecordingController:
             if app._transcriber.supports_streaming:
                 from PyObjCTools import AppHelper
                 AppHelper.callAfter(self._show_live_overlay, False)
-            threading.Thread(target=_delayed_start, daemon=True).start()
+            self._delayed_thread = threading.Thread(target=_delayed_start, daemon=True)
+            self._delayed_thread.start()
         else:
             self._start_recording_and_update_indicator(show_active=True)
             app._recording_started.set()

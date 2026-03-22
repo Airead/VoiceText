@@ -975,6 +975,7 @@ class TestDelayedStartExceptionSafety:
         # Wait for _delayed_start to complete — use event.wait() instead of
         # time.sleep() for robustness against thread scheduling jitter.
         mock_app._recording_started.wait(timeout=2.0)
+        ctrl._delayed_thread.join(timeout=1.0)
 
         # recording_started must be set despite the exception (via finally)
         assert mock_app._recording_started.is_set()
