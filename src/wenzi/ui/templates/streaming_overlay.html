@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+:root {
+    --bg: rgba(245, 245, 245, 0.92);
+    --text: #1d1d1f;
+    --secondary: #6e6e73;
+    --border: rgba(0, 0, 0, 0.12);
+    --thinking: #86868b;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: rgba(38, 38, 38, 0.92);
+        --text: #f0f0f0;
+        --secondary: #a0a0a5;
+        --border: rgba(255, 255, 255, 0.15);
+        --thinking: #8e8e93;
+        }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+    height: 100%;
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    -webkit-user-select: none; user-select: none;
+}
+body {
+    background: var(--bg);
+    border-radius: __RADIUS__px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    padding: 10px 12px;
+}
+#asr-section {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+    margin-bottom: 4px;
+}
+#asr-title {
+    font-weight: 600; font-size: 11px; color: var(--secondary);
+    margin-bottom: 2px; flex-shrink: 0;
+}
+#asr-text {
+    flex: 1; min-height: 0;
+    font-size: 12px; color: var(--secondary);
+    line-height: 1.4;
+    overflow-y: auto; scrollbar-width: none;
+    -webkit-user-select: text; user-select: text;
+    cursor: text;
+}
+#asr-text::-webkit-scrollbar { display: none; }
+#asr-text:empty::after {
+    content: "Transcribing...";
+    animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+#ai-section {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+    padding-top: 4px;
+}
+#status {
+    font-weight: 600; font-size: 11px;
+    margin-bottom: 2px; flex-shrink: 0;
+}
+#stream-area {
+    flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+    font-size: 13px; line-height: 1.4;
+    scrollbar-width: none;
+    -webkit-user-select: text; user-select: text;
+    cursor: text;
+}
+#stream-area::-webkit-scrollbar { display: none; }
+.thinking { color: var(--thinking); font-style: italic; }
+</style>
+</head>
+<body>
+<div id="asr-section">
+  <div id="asr-title"></div>
+  <div id="asr-text"></div>
+</div>
+<div id="ai-section">
+  <div id="status"></div>
+  <div id="stream-area"></div>
+</div>
+<script>
+const C = __CONFIG__;
+document.getElementById('asr-title').textContent = C.asrTitle;
+document.getElementById('asr-text').textContent = C.asrText;
+document.getElementById('status').textContent = C.statusText;
+
+function setAsrText(t) { document.getElementById('asr-text').textContent = t; }
+function setStatus(t) { document.getElementById('status').textContent = t; }
+function setStatusHtml(h) { document.getElementById('status').innerHTML = h; }
+
+function appendText(chunk, tokens) {
+    const el = document.getElementById('stream-area');
+    // If there was thinking content, clear it for real content
+    if (el._hasThinking) { el.innerHTML = ''; el._hasThinking = false; }
+    el.appendChild(document.createTextNode(chunk));
+    el.scrollTop = el.scrollHeight;
+    if (tokens > 0) setStatus(C.aiBase + '  Chars: \u2193' + tokens.toLocaleString());
+}
+
+function appendThinkingText(chunk, tokens) {
+    const el = document.getElementById('stream-area');
+    el._hasThinking = true;
+    const span = document.createElement('span');
+    span.className = 'thinking';
+    span.textContent = chunk;
+    el.appendChild(span);
+    el.scrollTop = el.scrollHeight;
+    if (tokens > 0) setStatus(C.aiBase + '  \u25b6 Thinking: ' + tokens.toLocaleString() + ' chars');
+}
+
+function clearText() {
+    const el = document.getElementById('stream-area');
+    el.innerHTML = '';
+    el._hasThinking = false;
+}
+
+function setComplete(usage) {
+    if (usage && usage.total_tokens) {
+        var prompt = usage.prompt_tokens||0, comp = usage.completion_tokens||0;
+        var cached = usage.cache_read_tokens||0;
+        var pp = cached
+            ? '<span style="opacity:0.5">\u2191' + cached.toLocaleString() + '</span>+' + (prompt-cached).toLocaleString()
+            : '\u2191' + prompt.toLocaleString();
+        var safe = C.aiBase.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+        setStatusHtml(safe + '&ensp;Tokens: ' + usage.total_tokens.toLocaleString()
+            + ' (' + pp + ' \u2193' + comp.toLocaleString() + ')');
+    } else {
+        setStatus(C.aiBase);
+    }
+}
+</script>
+</body>
+</html>

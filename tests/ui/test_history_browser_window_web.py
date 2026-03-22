@@ -614,36 +614,35 @@ class TestPushData:
 
 
 class TestHtmlTemplate:
-    def test_has_dark_mode_support(self):
-        from wenzi.ui.history_browser_window_web import _HTML_TEMPLATE
+    def _template(self):
+        from wenzi.ui.templates import load_template
 
-        assert "prefers-color-scheme: dark" in _HTML_TEMPLATE
+        return load_template("history_browser_window_web.html")
+
+    def test_has_dark_mode_support(self):
+        assert "prefers-color-scheme: dark" in self._template()
 
     def test_has_key_ui_elements(self):
-        from wenzi.ui.history_browser_window_web import _HTML_TEMPLATE
-
+        html = self._template()
         for elem_id in ("search", "time-range", "clear-btn",
                          "tag-row", "stats-line", "table-body",
                          "save-btn", "close-btn"):
-            assert elem_id in _HTML_TEMPLATE
+            assert elem_id in html
 
     def test_has_tag_filter_row(self):
-        from wenzi.ui.history_browser_window_web import _HTML_TEMPLATE
-
-        assert "tag-pill" in _HTML_TEMPLATE
-        assert "tag-row" in _HTML_TEMPLATE
+        html = self._template()
+        assert "tag-pill" in html
+        assert "tag-row" in html
 
     def test_has_keyboard_shortcuts(self):
-        from wenzi.ui.history_browser_window_web import _HTML_TEMPLATE
-
-        assert "Escape" in _HTML_TEMPLATE
-        assert "metaKey" in _HTML_TEMPLATE
+        html = self._template()
+        assert "Escape" in html
+        assert "metaKey" in html
 
     def test_has_table_columns(self):
-        from wenzi.ui.history_browser_window_web import _HTML_TEMPLATE
-
+        html = self._template()
         for col in ("col-time", "col-mode", "col-content", "col-tags"):
-            assert col in _HTML_TEMPLATE
+            assert col in html
 
 
 class TestFormatTimestamp:

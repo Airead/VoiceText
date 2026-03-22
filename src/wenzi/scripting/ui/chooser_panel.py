@@ -1306,14 +1306,14 @@ class ChooserPanel:
         # of these two XDG paths is ~/, so we must grant home-wide read
         # access.  This is safe because the web view only loads our own
         # local HTML — no user-controlled URLs are loaded.
-        from wenzi.scripting.ui.chooser_html import CHOOSER_HTML
+        from wenzi.ui.templates import load_template
         from wenzi.config import DEFAULT_CACHE_DIR
 
         cache_dir = os.path.expanduser(DEFAULT_CACHE_DIR)
         os.makedirs(cache_dir, exist_ok=True)
         html_path = os.path.join(cache_dir, "_chooser.html")
         with open(html_path, "w", encoding="utf-8") as f:
-            f.write(CHOOSER_HTML)
+            f.write(load_template("chooser.html"))
         home_dir = os.path.expanduser("~")
         webview.loadFileURL_allowingReadAccessToURL_(
             NSURL.fileURLWithPath_(html_path),
