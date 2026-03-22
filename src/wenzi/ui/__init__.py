@@ -1,25 +1,28 @@
 """UI subpackage — panels, windows, and overlays."""
 
-from .history_browser_window import HistoryBrowserPanel
-from .history_browser_window_web import HistoryBrowserPanel as WebHistoryBrowserPanel
-from .live_transcription_overlay import LiveTranscriptionOverlay
-from .log_viewer_window import LogViewerPanel
-from .result_window_web import ResultPreviewPanel
-from .settings_window_web import SettingsWebPanel as SettingsPanel
-from .streaming_overlay import StreamingOverlayPanel
-from .stats_panel import StatsChartPanel
-from .translate_webview import TranslateWebViewPanel
-from .vocab_build_window import VocabBuildProgressPanel
+_LAZY_IMPORTS: dict[str, tuple[str, str]] = {
+    "HistoryBrowserPanel": (".history_browser_window", "HistoryBrowserPanel"),
+    "WebHistoryBrowserPanel": (".history_browser_window_web", "HistoryBrowserPanel"),
+    "LiveTranscriptionOverlay": (".live_transcription_overlay", "LiveTranscriptionOverlay"),
+    "LogViewerPanel": (".log_viewer_window", "LogViewerPanel"),
+    "ResultPreviewPanel": (".result_window_web", "ResultPreviewPanel"),
+    "SettingsPanel": (".settings_window_web", "SettingsWebPanel"),
+    "StatsChartPanel": (".stats_panel", "StatsChartPanel"),
+    "StreamingOverlayPanel": (".streaming_overlay", "StreamingOverlayPanel"),
+    "TranslateWebViewPanel": (".translate_webview", "TranslateWebViewPanel"),
+    "VocabBuildProgressPanel": (".vocab_build_window", "VocabBuildProgressPanel"),
+}
 
-__all__ = [
-    "HistoryBrowserPanel",
-    "WebHistoryBrowserPanel",
-    "LiveTranscriptionOverlay",
-    "LogViewerPanel",
-    "ResultPreviewPanel",
-    "SettingsPanel",
-    "StatsChartPanel",
-    "StreamingOverlayPanel",
-    "TranslateWebViewPanel",
-    "VocabBuildProgressPanel",
-]
+__all__ = list(_LAZY_IMPORTS)
+
+
+def __getattr__(name: str):
+    if name in _LAZY_IMPORTS:
+        import importlib
+
+        module_path, attr = _LAZY_IMPORTS[name]
+        mod = importlib.import_module(module_path, __package__)
+        value = getattr(mod, attr)
+        globals()[name] = value  # cache for subsequent access
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

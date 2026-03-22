@@ -2,6 +2,7 @@
 
 import os
 
+import pytest
 from unittest.mock import patch
 
 from wenzi.scripting.sources.app_source import (
@@ -116,6 +117,14 @@ class TestScanApps:
 
 
 class TestAppSource:
+    @pytest.fixture(autouse=True)
+    def _no_real_icon_extraction(self, monkeypatch):
+        """Prevent real AppKit icon extraction in search tests."""
+        monkeypatch.setattr(
+            "wenzi.scripting.sources.app_source._get_app_icon_png",
+            lambda path: None,
+        )
+
     def _make_source(self, tmp_path):
         """Create an AppSource with a temp directory."""
         (tmp_path / "Safari.app").mkdir()

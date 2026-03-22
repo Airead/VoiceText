@@ -355,39 +355,52 @@ class TestVadHasSpeech:
 # ---------------------------------------------------------------------------
 
 class TestGetModelDir:
+    @staticmethod
+    def _mock_modelscope(cache_root):
+        """Return a context manager that mocks modelscope in sys.modules."""
+        mock_ms = MagicMock()
+        mock_ms.utils.file_utils.get_modelscope_cache_dir.return_value = str(cache_root)
+        return patch.dict("sys.modules", {
+            "modelscope": mock_ms,
+            "modelscope.utils": mock_ms.utils,
+            "modelscope.utils.file_utils": mock_ms.utils.file_utils,
+        })
+
     def test_uses_cached_model_quant(self, tmp_path):
         """Returns cache path when model_quant.onnx exists."""
-        model_dir = (tmp_path / ".cache" / "modelscope" / "hub" / "models" /
-                     "iic" / "speech_paraformer-large_asr_nat-zh-cn")
+        cache_root = tmp_path / ".cache" / "modelscope" / "hub"
+        model_dir = cache_root / "models" / "iic" / "speech_paraformer-large_asr_nat-zh-cn"
         model_dir.mkdir(parents=True)
         (model_dir / "model_quant.onnx").touch()
 
         t = FunASRTranscriber()
-        with patch("pathlib.Path.home", return_value=tmp_path):
+        with self._mock_modelscope(cache_root):
             result = t._get_model_dir("iic/speech_paraformer-large_asr_nat-zh-cn")
 
         assert result == str(model_dir)
 
     def test_uses_cached_model_onnx(self, tmp_path):
         """Returns cache path when model.onnx exists."""
-        model_dir = tmp_path / ".cache" / "modelscope" / "hub" / "models" / "iic" / "mymodel"
+        cache_root = tmp_path / ".cache" / "modelscope" / "hub"
+        model_dir = cache_root / "models" / "iic" / "mymodel"
         model_dir.mkdir(parents=True)
         (model_dir / "model.onnx").touch()
 
         t = FunASRTranscriber()
-        with patch("pathlib.Path.home", return_value=tmp_path):
+        with self._mock_modelscope(cache_root):
             result = t._get_model_dir("iic/mymodel")
 
         assert result == str(model_dir)
 
     def test_model_name_without_slash(self, tmp_path):
         """Model names without '/' use the full name as short_name."""
-        model_dir = tmp_path / ".cache" / "modelscope" / "hub" / "models" / "iic" / "modelonly"
+        cache_root = tmp_path / ".cache" / "modelscope" / "hub"
+        model_dir = cache_root / "models" / "iic" / "modelonly"
         model_dir.mkdir(parents=True)
         (model_dir / "model_quant.onnx").touch()
 
         t = FunASRTranscriber()
-        with patch("pathlib.Path.home", return_value=tmp_path):
+        with self._mock_modelscope(cache_root):
             result = t._get_model_dir("modelonly")
 
         # short_name == "modelonly", but cache_base is under "iic"
@@ -441,7 +454,10 @@ class TestLoaders:
 
     def test_load_asr_failure(self):
         t = FunASRTranscriber()
-        with patch.object(t, "_get_model_dir", side_effect=Exception("download failed")):
+        with patch.dict("sys.modules", {
+            "funasr_onnx": MagicMock(),
+            "funasr_onnx.paraformer_bin": MagicMock(),
+        }), patch.object(t, "_get_model_dir", side_effect=Exception("download failed")):
             result = t._load_asr()
         assert result is False
         assert t._asr_model is None
