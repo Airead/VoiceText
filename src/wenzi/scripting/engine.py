@@ -771,9 +771,8 @@ class ScriptEngine:
 
         from wenzi.scripting.plugin_installer import BACKUP_SUFFIX, TEMP_DIR_PREFIX
 
-        # Single scan: clean up stale temp/backup dirs, collect plugin entries
-        all_entries = sorted(os.listdir(self._plugins_dir))
-        for entry in all_entries:
+        # Clean up stale temp/backup dirs from interrupted installs
+        for entry in os.listdir(self._plugins_dir):
             entry_path = os.path.join(self._plugins_dir, entry)
             if not os.path.isdir(entry_path):
                 continue
@@ -801,7 +800,8 @@ class ScriptEngine:
 
         disabled = set(self._config.get("disabled_plugins", []))
 
-        for entry in all_entries:
+        # Re-scan after cleanup to see the post-cleanup state
+        for entry in sorted(os.listdir(self._plugins_dir)):
             if entry.startswith((".", "_")):
                 continue
             plugin_path = os.path.join(self._plugins_dir, entry)
