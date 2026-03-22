@@ -5,6 +5,7 @@ from __future__ import annotations
 import json as _json
 import logging
 import os
+import re
 import threading
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
@@ -167,6 +168,23 @@ def parse_provider_text(text: str):
         return "\n".join(errors)
 
     return name, base_url, api_key, models, extra_body
+
+
+_PROVIDER_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
+def validate_provider_name(name: str) -> Optional[str]:
+    """Validate provider name format.
+
+    Returns None if valid, or an error message string if invalid.
+    Allowed characters: letters, digits, hyphens, underscores.
+    """
+    if not name or not name.strip():
+        return "name is required"
+    name = name.strip()
+    if not _PROVIDER_NAME_RE.match(name):
+        return "name may only contain letters, digits, hyphens, and underscores"
+    return None
 
 
 def migrate_asr_config(asr_cfg: Dict[str, Any]) -> None:

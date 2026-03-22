@@ -11,6 +11,7 @@ from wenzi.controllers.model_controller import (
     migrate_asr_config,
     parse_asr_provider_text,
     parse_provider_text,
+    validate_provider_name,
     ModelController,
 )
 
@@ -508,3 +509,39 @@ class TestLlmProviderDraft:
         config_path = str(tmp_path / "config.json")
         ctrl = _make_controller(config_path)
         assert ctrl._get_asr_provider_draft_path() != ctrl._get_provider_draft_path()
+
+
+# ---------------------------------------------------------------------------
+# validate_provider_name
+# ---------------------------------------------------------------------------
+
+
+class TestValidateProviderName:
+    """Tests for provider name format validation."""
+
+    def test_valid_names(self):
+        assert validate_provider_name("openai") is None
+        assert validate_provider_name("my-provider") is None
+        assert validate_provider_name("provider_2") is None
+        assert validate_provider_name("DeepSeek") is None
+
+    def test_empty_name(self):
+        err = validate_provider_name("")
+        assert err is not None
+        assert "required" in err.lower()
+
+    def test_spaces(self):
+        err = validate_provider_name("my provider")
+        assert err is not None
+
+    def test_dots(self):
+        err = validate_provider_name("my.provider")
+        assert err is not None
+
+    def test_slashes(self):
+        err = validate_provider_name("my/provider")
+        assert err is not None
+
+    def test_special_chars(self):
+        err = validate_provider_name("provider@home")
+        assert err is not None
