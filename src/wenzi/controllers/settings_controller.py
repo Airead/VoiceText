@@ -45,9 +45,7 @@ class SettingsController:
 
     def __init__(self, app: WenZiApp) -> None:
         self._app = app
-        from wenzi.config import DEFAULT_PLUGINS_DIR
-
-        plugins_dir = os.path.expanduser(DEFAULT_PLUGINS_DIR)
+        plugins_dir = os.path.join(app._config_dir, "plugins")
         self._plugin_registry = PluginRegistry(plugins_dir=plugins_dir)
         self._plugin_installer = PluginInstaller(plugins_dir=plugins_dir)
         self._needs_reload = False
@@ -1409,7 +1407,9 @@ class SettingsController:
         if engine is not None:
             engine.reload()
         self._needs_reload = False
-        app._settings_panel.update_state({"show_reload_banner": False})
+        app._settings_panel.update_state(
+            {"show_reload_banner": False, "plugins_error": None}
+        )
         self._refresh_plugin_state()
 
     def _refresh_plugin_state(self) -> None:
@@ -1469,9 +1469,26 @@ class SettingsController:
             registries.append({"name": url, "removable": True})
         self._app._settings_panel.update_state({"registries": registries})
 
+    def _get_load_errors_by_id(self) -> dict[str, dict[str, str]]:
+        """Return plugin load errors keyed by plugin ID."""
+        engine = getattr(self._app, "_script_engine", None)
+        if engine is None:
+            return {}
+        return engine.get_load_errors_by_id()
+
+    @staticmethod
+    def _error_fields(load_errors: dict, pid: str) -> dict:
+        """Extract load_error/load_traceback fields for a plugin state dict."""
+        err = load_errors.get(pid, {})
+        return {
+            "load_error": err.get("message", ""),
+            "load_traceback": err.get("traceback", ""),
+        }
+
     def _plugin_infos_to_state(self, infos: list[PluginInfo]) -> list[dict]:
         """Convert PluginInfo list to serialisable state dicts for the UI."""
         disabled = set(self._app._config.get("disabled_plugins", []))
+        load_errors = self._get_load_errors_by_id()
         result = []
         for info in infos:
             pid = info.meta.id
@@ -1490,12 +1507,15 @@ class SettingsController:
                     "installed_version": info.installed_version or "",
                     "is_official": info.is_official,
                     "enabled": is_enabled,
+                    **self._error_fields(load_errors, pid),
                 }
             )
-        self._add_local_only_plugins(result, disabled)
+        self._add_local_only_plugins(result, disabled, load_errors)
         return result
 
-    def _add_local_only_plugins(self, result: list[dict], disabled: set) -> None:
+    def _add_local_only_plugins(
+        self, result: list[dict], disabled: set, load_errors: dict[str, dict[str, str]],
+    ) -> None:
         """Append locally-installed plugins that don't appear in any registry."""
         from wenzi.scripting.plugin_meta import load_install_info, scan_local_plugins
 
@@ -1525,5 +1545,6 @@ class SettingsController:
                     "installed_version": meta.version,
                     "is_official": False,
                     "enabled": is_enabled,
+                    **self._error_fields(load_errors, pid),
                 }
             )

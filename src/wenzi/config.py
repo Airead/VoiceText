@@ -52,9 +52,10 @@ DEFAULT_SCRIPTS_DIR = os.path.join(DEFAULT_CONFIG_DIR, "scripts")
 DEFAULT_PLUGINS_DIR = os.path.join(DEFAULT_CONFIG_DIR, "plugins")
 DEFAULT_SNIPPETS_DIR = os.path.join(DEFAULT_CONFIG_DIR, "snippets")
 
-# Plugin registry
-BUILTIN_REGISTRY_URL = (
-    "https://raw.githubusercontent.com/Airead/WenZi/refs/heads/main/plugins/registry.toml"
+# Plugin registry (override with WENZI_REGISTRY_URL env var for local testing)
+BUILTIN_REGISTRY_URL = os.environ.get(
+    "WENZI_REGISTRY_URL",
+    "https://raw.githubusercontent.com/Airead/WenZi/refs/heads/main/plugins/registry.toml",
 )
 
 # Data files (user-generated, not recoverable if deleted)

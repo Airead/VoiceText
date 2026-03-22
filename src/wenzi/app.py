@@ -1426,7 +1426,8 @@ class WenZiApp(StatusBarApp):
 
             script_dir = scripting_cfg.get("script_dir")
             self._script_engine = ScriptEngine(
-                script_dir=script_dir, config=scripting_cfg
+                script_dir=script_dir, config=scripting_cfg,
+                plugins_dir=os.path.join(self._config_dir, "plugins"),
             )
             self._script_engine.start()
             self._script_engine.wz.chooser._event_handlers.setdefault(

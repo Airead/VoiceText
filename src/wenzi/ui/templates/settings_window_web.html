@@ -375,6 +375,8 @@ input[type="range"] {
 .badge-official { background:#e8f5e9; color:#2e7d32; }
 .badge-unverified { background:#fff3e0; color:#e65100; }
 .plugin-actions { display:flex; gap:6px; align-items:center; flex-shrink:0; }
+.plugin-error { font-size:12px; color:#d32f2f; margin-top:4px; }
+.plugin-card-error { border-color:#e57373; }
 .reload-banner { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; margin-top:12px; background:#f5f5f7; border:1px solid #d2d2d7; border-radius:8px; }
 .manual-install-row { display:flex; gap:8px; align-items:center; }
 
@@ -432,7 +434,21 @@ input[type="range"] {
   .badge-official { background:#1b5e20; color:#a5d6a7; }
   .badge-unverified { background:#bf360c; color:#ffcc80; }
   .reload-banner { background: #2a2a2a; border-color: #3a3a3a; }
+  .plugin-error { color: #ef9a9a; }
+  .plugin-card-error { border-color: #c62828; }
+  .modal-overlay { background: rgba(0,0,0,0.5); }
+  .modal-box { background: #2a2a2a; border-color: #3a3a3a; }
+  .modal-message { color: #f5f5f7; }
+  .modal-traceback { background: #1a1a1a; color: #e0e0e0; }
 }
+
+/* Confirmation modal */
+.modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.3); z-index:1000; align-items:center; justify-content:center; }
+.modal-overlay.visible { display:flex; }
+.modal-box { background:white; border-radius:12px; padding:20px; max-width:500px; width:90%; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.15); }
+.modal-message { font-size:14px; color:#1d1d1f; margin-bottom:16px; }
+.modal-actions { display:flex; gap:8px; justify-content:center; }
+.modal-traceback { text-align:left; font-family:monospace; font-size:11px; background:#f5f5f7; border-radius:6px; padding:10px; max-height:300px; overflow:auto; white-space:pre-wrap; word-break:break-all; color:#1d1d1f; margin-bottom:16px; }
 </style>
 </head>
 <body>
@@ -814,6 +830,13 @@ input[type="range"] {
         <button class="btn btn-primary" onclick="postCallback('on_plugin_reload')">Reload Now</button>
       </div>
     </div>
+  </div>
+</div>
+
+<div id="app-modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div id="modal-body"></div>
+    <div id="modal-actions" class="modal-actions"></div>
   </div>
 </div>
 
@@ -1389,7 +1412,10 @@ function _initState(config) {
 /* Plugins tab                                                         */
 /* ------------------------------------------------------------------ */
 
+var _pluginTracebacks = {};
+
 function renderPlugins() {
+  _pluginTracebacks = {};
   var plugins = CONFIG.plugins || [];
   var list = document.getElementById('plugin-list');
   if (!list) return;
@@ -1410,18 +1436,27 @@ function renderPluginCard(p) {
   if (p.status === 'incompatible') {
     actions = '<button class="btn btn-secondary" disabled title="Requires WenZi >= ' + _esc(p.min_wenzi_version) + '">Install</button>';
   } else if (p.status === 'not_installed') {
-    actions = '<button class="btn btn-primary" onclick="installPlugin(\\\'' + _esc(p.id) + '\\\')">Install</button>';
+    actions = '<button class="btn btn-primary" data-id="' + _esc(p.id) + '" onclick="installPlugin(this.dataset.id)">Install</button>';
   } else if (p.status === 'update_available') {
-    actions = '<button class="btn btn-primary" onclick="updatePlugin(\\\'' + _esc(p.id) + '\\\')">Update (' + _esc(p.installed_version) + ' \u2192 ' + _esc(p.version) + ')</button>';
+    actions = '<button class="btn btn-primary" data-id="' + _esc(p.id) + '" onclick="updatePlugin(this.dataset.id)">Update (' + _esc(p.installed_version) + ' \u2192 ' + _esc(p.version) + ')</button>';
     actions += toggleHtml(p.id, p.enabled);
-    actions += '<button class="btn btn-danger" onclick="uninstallPlugin(\\\'' + _esc(p.id) + '\\\')">Uninstall</button>';
+    actions += '<button class="btn btn-danger" data-id="' + _esc(p.id) + '" onclick="uninstallPlugin(this.dataset.id)">Uninstall</button>';
   } else if (p.status === 'installed') {
     actions += toggleHtml(p.id, p.enabled);
-    actions += '<button class="btn btn-danger" onclick="uninstallPlugin(\\\'' + _esc(p.id) + '\\\')">Uninstall</button>';
+    actions += '<button class="btn btn-danger" data-id="' + _esc(p.id) + '" onclick="uninstallPlugin(this.dataset.id)">Uninstall</button>';
   } else if (p.status === 'manually_placed') {
     actions += toggleHtml(p.id, p.enabled);
   }
-  return '<div class="plugin-card">'
+  var errorHtml = '';
+  if (p.load_error) {
+    errorHtml = '<div class="plugin-error">\u26A0 ' + _esc(p.load_error);
+    if (p.load_traceback) {
+      _pluginTracebacks[p.id] = p.load_traceback;
+      errorHtml += ' <a href="#" data-id="' + _esc(p.id) + '" onclick="showErrorDetails(this.dataset.id); return false;">Details</a>';
+    }
+    errorHtml += '</div>';
+  }
+  return '<div class="plugin-card' + (p.load_error ? ' plugin-card-error' : '') + '">'
     + '<div class="plugin-icon">&#x1F9E9;</div>'
     + '<div class="plugin-info">'
     + '<div><span class="plugin-name">' + _esc(p.name) + '</span>'
@@ -1429,6 +1464,7 @@ function renderPluginCard(p) {
     + badge + '</div>'
     + '<div class="plugin-author">' + _esc(p.author) + ' \u00B7 ' + _esc(p.registry_name) + '</div>'
     + '<div class="plugin-desc">' + _esc(p.description) + '</div>'
+    + errorHtml
     + '</div>'
     + '<div class="plugin-actions">' + actions + '</div>'
     + '</div>';
@@ -1436,15 +1472,43 @@ function renderPluginCard(p) {
 
 function toggleHtml(pluginId, enabled) {
   var cls = enabled ? 'toggle on' : 'toggle';
-  return '<div class="' + cls + '" onclick="togglePlugin(this, \\\'' + _esc(pluginId) + '\\\')"><div class="toggle-knob"></div></div>';
+  return '<div class="' + cls + '" data-id="' + _esc(pluginId) + '" onclick="togglePlugin(this, this.dataset.id)"><div class="toggle-knob"></div></div>';
 }
 
 function installPlugin(id) { postCallback('on_plugin_install_by_id', id); }
 function updatePlugin(id) { postCallback('on_plugin_update', id); }
-function uninstallPlugin(id) {
-  if (confirm('Uninstall this plugin? This will delete all plugin files.')) {
-    postCallback('on_plugin_uninstall', id);
+function showModal(bodyHtml, buttons) {
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  var actionsEl = document.getElementById('modal-actions');
+  actionsEl.innerHTML = '';
+  for (var i = 0; i < buttons.length; i++) {
+    var b = buttons[i];
+    var btn = document.createElement('button');
+    btn.className = 'btn ' + (b.cls || 'btn-secondary');
+    btn.textContent = b.label;
+    btn.onclick = b.action;
+    actionsEl.appendChild(btn);
   }
+  document.getElementById('app-modal').classList.add('visible');
+}
+function closeModal() {
+  document.getElementById('app-modal').classList.remove('visible');
+}
+function uninstallPlugin(id) {
+  showModal(
+    '<div class="modal-message">Uninstall this plugin? This will delete all plugin files.</div>',
+    [
+      { label: 'Cancel', cls: 'btn-secondary', action: closeModal },
+      { label: 'Uninstall', cls: 'btn-danger', action: function() { closeModal(); postCallback('on_plugin_uninstall', id); } }
+    ]
+  );
+}
+function showErrorDetails(pluginId) {
+  var tb = _pluginTracebacks[pluginId] || 'No traceback available.';
+  showModal(
+    '<div class="modal-traceback">' + _esc(tb) + '</div>',
+    [{ label: 'Close', cls: 'btn-secondary', action: closeModal }]
+  );
 }
 function togglePlugin(el, id) {
   el.classList.toggle('on');

@@ -114,7 +114,8 @@ class PluginInstaller:
                 f.write(file_data)
 
     def _resolve_install_dir(self, plugin_id: str) -> str:
-        dir_name = plugin_id.rsplit(".", 1)[-1] if "." in plugin_id else plugin_id
+        raw = plugin_id.rsplit(".", 1)[-1] if "." in plugin_id else plugin_id
+        dir_name = raw.replace("-", "_")
         install_dir = os.path.join(self._plugins_dir, dir_name)
         if os.path.isdir(install_dir):
             existing_meta = load_plugin_meta(install_dir)

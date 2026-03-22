@@ -6,6 +6,7 @@ import importlib
 import logging
 import os
 import sys
+import traceback as _tb
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 import wenzi.config as _cfg
@@ -44,6 +45,7 @@ class ScriptEngine:
         self._system_settings_open_cb: Optional[Callable[[], None]] = None
         self._reloading = False
         self._plugin_metas: Dict[str, PluginMeta] = {}
+        self._plugin_load_errors: Dict[str, Dict[str, str]] = {}
 
         # Create wz namespace and install as module singleton
         from wenzi.scripting.api import _WZNamespace
@@ -58,6 +60,16 @@ class ScriptEngine:
         """The wz namespace object."""
         return self._wz
 
+    @staticmethod
+    def _try_alert(message: str, duration: float = 2.0) -> None:
+        """Show a floating alert, silently ignoring failures."""
+        try:
+            from wenzi.scripting.api.alert import alert
+
+            alert(message, duration=duration)
+        except Exception:
+            logger.debug("Alert failed", exc_info=True)
+
     def start(self) -> None:
         """Load scripts, register built-in sources, and start all listeners."""
         self._register_builtin_sources()
@@ -69,6 +81,12 @@ class ScriptEngine:
         # Start hotkey/leader listeners after scripts register their bindings
         self._wz.hotkey.start()
         logger.info("Script engine started (script_dir=%s)", self._script_dir)
+        if self._plugin_load_errors:
+            n = len(self._plugin_load_errors)
+            self._try_alert(
+                f"{n} plugin(s) failed to load. Check Settings → Plugins.",
+                duration=3.0,
+            )
 
     def stop(self) -> None:
         """Stop all listeners and clean up."""
@@ -117,12 +135,14 @@ class ScriptEngine:
             self._bind_new_snippet_hotkey()
             self._wz.hotkey.start()
             logger.info("Scripts reloaded")
-            try:
-                from wenzi.scripting.api.alert import alert
-
-                alert("Scripts reloaded", duration=1.5)
-            except Exception:
-                logger.debug("Reload alert failed", exc_info=True)
+            if self._plugin_load_errors:
+                n = len(self._plugin_load_errors)
+                self._try_alert(
+                    f"Scripts reloaded. {n} plugin(s) failed to load.",
+                    duration=3.0,
+                )
+            else:
+                self._try_alert("Scripts reloaded", duration=1.5)
         finally:
             self._reloading = False
 
@@ -729,13 +749,7 @@ class ScriptEngine:
             logger.info("Script loaded successfully: %s", init_path)
         except Exception as exc:
             logger.error("Failed to load script %s: %s", init_path, exc, exc_info=True)
-            # Show alert to user
-            try:
-                from wenzi.scripting.api.alert import alert
-
-                alert(f"Script error: {exc}", duration=5.0)
-            except Exception:
-                pass
+            self._try_alert(f"Script error: {exc}", duration=5.0)
 
     def _load_plugins(self) -> None:
         """Auto-discover and load plugins from the plugins directory.
@@ -744,10 +758,14 @@ class ScriptEngine:
         function is treated as a plugin.  Plugins listed in the config key
         ``disabled_plugins`` are skipped.  Plugins whose
         ``min_wenzi_version`` exceeds the running version are skipped.
+
+        Load errors are stored in ``_plugin_load_errors`` keyed by dir name.
         """
         self._plugin_metas.clear()
+        errors: Dict[str, Dict[str, str]] = {}
 
         if not os.path.isdir(self._plugins_dir):
+            self._plugin_load_errors = errors
             return
 
         from wenzi.scripting.plugin_meta import load_plugin_meta
@@ -815,15 +833,32 @@ class ScriptEngine:
                         parts.append(f"[by {meta.author}]")
                     logger.info(" ".join(parts))
                 else:
-                    logger.warning(
-                        "Plugin %s has no setup() function, skipped", entry
-                    )
-            except Exception:
+                    logger.warning("Plugin %s has no setup() function, skipped", entry)
+                    errors[entry] = {
+                        "message": "no setup() function",
+                        "traceback": "",
+                    }
+            except Exception as exc:
                 logger.exception("Failed to load plugin: %s", entry)
+                errors[entry] = {
+                    "message": str(exc),
+                    "traceback": _tb.format_exc(),
+                }
+
+        self._plugin_load_errors = errors
 
     def get_plugin_metas(self) -> Dict[str, "PluginMeta"]:
         """Return metadata for all discovered plugins (keyed by directory name)."""
         return dict(self._plugin_metas)
+
+    def get_load_errors_by_id(self) -> Dict[str, Dict[str, str]]:
+        """Return plugin load errors keyed by plugin bundle ID."""
+        result: Dict[str, Dict[str, str]] = {}
+        for dir_name, error in self._plugin_load_errors.items():
+            meta = self._plugin_metas.get(dir_name)
+            key = meta.id if meta and meta.id else dir_name
+            result[key] = error
+        return result
 
     @staticmethod
     def _version_compatible(min_version: str) -> bool:
