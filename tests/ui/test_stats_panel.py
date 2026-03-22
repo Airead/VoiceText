@@ -146,22 +146,19 @@ class TestBuildHtml:
 class TestHtmlTemplate:
     """Tests for the HTML template string."""
 
-    def test_template_has_placeholder(self):
+    def _template(self):
         from wenzi.ui.templates import load_template
 
-        html = load_template("stats_panel.html")
-        assert "__STATS_DATA__" in html
+        return load_template("stats_panel.html")
+
+    def test_template_has_placeholder(self):
+        assert "__STATS_DATA__" in self._template()
 
     def test_template_has_chart_js_placeholder(self):
-        from wenzi.ui.templates import load_template
-
-        html = load_template("stats_panel.html")
-        assert "__CHARTJS_INLINE__" in html
+        assert "__CHARTJS_INLINE__" in self._template()
 
     def test_template_has_canvas_elements(self):
-        from wenzi.ui.templates import load_template
-
-        html = load_template("stats_panel.html")
+        html = self._template()
         for canvas_id in ("dailyTrend", "actionBar", "tokenBar", "enhanceBar"):
             assert canvas_id in html
 

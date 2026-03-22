@@ -80,10 +80,16 @@ def _build_i18n_payload() -> Dict[str, str]:
 _VENDOR_DIR = Path(__file__).parent / "vendor"
 
 
+_chartjs_cache: str | None = None
+
+
 def _read_chartjs() -> str:
-    """Read the vendored Chart.js file and wrap in a <script> tag."""
-    js_path = _VENDOR_DIR / "chart.min.js"
-    return "<script>" + js_path.read_text(encoding="utf-8") + "</script>"
+    """Read the vendored Chart.js file and wrap in a <script> tag (cached)."""
+    global _chartjs_cache
+    if _chartjs_cache is None:
+        js_path = _VENDOR_DIR / "chart.min.js"
+        _chartjs_cache = "<script>" + js_path.read_text(encoding="utf-8") + "</script>"
+    return _chartjs_cache
 
 
 def build_html(payload: Dict[str, Any]) -> str:
