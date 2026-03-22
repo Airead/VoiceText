@@ -1420,7 +1420,13 @@ class WenZiApp(StatusBarApp):
             self._start_hotkey_listeners()
 
         # Start scripting engine if enabled
-        scripting_cfg = self._config.get("scripting", {})
+        scripting_cfg = self._config.setdefault("scripting", {})
+        # Engine reads disabled_plugins from the scripting sub-config;
+        # move it there if a legacy config still has it at the top level.
+        if "disabled_plugins" in self._config:
+            scripting_cfg.setdefault(
+                "disabled_plugins", self._config.pop("disabled_plugins")
+            )
         if scripting_cfg.get("enabled", False):
             from .scripting import ScriptEngine
 

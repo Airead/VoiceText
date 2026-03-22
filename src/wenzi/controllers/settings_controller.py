@@ -1381,7 +1381,8 @@ class SettingsController:
         """Enable or disable a plugin."""
         from PyObjCTools import AppHelper
 
-        disabled = list(self._app._config.get("disabled_plugins", []))
+        scripting = self._app._config.setdefault("scripting", {})
+        disabled = list(scripting.get("disabled_plugins", []))
         changed = False
         if enabled and plugin_id in disabled:
             disabled.remove(plugin_id)
@@ -1391,7 +1392,7 @@ class SettingsController:
             changed = True
         if not changed:
             return
-        self._app._config["disabled_plugins"] = disabled
+        scripting["disabled_plugins"] = disabled
         self._save_and_reload()
         self._needs_reload = True
         AppHelper.callAfter(self._auto_reload_if_needed)
@@ -1507,7 +1508,8 @@ class SettingsController:
 
     def _plugin_infos_to_state(self, infos: list[PluginInfo]) -> list[dict]:
         """Convert PluginInfo list to serialisable state dicts for the UI."""
-        disabled = set(self._app._config.get("disabled_plugins", []))
+        scripting = self._app._config.get("scripting", {})
+        disabled = set(scripting.get("disabled_plugins", []))
         load_errors = self._get_load_errors_by_id()
         result = []
         for info in infos:

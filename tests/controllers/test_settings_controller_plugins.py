@@ -17,7 +17,7 @@ def ctrl(tmp_path):
     """Build a SettingsController wired to mocks."""
     app = MagicMock()
     app._config_dir = str(tmp_path)
-    app._config = {"disabled_plugins": []}
+    app._config = {"scripting": {"disabled_plugins": []}}
     app._config_path = str(tmp_path / "config.yaml")
     app._settings_panel.is_visible = True
 
@@ -92,7 +92,7 @@ class TestUninstallTriggersAutoReload:
 
 class TestToggleTriggersAutoReload:
     def test_disable_triggers_auto_reload(self, ctrl):
-        ctrl._app._config["disabled_plugins"] = []
+        ctrl._app._config["scripting"]["disabled_plugins"] = []
 
         with patch(
             "PyObjCTools.AppHelper.callAfter",
