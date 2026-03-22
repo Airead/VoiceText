@@ -8,7 +8,11 @@ import threading
 
 import pytest
 
-from wenzi.scripting.plugin_installer import PluginInstaller, resolve_ref
+from wenzi.scripting.plugin_installer import (
+    PluginInstaller,
+    replace_github_ref,
+    resolve_ref,
+)
 from wenzi.scripting.plugin_meta import INSTALL_TOML, load_plugin_meta
 
 
@@ -292,6 +296,43 @@ class TestUninstall:
         installer = PluginInstaller(plugins_dir)
         with pytest.raises(ValueError, match="not found"):
             installer.uninstall("com.example.nonexistent")
+
+
+_BASE = "https://raw.githubusercontent.com/Airead/WenZi"
+_PATH = "plugins/cc_sessions/plugin.toml"
+_DEFAULT_URL = f"{_BASE}/refs/heads/main/{_PATH}"
+
+
+class TestReplaceGithubRef:
+    def test_replace_with_tag(self):
+        result = replace_github_ref(_DEFAULT_URL, "refs/tags/v0.1.0")
+        assert result == f"{_BASE}/refs/tags/v0.1.0/{_PATH}"
+
+    def test_replace_with_commit_sha(self):
+        sha = "a" * 40
+        result = replace_github_ref(_DEFAULT_URL, sha)
+        assert result == f"{_BASE}/{sha}/{_PATH}"
+
+    def test_replace_with_branch(self):
+        result = replace_github_ref(_DEFAULT_URL, "refs/heads/feat/foo")
+        assert result == f"{_BASE}/refs/heads/feat/foo/{_PATH}"
+
+    def test_custom_current_ref(self):
+        url = f"{_BASE}/refs/heads/develop/{_PATH}"
+        result = replace_github_ref(url, "refs/tags/v1.0.0", current_ref="refs/heads/develop")
+        assert result == f"{_BASE}/refs/tags/v1.0.0/{_PATH}"
+
+    def test_non_github_url_raises(self):
+        with pytest.raises(ValueError, match="GitHub raw URL"):
+            replace_github_ref("https://example.com/plugin.toml", "refs/tags/v1.0")
+
+    def test_current_ref_not_found_raises(self):
+        with pytest.raises(ValueError, match="not found"):
+            replace_github_ref(_DEFAULT_URL, "refs/tags/v1.0", current_ref="refs/heads/develop")
+
+    def test_local_path_raises(self):
+        with pytest.raises(ValueError, match="GitHub raw URL"):
+            replace_github_ref("/tmp/plugin.toml", "refs/tags/v1.0")
 
 
 class TestResolveRef:

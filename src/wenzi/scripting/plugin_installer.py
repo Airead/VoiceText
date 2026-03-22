@@ -48,6 +48,34 @@ def resolve_ref(ref: str) -> str:
     return f"refs/heads/{ref}"
 
 
+_GITHUB_RAW_PREFIX = "https://raw.githubusercontent.com/"
+_DEFAULT_GITHUB_REF = "refs/heads/main"
+
+
+def replace_github_ref(
+    source_url: str,
+    new_ref: str,
+    current_ref: str = _DEFAULT_GITHUB_REF,
+) -> str:
+    """Replace the git ref segment in a raw.githubusercontent.com URL.
+
+    Raises ValueError if the URL is not a GitHub raw URL or if *current_ref*
+    is not found in the URL.
+    """
+    if not source_url.startswith(_GITHUB_RAW_PREFIX):
+        raise ValueError(
+            "Version-specific install is only supported for GitHub raw URLs, "
+            f"got: {source_url!r}"
+        )
+    marker = f"/{current_ref}/"
+    idx = source_url.find(marker)
+    if idx == -1:
+        raise ValueError(
+            f"Current ref {current_ref!r} not found in URL: {source_url!r}"
+        )
+    return source_url[:idx] + f"/{new_ref}/" + source_url[idx + len(marker):]
+
+
 class PluginInstaller:
     """Install, update, and uninstall plugins."""
 
