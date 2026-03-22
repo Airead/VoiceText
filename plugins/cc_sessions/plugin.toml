@@ -14,6 +14,7 @@ files = [
     "reader.py",
     "cache.py",
     "preview.py",
+    "identicon.py",
     "viewer.html",
     "claude_icon.png",
     "vendor/github-dark.min.css",
