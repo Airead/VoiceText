@@ -30,3 +30,9 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests/ -v --cov=wenzi
+
+      - name: Validate registry.toml sync
+        run: |
+          cp plugins/registry.toml /tmp/registry-before.toml
+          uv run python scripts/sync_registry.py
+          diff /tmp/registry-before.toml plugins/registry.toml || (echo "ERROR: plugins/registry.toml is out of sync. Run 'make sync-registry' and commit." && exit 1)

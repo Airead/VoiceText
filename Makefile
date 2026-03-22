@@ -1,4 +1,4 @@
-.PHONY: dev run-lite docs docs-serve lint test build build-lite build-dmg build-lite-dmg clean
+.PHONY: dev run-lite docs docs-serve lint test build build-lite build-dmg build-lite-dmg clean sync-registry
 
 # Overridable environment variables for development:
 # WENZI_CONFIG_DIR    — config directory path (default: ~/.config/WenZi)
@@ -55,3 +55,7 @@ build-lite-dmg:
 # Remove build artifacts
 clean:
 	rm -rf build/ dist/
+
+# Regenerate plugins/registry.toml from plugins/*/plugin.toml
+sync-registry:
+	uv run python scripts/sync_registry.py
