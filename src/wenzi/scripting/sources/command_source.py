@@ -25,7 +25,7 @@ from wenzi.scripting.sources import (
 
 logger = logging.getLogger(__name__)
 
-_VALID_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
+_VALID_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_:-]*$")
 
 COMMAND_PREFIX = ">"
 

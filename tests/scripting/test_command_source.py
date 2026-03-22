@@ -31,6 +31,11 @@ class TestCommandEntry:
         with pytest.raises(ValueError, match="Invalid command name"):
             src.register(CommandEntry(name="-reload", title="Reload"))
 
+    def test_valid_name_with_colon(self):
+        src = CommandSource()
+        src.register(CommandEntry(name="cc-sessions:clear-cache", title="Clear"))
+        assert "cc-sessions:clear-cache" in src._commands
+
     def test_valid_name_with_underscores(self):
         src = CommandSource()
         src.register(CommandEntry(name="reload_scripts", title="Reload"))
