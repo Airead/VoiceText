@@ -17,7 +17,7 @@ from wenzi.scripting.clipboard_monitor import (
 )
 from wenzi.scripting.sources import (
     ChooserItem, ChooserSource, ModifierAction,
-    copy_to_clipboard, fuzzy_match, paste_text,
+    copy_to_clipboard, fuzzy_match, fuzzy_match_fields, paste_text,
 )
 
 logger = logging.getLogger(__name__)
@@ -193,11 +193,16 @@ class ClipboardSource:
             subtitle = entry.source_app if entry.source_app else ""
 
             if is_image:
-                # Image entries: match query against "image"
-                if q and "image" not in q and q not in subtitle.lower():
-                    continue
-
                 display = self._format_image_title(entry)
+
+                score = 0
+                if q:
+                    matched, score = fuzzy_match_fields(
+                        q, (display, subtitle),
+                    )
+                    if not matched:
+                        continue
+
                 time_ago = _format_time_ago(entry.timestamp)
 
                 full_path = os.path.join(self._monitor.image_dir, entry.image_path)
@@ -221,7 +226,7 @@ class ClipboardSource:
                     return self._make_preview(e)
 
                 scored_results.append((
-                    0,
+                    score,
                     idx,
                     ChooserItem(
                         title=display,

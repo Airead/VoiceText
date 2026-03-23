@@ -370,6 +370,64 @@ class TestImageEntries:
         assert len(result) == 1
         assert "Image" in result[0].title
 
+    def test_image_search_by_source_app(self):
+        now = time.time()
+        monitor = self._make_monitor_with_entries([
+            {"text": "hello", "timestamp": now},
+            {
+                "image_path": "test.png",
+                "image_width": 100,
+                "image_height": 100,
+                "image_size": 1000,
+                "timestamp": now,
+                "source_app": "Safari",
+            },
+        ])
+        source = ClipboardSource(monitor)
+        with patch("os.path.isfile", return_value=False):
+            result = source.search("safari")
+        assert len(result) == 1
+        assert "Image" in result[0].title
+
+    def test_image_search_by_dimensions(self):
+        now = time.time()
+        monitor = self._make_monitor_with_entries([
+            {"text": "hello", "timestamp": now},
+            {
+                "image_path": "test.png",
+                "image_width": 1450,
+                "image_height": 866,
+                "image_size": 1000,
+                "timestamp": now,
+            },
+        ])
+        source = ClipboardSource(monitor)
+        with patch("os.path.isfile", return_value=False):
+            result = source.search("1450")
+        assert len(result) == 1
+        assert "1450" in result[0].title
+
+    def test_image_ranked_above_text_for_image_query(self):
+        """Searching 'image' should rank actual images above text containing 'image'."""
+        now = time.time()
+        monitor = self._make_monitor_with_entries([
+            {"text": "clipboard_images folder", "timestamp": now - 10},
+            {
+                "image_path": "test.png",
+                "image_width": 100,
+                "image_height": 100,
+                "image_size": 1000,
+                "timestamp": now - 60,
+                "source_app": "Safari",
+            },
+        ])
+        source = ClipboardSource(monitor)
+        with patch("os.path.isfile", return_value=False):
+            result = source.search("image")
+        assert len(result) == 2
+        # Image entry should rank first (prefix match 100 vs substring 60)
+        assert "Image:" in result[0].title
+
     def test_image_text_mixed(self):
         now = time.time()
         monitor = self._make_monitor_with_entries([
