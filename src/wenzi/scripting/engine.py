@@ -210,6 +210,7 @@ class ScriptEngine:
 
             chooser_config = self._config.get("chooser", {})
             max_days = chooser_config.get("clipboard_max_days", 7)
+            ocr_enabled = chooser_config.get("clipboard_ocr", True)
             persist_path = os.path.expanduser(
                 _cfg.DEFAULT_CLIPBOARD_HISTORY_PATH
             )
@@ -218,6 +219,7 @@ class ScriptEngine:
             self._clipboard_monitor = ClipboardMonitor(
                 max_days=max_days,
                 persist_path=persist_path,
+                ocr_enabled=ocr_enabled,
             )
             self._clipboard_monitor.start()
             self._wz.pasteboard._set_monitor(self._clipboard_monitor)
@@ -508,6 +510,7 @@ class ScriptEngine:
                 )
 
                 max_days = chooser_config.get("clipboard_max_days", 7)
+                ocr_enabled = chooser_config.get("clipboard_ocr", True)
                 persist_path = os.path.expanduser(
                     _cfg.DEFAULT_CLIPBOARD_HISTORY_PATH
                 )
@@ -515,6 +518,7 @@ class ScriptEngine:
                 self._clipboard_monitor = ClipboardMonitor(
                     max_days=max_days,
                     persist_path=persist_path,
+                    ocr_enabled=ocr_enabled,
                 )
                 self._clipboard_monitor.start()
                 self._wz.pasteboard._set_monitor(self._clipboard_monitor)

@@ -1111,3 +1111,226 @@ class TestCacheAppIcon:
             image_dir=str(tmp_path / "images"), icon_cache_dir=icon_dir,
         )
         assert monitor.icon_cache_dir == icon_dir
+
+
+class TestOCRIntegration:
+    """Tests for OCR integration in ClipboardMonitor."""
+
+    def test_entry_ocr_text_default(self):
+        """ClipboardEntry should have ocr_text defaulting to empty string."""
+        entry = ClipboardEntry(text="hello")
+        assert entry.ocr_text == ""
+
+    def test_entry_ocr_text_set(self):
+        entry = ClipboardEntry(image_path="img.png", ocr_text="Hello World")
+        assert entry.ocr_text == "Hello World"
+
+    def test_db_insert_and_load_with_ocr_text(self, tmp_path):
+        import time
+        db = _ClipboardDB(str(tmp_path / "test.db"))
+        entry = ClipboardEntry(
+            image_path="img.png", image_width=200, image_height=150,
+            image_size=5000, timestamp=time.time(), ocr_text="OCR result",
+        )
+        db.insert(entry)
+        entries = db.load_all(max_days=999)
+        assert len(entries) == 1
+        assert entries[0].ocr_text == "OCR result"
+        db.close()
+
+    def test_db_update_ocr_text(self, tmp_path):
+        import time
+        db = _ClipboardDB(str(tmp_path / "test.db"))
+        db.insert(ClipboardEntry(
+            image_path="img.png", timestamp=time.time(),
+        ))
+        assert db.update_ocr_text("img.png", "Updated OCR") is True
+        entries = db.load_all(max_days=999)
+        assert entries[0].ocr_text == "Updated OCR"
+        db.close()
+
+    def test_db_update_ocr_text_not_found(self, tmp_path):
+        db = _ClipboardDB(str(tmp_path / "test.db"))
+        assert db.update_ocr_text("nonexistent.png", "text") is False
+        db.close()
+
+    def test_db_migration_adds_ocr_text(self, tmp_path):
+        """Opening a DB without ocr_text column should add it."""
+        import sqlite3
+        db_path = str(tmp_path / "old.db")
+        conn = sqlite3.connect(db_path)
+        conn.executescript("""\
+CREATE TABLE entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL DEFAULT '',
+    timestamp REAL NOT NULL,
+    source_app TEXT NOT NULL DEFAULT '',
+    source_bundle_id TEXT NOT NULL DEFAULT '',
+    image_path TEXT NOT NULL DEFAULT '',
+    image_width INTEGER NOT NULL DEFAULT 0,
+    image_height INTEGER NOT NULL DEFAULT 0,
+    image_size INTEGER NOT NULL DEFAULT 0
+);
+""")
+        conn.execute(
+            "INSERT INTO entries (text, timestamp) VALUES (?, ?)",
+            ("hello", 1000.0),
+        )
+        conn.commit()
+        conn.close()
+
+        db = _ClipboardDB(db_path)
+        entries = db.load_all(max_days=999999)
+        assert len(entries) == 1
+        assert entries[0].ocr_text == ""  # migrated default
+        # New inserts with ocr_text should work
+        import time
+        db.insert(ClipboardEntry(
+            image_path="new.png", timestamp=time.time(),
+            ocr_text="extracted text",
+        ))
+        entries = db.load_all(max_days=999999)
+        assert entries[0].ocr_text == "extracted text"
+        db.close()
+
+    def test_run_ocr_updates_memory_and_db(self, tmp_path):
+        """_run_ocr should update in-memory entry and DB."""
+        import time
+        persist_path = str(tmp_path / "clipboard.json")
+        image_dir = str(tmp_path / "images")
+        os.makedirs(image_dir, exist_ok=True)
+
+        # Create a fake image file
+        with open(os.path.join(image_dir, "img.png"), "wb") as f:
+            f.write(b"fake")
+
+        monitor = ClipboardMonitor(
+            max_days=7, persist_path=persist_path, image_dir=image_dir,
+            ocr_enabled=False,
+        )
+        # Manually add an image entry
+        entry = ClipboardEntry(
+            image_path="img.png", image_width=200, image_height=150,
+            timestamp=time.time(),
+        )
+        monitor._entries.insert(0, entry)
+        monitor._db.insert(entry)
+
+        v_before = monitor.version
+
+        with patch(
+            "wenzi.scripting.ocr.recognize_text", return_value="Hello World",
+        ):
+            monitor._run_ocr(
+                os.path.join(image_dir, "img.png"), "img.png",
+            )
+
+        assert monitor._entries[0].ocr_text == "Hello World"
+        assert monitor.version == v_before + 1
+        # DB should also be updated
+        db_entries = monitor._db.load_all(max_days=999)
+        assert db_entries[0].ocr_text == "Hello World"
+
+    def test_run_ocr_skips_empty_result(self, tmp_path):
+        image_dir = str(tmp_path / "images")
+        monitor = ClipboardMonitor(
+            max_days=7, image_dir=image_dir, ocr_enabled=False,
+        )
+        entry = ClipboardEntry(image_path="img.png")
+        monitor._entries.insert(0, entry)
+        v_before = monitor.version
+
+        with patch(
+            "wenzi.scripting.ocr.recognize_text", return_value="",
+        ):
+            monitor._run_ocr("/fake/img.png", "img.png")
+
+        assert monitor._entries[0].ocr_text == ""
+        assert monitor.version == v_before
+
+    def test_run_ocr_handles_exception(self, tmp_path):
+        image_dir = str(tmp_path / "images")
+        monitor = ClipboardMonitor(
+            max_days=7, image_dir=image_dir, ocr_enabled=False,
+        )
+        entry = ClipboardEntry(image_path="img.png")
+        monitor._entries.insert(0, entry)
+
+        with patch(
+            "wenzi.scripting.ocr.recognize_text",
+            side_effect=RuntimeError("boom"),
+        ):
+            monitor._run_ocr("/fake/img.png", "img.png")  # should not raise
+
+        assert monitor._entries[0].ocr_text == ""
+
+    def test_add_image_entry_submits_ocr(self, tmp_path):
+        """Large images should submit OCR task when enabled."""
+        image_dir = str(tmp_path / "images")
+        monitor = ClipboardMonitor(
+            max_days=7, image_dir=image_dir, ocr_enabled=True,
+        )
+        monitor._save_image = MagicMock(
+            return_value=("big.png", 200, 150, 5000),
+        )
+        mock_executor = MagicMock()
+        monitor._ocr_executor = mock_executor
+
+        monitor._add_image_entry(b"data", "png")
+
+        mock_executor.submit.assert_called_once()
+        args = mock_executor.submit.call_args
+        assert args[0][0] == monitor._run_ocr
+
+    def test_add_image_entry_skips_ocr_small_image(self, tmp_path):
+        """Images smaller than 100x100 should not trigger OCR."""
+        image_dir = str(tmp_path / "images")
+        monitor = ClipboardMonitor(
+            max_days=7, image_dir=image_dir, ocr_enabled=True,
+        )
+        monitor._save_image = MagicMock(
+            return_value=("small.png", 50, 50, 500),
+        )
+        mock_executor = MagicMock()
+        monitor._ocr_executor = mock_executor
+
+        monitor._add_image_entry(b"data", "png")
+
+        mock_executor.submit.assert_not_called()
+
+    def test_add_image_entry_skips_ocr_when_disabled(self, tmp_path):
+        """OCR should not be submitted when ocr_enabled=False."""
+        image_dir = str(tmp_path / "images")
+        monitor = ClipboardMonitor(
+            max_days=7, image_dir=image_dir, ocr_enabled=False,
+        )
+        monitor._save_image = MagicMock(
+            return_value=("big.png", 200, 150, 5000),
+        )
+
+        monitor._add_image_entry(b"data", "png")
+
+        assert monitor._ocr_executor is None
+
+    def test_stop_shuts_down_ocr_executor(self, tmp_path):
+        monitor = ClipboardMonitor(
+            max_days=7, image_dir=str(tmp_path / "images"),
+            ocr_enabled=True,
+        )
+        assert monitor._ocr_executor is not None
+        monitor.stop()
+        assert monitor._ocr_executor is None
+
+    def test_ocr_enabled_creates_executor(self, tmp_path):
+        monitor = ClipboardMonitor(
+            max_days=7, image_dir=str(tmp_path / "images"),
+            ocr_enabled=True,
+        )
+        assert monitor._ocr_executor is not None
+
+    def test_ocr_disabled_no_executor(self, tmp_path):
+        monitor = ClipboardMonitor(
+            max_days=7, image_dir=str(tmp_path / "images"),
+            ocr_enabled=False,
+        )
+        assert monitor._ocr_executor is None

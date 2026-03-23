@@ -381,6 +381,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
                 "bookmarks": "",
             },
             "new_snippet_hotkey": "",
+            "clipboard_ocr": True,
             "switch_to_english": True,
         },
     },

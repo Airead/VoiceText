@@ -9,6 +9,7 @@ Storage uses SQLite for incremental writes instead of full JSON dumps.
 
 from __future__ import annotations
 
+import concurrent.futures
 import hashlib
 import json
 import logging
@@ -47,6 +48,7 @@ def _mask_text(text: str) -> str:
         return "*" * len(text)
     return f"{text[:2]}..{text[-2:]}"
 _MIN_IMAGE_DIM = 4  # ignore images smaller than 4×4 (tracking pixels, mock artifacts)
+_MIN_OCR_DIM = 100  # below this, images rarely contain readable text
 
 _DEFAULT_IMAGE_DIR = os.path.expanduser(DEFAULT_CLIPBOARD_IMAGES_DIR)
 _DEFAULT_ICON_CACHE_DIR = os.path.expanduser(DEFAULT_ICON_CACHE_DIR)
@@ -137,6 +139,7 @@ class ClipboardEntry:
     image_width: int = 0
     image_height: int = 0
     image_size: int = 0  # file size in bytes
+    ocr_text: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +156,8 @@ CREATE TABLE IF NOT EXISTS entries (
     image_path TEXT    NOT NULL DEFAULT '',
     image_width  INTEGER NOT NULL DEFAULT 0,
     image_height INTEGER NOT NULL DEFAULT 0,
-    image_size   INTEGER NOT NULL DEFAULT 0
+    image_size   INTEGER NOT NULL DEFAULT 0,
+    ocr_text     TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_entries_timestamp ON entries(timestamp);
 """
@@ -177,6 +181,15 @@ class _ClipboardDB:
             self._conn.commit()
         except sqlite3.OperationalError:
             pass  # column already exists
+        # Migrate: add ocr_text column for existing databases
+        try:
+            self._conn.execute(
+                "ALTER TABLE entries ADD COLUMN"
+                " ocr_text TEXT NOT NULL DEFAULT ''"
+            )
+            self._conn.commit()
+        except sqlite3.OperationalError:
+            pass  # column already exists
 
     def close(self) -> None:
         self._conn.close()
@@ -187,12 +200,13 @@ class _ClipboardDB:
         self._conn.execute(
             "INSERT INTO entries"
             " (text, timestamp, source_app, source_bundle_id, image_path,"
-            "  image_width, image_height, image_size)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "  image_width, image_height, image_size, ocr_text)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 entry.text, entry.timestamp, entry.source_app,
                 entry.source_bundle_id, entry.image_path,
                 entry.image_width, entry.image_height, entry.image_size,
+                entry.ocr_text,
             ),
         )
         self._conn.commit()
@@ -285,7 +299,7 @@ class _ClipboardDB:
         cutoff = time.time() - max_days * 86400
         cur = self._conn.execute(
             "SELECT text, timestamp, source_app, source_bundle_id,"
-            " image_path, image_width, image_height, image_size"
+            " image_path, image_width, image_height, image_size, ocr_text"
             " FROM entries WHERE timestamp >= ?"
             " ORDER BY timestamp DESC",
             (cutoff,),
@@ -295,10 +309,19 @@ class _ClipboardDB:
                 text=row[0], timestamp=row[1], source_app=row[2],
                 source_bundle_id=row[3], image_path=row[4],
                 image_width=row[5], image_height=row[6],
-                image_size=row[7],
+                image_size=row[7], ocr_text=row[8],
             )
             for row in cur.fetchall()
         ]
+
+    def update_ocr_text(self, image_path: str, ocr_text: str) -> bool:
+        """Update ocr_text for an image entry. Returns True if updated."""
+        cur = self._conn.execute(
+            "UPDATE entries SET ocr_text=? WHERE image_path=?",
+            (ocr_text, image_path),
+        )
+        self._conn.commit()
+        return cur.rowcount > 0
 
     def latest_text(self) -> str:
         """Return the text of the most recent entry, or ''."""
@@ -378,6 +401,7 @@ class ClipboardMonitor:
         persist_path: Optional[str] = None,
         image_dir: Optional[str] = None,
         icon_cache_dir: Optional[str] = None,
+        ocr_enabled: bool = True,
     ) -> None:
         self._max_days = max_days
         self._poll_interval = poll_interval
@@ -391,6 +415,11 @@ class ClipboardMonitor:
         self._stop_event = threading.Event()
         self._last_change_count: int = -1
         self._db: Optional[_ClipboardDB] = None
+        self._ocr_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None
+        if ocr_enabled:
+            self._ocr_executor = concurrent.futures.ThreadPoolExecutor(
+                max_workers=1, thread_name_prefix="ocr",
+            )
 
         if persist_path:
             self._init_db()
@@ -529,6 +558,9 @@ class ClipboardMonitor:
             if self._thread.is_alive():
                 logger.warning("Clipboard monitor thread did not stop in time")
             self._thread = None
+        if self._ocr_executor is not None:
+            self._ocr_executor.shutdown(wait=False)
+            self._ocr_executor = None
         logger.info("Clipboard monitor stopped")
 
     def clear(self) -> None:
@@ -743,7 +775,47 @@ class ClipboardMonitor:
         logger.debug(
             "Clipboard image entry added: %s (%dx%d)", filename, width, height,
         )
+
+        if (
+            self._ocr_executor is not None
+            and width >= _MIN_OCR_DIM
+            and height >= _MIN_OCR_DIM
+        ):
+            filepath = os.path.join(self._image_dir, filename)
+            self._ocr_executor.submit(self._run_ocr, filepath, filename)
+
         return True
+
+    def _run_ocr(self, filepath: str, image_path: str) -> None:
+        """Run OCR on an image file and update the entry (background thread)."""
+        try:
+            if self._stop_event.is_set():
+                return
+
+            from wenzi.scripting.ocr import recognize_text
+
+            text = recognize_text(filepath)
+            if not text:
+                return
+
+            if self._stop_event.is_set():
+                return
+
+            with self._lock:
+                for entry in self._entries:
+                    if entry.image_path == image_path:
+                        entry.ocr_text = text
+                        self._version += 1
+                        break
+
+            if self._db:
+                self._db.update_ocr_text(image_path, text)
+
+            logger.debug(
+                "OCR completed for %s: %d chars", image_path, len(text),
+            )
+        except Exception:
+            logger.debug("OCR failed for %s", image_path, exc_info=True)
 
     def _save_image(
         self, image_data: bytes, image_type: str

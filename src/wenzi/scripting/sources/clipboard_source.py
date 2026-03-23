@@ -17,7 +17,7 @@ from wenzi.scripting.clipboard_monitor import (
 )
 from wenzi.scripting.sources import (
     ChooserItem, ChooserSource, ModifierAction,
-    copy_to_clipboard, paste_text,
+    copy_to_clipboard, fuzzy_match, fuzzy_match_fields, paste_text,
 )
 
 logger = logging.getLogger(__name__)
@@ -110,7 +110,8 @@ class ClipboardSource:
     """Clipboard history search data source.
 
     Uses a ClipboardMonitor to access recorded entries.
-    Supports substring filtering and pastes the selected entry on execute.
+    Supports fuzzy matching with quality-based ranking (prefix > word-initials
+    > substring > scattered chars) and pastes the selected entry on execute.
     """
 
     _DEFAULT_MAX_RESULTS = 30
@@ -185,19 +186,27 @@ class ClipboardSource:
             self._empty_cache = None
             return []
 
-        results = []
+        scored_results: list[tuple[int, int, ChooserItem]] = []
 
-        for entry in entries:
+        for idx, entry in enumerate(entries):
             is_image = bool(entry.image_path)
-            time_ago = _format_time_ago(entry.timestamp)
             subtitle = entry.source_app if entry.source_app else ""
 
             if is_image:
-                # Image entries: match query against "image"
-                if q and "image" not in q and q not in subtitle.lower():
-                    continue
-
                 display = self._format_image_title(entry)
+
+                score = 0
+                if q:
+                    fields = [display, subtitle]
+                    if entry.ocr_text:
+                        fields.append(entry.ocr_text)
+                    matched, score = fuzzy_match_fields(
+                        q, tuple(fields),
+                    )
+                    if not matched:
+                        continue
+
+                time_ago = _format_time_ago(entry.timestamp)
 
                 full_path = os.path.join(self._monitor.image_dir, entry.image_path)
                 monitor = self._monitor
@@ -219,7 +228,9 @@ class ClipboardSource:
                 def _lazy_preview(e=_entry):
                     return self._make_preview(e)
 
-                results.append(
+                scored_results.append((
+                    score,
+                    idx,
                     ChooserItem(
                         title=display,
                         subtitle=f"{subtitle}  {time_ago}".strip() if subtitle else time_ago,
@@ -229,19 +240,20 @@ class ClipboardSource:
                         action=_do_paste_img,
                         secondary_action=_do_copy_img,
                         delete_action=_do_delete_img,
-                    )
-                )
-                if len(results) >= self._max_results:
-                    break
+                    ),
+                ))
             else:
-                # Text entries
-                if q and q not in entry.text.lower():
-                    continue
+                score = 0
+                if q:
+                    matched, score = fuzzy_match(q, entry.text)
+                    if not matched:
+                        continue
 
                 display = entry.text.replace("\n", " ").strip()
                 if len(display) > 80:
                     display = display[:77] + "..."
 
+                time_ago = _format_time_ago(entry.timestamp)
                 text = entry.text  # capture
                 monitor = self._monitor
 
@@ -264,7 +276,9 @@ class ClipboardSource:
                     )
                     open_quick_edit(t)
 
-                results.append(
+                scored_results.append((
+                    score,
+                    idx,
                     ChooserItem(
                         title=display,
                         subtitle=f"{subtitle}  {time_ago}".strip() if subtitle else time_ago,
@@ -278,10 +292,17 @@ class ClipboardSource:
                             subtitle="Quick Edit",
                             action=_do_edit,
                         )},
-                    )
-                )
-                if len(results) >= self._max_results:
-                    break
+                    ),
+                ))
+
+            if not q and len(scored_results) >= self._max_results:
+                break
+
+        if q:
+            scored_results.sort(key=lambda x: (-x[0], x[1]))
+            scored_results = scored_results[:self._max_results]
+
+        results = [item for _, _, item in scored_results]
 
         # Cache empty-query results for reuse on next open.
         # Use the version read at lookup time (ver) to stay consistent

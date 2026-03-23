@@ -25,6 +25,7 @@ def _make_mock_monitor(entries, version=None):
             image_width=e.get("image_width", 0),
             image_height=e.get("image_height", 0),
             image_size=e.get("image_size", 0),
+            ocr_text=e.get("ocr_text", ""),
         )
         for e in entries
     ]
@@ -96,7 +97,7 @@ class TestClipboardSource:
         result = source.search("")
         assert len(result) == 2
 
-    def test_substring_filter(self):
+    def test_fuzzy_filter(self):
         now = time.time()
         monitor = self._make_monitor_with_entries([
             {"text": "hello world", "timestamp": now - 60},
@@ -107,6 +108,59 @@ class TestClipboardSource:
         result = source.search("hello")
         assert len(result) == 2
         assert "hello" in result[0].title.lower()
+
+    def test_prefix_match_ranked_first(self):
+        """Prefix match (score 100) should rank above substring (score 60)."""
+        now = time.time()
+        monitor = self._make_monitor_with_entries([
+            {"text": "contains zkverify in middle", "timestamp": now - 10},
+            {"text": "zkverify starts here", "timestamp": now - 60},
+        ])
+        source = ClipboardSource(monitor)
+        result = source.search("zk")
+        assert len(result) == 2
+        # Prefix match should be first despite being older
+        assert result[0].title.startswith("zkverify")
+
+    def test_same_score_preserves_recency(self):
+        """Items with equal match score should keep recency order."""
+        now = time.time()
+        monitor = self._make_monitor_with_entries([
+            {"text": "zkfoo", "timestamp": now - 10},
+            {"text": "zkbar", "timestamp": now - 60},
+        ])
+        source = ClipboardSource(monitor)
+        result = source.search("zk")
+        assert len(result) == 2
+        # Both are prefix matches (score 100), newer should be first
+        assert result[0].title == "zkfoo"
+        assert result[1].title == "zkbar"
+
+    def test_scattered_char_match(self):
+        """Scattered character match (e.g. 'zk' in 'pizza knot')."""
+        now = time.time()
+        monitor = self._make_monitor_with_entries([
+            {"text": "pizza knot", "timestamp": now - 10},
+            {"text": "no match here", "timestamp": now - 60},
+        ])
+        source = ClipboardSource(monitor)
+        result = source.search("zk")
+        assert len(result) == 1
+        assert "pizza" in result[0].title
+
+    def test_empty_query_no_sorting(self):
+        """Empty query should return results in original recency order."""
+        now = time.time()
+        monitor = self._make_monitor_with_entries([
+            {"text": "zkfirst", "timestamp": now - 10},
+            {"text": "alpha", "timestamp": now - 60},
+        ])
+        monitor.version = 1
+        source = ClipboardSource(monitor)
+        result = source.search("")
+        assert len(result) == 2
+        assert result[0].title == "zkfirst"
+        assert result[1].title == "alpha"
 
     def test_case_insensitive(self):
         now = time.time()
@@ -317,6 +371,64 @@ class TestImageEntries:
         assert len(result) == 1
         assert "Image" in result[0].title
 
+    def test_image_search_by_source_app(self):
+        now = time.time()
+        monitor = self._make_monitor_with_entries([
+            {"text": "hello", "timestamp": now},
+            {
+                "image_path": "test.png",
+                "image_width": 100,
+                "image_height": 100,
+                "image_size": 1000,
+                "timestamp": now,
+                "source_app": "Safari",
+            },
+        ])
+        source = ClipboardSource(monitor)
+        with patch("os.path.isfile", return_value=False):
+            result = source.search("safari")
+        assert len(result) == 1
+        assert "Image" in result[0].title
+
+    def test_image_search_by_dimensions(self):
+        now = time.time()
+        monitor = self._make_monitor_with_entries([
+            {"text": "hello", "timestamp": now},
+            {
+                "image_path": "test.png",
+                "image_width": 1450,
+                "image_height": 866,
+                "image_size": 1000,
+                "timestamp": now,
+            },
+        ])
+        source = ClipboardSource(monitor)
+        with patch("os.path.isfile", return_value=False):
+            result = source.search("1450")
+        assert len(result) == 1
+        assert "1450" in result[0].title
+
+    def test_image_ranked_above_text_for_image_query(self):
+        """Searching 'image' should rank actual images above text containing 'image'."""
+        now = time.time()
+        monitor = self._make_monitor_with_entries([
+            {"text": "clipboard_images folder", "timestamp": now - 10},
+            {
+                "image_path": "test.png",
+                "image_width": 100,
+                "image_height": 100,
+                "image_size": 1000,
+                "timestamp": now - 60,
+                "source_app": "Safari",
+            },
+        ])
+        source = ClipboardSource(monitor)
+        with patch("os.path.isfile", return_value=False):
+            result = source.search("image")
+        assert len(result) == 2
+        # Image entry should rank first (prefix match 100 vs substring 60)
+        assert "Image:" in result[0].title
+
     def test_image_text_mixed(self):
         now = time.time()
         monitor = self._make_monitor_with_entries([
@@ -367,6 +479,70 @@ class TestImageEntries:
             result = source.search("")
         result[0].delete_action()
         monitor.delete_image.assert_called_once_with("test.png")
+
+
+class TestImageOCRSearch:
+    """Tests for OCR text search in image entries."""
+
+    def test_image_search_by_ocr_text(self):
+        """Searching for OCR text should match image entries."""
+        now = time.time()
+        monitor = _make_mock_monitor([
+            {
+                "image_path": "screenshot.png",
+                "image_width": 800,
+                "image_height": 600,
+                "image_size": 50000,
+                "timestamp": now,
+                "ocr_text": "Hello World from screenshot",
+            },
+            {"text": "unrelated text", "timestamp": now - 10},
+        ])
+        source = ClipboardSource(monitor)
+        with patch("os.path.isfile", return_value=False):
+            result = source.search("hello")
+        assert len(result) == 1
+        assert "Image:" in result[0].title
+
+    def test_image_search_ocr_empty_no_effect(self):
+        """Empty ocr_text should not affect search behavior."""
+        now = time.time()
+        monitor = _make_mock_monitor([
+            {
+                "image_path": "test.png",
+                "image_width": 100,
+                "image_height": 100,
+                "image_size": 1000,
+                "timestamp": now,
+                "ocr_text": "",
+            },
+        ])
+        source = ClipboardSource(monitor)
+        with patch("os.path.isfile", return_value=False):
+            result = source.search("hello")
+        assert len(result) == 0
+
+    def test_image_search_ocr_and_title_both_searchable(self):
+        """Both OCR text and image title should be searchable."""
+        now = time.time()
+        monitor = _make_mock_monitor([
+            {
+                "image_path": "test.png",
+                "image_width": 1920,
+                "image_height": 1080,
+                "image_size": 50000,
+                "timestamp": now,
+                "ocr_text": "Login Page",
+            },
+        ])
+        source = ClipboardSource(monitor)
+        with patch("os.path.isfile", return_value=False):
+            # Search by OCR text
+            result1 = source.search("login")
+            assert len(result1) == 1
+            # Search by dimensions
+            result2 = source.search("1920")
+            assert len(result2) == 1
 
 
 class TestAltModifier:
