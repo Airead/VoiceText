@@ -6,6 +6,7 @@ import io
 import logging
 import queue
 import threading
+import time
 from typing import Optional
 
 import numpy as np
@@ -25,8 +26,12 @@ class Recorder:
     # Reference RMS for normalizing current_level to 0.0-1.0 range.
     # Normal speech (~1000-3000 RMS) maps to roughly 0.5-1.0.
     _LEVEL_REFERENCE_RMS = 800.0
-    # Timeout for stream stop/close to prevent blocking on hung PortAudio.
-    _STREAM_CLOSE_TIMEOUT = 2.0
+    # Brief grace period for a pending background stream close to finish
+    # before forcing a PortAudio re-init in start().
+    _CLOSE_WAIT_TIMEOUT = 0.5
+    # Max seconds _starting may remain True before it is considered stuck
+    # and forcibly reset, allowing a new start() to proceed.
+    _STARTING_STALE_SECS = 10.0
 
     def __init__(
         self,
@@ -47,11 +52,17 @@ class Recorder:
         self._stream: Optional[sd.RawInputStream] = None
         self._lock = threading.Lock()
         self._recording = False
+        # Non-None while start() is in progress (value = monotonic timestamp).
+        self._starting_since: Optional[float] = None
         self._total_bytes = 0
         self._current_rms: float = 0.0
         self._on_audio_chunk: Optional[callable] = None
         self._last_device_name: Optional[str] = None  # track last used device name
         self._query_device_name_enabled: bool = True
+        # Signalled when the background stream-close thread finishes (or
+        # on init when there is no pending close).
+        self._close_done = threading.Event()
+        self._close_done.set()
 
     @property
     def is_recording(self) -> bool:
@@ -66,87 +77,121 @@ class Recorder:
     def current_level(self) -> float:
         """Return current audio level normalized to 0.0-1.0.
 
-        Uses 2000 as reference so normal speech (~1000-3000 RMS) maps
-        to roughly 0.5-1.0.
+        Uses ``_LEVEL_REFERENCE_RMS`` (800) as reference so normal
+        speech (~1000-3000 RMS) maps to roughly 0.5-1.0.
         """
         return min(1.0, self._current_rms / self._LEVEL_REFERENCE_RMS)
 
     def start(self) -> Optional[str]:
-        """Start recording. Returns the input device name, or None."""
+        """Start recording. Returns the input device name, or None.
+
+        Stream creation happens **outside** the lock so that a hung
+        PortAudio call cannot deadlock subsequent ``stop()`` /
+        ``is_recording`` calls.  ``_starting_since`` prevents
+        concurrent ``start()`` calls from racing.
+        """
+        # --- Phase 0: wait for any pending background stream-close ------
+        if not self._close_done.wait(timeout=self._CLOSE_WAIT_TIMEOUT):
+            logger.warning(
+                "Previous stream close still pending, forcing PortAudio re-init"
+            )
+            self._reinit_portaudio()
+            self._close_done.set()
+
+        # --- Phase 1: claim the "starting" slot (lock held briefly) -----
         with self._lock:
             if self._recording:
                 return self._last_device_name
-
+            if self._starting_since is not None:
+                elapsed = time.monotonic() - self._starting_since
+                if elapsed > self._STARTING_STALE_SECS:
+                    logger.warning(
+                        "Previous start() appears stuck (%.0fs), resetting",
+                        elapsed,
+                    )
+                    self._starting_since = None
+                else:
+                    return self._last_device_name
+            self._starting_since = time.monotonic()
             self._flush()
             self._total_bytes = 0
-
             device = self.device
-            current_name: Optional[str] = None
+            last_name = self._last_device_name
 
-            if self._query_device_name_enabled:
+        # --- Phase 2: device query & PortAudio re-init (lock free) ------
+        current_name: Optional[str] = None
+        if self._query_device_name_enabled:
+            current_name = self._query_device_name(device)
+
+            # Re-initialize PortAudio only when the device has changed
+            # (e.g. user plugged in a different mic) to avoid the cost
+            # of terminate/initialize on every recording.
+            if current_name != last_name:
+                self._reinit_portaudio()
                 current_name = self._query_device_name(device)
 
-                # Re-initialize PortAudio only when the device has changed
-                # (e.g. user plugged in a different mic) to avoid the cost
-                # of terminate/initialize on every recording.
-                if current_name != self._last_device_name:
-                    try:
-                        sd._terminate()
-                        sd._initialize()
-                    except Exception:
-                        logger.debug("PortAudio re-init failed, continuing", exc_info=True)
-                    current_name = self._query_device_name(device)
+            if current_name != last_name:
+                logger.info(
+                    "Input device changed: %s -> %s",
+                    last_name or "(none)",
+                    current_name or "unknown",
+                )
+            else:
+                logger.debug("Reusing input device: %s", current_name)
 
-                if current_name != self._last_device_name:
-                    logger.info(
-                        "Input device changed: %s -> %s",
-                        self._last_device_name or "(none)",
-                        current_name or "unknown",
-                    )
-                else:
-                    logger.debug("Reusing input device: %s", current_name)
-
+        # --- Phase 3: create & start stream (lock free) -----------------
+        base_kwargs = dict(
+            samplerate=self.sample_rate,
+            blocksize=self._block_size,
+            dtype="int16",
+            channels=1,
+            callback=self._callback,
+        )
+        try:
+            stream = sd.RawInputStream(**base_kwargs, device=device)
+            stream.start()
+        except Exception:
             try:
-                self._stream = sd.RawInputStream(
-                    samplerate=self.sample_rate,
-                    blocksize=self._block_size,
-                    dtype="int16",
-                    channels=1,
-                    callback=self._callback,
-                    device=device,
-                )
-                self._stream.start()
-            except Exception:
                 # Fallback to default input device
-                self._stream = sd.RawInputStream(
-                    samplerate=self.sample_rate,
-                    blocksize=self._block_size,
-                    dtype="int16",
-                    channels=1,
-                    callback=self._callback,
-                )
-                self._stream.start()
+                stream = sd.RawInputStream(**base_kwargs)
+                stream.start()
+            except Exception:
+                logger.error("Failed to create audio stream", exc_info=True)
+                with self._lock:
+                    self._starting_since = None
+                return None
 
+        # --- Phase 4: commit (lock held briefly) ------------------------
+        with self._lock:
+            self._stream = stream
             self._recording = True
+            self._starting_since = None
             self._last_device_name = current_name
             logger.info("Recording started (sr=%d)", self.sample_rate)
             return current_name
 
     def stop(self) -> Optional[bytes]:
-        """Stop recording and return WAV data as bytes, or None if nothing recorded."""
+        """Stop recording and return WAV data as bytes, or None if nothing recorded.
+
+        The callback guard (``if not self._recording``) provides a
+        deterministic cutoff — no new frames are enqueued after
+        ``_recording`` is set to ``False``.  Stream close is therefore
+        fire-and-forget; we never need to block the caller waiting for
+        PortAudio to finish.
+        """
         with self._lock:
             if not self._recording:
                 return None
 
             self._recording = False
+            self._current_rms = 0.0
             stream = self._stream
             self._stream = None
 
-        # Stop/close stream outside the lock with a timeout so a hung
-        # PortAudio callback cannot block the caller (e.g. the Quartz
-        # event-tap thread) forever.
+        # Fire-and-forget stream close.  The _close_done event lets a
+        # subsequent start() know whether cleanup has finished.
         if stream is not None:
-            done = threading.Event()
+            self._close_done.clear()
 
             def _close_stream() -> None:
                 try:
@@ -155,15 +200,9 @@ class Recorder:
                 except Exception as e:
                     logger.warning("Error closing audio stream: %s", e)
                 finally:
-                    done.set()
+                    self._close_done.set()
 
             threading.Thread(target=_close_stream, daemon=True).start()
-            if not done.wait(timeout=self._STREAM_CLOSE_TIMEOUT):
-                logger.error(
-                    "Audio stream stop/close timed out after %.1fs, "
-                    "continuing without waiting",
-                    self._STREAM_CLOSE_TIMEOUT,
-                )
 
         # Collect all buffered frames
         frames = []
@@ -180,7 +219,7 @@ class Recorder:
         audio = np.concatenate(frames)
         duration = len(audio) / self.sample_rate
         rms = int(np.sqrt(np.mean(audio.astype(np.float64) ** 2)))
-        logger.warning(
+        logger.info(
             "Recording stopped, captured %d samples (%.1fs), RMS=%d",
             len(audio), duration, rms,
         )
@@ -204,6 +243,12 @@ class Recorder:
         self._on_audio_chunk = None
 
     def _callback(self, in_data, frames, time_info, status):
+        # Guard: once _recording is False the callback becomes a no-op.
+        # This prevents an orphaned (not-yet-closed) stream from
+        # polluting the queue, RMS, or chunk callback.
+        if not self._recording:
+            return
+
         if status:
             logger.warning("Audio stream status: %s", status)
 
@@ -228,6 +273,15 @@ class Recorder:
                 cb(copied)
             except Exception:
                 logger.debug("Audio chunk callback error", exc_info=True)
+
+    @staticmethod
+    def _reinit_portaudio() -> None:
+        """Force-terminate and re-initialize PortAudio."""
+        try:
+            sd._terminate()
+            sd._initialize()
+        except Exception:
+            logger.debug("PortAudio re-init failed, continuing", exc_info=True)
 
     @staticmethod
     def _query_device_name(device: Optional[str]) -> Optional[str]:

@@ -24,6 +24,7 @@ class TestAudioChunkCallback:
 
     def test_callback_receives_audio_chunks(self):
         r = Recorder(sample_rate=16000, block_ms=20)
+        r._recording = True  # callback guard requires recording state
         chunks = []
         r.set_on_audio_chunk(lambda data: chunks.append(data))
 
@@ -36,6 +37,7 @@ class TestAudioChunkCallback:
 
     def test_callback_not_called_when_unset(self):
         r = Recorder(sample_rate=16000, block_ms=20)
+        r._recording = True
 
         fake_audio = np.array([100, 200], dtype=np.int16)
         # Should not raise when no callback is set
@@ -43,6 +45,7 @@ class TestAudioChunkCallback:
 
     def test_callback_error_does_not_break_recording(self):
         r = Recorder(sample_rate=16000, block_ms=20)
+        r._recording = True
 
         def bad_cb(data):
             raise RuntimeError("callback error")
@@ -60,6 +63,7 @@ class TestAudioChunkCallback:
 
     def test_callback_receives_copy_not_original(self):
         r = Recorder(sample_rate=16000, block_ms=20)
+        r._recording = True
         received = []
         r.set_on_audio_chunk(lambda data: received.append(data))
 
@@ -72,6 +76,7 @@ class TestAudioChunkCallback:
 
     def test_callback_not_invoked_when_max_size_reached(self):
         r = Recorder(sample_rate=16000, block_ms=20, max_session_bytes=4)
+        r._recording = True
         cb = MagicMock()
         r.set_on_audio_chunk(cb)
 

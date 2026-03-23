@@ -190,10 +190,11 @@ class RecordingController:
             finally:
                 app._recording_started.set()
 
-            # If hotkey was released while blocked (e.g. mic permission dialog),
-            # stop the orphaned recording/streaming now.
-            if self._release_done and app._recorder.is_recording:
-                logger.info("Hotkey released during delayed start, stopping orphaned recording")
+            # If hotkey was released or recording was cancelled while
+            # blocked (e.g. mic permission dialog or slow PortAudio
+            # init), stop the orphaned recording/streaming now.
+            if (self._release_done or self._cancel_delayed.is_set()) and app._recorder.is_recording:
+                logger.info("Recording orphaned during delayed start, stopping")
                 self._stop_streaming_if_active("orphan cleanup")
                 app._recorder.stop()
                 from PyObjCTools import AppHelper
