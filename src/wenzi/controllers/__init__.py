@@ -16,16 +16,16 @@ def fire_scripting_event(app, event_name: str, **kwargs) -> None:
         _logger.debug("Failed to fire scripting event %s", event_name)
 
 
-from .config_controller import ConfigController
-from .enhance_controller import EnhanceCacheEntry, EnhanceController
-from .enhance_mode_controller import EnhanceModeController
-from .menu_builder import MenuBuilder
-from .model_controller import ModelController, migrate_asr_config
-from .preview_controller import PreviewController
-from .recording_controller import RecordingController
-from .recording_flow import Action, RecordingFlow
-from .settings_controller import SettingsController
-from .update_controller import UpdateController
+from .config_controller import ConfigController  # noqa: E402
+from .enhance_controller import EnhanceCacheEntry, EnhanceController  # noqa: E402
+from .enhance_mode_controller import EnhanceModeController  # noqa: E402
+from .menu_builder import MenuBuilder  # noqa: E402
+from .model_controller import ModelController, migrate_asr_config  # noqa: E402
+from .preview_controller import PreviewController  # noqa: E402
+from .recording_controller import RecordingController  # noqa: E402
+from .recording_flow import Action, RecordingFlow  # noqa: E402
+from .settings_controller import SettingsController  # noqa: E402
+from .update_controller import UpdateController  # noqa: E402
 
 __all__ = [
     "ConfigController",
