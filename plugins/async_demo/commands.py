@@ -101,6 +101,7 @@ def register(wz):
         text = data.get("asr_text", "")
         await asyncio.sleep(0.1)
         logger.info("[async-demo] transcription_done: %s", text[:50])
+        wz.notify("Async Event", f"transcription_done: {text[:50]}", sound=_rand_sound())
 
     @wz.chooser.command("async-event", title="Async Event", subtitle="Verify async event listener is registered")
     def cmd_event(args):

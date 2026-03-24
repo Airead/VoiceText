@@ -18,6 +18,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from wenzi import async_loop
+from wenzi.controllers import fire_scripting_event
 from wenzi.config import save_config
 from wenzi.input import type_text
 from wenzi.input_context import capture_input_context
@@ -462,6 +463,8 @@ class RecordingFlow:
         use_enhance = bool(app._enhancer and app._enhancer.is_active)
         logger.debug("Routing to preview flow (asr_text=%s)",
                       "background STT" if asr_text is None else "ready")
+        if asr_text is not None:
+            self._fire_scripting_event("transcription_done", asr_text=asr_text)
         await self._loop.run_in_executor(
             None,
             lambda: app._do_transcribe_with_preview(
@@ -1051,13 +1054,7 @@ class RecordingFlow:
     # ------------------------------------------------------------------
 
     def _fire_scripting_event(self, event_name: str, **kwargs) -> None:
-        engine = getattr(self._app, "_script_engine", None)
-        if engine is None:
-            return
-        try:
-            engine.wz._registry.fire_event(event_name, **kwargs)
-        except Exception:
-            logger.debug("Failed to fire scripting event %s", event_name)
+        fire_scripting_event(self._app, event_name, **kwargs)
 
     # ------------------------------------------------------------------
     # Voice input initialization (delegated to main thread)
