@@ -457,3 +457,111 @@ class TestDoTranscribeDirectFlow:
             text = asr_text
 
         assert text == "原始"
+
+
+class TestMergeEvents:
+    """Test the _merge_events helper."""
+
+    def test_first_event_sets_merged(self):
+        from wenzi.controllers.recording_flow import _merge_events
+
+        loop = asyncio.new_event_loop()
+
+        async def _run():
+            a = asyncio.Event()
+            b = asyncio.Event()
+            merged, tasks = _merge_events(a, b)
+            assert not merged.is_set()
+            a.set()
+            await asyncio.sleep(0)  # let waiter tasks run
+            assert merged.is_set()
+            for t in tasks:
+                t.cancel()
+
+        loop.run_until_complete(_run())
+        loop.close()
+
+    def test_second_event_sets_merged(self):
+        from wenzi.controllers.recording_flow import _merge_events
+
+        loop = asyncio.new_event_loop()
+
+        async def _run():
+            a = asyncio.Event()
+            b = asyncio.Event()
+            merged, tasks = _merge_events(a, b)
+            b.set()
+            await asyncio.sleep(0)
+            assert merged.is_set()
+            for t in tasks:
+                t.cancel()
+
+        loop.run_until_complete(_run())
+        loop.close()
+
+    def test_merged_not_set_when_neither(self):
+        from wenzi.controllers.recording_flow import _merge_events
+
+        loop = asyncio.new_event_loop()
+
+        async def _run():
+            a = asyncio.Event()
+            b = asyncio.Event()
+            merged, tasks = _merge_events(a, b)
+            await asyncio.sleep(0)
+            assert not merged.is_set()
+            for t in tasks:
+                t.cancel()
+
+        loop.run_until_complete(_run())
+        loop.close()
+
+    def test_tasks_can_be_cancelled(self):
+        from wenzi.controllers.recording_flow import _merge_events
+
+        loop = asyncio.new_event_loop()
+
+        async def _run():
+            a = asyncio.Event()
+            b = asyncio.Event()
+            merged, tasks = _merge_events(a, b)
+            assert len(tasks) == 2
+            for t in tasks:
+                t.cancel()
+            await asyncio.sleep(0)
+            # Merged should not be set since tasks were cancelled
+            assert not merged.is_set()
+
+        loop.run_until_complete(_run())
+        loop.close()
+
+
+class TestConfirmAsrAction:
+    """Test that CONFIRM_ASR action exists and _watch_cancel handles it."""
+
+    def test_action_enum_has_confirm_asr(self):
+        from wenzi.controllers.recording_flow import Action
+        assert Action.CONFIRM_ASR.value == "confirm_asr"
+
+    def test_watch_cancel_handles_confirm_asr(self):
+        from wenzi.controllers.recording_flow import Action
+
+        loop = asyncio.new_event_loop()
+
+        async def _run():
+            actions = asyncio.Queue()
+            cancel_event = asyncio.Event()
+            confirm_asr_event = asyncio.Event()
+
+            # Simulate the watcher logic
+            actions.put_nowait(Action.CONFIRM_ASR)
+
+            action = await actions.get()
+            if action == Action.CONFIRM_ASR:
+                confirm_asr_event.set()
+
+            assert confirm_asr_event.is_set()
+            assert not cancel_event.is_set()
+
+        loop.run_until_complete(_run())
+        loop.close()

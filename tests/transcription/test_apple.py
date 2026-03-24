@@ -156,6 +156,10 @@ class TestCheckSiriAvailable:
 
     @pytest.fixture(autouse=True)
     def _mock_apple_frameworks(self, monkeypatch):
+        import wenzi.transcription.apple as _apple_mod
+
+        monkeypatch.setattr(_apple_mod, "_SIRI_CHECK_TIMEOUT", 0.01)
+
         self.mock_speech = MagicMock()
         self.mock_foundation = MagicMock()
         self.mock_corefoundation = MagicMock()

@@ -558,6 +558,54 @@ def build_source():
 >
 > **注意：** 不要在用户脚本中定义 PyObjC 的 `NSObject` 子类。Objective-C 运行时不支持重复注册同名类，重载时会导致崩溃。
 
+## 异步 / Async
+
+所有接受回调的 API（`wz.hotkey.bind`、`wz.timer.after`、`wz.timer.every`、`wz.leader`、`wz.on`、`wz.chooser.command`、`wz.chooser.register_command`、`wz.chooser.pick`、`wz.chooser.on`）都透明支持 `async def` 回调，无需额外设置：
+
+```python
+import asyncio
+
+async def slow_task():
+    await asyncio.sleep(2)
+    wz.notify("Done", "Task finished!")
+
+wz.hotkey.bind("ctrl+cmd+a", slow_task)
+```
+
+Lambda 返回协程也同样支持：
+
+```python
+wz.hotkey.bind("ctrl+cmd+b", lambda: slow_task())
+```
+
+### `wz.run(coroutine)`
+
+在回调之外执行异步代码：
+
+```python
+async def fetch_and_copy(url):
+    import urllib.request
+    loop = asyncio.get_event_loop()
+    resp = await loop.run_in_executor(None, urllib.request.urlopen, url)
+    wz.pasteboard.set(resp.read().decode())
+    wz.notify("Copied", f"Content from {url}")
+
+wz.run(fetch_and_copy("https://example.com"))
+```
+
+### 工作原理
+
+异步回调会自动提交到后台 asyncio 事件循环。未捕获的异常会记录到 `~/Library/Logs/WenZi/wenzi.log`，不会静默丢失。
+
+脚本重载（`wz.reload()`）时，上一轮脚本产生的所有异步任务会被取消，有 2 秒的清理宽限期。
+
+### 限制
+
+- **不支持顶层 `await`** — `init.py` 是同步执行的。将异步逻辑写在 `async def` 函数中，注册为回调或通过 `wz.run()` 提交。
+- **Chooser source 必须同步** — `@wz.chooser.source()` 的搜索函数需要立即返回结果，不支持异步。
+- **不要在 async 回调中调用 `wz.run(coro).result()`** — 这会死锁。在 async 函数内直接用 `await`。
+- **无内置并发控制** — 快速连按快捷键会产生多个并发任务。如需互斥，自行使用 flag 或 `asyncio.Lock`。
+
 ## 安全说明
 
 脚本以**未沙箱化的 Python** 运行，拥有与 闻字 相同的系统权限。这意味着脚本可以：

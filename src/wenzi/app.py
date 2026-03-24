@@ -567,6 +567,19 @@ class WenZiApp(StatusBarApp):
         )
         logging.getLogger("wenzi").setLevel(log_level)
 
+        # Dedicated log file for connection pool monitor
+        pool_logger = logging.getLogger("wenzi.enhance.pool_monitor")
+        if not pool_logger.handlers:
+            pool_log_file = LOG_DIR / "pool_monitor.log"
+            pool_handler = logging.handlers.RotatingFileHandler(
+                pool_log_file, maxBytes=2 * 1024 * 1024, backupCount=2,
+                encoding="utf-8",
+            )
+            pool_handler.setLevel(logging.DEBUG)
+            pool_handler.setFormatter(logging.Formatter(fmt))
+            pool_logger.addHandler(pool_handler)
+        pool_logger.propagate = False
+
     @staticmethod
     def _sf_symbol_image(name: str, description: str = "") -> Any:
         """Create an NSImage from an SF Symbol name, or return None."""

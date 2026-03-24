@@ -253,6 +253,17 @@ body { display: flex; flex-direction: column; }
     background: var(--input-bg); border: 1px solid var(--border);
     border-radius: 3px; font-size: 10px; font-family: inherit;
 }
+/* Loading spinner for async sources */
+.search-spinner {
+    display: none; flex-shrink: 0;
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+.search-spinner.visible { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -262,6 +273,7 @@ body { display: flex; flex-direction: column; }
     <input class="search-input" id="search-input"
            type="text" placeholder="" autocomplete="off"
            autocorrect="off" autocapitalize="off" spellcheck="false">
+    <span class="search-spinner" id="search-spinner"></span>
     <span class="create-group" id="create-group">
         <button class="create-btn" id="create-btn" title="">+</button>
         <span class="create-hint">&#8984;N</span>
@@ -467,6 +479,9 @@ resultList.addEventListener('mousemove', function(e) {
     if (prev) prev.className = 'result-item';
     row.className = 'result-item selected';
     selectedIndex = idx;
+    if (activeModifier) {
+        post('modifierChange', { index: idx, modifier: activeModifier });
+    }
     updatePreview();
 }, false);
 
@@ -493,7 +508,10 @@ resultList.addEventListener('click', function(e) {
         var idx = parseInt(row.getAttribute('data-idx'), 10);
         if (!isNaN(idx)) {
             selectedIndex = idx;
-            post('execute', { index: idx, version: itemsVersion });
+            var msg = { index: idx, version: itemsVersion };
+            var mod = getModifierName(e);
+            if (mod) msg.modifier = mod;
+            post('execute', msg);
         }
     }
 }, false);
@@ -631,7 +649,11 @@ function _checkPanelResize() {
     }
 }
 
-// --- Input handling ---
+// --- Input handling (debounced) ---
+var _searchTimer = null;
+var _DEBOUNCE_MS = 150;
+var searchSpinner = document.getElementById('search-spinner');
+
 searchInput.addEventListener('input', function() {
     if (_settingHistoryValue) return;
     if (inHistoryMode) {
@@ -639,7 +661,11 @@ searchInput.addEventListener('input', function() {
         post('exitHistory');
     }
     _checkPanelResize();
-    post('search', { query: searchInput.value });
+    if (_searchTimer !== null) { clearTimeout(_searchTimer); }
+    _searchTimer = setTimeout(function() {
+        _searchTimer = null;
+        post('search', { query: searchInput.value });
+    }, _DEBOUNCE_MS);
 });
 
 // --- Keyboard navigation ---
@@ -810,7 +836,10 @@ function setResults(newItems, version, selectedIdx) {
     // Show/hide result area
     if (items.length > 0) { mainContent.classList.add('visible'); }
     else { mainContent.classList.remove('visible'); }
-    if (typeof selectedIdx === 'number') {
+    if (selectedIdx === -2) {
+        // Async append — preserve current selection
+        selectedIndex = Math.max(0, Math.min(selectedIndex, items.length - 1));
+    } else if (typeof selectedIdx === 'number') {
         // Preserve scroll position for delete/refresh operations
         selectedIndex = Math.max(0, Math.min(selectedIdx, items.length - 1));
     } else {
@@ -834,6 +863,11 @@ function setResults(newItems, version, selectedIdx) {
             _renderVisibleRows();
         }
     }
+}
+
+function setLoading(loading) {
+    if (loading) { searchSpinner.classList.add('visible'); }
+    else { searchSpinner.classList.remove('visible'); }
 }
 
 function _measureCollapsedHeight() {

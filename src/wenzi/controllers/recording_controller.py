@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 if TYPE_CHECKING:
     from wenzi.app import WenZiApp
 
+from wenzi.controllers import fire_scripting_event
 from wenzi.config import save_config
 from wenzi.i18n import t
 from wenzi.input import type_text
@@ -62,14 +63,7 @@ class RecordingController:
             self._app._busy = False
 
     def _fire_scripting_event(self, event_name: str, **kwargs) -> None:
-        """Fire a scripting event if the script engine is available."""
-        engine = getattr(self._app, "_script_engine", None)
-        if engine is None:
-            return
-        try:
-            engine.wz._registry.fire_event(event_name, **kwargs)
-        except Exception:
-            logger.debug("Failed to fire scripting event %s", event_name)
+        fire_scripting_event(self._app, event_name, **kwargs)
 
     # ------------------------------------------------------------------
     # Recording watchdog — auto-stop if hotkey release event is lost
@@ -572,6 +566,7 @@ class RecordingController:
                     if text and text.strip():
                         asr_text = text.strip()
                         if app._preview_enabled:
+                            self._fire_scripting_event("transcription_done", asr_text=asr_text)
                             app._do_transcribe_with_preview(
                                 asr_text=asr_text,
                                 use_enhance=use_enhance,

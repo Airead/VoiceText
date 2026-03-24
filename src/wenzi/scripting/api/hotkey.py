@@ -6,6 +6,7 @@ import logging
 import threading
 from typing import Callable, Optional
 
+from wenzi.scripting.api._async_util import wrap_async
 from wenzi.scripting.registry import LeaderConfig, LeaderMapping, ScriptingRegistry
 from wenzi.scripting.ui.leader_alert import LeaderAlertPanel
 
@@ -22,6 +23,7 @@ class HotkeyAPI:
         self._active_leader: Optional[LeaderConfig] = None
         self._leader_triggered: bool = False
         self._lock = threading.Lock()
+        self._started = False
 
     def define_key(self, name: str, keycode: int) -> None:
         """Define a custom key mapping for use in hotkeys and leader keys."""
@@ -35,8 +37,15 @@ class HotkeyAPI:
             self.define_key(name, keycode)
 
     def bind(self, hotkey_str: str, callback: Callable) -> None:
-        """Bind a hotkey combination (e.g. "ctrl+cmd+v")."""
-        self._registry.register_hotkey(hotkey_str, callback)
+        """Bind a hotkey combination (e.g. "ctrl+cmd+v").
+
+        *callback* may be a regular function or an ``async def``.
+        Async callbacks are automatically submitted to the background
+        event loop.
+        """
+        self._registry.register_hotkey(hotkey_str, wrap_async(callback))
+        if self._started:
+            self._start_hotkey_listeners()
 
     def unbind(self, hotkey_str: str) -> None:
         """Remove and stop a hotkey binding."""
@@ -44,11 +53,13 @@ class HotkeyAPI:
 
     def start(self) -> None:
         """Start all hotkey and leader-key listeners."""
+        self._started = True
         self._start_leader_listener()
         self._start_hotkey_listeners()
 
     def stop(self) -> None:
         """Stop all listeners."""
+        self._started = False
         if self._listener:
             self._listener.stop()
             self._listener = None

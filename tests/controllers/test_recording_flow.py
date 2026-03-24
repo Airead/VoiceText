@@ -125,6 +125,10 @@ class TestIsNotBusy:
 
 
 class TestSoundDelay:
+    @pytest.fixture(autouse=True)
+    def _fast_delay(self, monkeypatch):
+        monkeypatch.setattr(RecordingFlow, "_DELAYED_START_SECS", 0.1)
+
     @patch("wenzi.controllers.recording_flow.capture_input_context", return_value=None)
     @patch("PyObjCTools.AppHelper")
     def test_cancel_during_delay(self, mock_ah, _mock_ic, flow, mock_app):

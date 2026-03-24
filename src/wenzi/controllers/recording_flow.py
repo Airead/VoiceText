@@ -18,6 +18,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from wenzi import async_loop
+from wenzi.controllers import fire_scripting_event
 from wenzi.config import save_config
 from wenzi.input import type_text
 from wenzi.input_context import capture_input_context
@@ -35,10 +36,29 @@ logger = logging.getLogger(__name__)
 class Action(enum.Enum):
     RELEASE = "release"
     CANCEL = "cancel"
+    CONFIRM_ASR = "confirm_asr"
     RESTART = "restart"
     MODE_PREV = "mode_prev"
     MODE_NEXT = "mode_next"
     PREVIEW_HISTORY = "preview_history"
+
+
+def _merge_events(
+    *events: asyncio.Event,
+) -> tuple[asyncio.Event, list[asyncio.Task]]:
+    """Return a new Event that is set when any of *events* is set.
+
+    Also returns the background waiter tasks so the caller can cancel
+    them when the merged event is no longer needed (avoid task leaks).
+    """
+    merged = asyncio.Event()
+
+    async def _waiter(ev: asyncio.Event) -> None:
+        await ev.wait()
+        merged.set()
+
+    tasks = [asyncio.ensure_future(_waiter(ev)) for ev in events]
+    return merged, tasks
 
 
 class _RestartSession(Exception):
@@ -308,7 +328,7 @@ class RecordingFlow:
             # Indicate we are busy processing (keep indicator alive for animation)
             AppHelper.callAfter(self._stop_indicator, True)
 
-            # ⑥ Transcribe (or defer to preview for background STT)
+            # ⑥ Transcribe (or defer to preview/direct for background STT)
             if app._preview_enabled and not streaming:
                 # Non-streaming preview: open preview immediately and
                 # let it run STT in the background (asr_text=None).
@@ -317,28 +337,26 @@ class RecordingFlow:
                 )
                 return
 
-            if streaming:
-                try:
-                    text = await self._loop.run_in_executor(
-                        None, app._transcriber.stop_streaming
-                    )
-                except Exception as e:
-                    logger.error("Streaming stop failed: %s", e)
-                    text = None
-                self._hide_live_overlay()
-            else:
-                AppHelper.callAfter(
-                    app._set_status, "statusbar.status.transcribing"
+            if not app._preview_enabled and not streaming:
+                # Non-streaming direct: show overlay immediately and
+                # run STT in the background.
+                logger.debug("Routing to direct flow with background STT")
+                await self._do_direct_flow(
+                    None, wav_data, audio_duration
                 )
-                app._transcriber.skip_punc = bool(
-                    app._enhancer and app._enhancer.is_active
-                )
-                hotwords, _ = app._build_dynamic_hotwords()
+                app._busy = False
+                logger.debug("Direct flow done, session done")
+                return
+
+            # All non-streaming paths returned above; only streaming remains.
+            try:
                 text = await self._loop.run_in_executor(
-                    None, lambda: app._transcriber.transcribe(
-                        wav_data, hotwords=hotwords
-                    )
+                    None, app._transcriber.stop_streaming
                 )
+            except Exception as e:
+                logger.error("Streaming stop failed: %s", e)
+                text = None
+            self._hide_live_overlay()
 
             logger.debug("Transcription result: %r", text[:100] if text else None)
 
@@ -361,7 +379,7 @@ class RecordingFlow:
             else:
                 logger.debug("Routing to direct flow")
                 await self._do_direct_flow(
-                    asr_text, wav_data, audio_duration, streaming
+                    asr_text, wav_data, audio_duration
                 )
                 app._busy = False
                 logger.debug("Direct flow done, session done")
@@ -420,8 +438,12 @@ class RecordingFlow:
         elif action == Action.MODE_NEXT:
             self._navigate_mode(+1)
 
-    async def _watch_cancel(self, cancel_event: asyncio.Event) -> None:
-        """Monitor the action queue for CANCEL and bridge to cancel_event.
+    async def _watch_cancel(
+        self,
+        cancel_event: asyncio.Event,
+        confirm_asr_event: asyncio.Event | None = None,
+    ) -> None:
+        """Monitor the action queue for CANCEL / CONFIRM_ASR.
 
         Inline actions (mode nav) are handled directly.  Other actions
         (RELEASE, RESTART, PREVIEW_HISTORY) are put back so the caller
@@ -432,6 +454,9 @@ class RecordingFlow:
                 action = await self._actions.get()
                 if action == Action.CANCEL:
                     cancel_event.set()
+                    return
+                if action == Action.CONFIRM_ASR and confirm_asr_event is not None:
+                    confirm_asr_event.set()
                     return
                 if action in (Action.MODE_PREV, Action.MODE_NEXT):
                     self._handle_inline_action(action)
@@ -462,6 +487,8 @@ class RecordingFlow:
         use_enhance = bool(app._enhancer and app._enhancer.is_active)
         logger.debug("Routing to preview flow (asr_text=%s)",
                       "background STT" if asr_text is None else "ready")
+        if asr_text is not None:
+            self._fire_scripting_event("transcription_done", asr_text=asr_text)
         await self._loop.run_in_executor(
             None,
             lambda: app._do_transcribe_with_preview(
@@ -480,15 +507,15 @@ class RecordingFlow:
 
     async def _do_direct_flow(
         self,
-        asr_text: str,
+        asr_text: str | None,
         wav_data: bytes,
         audio_duration: float,
-        streaming_was_active: bool,
     ) -> None:
         from PyObjCTools import AppHelper
 
         app = self._app
         use_enhance = bool(app._enhancer and app._enhancer.is_active)
+        need_stt = asr_text is None
 
         try:
             app._usage_stats.record_transcription(
@@ -497,92 +524,188 @@ class RecordingFlow:
         except Exception as e:
             logger.error("Failed to record usage stats: %s", e)
 
-        self._fire_scripting_event("transcription_done", asr_text=asr_text)
-
-        text = asr_text
+        text = asr_text or ""
         enhanced_text = None
         cancel_event = asyncio.Event()
 
         if use_enhance:
-            AppHelper.callAfter(
-                app._set_status, "statusbar.status.enhancing"
+            initial_status = (
+                "statusbar.status.transcribing" if need_stt
+                else "statusbar.status.enhancing"
             )
+            AppHelper.callAfter(app._set_status, initial_status)
 
-            # ESC cancel: watch the action queue for CANCEL and bridge
-            # it to cancel_event so the streaming loops can detect it.
+            # Enter → output ASR directly, ESC → discard all.
+            confirm_asr_event = asyncio.Event()
             cancel_watcher = asyncio.create_task(
-                self._watch_cancel(cancel_event)
+                self._watch_cancel(cancel_event, confirm_asr_event)
             )
 
-            # Show streaming overlay for LLM enhancement.
-            # Read indicator frame and build overlay on the main thread
-            # (AppKit objects must not be accessed from the asyncio thread).
             stt_info = app._current_stt_model()
             llm_info = app._current_llm_model()
 
-            def _show_overlay():
-                indicator_frame = app._recording_indicator.current_frame
-                app._recording_indicator.animate_out(
-                    completion=lambda: app._streaming_overlay.show(
-                        asr_text=asr_text,
-                        cancel_event=None,
-                        animate_from_frame=indicator_frame,
-                        stt_info=stt_info,
-                        llm_info=llm_info,
-                        on_cancel=lambda: self.send_action(Action.CANCEL),
-                    )
+            AppHelper.callAfter(
+                self._show_streaming_overlay,
+                asr_text or "", stt_info, llm_info, True,
+            )
+
+            # Background STT if needed
+            if need_stt:
+                asr_text = await self._background_stt(
+                    wav_data, cancel_event, skip_punc=True
                 )
-            AppHelper.callAfter(_show_overlay)
-
-            # Resolve chain steps
-            try:
-                current_mode_def = app._enhancer.get_mode_definition(
-                    app._enhance_mode
-                )
-                chain_steps: list[str] = []
-                if current_mode_def and current_mode_def.steps:
-                    for step_id in current_mode_def.steps:
-                        step_def = app._enhancer.get_mode_definition(step_id)
-                        if step_def:
-                            chain_steps.append(step_id)
-                        else:
-                            logger.warning(
-                                "Chain step '%s' not found, skipping", step_id
-                            )
-
-                if chain_steps:
-                    text = await self._run_direct_chain_stream(
-                        asr_text, chain_steps, cancel_event
-                    )
-                else:
-                    text = await self._run_direct_single_stream(
-                        asr_text, cancel_event
-                    )
-
                 if cancel_event.is_set():
-                    text = asr_text
-                    enhanced_text = None
-                else:
-                    enhanced_text = text
-                    self._fire_scripting_event(
-                        "enhancement_done", enhanced_text=enhanced_text
-                    )
-            except Exception as e:
-                logger.error("AI enhancement failed: %s", e)
-                text = asr_text
-            finally:
-                cancel_watcher.cancel()
-                if cancel_event.is_set():
+                    cancel_watcher.cancel()
                     AppHelper.callAfter(app._streaming_overlay.close)
+                    AppHelper.callAfter(
+                        app._set_status, "statusbar.status.ready"
+                    )
+                    return
+                if not asr_text:
+                    cancel_watcher.cancel()
+                    AppHelper.callAfter(app._streaming_overlay.close)
+                    AppHelper.callAfter(
+                        app._set_status, "statusbar.status.empty"
+                    )
+                    return
+                text = asr_text
+
+                # Enter pressed during STT: skip enhancement, output ASR
+                if confirm_asr_event.is_set():
+                    logger.debug("Enter during STT: skipping enhance")
+                    cancel_watcher.cancel()
+                    AppHelper.callAfter(
+                        app._streaming_overlay.close_now
+                    )
+                    self._fire_scripting_event(
+                        "transcription_done", asr_text=asr_text
+                    )
                 else:
-                    app._streaming_overlay.close_with_delay()
-        else:
-            # No enhancement — update overlay with ASR result if shown
-            if streaming_was_active:
-                AppHelper.callAfter(
-                    app._streaming_overlay.set_asr_text, asr_text
+                    AppHelper.callAfter(
+                        app._set_status, "statusbar.status.enhancing"
+                    )
+
+            if not confirm_asr_event.is_set():
+                self._fire_scripting_event(
+                    "transcription_done", asr_text=asr_text
                 )
-                app._streaming_overlay.close_with_delay()
+
+                # Resolve chain steps
+                try:
+                    current_mode_def = app._enhancer.get_mode_definition(
+                        app._enhance_mode
+                    )
+                    chain_steps: list[str] = []
+                    if current_mode_def and current_mode_def.steps:
+                        for step_id in current_mode_def.steps:
+                            step_def = app._enhancer.get_mode_definition(
+                                step_id
+                            )
+                            if step_def:
+                                chain_steps.append(step_id)
+                            else:
+                                logger.warning(
+                                    "Chain step '%s' not found, skipping",
+                                    step_id,
+                                )
+
+                    # Both cancel_event and confirm_asr_event abort the stream
+                    abort_event, abort_tasks = _merge_events(
+                        cancel_event, confirm_asr_event
+                    )
+
+                    try:
+                        if chain_steps:
+                            text = await self._run_direct_chain_stream(
+                                asr_text, chain_steps, abort_event
+                            )
+                        else:
+                            text = await self._run_direct_single_stream(
+                                asr_text, abort_event
+                            )
+                    finally:
+                        for t in abort_tasks:
+                            t.cancel()
+                        results = await asyncio.gather(
+                            *abort_tasks, return_exceptions=True
+                        )
+                        for r in results:
+                            if isinstance(r, Exception) and not isinstance(
+                                r, asyncio.CancelledError
+                            ):
+                                logger.warning(
+                                    "abort waiter error: %s", r
+                                )
+
+                    if confirm_asr_event.is_set():
+                        logger.debug("Enter during enhance: using ASR text")
+                        text = asr_text
+                        enhanced_text = None
+                    elif cancel_event.is_set():
+                        text = asr_text
+                        enhanced_text = None
+                    else:
+                        enhanced_text = text
+                        self._fire_scripting_event(
+                            "enhancement_done", enhanced_text=enhanced_text
+                        )
+                except Exception as e:
+                    logger.error("AI enhancement failed: %s", e)
+                    text = asr_text
+                finally:
+                    cancel_watcher.cancel()
+                    if cancel_event.is_set() or confirm_asr_event.is_set():
+                        # Use _do_close directly so the panel is removed
+                        # before type_text runs in the same callAfter queue.
+                        AppHelper.callAfter(
+                            app._streaming_overlay.close_now
+                        )
+                    else:
+                        AppHelper.callAfter(
+                            app._streaming_overlay.close_with_delay
+                        )
+        else:
+            # No enhancement — show overlay for background STT if needed.
+            # Streaming already has ASR text; just hide the indicator.
+            if need_stt:
+                cancel_watcher = asyncio.create_task(
+                    self._watch_cancel(cancel_event)
+                )
+                AppHelper.callAfter(
+                    self._show_streaming_overlay,
+                    "", app._current_stt_model(), "",
+                )
+
+                asr_text = await self._background_stt(
+                    wav_data, cancel_event
+                )
+                cancel_watcher.cancel()
+                if cancel_event.is_set() or not asr_text:
+                    AppHelper.callAfter(app._streaming_overlay.close)
+                    AppHelper.callAfter(
+                        app._set_status,
+                        "statusbar.status.ready"
+                        if cancel_event.is_set()
+                        else "statusbar.status.empty",
+                    )
+                    return
+                text = asr_text
+                AppHelper.callAfter(
+                    app._streaming_overlay.close_with_delay
+                )
+            else:
+                AppHelper.callAfter(app._recording_indicator.hide)
+
+            self._fire_scripting_event(
+                "transcription_done", asr_text=asr_text
+            )
+
+        logger.debug(
+            "Direct flow output: cancel=%s, confirm_asr=%s, text=%r",
+            cancel_event.is_set(),
+            confirm_asr_event.is_set() if use_enhance else "N/A",
+            text[:50] if text else None,
+        )
 
         if cancel_event.is_set():
             AppHelper.callAfter(
@@ -590,13 +713,15 @@ class RecordingFlow:
             )
             return
 
+        text = text.strip()
+
         self._fire_scripting_event(
-            "output_text", final_text=text.strip()
+            "output_text", final_text=text
         )
 
         AppHelper.callAfter(
             type_text,
-            text.strip(),
+            text,
             append_newline=app._append_newline,
             method=app._output_method,
         )
@@ -615,7 +740,7 @@ class RecordingFlow:
             app._conversation_history.log(
                 asr_text=asr_text,
                 enhanced_text=enhanced_text,
-                final_text=text.strip(),
+                final_text=text,
                 enhance_mode=app._enhance_mode,
                 preview_enabled=False,
                 stt_model=app._current_stt_model(),
@@ -627,8 +752,108 @@ class RecordingFlow:
             logger.error("Failed to log conversation: %s", e)
 
     # ------------------------------------------------------------------
+    # Overlay helpers for direct flow
+    # ------------------------------------------------------------------
+
+    def _show_streaming_overlay(
+        self,
+        asr_text: str,
+        stt_info: str,
+        llm_info: str,
+        with_confirm_asr: bool = False,
+    ) -> None:
+        """Hide recording indicator and show the streaming overlay immediately.
+
+        Must be called on the main thread (via AppHelper.callAfter).
+        """
+        app = self._app
+        app._recording_indicator.hide()
+        app._streaming_overlay.show(
+            asr_text=asr_text,
+            stt_info=stt_info,
+            llm_info=llm_info,
+            on_cancel=lambda: self.send_action(Action.CANCEL),
+            on_confirm_asr=(
+                lambda: self.send_action(Action.CONFIRM_ASR)
+            ) if with_confirm_asr else None,
+        )
+
+    # ------------------------------------------------------------------
+    # Background STT for direct flow
+    # ------------------------------------------------------------------
+
+    async def _background_stt(
+        self,
+        wav_data: bytes,
+        cancel_event: asyncio.Event,
+        skip_punc: bool = False,
+    ) -> str | None:
+        """Run STT in background, update overlay when done.
+
+        Returns the transcribed text (stripped), or None on empty/failure.
+        """
+        from PyObjCTools import AppHelper
+
+        app = self._app
+        app._transcriber.skip_punc = skip_punc
+        hotwords, _ = app._build_dynamic_hotwords()
+
+        text = await self._loop.run_in_executor(
+            None, lambda: app._transcriber.transcribe(
+                wav_data, hotwords=hotwords
+            )
+        )
+
+        if cancel_event.is_set():
+            return None
+
+        asr_text = (text or "").strip()
+        logger.debug("Background STT result: %r", asr_text[:100] if asr_text else None)
+
+        if asr_text:
+            AppHelper.callAfter(
+                app._streaming_overlay.set_asr_text, asr_text
+            )
+
+        return asr_text or None
+
+    # ------------------------------------------------------------------
     # Streaming enhancement helpers (native async — no event loop hacks)
     # ------------------------------------------------------------------
+
+    @staticmethod
+    async def _iter_or_cancel(gen, cancel_event: asyncio.Event):
+        """Iterate an async generator, aborting immediately on cancel.
+
+        Races each ``__anext__`` against ``cancel_event.wait()`` so
+        cancellation is detected even while blocked waiting for a chunk.
+        The generator is always closed (``aclose``) on exit.
+        """
+        aiter = gen.__aiter__()
+        cancel_fut = asyncio.ensure_future(cancel_event.wait())
+        try:
+            while True:
+                next_fut = asyncio.ensure_future(aiter.__anext__())
+                done, _ = await asyncio.wait(
+                    [next_fut, cancel_fut],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if cancel_fut in done:
+                    next_fut.cancel()
+                    # Wait for __anext__ to finish cancellation before
+                    # closing the generator (avoids "already running").
+                    try:
+                        await next_fut
+                    except (asyncio.CancelledError, StopAsyncIteration):
+                        pass
+                    return
+                try:
+                    yield next_fut.result()
+                except StopAsyncIteration:
+                    return
+        finally:
+            cancel_fut.cancel()
+            await gen.aclose()
 
     async def _run_direct_single_stream(
         self, asr_text: str, cancel_event: asyncio.Event,
@@ -644,34 +869,31 @@ class RecordingFlow:
         gen = app._enhancer.enhance_stream(
             asr_text, input_context=self._input_context
         )
-        try:
-            async for chunk, chunk_usage, is_thinking in gen:
-                if cancel_event.is_set():
-                    return asr_text
-                if is_thinking == "retry" and chunk:
-                    had_thinking = True
-                    app._streaming_overlay.append_thinking_text(chunk)
-                    label = chunk.strip().strip("()\n")
-                    app._streaming_overlay.set_status(f"\u23f3 {label}")
-                elif is_thinking and chunk:
-                    had_thinking = True
-                    thinking_tokens += len(chunk)
-                    app._streaming_overlay.append_thinking_text(
-                        chunk, thinking_tokens=thinking_tokens
-                    )
-                elif chunk:
-                    if had_thinking:
-                        had_thinking = False
-                        app._streaming_overlay.clear_text()
-                    collected.append(chunk)
-                    completion_tokens += len(chunk)
-                    app._streaming_overlay.append_text(
-                        chunk, completion_tokens=completion_tokens
-                    )
-                if chunk_usage is not None:
-                    usage = chunk_usage
-        finally:
-            await gen.aclose()
+        async for chunk, chunk_usage, is_thinking in self._iter_or_cancel(
+            gen, cancel_event
+        ):
+            if is_thinking == "retry" and chunk:
+                had_thinking = True
+                app._streaming_overlay.append_thinking_text(chunk)
+                label = chunk.strip().strip("()\n")
+                app._streaming_overlay.set_status(f"\u23f3 {label}")
+            elif is_thinking and chunk:
+                had_thinking = True
+                thinking_tokens += len(chunk)
+                app._streaming_overlay.append_thinking_text(
+                    chunk, thinking_tokens=thinking_tokens
+                )
+            elif chunk:
+                if had_thinking:
+                    had_thinking = False
+                    app._streaming_overlay.clear_text()
+                collected.append(chunk)
+                completion_tokens += len(chunk)
+                app._streaming_overlay.append_text(
+                    chunk, completion_tokens=completion_tokens
+                )
+            if chunk_usage is not None:
+                usage = chunk_usage
 
         if usage:
             try:
@@ -722,31 +944,28 @@ class RecordingFlow:
                 gen = app._enhancer.enhance_stream(
                     input_text, input_context=self._input_context
                 )
-                try:
-                    async for chunk, chunk_usage, is_thinking in gen:
-                        if cancel_event.is_set():
-                            return input_text
-                        if is_thinking == "retry" and chunk:
-                            app._streaming_overlay.append_thinking_text(chunk)
-                            label = chunk.strip().strip("()\n")
-                            app._streaming_overlay.set_status(
-                                f"\u23f3 Step {step_idx}/{total_steps}: {label}"
-                            )
-                        elif is_thinking and chunk:
-                            thinking_tokens += len(chunk)
-                            app._streaming_overlay.append_thinking_text(
-                                chunk, thinking_tokens=thinking_tokens
-                            )
-                        elif chunk:
-                            collected.append(chunk)
-                            completion_tokens += len(chunk)
-                            app._streaming_overlay.append_text(
-                                chunk, completion_tokens=completion_tokens
-                            )
-                        if chunk_usage is not None:
-                            step_usage = chunk_usage
-                finally:
-                    await gen.aclose()
+                async for chunk, chunk_usage, is_thinking in self._iter_or_cancel(
+                    gen, cancel_event
+                ):
+                    if is_thinking == "retry" and chunk:
+                        app._streaming_overlay.append_thinking_text(chunk)
+                        label = chunk.strip().strip("()\n")
+                        app._streaming_overlay.set_status(
+                            f"\u23f3 Step {step_idx}/{total_steps}: {label}"
+                        )
+                    elif is_thinking and chunk:
+                        thinking_tokens += len(chunk)
+                        app._streaming_overlay.append_thinking_text(
+                            chunk, thinking_tokens=thinking_tokens
+                        )
+                    elif chunk:
+                        collected.append(chunk)
+                        completion_tokens += len(chunk)
+                        app._streaming_overlay.append_text(
+                            chunk, completion_tokens=completion_tokens
+                        )
+                    if chunk_usage is not None:
+                        step_usage = chunk_usage
 
                 step_result = "".join(collected).strip()
                 if step_result:
@@ -1051,13 +1270,7 @@ class RecordingFlow:
     # ------------------------------------------------------------------
 
     def _fire_scripting_event(self, event_name: str, **kwargs) -> None:
-        engine = getattr(self._app, "_script_engine", None)
-        if engine is None:
-            return
-        try:
-            engine.wz._registry.fire_event(event_name, **kwargs)
-        except Exception:
-            logger.debug("Failed to fire scripting event %s", event_name)
+        fire_scripting_event(self._app, event_name, **kwargs)
 
     # ------------------------------------------------------------------
     # Voice input initialization (delegated to main thread)

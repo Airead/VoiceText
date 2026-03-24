@@ -100,6 +100,8 @@ class ChooserSource:
     create_action: Optional[Callable[[str], None]] = field(
         default=None, repr=False,
     )  # Optional "create new" action; receives stripped query
+    is_async: bool = False
+    search_timeout: float = 5.0  # Async sources only; sync sources ignore this
 
 
 # ---------------------------------------------------------------------------

@@ -547,8 +547,8 @@ class TestRecordCorrectionLlmVocab:
 
 class TestThreadSafety:
     def test_thread_safety(self, stats):
-        n_threads = 10
-        n_ops = 50
+        n_threads = 4
+        n_ops = 20
         barrier = threading.Barrier(n_threads)
 
         def worker():

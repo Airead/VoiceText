@@ -1284,8 +1284,8 @@ class TestPanelPreviewWidth:
         panel._do_search("cb ")
 
         assert panel._show_preview is True
-        js_call = panel._eval_js.call_args[0][0]
-        assert "setPreviewVisible(true)" in js_call
+        all_js = " ".join(c[0][0] for c in panel._eval_js.call_args_list)
+        assert "setPreviewVisible(true)" in all_js
 
     def test_search_without_preview_source_stays_narrow(self):
         """General search should keep preview off."""
@@ -1297,8 +1297,8 @@ class TestPanelPreviewWidth:
         panel._do_search("Safari")
 
         assert panel._show_preview is False
-        js_call = panel._eval_js.call_args[0][0]
-        assert "setPreviewVisible(false)" in js_call
+        all_js = " ".join(c[0][0] for c in panel._eval_js.call_args_list)
+        assert "setPreviewVisible(false)" in all_js
 
     def test_switch_from_preview_to_no_preview(self):
         """Switching from preview source to general search should send preview false."""
@@ -1311,8 +1311,8 @@ class TestPanelPreviewWidth:
         panel._do_search("Safari")
 
         assert panel._show_preview is False
-        js_call = panel._eval_js.call_args[0][0]
-        assert "setPreviewVisible(false)" in js_call
+        all_js = " ".join(c[0][0] for c in panel._eval_js.call_args_list)
+        assert "setPreviewVisible(false)" in all_js
 
     def test_push_items_includes_setPreviewVisible(self):
         """_push_items_to_js should include setPreviewVisible call."""
@@ -1373,8 +1373,8 @@ class TestCompactCalcHeight:
         panel._do_search("2 + 3")
 
         assert panel._compact_results is True
-        js_call = panel._eval_js.call_args[0][0]
-        assert "setCompact(true)" in js_call
+        all_js = " ".join(c[0][0] for c in panel._eval_js.call_args_list)
+        assert "setCompact(true)" in all_js
 
     def test_calc_results_use_calc_action_hints(self):
         """Calc-only results should show calculator action hints, not defaults."""
@@ -1389,10 +1389,10 @@ class TestCompactCalcHeight:
 
         panel._do_search("2 + 3")
 
-        js_call = panel._eval_js.call_args[0][0]
-        assert '"Copy"' in js_call
-        assert '"Paste"' in js_call
-        assert '"Open"' not in js_call
+        all_js = " ".join(c[0][0] for c in panel._eval_js.call_args_list)
+        assert '"Copy"' in all_js
+        assert '"Paste"' in all_js
+        assert '"Open"' not in all_js
 
     def test_mixed_results_do_not_enter_compact(self):
         """When calc + non-calc results from scratch, should NOT enter compact."""

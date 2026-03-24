@@ -85,7 +85,7 @@ class TestWZNamespace:
         reg = ScriptingRegistry()
         wz = _WZNamespace(reg)
         wz.notify("Test", "msg")
-        mock_send.assert_called_once_with("Test", "", "msg")
+        mock_send.assert_called_once_with("Test", "", "msg", sound="default")
 
     @patch("wenzi.scripting.api.execute._run")
     def test_execute_returns_dict(self, mock_run):
@@ -112,7 +112,10 @@ class TestWZNamespace:
 
         result = wz.on("test_event", handler)
         assert result is handler
-        assert handler in reg._event_listeners["test_event"]
+        registered = reg._event_listeners["test_event"]
+        assert len(registered) == 1
+        # The registered callback is wrapped by wrap_async
+        assert registered[0].__wrapped__ is handler
 
     def test_on_as_decorator(self):
         reg = ScriptingRegistry()
@@ -122,7 +125,9 @@ class TestWZNamespace:
         def handler(data):
             pass
 
-        assert handler in reg._event_listeners["transcription_done"]
+        registered = reg._event_listeners["transcription_done"]
+        assert len(registered) == 1
+        assert registered[0].__wrapped__ is handler
 
     @patch("wenzi.input.type_text")
     def test_type_text_auto(self, mock_type):

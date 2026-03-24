@@ -558,6 +558,54 @@ When you call `wz.reload()`, **all files** in the scripts directory are reloaded
 >
 > **Note:** Do not define PyObjC `NSObject` subclasses in user scripts. The Objective-C runtime does not support re-registering a class with the same name, which causes a crash on reload.
 
+## Async / Await
+
+All callback-based APIs (`wz.hotkey.bind`, `wz.timer.after`, `wz.timer.every`, `wz.leader`, `wz.on`, `wz.chooser.command`, `wz.chooser.register_command`, `wz.chooser.pick`, `wz.chooser.on`) transparently support `async def` callbacks. You can write asynchronous code without any extra setup:
+
+```python
+import asyncio
+
+async def slow_task():
+    await asyncio.sleep(2)
+    wz.notify("Done", "Task finished!")
+
+wz.hotkey.bind("ctrl+cmd+a", slow_task)
+```
+
+Lambdas that return coroutines also work:
+
+```python
+wz.hotkey.bind("ctrl+cmd+b", lambda: slow_task())
+```
+
+### `wz.run(coroutine)`
+
+For ad-hoc async execution outside of callbacks, use `wz.run()`:
+
+```python
+async def fetch_and_copy(url):
+    import urllib.request
+    loop = asyncio.get_event_loop()
+    resp = await loop.run_in_executor(None, urllib.request.urlopen, url)
+    wz.pasteboard.set(resp.read().decode())
+    wz.notify("Copied", f"Content from {url}")
+
+wz.run(fetch_and_copy("https://example.com"))
+```
+
+### How It Works
+
+Async callbacks are automatically submitted to a background asyncio event loop (shared across the app). Unhandled exceptions are logged to `~/Library/Logs/WenZi/wenzi.log` — they are never silently swallowed.
+
+When scripts are reloaded (`wz.reload()`), all pending async tasks from the previous script cycle are cancelled with a 2-second grace period for cleanup.
+
+### Limitations
+
+- **No top-level `await`** — `init.py` is executed synchronously. Use `async def` functions and register them as callbacks, or submit them via `wz.run()`.
+- **Chooser sources must be synchronous** — `@wz.chooser.source()` search functions must return results immediately. Async sources are not supported because the UI needs synchronous results to render.
+- **Don't call `wz.run(coro).result()` inside an async callback** — this will deadlock because you're already on the async event loop thread. Inside async functions, use `await` directly.
+- **No built-in concurrency control** — pressing a hotkey rapidly can launch multiple concurrent async tasks. Use a flag or `asyncio.Lock` if you need mutual exclusion.
+
 ## Security
 
 Scripts run as **unsandboxed Python** with the same permissions as 闻字 itself. This means a script can:

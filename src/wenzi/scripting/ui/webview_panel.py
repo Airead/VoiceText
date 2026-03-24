@@ -122,6 +122,7 @@ _BRIDGE_JS = r"""
 _PanelCloseDelegate = None
 _MessageHandler = None
 _FileSchemeHandler = None
+_DragView = None
 
 
 def _get_close_delegate_class():
@@ -268,6 +269,32 @@ def _get_file_scheme_handler_class():
     return _FileSchemeHandler
 
 
+def _get_drag_view_class():
+    """Transparent NSView that enables window dragging over WKWebView."""
+    global _DragView
+    if _DragView is not None:
+        return _DragView
+
+    import objc
+    from AppKit import NSView
+
+    class WebViewPanelDragView(NSView):
+        """Transparent overlay that forwards drag to the window title bar."""
+
+        def initWithFrame_(self, frame):
+            self = objc.super(WebViewPanelDragView, self).initWithFrame_(frame)
+            return self
+
+        def mouseDown_(self, event):
+            self.window().performWindowDragWithEvent_(event)
+
+        def acceptsFirstMouse_(self, event):
+            return True
+
+    _DragView = WebViewPanelDragView
+    return _DragView
+
+
 # ---------------------------------------------------------------------------
 # WebViewPanel
 # ---------------------------------------------------------------------------
@@ -295,6 +322,8 @@ class WebViewPanel:
         height: int = 700,
         resizable: bool = True,
         allowed_read_paths: Optional[List[str]] = None,
+        titlebar_hidden: bool = False,
+        floating: bool = True,
     ) -> None:
         self._title = title
         self._html = html
@@ -303,6 +332,8 @@ class WebViewPanel:
         self._height = height
         self._resizable = resizable
         self._allowed_read_paths = allowed_read_paths or []
+        self._titlebar_hidden = titlebar_hidden
+        self._floating = floating
 
         self._panel = None
         self._webview = None
@@ -319,6 +350,11 @@ class WebViewPanel:
 
         # Temp file for HTML loading with allowed_read_paths
         self._tmp_html_path: Optional[str] = None
+
+        if self._titlebar_hidden:
+            import weakref
+            ref = weakref.ref(self)
+            self.on("close", lambda _data: (r := ref()) and r.close())
 
     # ------------------------------------------------------------------
     # Public API
@@ -516,11 +552,18 @@ class WebViewPanel:
         from AppKit import (
             NSBackingStoreBuffered,
             NSClosableWindowMask,
+            NSFullSizeContentViewWindowMask,
             NSMiniaturizableWindowMask,
             NSPanel,
             NSResizableWindowMask,
             NSStatusWindowLevel,
             NSTitledWindowMask,
+            NSViewMinYMargin,
+            NSViewWidthSizable,
+            NSWindowCloseButton,
+            NSWindowMiniaturizeButton,
+            NSWindowTitleHidden,
+            NSWindowZoomButton,
         )
         from Foundation import NSMakeRect
         from WebKit import (
@@ -534,6 +577,8 @@ class WebViewPanel:
         style = NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask
         if self._resizable:
             style |= NSResizableWindowMask
+        if self._titlebar_hidden:
+            style |= NSFullSizeContentViewWindowMask
 
         panel = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
             NSMakeRect(0, 0, self._width, self._height),
@@ -542,10 +587,21 @@ class WebViewPanel:
             False,
         )
         panel.setTitle_(self._title)
-        panel.setLevel_(NSStatusWindowLevel)
-        panel.setFloatingPanel_(True)
+        if self._floating:
+            panel.setLevel_(NSStatusWindowLevel)
+            panel.setFloatingPanel_(True)
         panel.setHidesOnDeactivate_(False)
         panel.center()
+
+        if self._titlebar_hidden:
+            panel.setTitlebarAppearsTransparent_(True)
+            panel.setTitleVisibility_(NSWindowTitleHidden)
+            for button_type in (
+                NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton,
+            ):
+                btn = panel.standardWindowButton_(button_type)
+                if btn:
+                    btn.setHidden_(True)
 
         # Ensure Edit menu for Cmd+C/V/A support in WKWebView
         from wenzi.ui.result_window_web import _ensure_edit_menu
@@ -602,6 +658,22 @@ class WebViewPanel:
         )
         webview.setAutoresizingMask_(0x12)  # Width + Height sizable
         panel.contentView().addSubview_(webview)
+
+        # Drag overlay — offset from left to keep the HTML close button clickable
+        if self._titlebar_hidden:
+            drag_cls = _get_drag_view_class()
+            drag_height = 28
+            drag_left = 30
+            drag_view = drag_cls.alloc().initWithFrame_(
+                NSMakeRect(
+                    drag_left,
+                    self._height - drag_height,
+                    self._width - drag_left,
+                    drag_height,
+                )
+            )
+            drag_view.setAutoresizingMask_(NSViewWidthSizable | NSViewMinYMargin)
+            panel.contentView().addSubview_(drag_view)
 
         self._panel = panel
         self._webview = webview

@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Callable, Dict, List, Optional
 
+from wenzi.scripting.api._async_util import wrap_async
 from wenzi.scripting.sources import ChooserItem, ChooserSource, ModifierAction
 from wenzi.scripting.sources.command_source import CommandEntry, CommandSource
 from wenzi.scripting.ui.chooser_panel import ChooserPanel
 
 logger = logging.getLogger(__name__)
+
+
+def _wrap_optional(fn: Optional[Callable]) -> Optional[Callable]:
+    """Wrap an optional callable with async support."""
+    return wrap_async(fn) if fn is not None else None
 
 
 def _parse_modifiers(raw: Optional[Dict]) -> Optional[Dict[str, ModifierAction]]:
@@ -26,9 +33,14 @@ def _parse_modifiers(raw: Optional[Dict]) -> Optional[Dict[str, ModifierAction]]
         if isinstance(val, dict):
             result[key] = ModifierAction(
                 subtitle=val.get("subtitle", ""),
-                action=val.get("action"),
+                action=_wrap_optional(val.get("action")),
             )
     return result or None
+
+
+def _convert_items(raw_items: Optional[List[dict]]) -> List[ChooserItem]:
+    """Convert a list of raw dicts to ChooserItem objects."""
+    return [_dict_to_chooser_item(item) for item in (raw_items or [])]
 
 
 def _dict_to_chooser_item(item: dict) -> ChooserItem:
@@ -38,11 +50,11 @@ def _dict_to_chooser_item(item: dict) -> ChooserItem:
         subtitle=item.get("subtitle", ""),
         icon=item.get("icon", ""),
         item_id=item.get("item_id", ""),
-        action=item.get("action"),
-        secondary_action=item.get("secondary_action"),
+        action=_wrap_optional(item.get("action")),
+        secondary_action=_wrap_optional(item.get("secondary_action")),
         reveal_path=item.get("reveal_path"),
         modifiers=_parse_modifiers(item.get("modifiers")),
-        delete_action=item.get("delete_action"),
+        delete_action=_wrap_optional(item.get("delete_action")),
         confirm_delete=item.get("confirm_delete", False),
         preview=item.get("preview"),
         icon_badge=item.get("icon_badge", ""),
@@ -249,8 +261,9 @@ class ChooserAPI:
             callback: ``callback(item_dict | None)``.
             placeholder: Custom placeholder text for the search input.
         """
+        callback = wrap_async(callback)
         source_name = f"__pick_{id(callback)}"
-        chooser_items = [_dict_to_chooser_item(d) for d in (items or [])]
+        chooser_items = _convert_items(items)
 
         # Assign stable IDs so the select event can identify pick items.
         pick_id_prefix = f"__pick_{id(callback)}_"
@@ -335,7 +348,7 @@ class ChooserAPI:
         """
 
         def decorator(func: Callable) -> Callable:
-            self._event_handlers.setdefault(event, []).append(func)
+            self._event_handlers.setdefault(event, []).append(wrap_async(func))
             return func
 
         return decorator
@@ -383,7 +396,7 @@ class ChooserAPI:
             title=title,
             subtitle=subtitle,
             icon=icon,
-            action=action,
+            action=wrap_async(action),
             modifiers=_parse_modifiers(modifiers),
             promoted=promoted,
         )
@@ -444,50 +457,63 @@ class ChooserAPI:
         action_hints: Optional[dict] = None,
         description: str = "",
         show_preview: bool = False,
+        search_timeout: float = 5.0,
     ) -> Callable:
         """Decorator to register a search function as a chooser source.
 
         The decorated function receives a query string and returns a list of
-        item dicts.  All :class:`ChooserItem` fields are supported::
+        item dicts.  Both sync and async functions are supported — async
+        sources are dispatched to the shared event loop and results are
+        merged incrementally.
+
+        All :class:`ChooserItem` fields are supported::
 
             @wz.chooser.source("todos", prefix="td", priority=5,
                                description="Search TODOs")
             def search_todos(query):
-                return [{
-                    "title": "Fix bug #123",
-                    "subtitle": "backend",
-                    "icon": "file:///path/to/icon.png",
-                    "item_id": "todo-123",
-                    "action": lambda: ...,
-                    "secondary_action": lambda: ...,
-                    "reveal_path": "/path/to/file",
-                    "modifiers": {
-                        "alt": {"subtitle": "Copy ID", "action": lambda: ...},
-                    },
-                    "delete_action": lambda: ...,
-                    "preview": {"type": "text", "content": "..."},
-                }]
+                return [{"title": "Fix bug #123", ...}]
+
+        Async sources::
+
+            @wz.chooser.source("api", prefix="api", search_timeout=3.0)
+            async def search_api(query):
+                async with aiohttp.ClientSession() as s:
+                    resp = await s.get(f"https://api.example.com?q={query}")
+                    data = await resp.json()
+                return [{"title": r["name"]} for r in data]
+
+        Args:
+            search_timeout: Per-source timeout in seconds for async sources.
         """
 
         def decorator(func: Callable[[str], List[dict]]) -> Callable:
-            def _search(query: str) -> List[ChooserItem]:
-                raw_items = func(query)
-                return [
-                    _dict_to_chooser_item(item)
-                    for item in (raw_items or [])
-                ]
+            _is_async = asyncio.iscoroutinefunction(func)
+
+            if _is_async:
+                async def _async_search(query: str) -> List[ChooserItem]:
+                    return _convert_items(await func(query))
+                search_fn = _async_search
+            else:
+                def _search(query: str) -> List[ChooserItem]:
+                    return _convert_items(func(query))
+                search_fn = _search
 
             src = ChooserSource(
                 name=name,
                 prefix=prefix,
-                search=_search,
+                search=search_fn,
                 priority=priority,
                 description=description,
                 action_hints=action_hints,
                 show_preview=show_preview,
+                is_async=_is_async,
+                search_timeout=search_timeout,
             )
             self._panel.register_source(src)
-            logger.info("User script registered chooser source: %s", name)
+            logger.info(
+                "User script registered chooser source: %s (async=%s)",
+                name, _is_async,
+            )
             return func
 
         return decorator

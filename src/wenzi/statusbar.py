@@ -337,13 +337,32 @@ class StatusBarApp:
 # Notifications
 # ---------------------------------------------------------------------------
 
-def send_notification(title: str, subtitle: str, message: str) -> None:
-    """Send a macOS notification. Gracefully fails in unbundled mode."""
+def send_notification(
+    title: str,
+    subtitle: str,
+    message: str,
+    sound: str | None = "default",
+) -> None:
+    """Send a macOS notification. Gracefully fails in unbundled mode.
+
+    Args:
+        sound: Notification sound name.  ``"default"`` plays the system
+            default sound, ``None`` is silent, or pass a macOS sound
+            name (e.g. ``"Glass"``, ``"Ping"``, ``"Hero"``).
+            Available sounds are in ``/System/Library/Sounds/``.
+    """
     try:
         notification = NSUserNotification.alloc().init()
         notification.setTitle_(title)
         notification.setSubtitle_(subtitle)
         notification.setInformativeText_(message)
+        if sound is not None:
+            sound_name = (
+                "NSUserNotificationDefaultSoundName"
+                if sound == "default"
+                else sound
+            )
+            notification.setSoundName_(sound_name)
         center = NSUserNotificationCenter.defaultUserNotificationCenter()
         center.deliverNotification_(notification)
     except Exception:

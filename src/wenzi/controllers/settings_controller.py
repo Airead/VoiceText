@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from wenzi.app import WenZiApp
 
-from wenzi import get_version
+from wenzi import get_version, is_version_compatible
 from wenzi.config import BUILTIN_REGISTRY_URL, is_keychain_enabled, save_config
 from wenzi.keychain import keychain_clear_prefix
 from wenzi.enhance.enhancer import MODE_OFF
@@ -1850,9 +1850,15 @@ class SettingsController:
             is_enabled = pid not in disabled and entry not in disabled
             ii = install_info_cache.get(pid)
             has_install = ii is not None
-            status = (
-                PluginStatus.INSTALLED if has_install else PluginStatus.MANUALLY_PLACED
-            )
+            # Check version compatibility for local plugins
+            if meta.min_wenzi_version and not is_version_compatible(
+                meta.min_wenzi_version
+            ):
+                status = PluginStatus.INCOMPATIBLE
+            elif has_install:
+                status = PluginStatus.INSTALLED
+            else:
+                status = PluginStatus.MANUALLY_PLACED
             result.append(
                 {
                     "id": pid,

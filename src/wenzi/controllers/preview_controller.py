@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, List
 if TYPE_CHECKING:
     from wenzi.app import WenZiApp
 
+from wenzi.controllers import fire_scripting_event
 from wenzi.config import save_config
 from wenzi.enhance.enhancer import MODE_OFF
 from wenzi.i18n import t
@@ -54,6 +55,9 @@ class PreviewController:
         self._viewing_history_index: int | None = None
         self._result_holder: dict | None = None
         self._input_context = None
+
+    def _fire_scripting_event(self, event_name: str, **kwargs) -> None:
+        fire_scripting_event(self._app, event_name, **kwargs)
 
     def _apply_input_context(self, ctx) -> None:
         """Store input context and sync display text to the preview panel."""
@@ -567,6 +571,8 @@ class PreviewController:
 
                 app._current_preview_asr_text = stt_text
                 app._enhance_controller.clear_cache()
+
+                self._fire_scripting_event("transcription_done", asr_text=stt_text)
 
                 # Build ASR info
                 parts = []

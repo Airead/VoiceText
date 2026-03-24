@@ -6,6 +6,7 @@ import logging
 import threading
 from typing import Callable
 
+from wenzi.scripting.api._async_util import wrap_async
 from wenzi.scripting.registry import ScriptingRegistry
 
 logger = logging.getLogger(__name__)
@@ -18,8 +19,13 @@ class TimerAPI:
         self._registry = registry
 
     def after(self, seconds: float, callback: Callable) -> str:
-        """Execute callback once after a delay. Returns timer_id."""
-        entry = self._registry.register_timer(seconds, callback, repeating=False)
+        """Execute callback once after a delay. Returns timer_id.
+
+        *callback* may be a regular function or an ``async def``.
+        """
+        entry = self._registry.register_timer(
+            seconds, wrap_async(callback), repeating=False,
+        )
         t = threading.Timer(seconds, self._fire_once, args=(entry.timer_id,))
         t.daemon = True
         entry._timer = t
@@ -27,8 +33,13 @@ class TimerAPI:
         return entry.timer_id
 
     def every(self, seconds: float, callback: Callable) -> str:
-        """Execute callback repeatedly at interval. Returns timer_id."""
-        entry = self._registry.register_timer(seconds, callback, repeating=True)
+        """Execute callback repeatedly at interval. Returns timer_id.
+
+        *callback* may be a regular function or an ``async def``.
+        """
+        entry = self._registry.register_timer(
+            seconds, wrap_async(callback), repeating=True,
+        )
         self._schedule_repeat(entry.timer_id)
         return entry.timer_id
 

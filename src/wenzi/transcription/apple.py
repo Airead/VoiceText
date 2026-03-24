@@ -31,6 +31,7 @@ _LANG_TO_LOCALE = {
 
 RECOGNITION_TIMEOUT = 30  # seconds
 STREAMING_FINAL_TIMEOUT = 10  # seconds to wait for final result after endAudio
+_SIRI_CHECK_TIMEOUT = 0.3  # seconds to wait for Siri-disabled error
 
 # macOS System Settings deep links
 SIRI_SETTINGS_URL = "x-apple.systempreferences:com.apple.Siri-Settings.extension"
@@ -94,7 +95,7 @@ def check_siri_available(language="zh", on_device=True):
     request.endAudio()
 
     # Siri-disabled errors fire within milliseconds; 0.3 s is plenty.
-    error_event.wait(timeout=0.3)
+    error_event.wait(timeout=_SIRI_CHECK_TIMEOUT)
 
     if task is not None:
         try:

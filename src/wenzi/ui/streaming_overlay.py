@@ -22,8 +22,9 @@ _PANEL_HEIGHT = 200
 _CORNER_RADIUS = 10
 _SCREEN_MARGIN = 20
 
-# ESC key code
+# Key codes
 _ESC_KEY_CODE = 53
+_RETURN_KEY_CODE = 36
 
 # Delayed close
 _CLOSE_DELAY = 1.0
@@ -71,9 +72,11 @@ class StreamingOverlayPanel:
         self._panel: object = None
         self._webview: object = None
         self._nav_delegate: object = None
-        self._esc_monitor: object = None
+        self._key_tap: object = None
+        self._key_tap_source: object = None
         self._cancel_event: Optional[threading.Event] = None
         self._on_cancel: object = None
+        self._on_confirm_asr: object = None
         self._loading_timer: object = None
         self._loading_seconds: int = 0
         self._llm_info: str = ""
@@ -123,12 +126,14 @@ class StreamingOverlayPanel:
         stt_info: str = "",
         llm_info: str = "",
         on_cancel: object = None,
+        on_confirm_asr: object = None,
     ) -> None:
         """Create and show the overlay panel. Must be called on main thread.
 
         Args:
-            on_cancel: Optional callback invoked immediately when ESC is
-                pressed, before the overlay closes. Runs on the main thread.
+            on_cancel: Optional callback invoked when ESC is pressed.
+            on_confirm_asr: Optional callback invoked when Enter is pressed
+                (skip enhancement, output ASR text directly).
         """
         try:
             from AppKit import NSColor, NSPanel, NSScreen, NSStatusWindowLevel
@@ -140,6 +145,7 @@ class StreamingOverlayPanel:
 
             self._cancel_event = cancel_event
             self._on_cancel = on_cancel
+            self._on_confirm_asr = on_confirm_asr
             self._loading_seconds = 0
             self._llm_info = llm_info
             self._page_loaded = False
@@ -232,7 +238,7 @@ class StreamingOverlayPanel:
                 panel.orderFront_(None)
 
             # Register global ESC key monitor
-            self._register_esc_monitor()
+            self._register_key_tap()
 
             # Start loading timer
             self._start_loading_timer()
@@ -242,46 +248,113 @@ class StreamingOverlayPanel:
             logger.error("Failed to show streaming overlay", exc_info=True)
 
     # ------------------------------------------------------------------
-    # ESC key monitor
+    # Key tap (ESC / Enter) — CGEventTap swallows the keys
     # ------------------------------------------------------------------
 
-    def _register_esc_monitor(self) -> None:
-        """Register a global key event monitor for ESC key."""
+    def _register_key_tap(self) -> None:
+        """Create a CGEventTap that intercepts and swallows ESC / Enter."""
+        if self._key_tap is not None:
+            return
         try:
-            from AppKit import NSEvent
+            import Quartz
+        except ImportError:
+            logger.warning("Quartz not available, cannot create key tap")
+            return
 
-            NSKeyDownMask = 1 << 10
+        _kCGEventKeyDown = Quartz.kCGEventKeyDown
+        _kCGKeyboardEventKeycode = Quartz.kCGKeyboardEventKeycode
 
-            def _handler(event):
-                if event.keyCode() == _ESC_KEY_CODE:
+        def _callback(proxy, event_type, event, refcon):
+            try:
+                if event_type == Quartz.kCGEventTapDisabledByTimeout:
+                    if self._key_tap is not None:
+                        Quartz.CGEventTapEnable(self._key_tap, True)
+                    return event
+                if event_type != _kCGEventKeyDown:
+                    return event
+
+                keycode = Quartz.CGEventGetIntegerValueField(
+                    event, _kCGKeyboardEventKeycode,
+                )
+
+                if keycode == _ESC_KEY_CODE:
+                    # Disable tap to prevent auto-repeat queueing
+                    if self._key_tap is not None:
+                        Quartz.CGEventTapEnable(self._key_tap, False)
                     if self._cancel_event is not None:
                         self._cancel_event.set()
                     if self._on_cancel is not None:
                         try:
                             self._on_cancel()
                         except Exception:
-                            logger.error("on_cancel callback failed", exc_info=True)
-                    self.close()
+                            logger.error(
+                                "on_cancel callback failed", exc_info=True
+                            )
+                    from PyObjCTools import AppHelper
+
+                    AppHelper.callAfter(self._do_close)
                     logger.info("Streaming cancelled via ESC key")
+                    return None  # swallow
 
-            self._esc_monitor = (
-                NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(
-                    NSKeyDownMask, _handler
-                )
-            )
-        except Exception:
-            logger.error("Failed to register ESC monitor", exc_info=True)
+                if keycode == _RETURN_KEY_CODE and self._on_confirm_asr is not None:
+                    try:
+                        self._on_confirm_asr()
+                    except Exception:
+                        logger.error(
+                            "on_confirm_asr callback failed",
+                            exc_info=True,
+                        )
+                    logger.info("ASR confirmed via Enter key")
+                    return None  # swallow
 
-    def _remove_esc_monitor(self) -> None:
-        """Remove the global ESC key monitor."""
-        if self._esc_monitor is not None:
-            try:
-                from AppKit import NSEvent
-
-                NSEvent.removeMonitor_(self._esc_monitor)
             except Exception:
-                logger.error("Failed to remove ESC monitor", exc_info=True)
-            self._esc_monitor = None
+                logger.warning("Key tap callback error", exc_info=True)
+            return event
+
+        mask = Quartz.CGEventMaskBit(_kCGEventKeyDown)
+        tap = Quartz.CGEventTapCreate(
+            Quartz.kCGSessionEventTap,
+            Quartz.kCGHeadInsertEventTap,
+            Quartz.kCGEventTapOptionDefault,
+            mask,
+            _callback,
+            None,
+        )
+        if tap is None:
+            logger.warning("Failed to create key event tap (no permission?)")
+            return
+
+        try:
+            source = Quartz.CFMachPortCreateRunLoopSource(None, tap, 0)
+        except Exception:
+            logger.warning("Failed to create run loop source", exc_info=True)
+            return
+        loop = Quartz.CFRunLoopGetMain()
+        Quartz.CFRunLoopAddSource(loop, source, Quartz.kCFRunLoopDefaultMode)
+        Quartz.CGEventTapEnable(tap, True)
+
+        self._key_tap = tap
+        self._key_tap_source = source
+        logger.debug("Key event tap started")
+
+    def _remove_key_tap(self) -> None:
+        """Disable and remove the CGEventTap."""
+        if self._key_tap is None:
+            return
+        try:
+            import Quartz
+
+            Quartz.CGEventTapEnable(self._key_tap, False)
+            if self._key_tap_source is not None:
+                loop = Quartz.CFRunLoopGetMain()
+                Quartz.CFRunLoopRemoveSource(
+                    loop, self._key_tap_source,
+                    Quartz.kCFRunLoopDefaultMode,
+                )
+        except Exception:
+            logger.warning("Failed to stop key tap", exc_info=True)
+        self._key_tap = None
+        self._key_tap_source = None
 
     # ------------------------------------------------------------------
     # Loading timer (elapsed seconds while waiting for first chunk)
@@ -378,8 +451,8 @@ class StreamingOverlayPanel:
 
         def _update():
             self._cancel_event = cancel_event
-            if self._esc_monitor is None:
-                self._register_esc_monitor()
+            if self._key_tap is None:
+                self._register_key_tap()
 
         AppHelper.callAfter(_update)
 
@@ -495,9 +568,10 @@ class StreamingOverlayPanel:
         """Immediate cleanup — shared by close() and fade-out completion."""
         self._stop_loading_timer()
         self._stop_close_timer()
-        self._remove_esc_monitor()
+        self._remove_key_tap()
         self._cancel_event = None
         self._on_cancel = None
+        self._on_confirm_asr = None
         self._page_loaded = False
         self._pending_js.clear()
 
@@ -508,6 +582,10 @@ class StreamingOverlayPanel:
         self._webview = None
         self._nav_delegate = None
         logger.debug("Streaming overlay closed")
+
+    def close_now(self) -> None:
+        """Close and clean up the overlay panel. Must be on main thread."""
+        self._do_close()
 
     def close(self) -> None:
         """Close and clean up the overlay panel immediately. Thread-safe."""

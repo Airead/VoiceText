@@ -1290,3 +1290,64 @@ class TestShowHotwordsAction:
         panel._show_hotwords_panel = MagicMock()
         panel._handle_js_message({"type": "showHotwords"})
         panel._show_hotwords_panel.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Screen selection tests
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_screen(x, y, w, h):
+    """Create a mock NSScreen with the given frame geometry."""
+    screen = MagicMock()
+    frame = MagicMock()
+    frame.origin.x = x
+    frame.origin.y = y
+    frame.size.width = w
+    frame.size.height = h
+    screen.frame.return_value = frame
+    return screen
+
+
+class TestScreenForMouse:
+    """Test _screen_for_mouse returns the screen containing the cursor."""
+
+    @pytest.fixture(autouse=True)
+    def _patch_appkit(self, monkeypatch):
+        self._mock_ns_screen = MagicMock()
+        self._mock_ns_event = MagicMock()
+        monkeypatch.setattr(sys.modules["AppKit"], "NSScreen", self._mock_ns_screen)
+        monkeypatch.setattr(sys.modules["AppKit"], "NSEvent", self._mock_ns_event)
+        monkeypatch.setattr(
+            sys.modules["Foundation"], "NSPointInRect",
+            lambda pt, frame: (
+                frame.origin.x <= pt.x < frame.origin.x + frame.size.width
+                and frame.origin.y <= pt.y < frame.origin.y + frame.size.height
+            ),
+        )
+
+    def _set_mouse(self, x, y):
+        pt = MagicMock()
+        pt.x = x
+        pt.y = y
+        self._mock_ns_event.mouseLocation.return_value = pt
+
+    def test_returns_screen_containing_mouse(self):
+        from wenzi.ui.result_window_web import ResultPreviewPanel
+
+        left = _make_mock_screen(0, 0, 1920, 1080)
+        right = _make_mock_screen(1920, 0, 1920, 1080)
+        self._mock_ns_screen.screens.return_value = [left, right]
+        self._set_mouse(2500, 500)
+
+        assert ResultPreviewPanel._screen_for_mouse() is right
+
+    def test_fallback_to_main_screen(self):
+        from wenzi.ui.result_window_web import ResultPreviewPanel
+
+        main = MagicMock()
+        self._mock_ns_screen.screens.return_value = []
+        self._mock_ns_screen.mainScreen.return_value = main
+        self._set_mouse(100, 100)
+
+        assert ResultPreviewPanel._screen_for_mouse() is main

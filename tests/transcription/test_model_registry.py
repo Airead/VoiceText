@@ -169,7 +169,11 @@ class TestIsBackendAvailable:
 
 class TestFindFallbackPreset:
     def test_skips_apple_presets(self):
-        result = find_fallback_preset()
+        with patch(
+            "wenzi.transcription.model_registry.is_model_cached",
+            return_value=False,
+        ):
+            result = find_fallback_preset()
         if result is not None:
             assert result.backend != "apple"
 

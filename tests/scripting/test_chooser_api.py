@@ -68,12 +68,16 @@ class TestDictToChooserItem:
         assert item.subtitle == "Sub"
         assert item.icon == "data:image/png;base64,abc"
         assert item.item_id == "test-1"
-        assert item.action is action_fn
-        assert item.secondary_action is sec_fn
+        # Actions are wrapped by wrap_async; verify they are callable wrappers
+        assert callable(item.action)
+        assert item.action.__wrapped__ is action_fn
+        assert callable(item.secondary_action)
+        assert item.secondary_action.__wrapped__ is sec_fn
         assert item.reveal_path == "/tmp/test"
         assert item.modifiers is not None
         assert item.modifiers["alt"].subtitle == "Alt action"
-        assert item.delete_action is del_fn
+        assert callable(item.delete_action)
+        assert item.delete_action.__wrapped__ is del_fn
         assert item.preview == {"type": "text", "content": "Preview text"}
 
 

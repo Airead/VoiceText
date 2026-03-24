@@ -109,6 +109,7 @@ a = Analysis(
         'wenzi.scripting.plugin_registry',
         # wenzi.scripting.api
         'wenzi.scripting.api',
+        'wenzi.scripting.api._async_util',
         'wenzi.scripting.api.alert',
         'wenzi.scripting.api.app',
         'wenzi.scripting.api.chooser',

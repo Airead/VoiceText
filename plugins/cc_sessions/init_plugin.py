@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import shlex
 from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
@@ -59,16 +58,26 @@ def _resolve_subagent_path(root_session_path: str, agent_id: str) -> str:
 def _check_subagent_exists(
     root_session_path: str, agent_ids: list,
 ) -> dict:
-    """Check which subagent JSONL files exist on disk."""
-    return {
-        aid: os.path.isfile(_resolve_subagent_path(root_session_path, aid))
-        for aid in agent_ids
-    }
+    """Check which subagent JSONL files exist and extract their model.
+
+    Returns ``{agent_id: {"exists": bool, "model": str}}``.
+    """
+    result = {}
+    for aid in agent_ids:
+        path = _resolve_subagent_path(root_session_path, aid)
+        if os.path.isfile(path):
+            meta = _parse_subagent_meta(path)
+            result[aid] = {"exists": True, "model": meta.get("model", "")}
+        else:
+            result[aid] = {"exists": False, "model": ""}
+    return result
 
 
 def _parse_subagent_meta(jsonl_path: str) -> dict:
     """Extract basic metadata from the first few lines of a subagent JSONL."""
-    meta: dict = {"cwd": "", "version": "", "git_branch": "", "project": ""}
+    meta: dict = {
+        "cwd": "", "version": "", "git_branch": "", "project": "", "model": "",
+    }
     try:
         with open(jsonl_path) as f:
             for i, line in enumerate(f):
@@ -86,6 +95,10 @@ def _parse_subagent_meta(jsonl_path: str) -> dict:
                     meta["git_branch"] = msg["git_branch"]
                 if not meta["project"] and msg.get("project"):
                     meta["project"] = msg["project"]
+                if not meta["model"]:
+                    m = msg.get("message", {})
+                    if isinstance(m, dict) and m.get("model"):
+                        meta["model"] = m["model"]
     except OSError:
         pass
     return meta
@@ -123,6 +136,21 @@ def _filter_sessions(
         result = [s for _, s in scored]
 
     return result
+
+
+_I18N = {
+    "action.view": {"en": "View", "zh": "查看"},
+    "action.path": {"en": "Path", "zh": "路径"},
+}
+
+
+def _t(key: str) -> str:
+    """Translate a plugin-local i18n key."""
+    from wenzi.i18n import get_locale
+
+    locale = get_locale()
+    entry = _I18N.get(key, {})
+    return entry.get(locale, entry.get("en", key))
 
 
 def register(wz) -> None:
@@ -199,6 +227,8 @@ def register(wz) -> None:
             width=900,
             height=700,
             resizable=True,
+            titlebar_hidden=True,
+            floating=False,
             allowed_read_paths=[
                 os.path.expanduser("~/.claude/"),
             ],
@@ -211,6 +241,7 @@ def register(wz) -> None:
                 "project": session["project"],
                 "cwd": session["cwd"],
                 "session_id": session["session_id"],
+                "title": session["title"],
                 "git_branch": session.get("git_branch", ""),
                 "version": session.get("version", ""),
                 "root_session_path": session["file_path"],
@@ -218,6 +249,7 @@ def register(wz) -> None:
             }
 
         panel.on("copy_resume", lambda data: _copy_text(data.get("text", "")))
+
         _register_subagent_handlers(panel)
         _start_auto_reload(panel, session["file_path"])
         panel.show()
@@ -243,6 +275,8 @@ def register(wz) -> None:
             width=900,
             height=700,
             resizable=True,
+            titlebar_hidden=True,
+            floating=False,
             allowed_read_paths=[
                 os.path.expanduser("~/.claude/"),
             ],
@@ -255,6 +289,7 @@ def register(wz) -> None:
                 "project": meta.get("project", ""),
                 "cwd": meta.get("cwd", ""),
                 "session_id": session_id,
+                "title": f"Subagent: {description}",
                 "git_branch": meta.get("git_branch", ""),
                 "version": meta.get("version", ""),
                 "root_session_path": root_session_path,
@@ -267,6 +302,7 @@ def register(wz) -> None:
             panel.close()
 
         panel.on("copy_resume", lambda data: _copy_text(data.get("text", "")))
+
         _register_subagent_handlers(panel)
         _start_auto_reload(panel, subagent_path)
         panel.show()
@@ -305,13 +341,11 @@ def register(wz) -> None:
         except Exception:
             logger.debug("HUD notification failed", exc_info=True)
 
-    def _copy_resume_command(session: Dict[str, Any]) -> None:
-        """Copy cd + claude --resume command to clipboard."""
+    def _copy_full_path(session: Dict[str, Any]) -> None:
+        """Copy session JSONL file path to clipboard."""
         from wenzi.scripting.sources import copy_to_clipboard
 
-        cwd = shlex.quote(session["cwd"])
-        cmd = f"cd {cwd} && claude --resume {session['session_id']}"
-        copy_to_clipboard(cmd)
+        copy_to_clipboard(session["file_path"])
 
     def _make_preview(session: Dict[str, Any]):
         """Return a lazy callable that builds HTML preview on demand."""
@@ -334,8 +368,8 @@ def register(wz) -> None:
         priority=5,
         description="Browse Claude Code sessions",
         action_hints={
-            "enter": "View",
-            "cmd_enter": "Copy resume command",
+            "enter": _t("action.view"),
+            "cmd_enter": _t("action.path"),
         },
         show_preview=True,
     )
@@ -361,7 +395,7 @@ def register(wz) -> None:
                 "icon_badge": str(msg_count) if msg_count else "",
                 "item_id": f"cc-{s['session_id']}",
                 "action": lambda sess=s: _open_viewer(sess),
-                "secondary_action": lambda sess=s: _copy_resume_command(sess),
+                "secondary_action": lambda sess=s: _copy_full_path(sess),
                 "preview": _make_preview(s),
                 "delete_action": lambda sess=s: _delete_session(sess),
                 "confirm_delete": True,

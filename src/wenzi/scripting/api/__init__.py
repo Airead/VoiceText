@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable, List, Optional
+from typing import Any, Callable, Coroutine, List, Optional
 
 from wenzi.scripting.registry import LeaderMapping, ScriptingRegistry
 
+from ._async_util import _submit_and_log, wrap_async
 from .alert import alert as _alert_fn
 from .app import AppAPI
 from .eventtap import keystroke as _keystroke_fn
@@ -93,12 +94,15 @@ class _WZNamespace:
         """
         parsed = []
         for m in mappings:
+            func = m.get("func")
+            if func is not None:
+                func = wrap_async(func)
             parsed.append(
                 LeaderMapping(
                     key=m["key"],
                     desc=m.get("desc", ""),
                     app=m.get("app"),
-                    func=m.get("func"),
+                    func=func,
                     exec_cmd=m.get("exec"),
                 )
             )
@@ -123,11 +127,11 @@ class _WZNamespace:
             wz.on("recording_start", my_handler)
         """
         if callback is not None:
-            self._registry.register_event(event_name, callback)
+            self._registry.register_event(event_name, wrap_async(callback))
             return callback
 
         def decorator(func: Callable) -> Callable:
-            self._registry.register_event(event_name, func)
+            self._registry.register_event(event_name, wrap_async(func))
             return func
 
         return decorator
@@ -136,9 +140,16 @@ class _WZNamespace:
         """Show a brief floating alert message."""
         _alert_fn(text, duration)
 
-    def notify(self, title: str, message: str = "") -> None:
-        """Send a macOS notification."""
-        _notify_fn(title, message)
+    def notify(
+        self, title: str, message: str = "", sound: str | None = "default",
+    ) -> None:
+        """Send a macOS notification.
+
+        Args:
+            sound: ``"default"`` for system sound, ``None`` for silent,
+                or a macOS sound name (e.g. ``"Glass"``, ``"Ping"``).
+        """
+        _notify_fn(title, message, sound=sound)
 
     def keystroke(self, key: str, modifiers: list[str] | None = None) -> None:
         """Synthesize a keystroke."""
@@ -177,6 +188,22 @@ class _WZNamespace:
     def date(self, fmt: str = "%Y-%m-%d") -> str:
         """Return formatted current date/time."""
         return time.strftime(fmt)
+
+    def run(self, coro: Coroutine[Any, Any, Any]) -> None:
+        """Submit a coroutine to the background event loop.
+
+        The coroutine runs asynchronously; unhandled exceptions are
+        automatically logged.
+
+        Example::
+
+            async def fetch():
+                await asyncio.sleep(1)
+                wz.notify("Done", "Fetched!")
+
+            wz.run(fetch())
+        """
+        _submit_and_log(coro)
 
     def reload(self) -> None:
         """Reload all scripts."""

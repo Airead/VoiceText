@@ -18,11 +18,20 @@ def _make_subagent_fixture(tmp_path):
     subagents_dir.mkdir(parents=True)
 
     agent1_jsonl = subagents_dir / "agent-abc123def.jsonl"
-    agent1_jsonl.write_text(json.dumps({
-        "type": "user",
-        "agentId": "abc123def",
-        "message": {"role": "user", "content": "test prompt"},
-    }) + "\n")
+    lines = [
+        json.dumps({
+            "type": "user",
+            "agentId": "abc123def",
+            "message": {"role": "user", "content": "test prompt"},
+        }),
+        json.dumps({
+            "type": "assistant",
+            "agentId": "abc123def",
+            "message": {"role": "assistant", "model": "claude-haiku-4-5-20251001",
+                         "content": [{"type": "text", "text": "ok"}]},
+        }),
+    ]
+    agent1_jsonl.write_text("\n".join(lines) + "\n")
 
     agent1_meta = subagents_dir / "agent-abc123def.meta.json"
     agent1_meta.write_text(json.dumps({"agentType": "Explore"}))
@@ -62,7 +71,10 @@ class TestCheckSubagentExists:
         result = _check_subagent_exists(
             fix["parent_path"], ["abc123def", "missing999"]
         )
-        assert result == {"abc123def": True, "missing999": False}
+        assert result["abc123def"]["exists"] is True
+        assert result["abc123def"]["model"] == "claude-haiku-4-5-20251001"
+        assert result["missing999"]["exists"] is False
+        assert result["missing999"]["model"] == ""
 
     def test_empty_list(self, tmp_path):
         from plugins.cc_sessions.init_plugin import _check_subagent_exists
@@ -89,6 +101,7 @@ class TestParseSubagentMeta:
         meta = _parse_subagent_meta(str(jsonl_path))
         assert meta["cwd"] == "/work/project"
         assert meta["version"] == "2.1.81"
+        assert meta["model"] == "claude-haiku-4-5-20251001"
 
     def test_missing_fields_return_defaults(self, tmp_path):
         from plugins.cc_sessions.init_plugin import _parse_subagent_meta
@@ -99,9 +112,11 @@ class TestParseSubagentMeta:
         meta = _parse_subagent_meta(str(jsonl_path))
         assert meta["cwd"] == ""
         assert meta["version"] == ""
+        assert meta["model"] == ""
 
     def test_nonexistent_file(self):
         from plugins.cc_sessions.init_plugin import _parse_subagent_meta
 
         meta = _parse_subagent_meta("/nonexistent/path.jsonl")
         assert meta["cwd"] == ""
+        assert meta["model"] == ""

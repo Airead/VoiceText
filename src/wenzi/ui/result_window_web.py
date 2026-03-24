@@ -1057,12 +1057,21 @@ class ResultPreviewPanel:
             combined = ";".join(pending)
             self._webview.evaluateJavaScript_completionHandler_(combined, None)
 
+    @staticmethod
+    def _screen_for_mouse() -> object:
+        """Return the NSScreen containing the mouse pointer, or mainScreen."""
+        from AppKit import NSEvent, NSScreen
+        from Foundation import NSPointInRect
+
+        mouse_loc = NSEvent.mouseLocation()
+        for s in NSScreen.screens():
+            if NSPointInRect(mouse_loc, s.frame()):
+                return s
+        return NSScreen.mainScreen()
+
     def _build_panel(self) -> None:
         """Build NSPanel + WKWebView, reusing pre-created objects from warmup()."""
-        from AppKit import (
-            NSApp,
-            NSScreen,
-        )
+        from AppKit import NSApp
         from Foundation import NSMakeRect, NSURL
 
         # Enable ⌘C/⌘V/⌘A via Edit menu in the responder chain
@@ -1152,8 +1161,8 @@ class ResultPreviewPanel:
         )
         panel.setTitle_(panel_title)
 
-        # Center on screen
-        screen = NSScreen.mainScreen()
+        # Center on the screen where the mouse pointer is
+        screen = self._screen_for_mouse()
         if screen:
             sf = screen.visibleFrame()
             pf = panel.frame()

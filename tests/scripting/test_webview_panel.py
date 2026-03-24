@@ -51,6 +51,31 @@ class TestWebViewPanelDefaults:
         assert p._title == "My Title"
         assert p._html == "<div>content</div>"
 
+    def test_default_titlebar_hidden(self):
+        p = WebViewPanel(title="T", html="<b>x</b>")
+        assert p._titlebar_hidden is False
+
+    def test_titlebar_hidden_enabled(self):
+        p = WebViewPanel(title="T", html="<b>x</b>", titlebar_hidden=True)
+        assert p._titlebar_hidden is True
+
+    def test_titlebar_hidden_registers_close_handler(self):
+        p = WebViewPanel(title="T", html="<b>x</b>", titlebar_hidden=True)
+        assert "close" in p._event_handlers
+        assert len(p._event_handlers["close"]) == 1
+
+    def test_titlebar_visible_no_close_handler(self):
+        p = WebViewPanel(title="T", html="<b>x</b>")
+        assert "close" not in p._event_handlers
+
+    def test_default_floating(self):
+        p = WebViewPanel(title="T", html="<b>x</b>")
+        assert p._floating is True
+
+    def test_floating_disabled(self):
+        p = WebViewPanel(title="T", html="<b>x</b>", floating=False)
+        assert p._floating is False
+
 
 # ---------------------------------------------------------------------------
 # Bridge: on() / handle() registration

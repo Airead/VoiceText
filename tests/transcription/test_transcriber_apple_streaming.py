@@ -35,6 +35,11 @@ def _mock_apple_frameworks(monkeypatch):
     mock_corefoundation.CFRunLoopRunInMode = MagicMock()
     mock_corefoundation.kCFRunLoopDefaultMode = "default"
 
+    # Speed up timeout-based tests
+    from wenzi.transcription import apple
+
+    monkeypatch.setattr(apple, "STREAMING_FINAL_TIMEOUT", 0.01)
+
     return {
         "Speech": mock_speech,
         "AVFoundation": mock_avfoundation,
@@ -106,21 +111,13 @@ class TestAppleSpeechStreaming:
         assert result == "hello world"
 
     def test_stop_streaming_timeout_returns_empty(self):
-        from wenzi.transcription import apple
-
-        original_timeout = apple.STREAMING_FINAL_TIMEOUT
-
         t = _make_transcriber()
         on_partial = MagicMock()
         t.start_streaming(on_partial)
 
         # Don't set final event — will timeout
-        apple.STREAMING_FINAL_TIMEOUT = 0.1
-        try:
-            result = t.stop_streaming()
-            assert result == ""
-        finally:
-            apple.STREAMING_FINAL_TIMEOUT = original_timeout
+        result = t.stop_streaming()
+        assert result == ""
 
     def test_cancel_streaming_cancels_task(self):
         t = _make_transcriber()
@@ -267,10 +264,6 @@ class TestAppleSpeechStreaming:
 
     def test_timeout_fallback_to_accumulated(self):
         """When final result times out, stop_streaming returns accumulated text."""
-        from wenzi.transcription import apple
-
-        original_timeout = apple.STREAMING_FINAL_TIMEOUT
-
         t = _make_transcriber()
         on_partial = MagicMock()
         t.start_streaming(on_partial)
@@ -279,12 +272,8 @@ class TestAppleSpeechStreaming:
         t._stream_accumulated = "accumulated text"
         # Don't set final event — will timeout
 
-        apple.STREAMING_FINAL_TIMEOUT = 0.1
-        try:
-            result = t.stop_streaming()
-            assert result == "accumulated text"
-        finally:
-            apple.STREAMING_FINAL_TIMEOUT = original_timeout
+        result = t.stop_streaming()
+        assert result == "accumulated text"
 
     def test_single_segment_works_normally(self):
         """Single segment recognition (no pause) works end-to-end."""
@@ -379,10 +368,6 @@ class TestAppleSpeechStreaming:
 
     def test_implicit_reset_timeout_fallback_includes_best_partial(self):
         """Timeout fallback returns accumulated + current best partial."""
-        from wenzi.transcription import apple
-
-        original_timeout = apple.STREAMING_FINAL_TIMEOUT
-
         t = _make_transcriber()
         on_partial = MagicMock()
         t.start_streaming(on_partial)
@@ -392,12 +377,8 @@ class TestAppleSpeechStreaming:
         t._stream_best_partial = "second partial"
         # Don't set final event — will timeout
 
-        apple.STREAMING_FINAL_TIMEOUT = 0.1
-        try:
-            result = t.stop_streaming()
-            assert result == "first segmentsecond partial"
-        finally:
-            apple.STREAMING_FINAL_TIMEOUT = original_timeout
+        result = t.stop_streaming()
+        assert result == "first segmentsecond partial"
 
     def test_small_text_fluctuation_not_treated_as_reset(self):
         """Normal ASR text shortening (refinement) should not trigger reset."""

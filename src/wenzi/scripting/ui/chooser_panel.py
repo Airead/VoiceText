@@ -6,6 +6,7 @@ Keyboard-driven: type to filter, ↑↓ to navigate, Enter to execute.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -197,6 +198,9 @@ class ChooserPanel:
         self._switch_english: bool = True
         self._saved_input_source: Optional[str] = None
         self._active_source: Optional[ChooserSource] = None  # currently prefix-activated source
+        self._search_generation: int = 0
+        self._pending_async_count: int = 0
+        self._loading_visible: bool = False
 
     # ------------------------------------------------------------------
     # Panel resize (driven by JS)
@@ -558,8 +562,14 @@ class ChooserPanel:
         Prefix activation: if the query starts with ``<prefix> `` (e.g.
         ``cb hello``), the matching source is activated and the prefix is
         stripped.  Otherwise all non-prefix sources are searched.
+
+        Sync sources return results immediately.  Async sources are
+        dispatched to the shared event loop; their results are merged
+        incrementally via :meth:`_merge_async_results`.
         """
         self._last_query = query
+        self._search_generation += 1
+        generation = self._search_generation
         source = None
 
         # Check for prefix activation (Alfred-style: "prefix query")
@@ -592,6 +602,7 @@ class ChooserPanel:
         if source is None:
             if not query.strip():
                 self._current_items = []
+                self._pending_async_count = 0
                 self._calc_sticky = False
                 self._compact_results = False
                 self._show_preview = False
@@ -599,29 +610,38 @@ class ChooserPanel:
                     "setResults([]);setPreviewVisible(false);"
                     "setCompact(false);clearActionHints()"
                 )
+                self._set_loading(False)
                 return
-            all_items = []
+
+        # Partition sources into sync and async
+        if source is not None:
+            # Single source activated by prefix
+            if source.is_async:
+                sync_sources = []
+                async_sources = [source]
+            else:
+                sync_sources = [source]
+                async_sources = []
+        else:
             sorted_sources = sorted(
                 self._sources.values(),
                 key=lambda s: s.priority,
                 reverse=True,
             )
-            for src in sorted_sources:
-                if src.prefix is not None:
-                    continue  # Skip prefix-only sources
-                if src.search is not None:
-                    try:
-                        all_items.extend(src.search(query))
-                    except Exception:
-                        logger.exception("Chooser source %s search error", src.name)
-            self._current_items = all_items[:self._MAX_TOTAL_RESULTS]
-        else:
+            sync_sources: list = []
+            async_sources: list = []
+            for s in sorted_sources:
+                if s.prefix is None and s.search is not None:
+                    (async_sources if s.is_async else sync_sources).append(s)
+
+        # Phase 1: Run sync sources immediately
+        all_items: list = []
+        for src in sync_sources:
             try:
-                items = source.search(query) if source.search else []
-                self._current_items = items[:self._MAX_TOTAL_RESULTS]
+                all_items.extend(src.search(query))
             except Exception:
-                logger.exception("Chooser source %s search error", source.name)
-                self._current_items = []
+                logger.exception("Chooser source %s search error", src.name)
+        self._current_items = all_items[:self._MAX_TOTAL_RESULTS]
 
         # Apply usage-based boosting
         if self._usage_tracker and self._current_items:
@@ -650,7 +670,17 @@ class ChooserPanel:
         self._compact_results = compact
         self._show_preview = show_preview
 
+        # Push sync results immediately
         self._push_items_to_js(source=source)
+
+        # Phase 2: Launch async sources
+        self._pending_async_count = len(async_sources)
+        if async_sources:
+            self._set_loading(True)
+            for asrc in async_sources:
+                self._launch_async_search(asrc, query, generation)
+        else:
+            self._set_loading(False)
 
     def _boost_by_usage(self, query: str) -> None:
         """Re-sort items by usage frequency while preserving source order."""
@@ -674,6 +704,7 @@ class ChooserPanel:
         self,
         selected_index: Optional[int] = None,
         source=None,
+        preserve_selection: bool = False,
     ) -> None:
         """Serialize current items and send to the web view.
 
@@ -719,7 +750,12 @@ class ChooserPanel:
         # Build a single JS snippet
         parts: list[str] = []
 
-        idx_arg = "" if selected_index is None else f",{selected_index}"
+        if preserve_selection:
+            idx_arg = ",-2"  # sentinel: JS keeps current selection
+        elif selected_index is None:
+            idx_arg = ""
+        else:
+            idx_arg = f",{selected_index}"
         parts.append(
             f"setResults({json.dumps(js_items, ensure_ascii=False)},"
             f"{self._items_version}{idx_arg})"
@@ -747,6 +783,92 @@ class ChooserPanel:
         parts.append(f"setCompact({compact})")
 
         self._eval_js(";".join(parts))
+
+    # ------------------------------------------------------------------
+    # Async source search
+    # ------------------------------------------------------------------
+
+    def _set_loading(self, visible: bool) -> None:
+        """Update the loading spinner, skipping no-op calls."""
+        if visible == self._loading_visible:
+            return
+        self._loading_visible = visible
+        self._eval_js(f"setLoading({'true' if visible else 'false'})")
+
+    def _launch_async_search(
+        self,
+        source: ChooserSource,
+        query: str,
+        generation: int,
+    ) -> None:
+        """Submit an async source search to the shared event loop."""
+        import wenzi.async_loop as _aloop
+
+        async def _run():
+            try:
+                return await asyncio.wait_for(
+                    source.search(query),
+                    timeout=source.search_timeout,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Async source %s timed out after %.1fs",
+                    source.name, source.search_timeout,
+                )
+                return []
+            except asyncio.CancelledError:
+                return []
+            except Exception:
+                logger.exception("Async source %s search error", source.name)
+                return []
+
+        def _on_future_done(future):
+            """Called on asyncio thread — bridge results to main thread."""
+            try:
+                items = future.result() or []
+            except Exception:
+                items = []
+            from PyObjCTools import AppHelper
+
+            AppHelper.callAfter(self._merge_async_results, source, items, generation)
+
+        try:
+            loop = _aloop.get_loop()
+            future = asyncio.run_coroutine_threadsafe(_run(), loop)
+            future.add_done_callback(_on_future_done)
+        except RuntimeError:
+            logger.error("Async loop unavailable for source %s", source.name)
+            self._pending_async_count = max(0, self._pending_async_count - 1)
+            if self._pending_async_count == 0:
+                self._set_loading(False)
+
+    def _merge_async_results(
+        self,
+        source: ChooserSource,
+        items: list,
+        generation: int,
+    ) -> None:
+        """Merge async source results on the main thread."""
+        if generation != self._search_generation:
+            return  # Stale search — discard
+
+        self._pending_async_count = max(0, self._pending_async_count - 1)
+
+        if items:
+            remaining = self._MAX_TOTAL_RESULTS - len(self._current_items)
+            if remaining > 0:
+                self._current_items.extend(items[:remaining])
+
+            if self._usage_tracker and self._current_items:
+                self._boost_by_usage(self._last_query)
+
+            self._push_items_to_js(
+                source=source if self._active_source is source else None,
+                preserve_selection=True,
+            )
+
+        if self._pending_async_count == 0:
+            self._set_loading(False)
 
     # ------------------------------------------------------------------
     # JS message handler
