@@ -646,7 +646,8 @@ class RecordingFlow:
                             app._streaming_overlay.close_with_delay
                         )
         else:
-            # No enhancement — show overlay for background STT if needed
+            # No enhancement — show overlay for background STT if needed.
+            # Streaming already has ASR text; just hide the indicator.
             if need_stt:
                 cancel_watcher = asyncio.create_task(
                     self._watch_cancel(cancel_event)
@@ -673,19 +674,12 @@ class RecordingFlow:
                 AppHelper.callAfter(
                     app._streaming_overlay.close_with_delay
                 )
+            else:
+                AppHelper.callAfter(app._recording_indicator.hide)
 
             self._fire_scripting_event(
                 "transcription_done", asr_text=asr_text
             )
-
-            # Update overlay with ASR result if shown from streaming
-            if not need_stt:
-                AppHelper.callAfter(
-                    app._streaming_overlay.set_asr_text, asr_text
-                )
-                AppHelper.callAfter(
-                    app._streaming_overlay.close_with_delay
-                )
 
         if cancel_event.is_set():
             AppHelper.callAfter(
@@ -805,6 +799,34 @@ class RecordingFlow:
     # Streaming enhancement helpers (native async — no event loop hacks)
     # ------------------------------------------------------------------
 
+    @staticmethod
+    async def _iter_or_cancel(gen, cancel_event: asyncio.Event):
+        """Iterate an async generator, aborting immediately on cancel.
+
+        Races each ``__anext__`` against ``cancel_event.wait()`` so
+        cancellation is detected even while blocked waiting for a chunk.
+        The generator is always closed (``aclose``) on exit.
+        """
+        aiter = gen.__aiter__()
+        cancel_fut = asyncio.ensure_future(cancel_event.wait())
+        try:
+            while True:
+                next_fut = asyncio.ensure_future(aiter.__anext__())
+                done, _ = await asyncio.wait(
+                    [next_fut, cancel_fut],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if cancel_fut in done:
+                    next_fut.cancel()
+                    return
+                try:
+                    yield next_fut.result()
+                except StopAsyncIteration:
+                    return
+        finally:
+            cancel_fut.cancel()
+            await gen.aclose()
+
     async def _run_direct_single_stream(
         self, asr_text: str, cancel_event: asyncio.Event,
     ) -> str:
@@ -819,34 +841,31 @@ class RecordingFlow:
         gen = app._enhancer.enhance_stream(
             asr_text, input_context=self._input_context
         )
-        try:
-            async for chunk, chunk_usage, is_thinking in gen:
-                if cancel_event.is_set():
-                    return asr_text
-                if is_thinking == "retry" and chunk:
-                    had_thinking = True
-                    app._streaming_overlay.append_thinking_text(chunk)
-                    label = chunk.strip().strip("()\n")
-                    app._streaming_overlay.set_status(f"\u23f3 {label}")
-                elif is_thinking and chunk:
-                    had_thinking = True
-                    thinking_tokens += len(chunk)
-                    app._streaming_overlay.append_thinking_text(
-                        chunk, thinking_tokens=thinking_tokens
-                    )
-                elif chunk:
-                    if had_thinking:
-                        had_thinking = False
-                        app._streaming_overlay.clear_text()
-                    collected.append(chunk)
-                    completion_tokens += len(chunk)
-                    app._streaming_overlay.append_text(
-                        chunk, completion_tokens=completion_tokens
-                    )
-                if chunk_usage is not None:
-                    usage = chunk_usage
-        finally:
-            await gen.aclose()
+        async for chunk, chunk_usage, is_thinking in self._iter_or_cancel(
+            gen, cancel_event
+        ):
+            if is_thinking == "retry" and chunk:
+                had_thinking = True
+                app._streaming_overlay.append_thinking_text(chunk)
+                label = chunk.strip().strip("()\n")
+                app._streaming_overlay.set_status(f"\u23f3 {label}")
+            elif is_thinking and chunk:
+                had_thinking = True
+                thinking_tokens += len(chunk)
+                app._streaming_overlay.append_thinking_text(
+                    chunk, thinking_tokens=thinking_tokens
+                )
+            elif chunk:
+                if had_thinking:
+                    had_thinking = False
+                    app._streaming_overlay.clear_text()
+                collected.append(chunk)
+                completion_tokens += len(chunk)
+                app._streaming_overlay.append_text(
+                    chunk, completion_tokens=completion_tokens
+                )
+            if chunk_usage is not None:
+                usage = chunk_usage
 
         if usage:
             try:
@@ -897,31 +916,28 @@ class RecordingFlow:
                 gen = app._enhancer.enhance_stream(
                     input_text, input_context=self._input_context
                 )
-                try:
-                    async for chunk, chunk_usage, is_thinking in gen:
-                        if cancel_event.is_set():
-                            return input_text
-                        if is_thinking == "retry" and chunk:
-                            app._streaming_overlay.append_thinking_text(chunk)
-                            label = chunk.strip().strip("()\n")
-                            app._streaming_overlay.set_status(
-                                f"\u23f3 Step {step_idx}/{total_steps}: {label}"
-                            )
-                        elif is_thinking and chunk:
-                            thinking_tokens += len(chunk)
-                            app._streaming_overlay.append_thinking_text(
-                                chunk, thinking_tokens=thinking_tokens
-                            )
-                        elif chunk:
-                            collected.append(chunk)
-                            completion_tokens += len(chunk)
-                            app._streaming_overlay.append_text(
-                                chunk, completion_tokens=completion_tokens
-                            )
-                        if chunk_usage is not None:
-                            step_usage = chunk_usage
-                finally:
-                    await gen.aclose()
+                async for chunk, chunk_usage, is_thinking in self._iter_or_cancel(
+                    gen, cancel_event
+                ):
+                    if is_thinking == "retry" and chunk:
+                        app._streaming_overlay.append_thinking_text(chunk)
+                        label = chunk.strip().strip("()\n")
+                        app._streaming_overlay.set_status(
+                            f"\u23f3 Step {step_idx}/{total_steps}: {label}"
+                        )
+                    elif is_thinking and chunk:
+                        thinking_tokens += len(chunk)
+                        app._streaming_overlay.append_thinking_text(
+                            chunk, thinking_tokens=thinking_tokens
+                        )
+                    elif chunk:
+                        collected.append(chunk)
+                        completion_tokens += len(chunk)
+                        app._streaming_overlay.append_text(
+                            chunk, completion_tokens=completion_tokens
+                        )
+                    if chunk_usage is not None:
+                        step_usage = chunk_usage
 
                 step_result = "".join(collected).strip()
                 if step_result:

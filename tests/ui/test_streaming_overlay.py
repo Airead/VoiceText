@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import threading
 from unittest.mock import MagicMock, patch
 
@@ -17,8 +18,6 @@ def _mock_appkit(mock_appkit_modules):
 @pytest.fixture(autouse=True)
 def _mock_webkit(monkeypatch):
     """Mock WebKit and navigation delegate for headless testing."""
-    import sys
-
     mock_webkit_mod = MagicMock()
     monkeypatch.setitem(sys.modules, "WebKit", mock_webkit_mod)
 
@@ -31,6 +30,53 @@ def _mock_webkit(monkeypatch):
         return_value=mock_nav_cls,
     ):
         yield
+
+
+@pytest.fixture(autouse=True)
+def _mock_quartz(monkeypatch):
+    """Mock Quartz CGEventTap for headless testing.
+
+    Captures the CGEventTapCreate callback so tests can simulate key presses.
+    """
+    mock_quartz = MagicMock()
+    mock_quartz.kCGEventKeyDown = 10
+    mock_quartz.kCGEventTapDisabledByTimeout = 0xFFFFFFFE
+    mock_quartz.kCGKeyboardEventKeycode = 9
+    mock_quartz.kCGSessionEventTap = 1
+    mock_quartz.kCGHeadInsertEventTap = 0
+    mock_quartz.kCGEventTapOptionDefault = 0
+    mock_quartz.kCFRunLoopDefaultMode = "kCFRunLoopDefaultMode"
+
+    _captured = {}
+
+    def fake_create(session, place, options, mask, callback, refcon):
+        _captured["callback"] = callback
+        return MagicMock()  # fake tap
+
+    mock_quartz.CGEventTapCreate.side_effect = fake_create
+    mock_quartz.CGEventMaskBit.return_value = 1 << 10
+    mock_quartz.CFMachPortCreateRunLoopSource.return_value = MagicMock()
+    mock_quartz.CFRunLoopGetMain.return_value = MagicMock()
+
+    monkeypatch.setitem(sys.modules, "Quartz", mock_quartz)
+
+    class _QuartzHelper:
+        quartz = mock_quartz
+
+        @staticmethod
+        def get_callback():
+            return _captured.get("callback")
+
+        @staticmethod
+        def simulate_key(keycode):
+            """Simulate a keyDown event through the captured CGEventTap callback."""
+            cb = _captured.get("callback")
+            assert cb is not None, "CGEventTap callback not captured"
+            mock_event = MagicMock()
+            mock_quartz.CGEventGetIntegerValueField.return_value = keycode
+            return cb(None, mock_quartz.kCGEventKeyDown, mock_event, None)
+
+    return _QuartzHelper()
 
 
 def _make_panel():
@@ -52,7 +98,7 @@ class TestStreamingOverlayPanel:
         panel = _make_panel()
         assert panel._panel is None
         assert panel._webview is None
-        assert panel._esc_monitor is None
+        assert panel._key_tap is None
 
     def test_show_creates_panel(self, _mock_appkit):
         panel = _make_panel()
@@ -80,67 +126,37 @@ class TestStreamingOverlayPanel:
         assert panel._panel is None
         assert panel._webview is None
 
-    def test_show_registers_esc_monitor(self, _mock_appkit):
-        mock_appkit_mod = _mock_appkit.appkit
+    def test_show_registers_key_tap(self, _mock_appkit, _mock_quartz):
         panel = _make_panel()
-        cancel_event = threading.Event()
-        panel.show(asr_text="test", cancel_event=cancel_event)
-        mock_appkit_mod.NSEvent.addGlobalMonitorForEventsMatchingMask_handler_.assert_called()
-        assert panel._esc_monitor is not None
+        panel.show(asr_text="test", cancel_event=threading.Event())
+        _mock_quartz.quartz.CGEventTapCreate.assert_called()
+        assert panel._key_tap is not None
 
-    def test_close_removes_esc_monitor(self, _mock_appkit):
-        mock_appkit_mod = _mock_appkit.appkit
+    def test_close_removes_key_tap(self, _mock_appkit, _mock_quartz):
         panel = _make_panel()
         panel.show(asr_text="test", cancel_event=threading.Event())
         panel.close()
-        mock_appkit_mod.NSEvent.removeMonitor_.assert_called()
-        assert panel._esc_monitor is None
+        _mock_quartz.quartz.CGEventTapEnable.assert_called()
+        assert panel._key_tap is None
 
-    def test_esc_handler_sets_cancel_event(self, _mock_appkit):
-        mock_appkit_mod = _mock_appkit.appkit
+    def test_esc_handler_sets_cancel_event(self, _mock_appkit, _mock_quartz):
         panel = _make_panel()
         cancel_event = threading.Event()
-
-        handler = None
-
-        def capture_handler(mask, h):
-            nonlocal handler
-            handler = h
-            return MagicMock()
-
-        mock_appkit_mod.NSEvent.addGlobalMonitorForEventsMatchingMask_handler_ = (
-            capture_handler
-        )
-
         panel.show(asr_text="test", cancel_event=cancel_event)
-        assert handler is not None
 
-        mock_event = MagicMock()
-        mock_event.keyCode.return_value = 53  # ESC
-        handler(mock_event)
+        result = _mock_quartz.simulate_key(53)  # ESC
+        assert result is None  # swallowed
         assert cancel_event.is_set()
 
-    def test_esc_handler_calls_on_cancel(self, _mock_appkit):
+    def test_esc_handler_calls_on_cancel(self, _mock_appkit, _mock_quartz):
         """ESC should invoke on_cancel callback before closing."""
-        mock_appkit_mod = _mock_appkit.appkit
         panel = _make_panel()
         on_cancel = MagicMock()
-
-        handler = None
-
-        def capture_handler(mask, h):
-            nonlocal handler
-            handler = h
-            return MagicMock()
-
-        mock_appkit_mod.NSEvent.addGlobalMonitorForEventsMatchingMask_handler_ = (
-            capture_handler
+        panel.show(
+            asr_text="test", cancel_event=threading.Event(), on_cancel=on_cancel
         )
 
-        panel.show(asr_text="test", cancel_event=threading.Event(), on_cancel=on_cancel)
-        mock_event = MagicMock()
-        mock_event.keyCode.return_value = 53
-        handler(mock_event)
+        _mock_quartz.simulate_key(53)
         on_cancel.assert_called_once()
 
     def test_multiple_show_close_cycles(self, _mock_appkit):
@@ -168,76 +184,39 @@ class TestStreamingOverlayPanel:
         panel.close()
         panel.set_status("done")
 
-    def test_enter_handler_calls_on_confirm_asr(self, _mock_appkit):
+    def test_enter_handler_calls_on_confirm_asr(self, _mock_appkit, _mock_quartz):
         """Enter should invoke on_confirm_asr callback."""
-        mock_appkit_mod = _mock_appkit.appkit
         panel = _make_panel()
         on_confirm_asr = MagicMock()
-
-        handler = None
-
-        def capture_handler(mask, h):
-            nonlocal handler
-            handler = h
-            return MagicMock()
-
-        mock_appkit_mod.NSEvent.addGlobalMonitorForEventsMatchingMask_handler_ = (
-            capture_handler
-        )
-
         panel.show(asr_text="test", on_confirm_asr=on_confirm_asr)
-        assert handler is not None
 
-        mock_event = MagicMock()
-        mock_event.keyCode.return_value = 36  # Enter/Return
-        handler(mock_event)
+        result = _mock_quartz.simulate_key(36)  # Enter/Return
+        assert result is None  # swallowed
         on_confirm_asr.assert_called_once()
 
-    def test_enter_does_not_close_overlay(self, _mock_appkit):
+    def test_enter_does_not_close_overlay(self, _mock_appkit, _mock_quartz):
         """Enter should NOT close the overlay (caller handles closing)."""
-        mock_appkit_mod = _mock_appkit.appkit
         panel = _make_panel()
-
-        handler = None
-
-        def capture_handler(mask, h):
-            nonlocal handler
-            handler = h
-            return MagicMock()
-
-        mock_appkit_mod.NSEvent.addGlobalMonitorForEventsMatchingMask_handler_ = (
-            capture_handler
-        )
-
         panel.show(asr_text="test", on_confirm_asr=MagicMock())
-        assert handler is not None
 
-        mock_event = MagicMock()
-        mock_event.keyCode.return_value = 36
-        handler(mock_event)
-        # Panel should still be open
+        _mock_quartz.simulate_key(36)
         assert panel._panel is not None
 
-    def test_enter_without_callback_no_crash(self, _mock_appkit):
-        """Enter without on_confirm_asr should not crash."""
-        mock_appkit_mod = _mock_appkit.appkit
+    def test_enter_swallowed_without_callback(self, _mock_appkit, _mock_quartz):
+        """Enter without on_confirm_asr should still be swallowed."""
         panel = _make_panel()
-
-        handler = None
-
-        def capture_handler(mask, h):
-            nonlocal handler
-            handler = h
-            return MagicMock()
-
-        mock_appkit_mod.NSEvent.addGlobalMonitorForEventsMatchingMask_handler_ = (
-            capture_handler
-        )
-
         panel.show(asr_text="test")
-        mock_event = MagicMock()
-        mock_event.keyCode.return_value = 36
-        handler(mock_event)  # Should not raise
+
+        result = _mock_quartz.simulate_key(36)
+        assert result is None  # swallowed even without callback
+
+    def test_other_keys_not_swallowed(self, _mock_appkit, _mock_quartz):
+        """Non-ESC/Enter keys should pass through."""
+        panel = _make_panel()
+        panel.show(asr_text="test")
+
+        result = _mock_quartz.simulate_key(0)  # 'A' key
+        assert result is not None  # not swallowed
 
     def test_show_without_cancel_event(self, _mock_appkit):
         panel = _make_panel()
@@ -368,15 +347,14 @@ class TestStreamingOverlayPanel:
         # Combined JS should have been executed
         panel._webview.evaluateJavaScript_completionHandler_.assert_called()
 
-    def test_set_cancel_event_registers_esc(self, _mock_appkit):
-        mock_appkit_mod = _mock_appkit.appkit
+    def test_set_cancel_event_registers_tap(self, _mock_appkit, _mock_quartz):
         panel = _make_panel()
         panel.show(asr_text="test")
-        panel._esc_monitor = None
+        panel._key_tap = None  # simulate tap not yet created
         cancel = threading.Event()
         panel.set_cancel_event(cancel)
         assert panel._cancel_event is cancel
-        mock_appkit_mod.NSEvent.addGlobalMonitorForEventsMatchingMask_handler_.assert_called()
+        _mock_quartz.quartz.CGEventTapCreate.assert_called()
 
     def test_set_asr_text_after_close_no_crash(self, _mock_appkit):
         panel = _make_panel()
