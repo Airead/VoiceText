@@ -26,14 +26,14 @@ fi
 cd "$PROJECT_DIR"
 
 echo "==> Syncing dependencies (including local-asr extras)..."
-uv sync --all-extras
+uv sync --all-extras --group dev
 
 if [ "${1:-}" = "--fast" ]; then
     echo "==> Fast build (incremental, skipping clean)..."
     CLEAN_FLAG=""
 else
     echo "==> Cleaning previous build..."
-    rm -rf build dist
+    rm -rf build "$APP_PATH" "$DIST_DIR/WenZi"
     find "$PROJECT_DIR/src" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
     CLEAN_FLAG="--clean"
 fi
