@@ -467,6 +467,9 @@ resultList.addEventListener('mousemove', function(e) {
     if (prev) prev.className = 'result-item';
     row.className = 'result-item selected';
     selectedIndex = idx;
+    if (activeModifier) {
+        post('modifierChange', { index: idx, modifier: activeModifier });
+    }
     updatePreview();
 }, false);
 
@@ -493,7 +496,10 @@ resultList.addEventListener('click', function(e) {
         var idx = parseInt(row.getAttribute('data-idx'), 10);
         if (!isNaN(idx)) {
             selectedIndex = idx;
-            post('execute', { index: idx, version: itemsVersion });
+            var msg = { index: idx, version: itemsVersion };
+            var mod = getModifierName(e);
+            if (mod) msg.modifier = mod;
+            post('execute', msg);
         }
     }
 }, false);
