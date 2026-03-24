@@ -22,6 +22,15 @@ def _make_panel():
     return panel
 
 
+def _poll_until(predicate, timeout=2.0, interval=0.01):
+    """Poll *predicate* until it returns True or *timeout* seconds elapse."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return
+        time.sleep(interval)
+
+
 def _make_source(name, prefix=None, items=None, priority=0):
     """Create a ChooserSource with a simple substring search."""
     items = items or []
@@ -823,7 +832,7 @@ class TestModifierActions:
         panel._DEFERRED_ACTION_DELAY = 0.01
         with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn, *a, **kw: fn(*a, **kw)):
             panel._execute_item(0, modifier="alt")
-        time.sleep(0.05)
+        _poll_until(lambda: called == ["alt"])
         assert called == ["alt"]
 
     def test_execute_without_modifier(self):
@@ -846,7 +855,7 @@ class TestModifierActions:
         panel._DEFERRED_ACTION_DELAY = 0.01
         with patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn, *a, **kw: fn(*a, **kw)):
             panel._execute_item(0)
-        time.sleep(0.05)
+        _poll_until(lambda: called == ["default"])
         assert called == ["default"]
 
 
