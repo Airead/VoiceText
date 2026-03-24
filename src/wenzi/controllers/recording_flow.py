@@ -309,7 +309,7 @@ class RecordingFlow:
             # Indicate we are busy processing (keep indicator alive for animation)
             AppHelper.callAfter(self._stop_indicator, True)
 
-            # ⑥ Transcribe (or defer to preview for background STT)
+            # ⑥ Transcribe (or defer to preview/direct for background STT)
             if app._preview_enabled and not streaming:
                 # Non-streaming preview: open preview immediately and
                 # let it run STT in the background (asr_text=None).
@@ -318,28 +318,26 @@ class RecordingFlow:
                 )
                 return
 
-            if streaming:
-                try:
-                    text = await self._loop.run_in_executor(
-                        None, app._transcriber.stop_streaming
-                    )
-                except Exception as e:
-                    logger.error("Streaming stop failed: %s", e)
-                    text = None
-                self._hide_live_overlay()
-            else:
-                AppHelper.callAfter(
-                    app._set_status, "statusbar.status.transcribing"
+            if not app._preview_enabled and not streaming:
+                # Non-streaming direct: show overlay immediately and
+                # run STT in the background.
+                logger.debug("Routing to direct flow with background STT")
+                await self._do_direct_flow(
+                    None, wav_data, audio_duration
                 )
-                app._transcriber.skip_punc = bool(
-                    app._enhancer and app._enhancer.is_active
-                )
-                hotwords, _ = app._build_dynamic_hotwords()
+                app._busy = False
+                logger.debug("Direct flow done, session done")
+                return
+
+            # All non-streaming paths returned above; only streaming remains.
+            try:
                 text = await self._loop.run_in_executor(
-                    None, lambda: app._transcriber.transcribe(
-                        wav_data, hotwords=hotwords
-                    )
+                    None, app._transcriber.stop_streaming
                 )
+            except Exception as e:
+                logger.error("Streaming stop failed: %s", e)
+                text = None
+            self._hide_live_overlay()
 
             logger.debug("Transcription result: %r", text[:100] if text else None)
 
@@ -362,7 +360,7 @@ class RecordingFlow:
             else:
                 logger.debug("Routing to direct flow")
                 await self._do_direct_flow(
-                    asr_text, wav_data, audio_duration, streaming
+                    asr_text, wav_data, audio_duration
                 )
                 app._busy = False
                 logger.debug("Direct flow done, session done")
@@ -483,15 +481,15 @@ class RecordingFlow:
 
     async def _do_direct_flow(
         self,
-        asr_text: str,
+        asr_text: str | None,
         wav_data: bytes,
         audio_duration: float,
-        streaming_was_active: bool,
     ) -> None:
         from PyObjCTools import AppHelper
 
         app = self._app
         use_enhance = bool(app._enhancer and app._enhancer.is_active)
+        need_stt = asr_text is None
 
         try:
             app._usage_stats.record_transcription(
@@ -500,16 +498,16 @@ class RecordingFlow:
         except Exception as e:
             logger.error("Failed to record usage stats: %s", e)
 
-        self._fire_scripting_event("transcription_done", asr_text=asr_text)
-
-        text = asr_text
+        text = asr_text or ""
         enhanced_text = None
         cancel_event = asyncio.Event()
 
         if use_enhance:
-            AppHelper.callAfter(
-                app._set_status, "statusbar.status.enhancing"
+            initial_status = (
+                "statusbar.status.transcribing" if need_stt
+                else "statusbar.status.enhancing"
             )
+            AppHelper.callAfter(app._set_status, initial_status)
 
             # ESC cancel: watch the action queue for CANCEL and bridge
             # it to cancel_event so the streaming loops can detect it.
@@ -517,25 +515,41 @@ class RecordingFlow:
                 self._watch_cancel(cancel_event)
             )
 
-            # Show streaming overlay for LLM enhancement.
-            # Read indicator frame and build overlay on the main thread
-            # (AppKit objects must not be accessed from the asyncio thread).
             stt_info = app._current_stt_model()
             llm_info = app._current_llm_model()
 
-            def _show_overlay():
-                indicator_frame = app._recording_indicator.current_frame
-                app._recording_indicator.animate_out(
-                    completion=lambda: app._streaming_overlay.show(
-                        asr_text=asr_text,
-                        cancel_event=None,
-                        animate_from_frame=indicator_frame,
-                        stt_info=stt_info,
-                        llm_info=llm_info,
-                        on_cancel=lambda: self.send_action(Action.CANCEL),
-                    )
+            AppHelper.callAfter(
+                self._show_streaming_overlay,
+                asr_text or "", stt_info, llm_info,
+            )
+
+            # Background STT if needed
+            if need_stt:
+                asr_text = await self._background_stt(
+                    wav_data, cancel_event, skip_punc=True
                 )
-            AppHelper.callAfter(_show_overlay)
+                if cancel_event.is_set():
+                    cancel_watcher.cancel()
+                    AppHelper.callAfter(app._streaming_overlay.close)
+                    AppHelper.callAfter(
+                        app._set_status, "statusbar.status.ready"
+                    )
+                    return
+                if not asr_text:
+                    cancel_watcher.cancel()
+                    AppHelper.callAfter(app._streaming_overlay.close)
+                    AppHelper.callAfter(
+                        app._set_status, "statusbar.status.empty"
+                    )
+                    return
+                text = asr_text
+                AppHelper.callAfter(
+                    app._set_status, "statusbar.status.enhancing"
+                )
+
+            self._fire_scripting_event(
+                "transcription_done", asr_text=asr_text
+            )
 
             # Resolve chain steps
             try:
@@ -578,14 +592,50 @@ class RecordingFlow:
                 if cancel_event.is_set():
                     AppHelper.callAfter(app._streaming_overlay.close)
                 else:
-                    app._streaming_overlay.close_with_delay()
+                    AppHelper.callAfter(
+                        app._streaming_overlay.close_with_delay
+                    )
         else:
-            # No enhancement — update overlay with ASR result if shown
-            if streaming_was_active:
+            # No enhancement — show overlay for background STT if needed
+            if need_stt:
+                cancel_watcher = asyncio.create_task(
+                    self._watch_cancel(cancel_event)
+                )
+                AppHelper.callAfter(
+                    self._show_streaming_overlay,
+                    "", app._current_stt_model(), "",
+                )
+
+                asr_text = await self._background_stt(
+                    wav_data, cancel_event
+                )
+                cancel_watcher.cancel()
+                if cancel_event.is_set() or not asr_text:
+                    AppHelper.callAfter(app._streaming_overlay.close)
+                    AppHelper.callAfter(
+                        app._set_status,
+                        "statusbar.status.ready"
+                        if cancel_event.is_set()
+                        else "statusbar.status.empty",
+                    )
+                    return
+                text = asr_text
+                AppHelper.callAfter(
+                    app._streaming_overlay.close_with_delay
+                )
+
+            self._fire_scripting_event(
+                "transcription_done", asr_text=asr_text
+            )
+
+            # Update overlay with ASR result if shown from streaming
+            if not need_stt:
                 AppHelper.callAfter(
                     app._streaming_overlay.set_asr_text, asr_text
                 )
-                app._streaming_overlay.close_with_delay()
+                AppHelper.callAfter(
+                    app._streaming_overlay.close_with_delay
+                )
 
         if cancel_event.is_set():
             AppHelper.callAfter(
@@ -593,13 +643,15 @@ class RecordingFlow:
             )
             return
 
+        text = text.strip()
+
         self._fire_scripting_event(
-            "output_text", final_text=text.strip()
+            "output_text", final_text=text
         )
 
         AppHelper.callAfter(
             type_text,
-            text.strip(),
+            text,
             append_newline=app._append_newline,
             method=app._output_method,
         )
@@ -618,7 +670,7 @@ class RecordingFlow:
             app._conversation_history.log(
                 asr_text=asr_text,
                 enhanced_text=enhanced_text,
-                final_text=text.strip(),
+                final_text=text,
                 enhance_mode=app._enhance_mode,
                 preview_enabled=False,
                 stt_model=app._current_stt_model(),
@@ -628,6 +680,69 @@ class RecordingFlow:
             )
         except Exception as e:
             logger.error("Failed to log conversation: %s", e)
+
+    # ------------------------------------------------------------------
+    # Overlay helpers for direct flow
+    # ------------------------------------------------------------------
+
+    def _show_streaming_overlay(
+        self, asr_text: str, stt_info: str, llm_info: str,
+    ) -> None:
+        """Animate recording indicator out and show the streaming overlay.
+
+        Must be called on the main thread (via AppHelper.callAfter).
+        """
+        app = self._app
+        indicator_frame = app._recording_indicator.current_frame
+        app._recording_indicator.animate_out(
+            completion=lambda: app._streaming_overlay.show(
+                asr_text=asr_text,
+                cancel_event=None,
+                animate_from_frame=indicator_frame,
+                stt_info=stt_info,
+                llm_info=llm_info,
+                on_cancel=lambda: self.send_action(Action.CANCEL),
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # Background STT for direct flow
+    # ------------------------------------------------------------------
+
+    async def _background_stt(
+        self,
+        wav_data: bytes,
+        cancel_event: asyncio.Event,
+        skip_punc: bool = False,
+    ) -> str | None:
+        """Run STT in background, update overlay when done.
+
+        Returns the transcribed text (stripped), or None on empty/failure.
+        """
+        from PyObjCTools import AppHelper
+
+        app = self._app
+        app._transcriber.skip_punc = skip_punc
+        hotwords, _ = app._build_dynamic_hotwords()
+
+        text = await self._loop.run_in_executor(
+            None, lambda: app._transcriber.transcribe(
+                wav_data, hotwords=hotwords
+            )
+        )
+
+        if cancel_event.is_set():
+            return None
+
+        asr_text = (text or "").strip()
+        logger.debug("Background STT result: %r", asr_text[:100] if asr_text else None)
+
+        if asr_text:
+            AppHelper.callAfter(
+                app._streaming_overlay.set_asr_text, asr_text
+            )
+
+        return asr_text or None
 
     # ------------------------------------------------------------------
     # Streaming enhancement helpers (native async — no event loop hacks)
