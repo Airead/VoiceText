@@ -238,10 +238,6 @@ body { display: flex; flex-direction: column; }
     padding: 20px;
 }
 
-/* Modifier hint style on subtitle */
-.result-item .subtitle-text.modifier-hint {
-    color: var(--accent);
-}
 /* Loading spinner for async sources */
 .search-spinner {
     display: none; flex-shrink: 0;
@@ -369,14 +365,12 @@ function _buildRowHtml(item, i) {
     parts.push('<div class="left"><div class="title">',
                _escHtml(item.title), '</div>');
     var subText = item.subtitle || '';
-    var subClass = 'subtitle-text';
     if (activeModifier && _activeModifierHint) {
         subText = (item._modifierHints && item._modifierHints[activeModifier])
                   || _activeModifierHint;
-        subClass = 'subtitle-text modifier-hint';
     }
     if (subText) {
-        parts.push('<div class="', subClass, '">',
+        parts.push('<div class="subtitle-text">',
                    _escHtml(subText), '</div>');
     }
     parts.push('</div><div class="right-group">');
