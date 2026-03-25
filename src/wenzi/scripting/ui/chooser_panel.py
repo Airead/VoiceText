@@ -39,20 +39,14 @@ def _get_message_handler_class():
     class ChooserMessageHandler(NSObject, protocols=[WKScriptMessageHandler]):
         _panel_ref = None
 
-        def userContentController_didReceiveScriptMessage_(
-            self, controller, message
-        ):
+        def userContentController_didReceiveScriptMessage_(self, controller, message):
             if self._panel_ref is None:
                 return
             raw = message.body()
             try:
                 from Foundation import NSJSONSerialization
 
-                json_data, _ = (
-                    NSJSONSerialization.dataWithJSONObject_options_error_(
-                        raw, 0, None
-                    )
-                )
+                json_data, _ = NSJSONSerialization.dataWithJSONObject_options_error_(raw, 0, None)
                 body = json.loads(bytes(json_data))
             except Exception:
                 logger.warning("Cannot convert chooser message: %r", raw)
@@ -213,10 +207,7 @@ class ChooserPanel:
         from Foundation import NSMakeRect
 
         old = self._panel.frame()
-        if (
-            round(old.size.width) == width
-            and round(old.size.height) == height
-        ):
+        if round(old.size.width) == width and round(old.size.height) == height:
             return
         # Keep the top edge fixed (macOS coords: origin is bottom-left)
         new_y = old.origin.y + old.size.height - height
@@ -277,10 +268,7 @@ class ChooserPanel:
                 if key is not None and key == self._panel:
                     return
                 # QL panel is now key — user is interacting with preview
-                if (
-                    self._ql_panel is not None
-                    and self._ql_panel.is_key_window
-                ):
+                if self._ql_panel is not None and self._ql_panel.is_key_window:
                     return
             except Exception:
                 pass
@@ -302,9 +290,7 @@ class ChooserPanel:
 
     def _has_calc_results(self) -> bool:
         """Check if current results include calculator items."""
-        return any(
-            item.item_id.startswith("calc:") for item in self._current_items
-        )
+        return any(item.item_id.startswith("calc:") for item in self._current_items)
 
     def _should_pin_for_calc(self) -> bool:
         """Whether the panel should stay visible for calculator use."""
@@ -352,7 +338,8 @@ class ChooserPanel:
                     return event
                 if event_type == _kCGEventKeyDown:
                     keycode = Quartz.CGEventGetIntegerValueField(
-                        event, _kCGKeyboardEventKeycode,
+                        event,
+                        _kCGKeyboardEventKeycode,
                     )
                     if keycode == _ESC_KEYCODE:
                         # Disable tap immediately to prevent auto-repeat
@@ -377,9 +364,7 @@ class ChooserPanel:
             None,
         )
         if tap is None:
-            logger.warning(
-                "Failed to create ESC event tap — closing panel instead"
-            )
+            logger.warning("Failed to create ESC event tap — closing panel instead")
             self.close()
             return
 
@@ -403,7 +388,9 @@ class ChooserPanel:
             if self._esc_source is not None:
                 loop = Quartz.CFRunLoopGetMain()
                 Quartz.CFRunLoopRemoveSource(
-                    loop, self._esc_source, Quartz.kCFRunLoopDefaultMode,
+                    loop,
+                    self._esc_source,
+                    Quartz.kCFRunLoopDefaultMode,
                 )
         except Exception:
             logger.warning("Failed to stop ESC tap", exc_info=True)
@@ -440,13 +427,12 @@ class ChooserPanel:
         if self._panel is not None and self._panel.isVisible():
             # Already visible — apply initial query if provided, else focus
             if initial_query:
-                self._eval_js(
-                    f"setInputValue({json.dumps(initial_query)})"
-                )
+                self._eval_js(f"setInputValue({json.dumps(initial_query)})")
             else:
                 self._eval_js("focusInput()")
             self._panel.makeKeyAndOrderFront_(None)
             from AppKit import NSApp
+
             NSApp.activateIgnoringOtherApps_(True)
             return
 
@@ -456,6 +442,7 @@ class ChooserPanel:
         self._panel.makeKeyAndOrderFront_(None)
 
         from AppKit import NSApp
+
         NSApp.activateIgnoringOtherApps_(True)
 
         if self._snippet_expander is not None:
@@ -498,9 +485,7 @@ class ChooserPanel:
             try:
                 config = self._webview.configuration()
                 if config:
-                    config.userContentController().removeScriptMessageHandlerForName_(
-                        "chooser"
-                    )
+                    config.userContentController().removeScriptMessageHandlerForName_("chooser")
             except Exception:
                 pass
         if self._message_handler is not None:
@@ -578,23 +563,17 @@ class ChooserPanel:
                 trigger = src.prefix + " "
                 if query.startswith(trigger):
                     source = src
-                    query = query[len(trigger):]
+                    query = query[len(trigger) :]
                     break
 
         # Track active source and toggle create button in JS
         prev_source = self._active_source
         self._active_source = source
         if source != prev_source:
-            has_create = (
-                source is not None
-                and source.create_action is not None
-            )
+            has_create = source is not None and source.create_action is not None
             # Hide prefix hints when inside a source, show otherwise
             show_right = "true" if source is None else "false"
-            self._eval_js(
-                f"setCreateButton({'true' if has_create else 'false'});"
-                f"setFooterRightVisible({show_right})"
-            )
+            self._eval_js(f"setCreateButton({'true' if has_create else 'false'});setFooterRightVisible({show_right})")
 
         # When searching across all non-prefix sources (no specific source),
         # empty query returns nothing. When a specific source is active
@@ -606,10 +585,7 @@ class ChooserPanel:
                 self._calc_sticky = False
                 self._compact_results = False
                 self._show_preview = False
-                self._eval_js(
-                    "setResults([]);setPreviewVisible(false);"
-                    "setCompact(false);clearActionHints()"
-                )
+                self._eval_js("setResults([]);setPreviewVisible(false);setCompact(false);clearActionHints()")
                 self._set_loading(False)
                 return
 
@@ -641,7 +617,7 @@ class ChooserPanel:
                 all_items.extend(src.search(query))
             except Exception:
                 logger.exception("Chooser source %s search error", src.name)
-        self._current_items = all_items[:self._MAX_TOTAL_RESULTS]
+        self._current_items = all_items[: self._MAX_TOTAL_RESULTS]
 
         # Apply usage-based boosting
         if self._usage_tracker and self._current_items:
@@ -658,13 +634,7 @@ class ChooserPanel:
         # the empty-query early return above).
         show_preview = source.show_preview if source is not None else False
         if not self._compact_results:
-            compact = (
-                bool(self._current_items)
-                and all(
-                    item.item_id.startswith("calc:")
-                    for item in self._current_items
-                )
-            )
+            compact = bool(self._current_items) and all(item.item_id.startswith("calc:") for item in self._current_items)
         else:
             compact = True
         self._compact_results = compact
@@ -722,19 +692,14 @@ class ChooserPanel:
                 "icon_badge": item.icon_badge,
                 "icon_accessory": item.icon_accessory,
                 "badge": "",
-                "hasReveal": (
-                    item.reveal_path is not None
-                    or item.secondary_action is not None
-                ),
+                "hasReveal": (item.reveal_path is not None or item.secondary_action is not None),
                 "hasModifiers": bool(item.modifiers),
                 "deletable": item.delete_action is not None,
                 "confirmDelete": item.confirm_delete,
             }
             # Include preview only for the selected item to keep payload
             # small while avoiding an extra bridge round-trip.
-            sel = (
-                selected_index if selected_index is not None else 0
-            )
+            sel = selected_index if selected_index is not None else 0
             if len(js_items) == sel and item.preview is not None:
                 preview = item.preview
                 if callable(preview):
@@ -756,10 +721,7 @@ class ChooserPanel:
             idx_arg = ""
         else:
             idx_arg = f",{selected_index}"
-        parts.append(
-            f"setResults({json.dumps(js_items, ensure_ascii=False)},"
-            f"{self._items_version}{idx_arg})"
-        )
+        parts.append(f"setResults({json.dumps(js_items, ensure_ascii=False)},{self._items_version}{idx_arg})")
 
         # Use the active source's hints, or fall back to the calculator
         # source's hints when all results are calc items (general search
@@ -767,15 +729,10 @@ class ChooserPanel:
         if source is not None and source.action_hints:
             hints = source.action_hints
         elif self._compact_results and "calculator" in self._sources:
-            hints = (
-                self._sources["calculator"].action_hints
-                or self._default_action_hints()
-            )
+            hints = self._sources["calculator"].action_hints or self._default_action_hints()
         else:
             hints = self._default_action_hints()
-        parts.append(
-            f"setActionHints({json.dumps(hints, ensure_ascii=False)})"
-        )
+        parts.append(f"setActionHints({json.dumps(hints, ensure_ascii=False)})")
 
         show = "true" if self._show_preview else "false"
         parts.append(f"setPreviewVisible({show})")
@@ -813,7 +770,8 @@ class ChooserPanel:
             except asyncio.TimeoutError:
                 logger.warning(
                     "Async source %s timed out after %.1fs",
-                    source.name, source.search_timeout,
+                    source.name,
+                    source.search_timeout,
                 )
                 return []
             except asyncio.CancelledError:
@@ -854,6 +812,7 @@ class ChooserPanel:
 
         self._pending_async_count = max(0, self._pending_async_count - 1)
 
+        pushed = False
         if items:
             remaining = self._MAX_TOTAL_RESULTS - len(self._current_items)
             if remaining > 0:
@@ -866,9 +825,17 @@ class ChooserPanel:
                 source=source if self._active_source is source else None,
                 preserve_selection=True,
             )
+            pushed = True
 
         if self._pending_async_count == 0:
-            self._set_loading(False)
+            if generation == self._search_generation:
+                self._set_loading(False)
+            # Force a state sync if no results were pushed
+            if not pushed:
+                self._push_items_to_js(
+                    source=self._active_source,
+                    preserve_selection=True,
+                )
 
     # ------------------------------------------------------------------
     # JS message handler
@@ -895,6 +862,7 @@ class ChooserPanel:
 
         elif msg_type == "close":
             from PyObjCTools import AppHelper
+
             AppHelper.callAfter(self.close)
 
         elif msg_type == "requestPreview":
@@ -935,6 +903,7 @@ class ChooserPanel:
 
         elif msg_type == "openSettings":
             from PyObjCTools import AppHelper
+
             AppHelper.callAfter(self.close)
             self._fire_event("openSettings")
 
@@ -987,7 +956,7 @@ class ChooserPanel:
         if source is None or source.complete is None:
             return
 
-        stripped_query = query[len(prefix_str):]
+        stripped_query = query[len(prefix_str) :]
         if not (0 <= index < len(self._current_items)):
             return
 
@@ -1019,7 +988,8 @@ class ChooserPanel:
                 source.create_action(query)
             except Exception:
                 logger.exception(
-                    "Chooser create action failed for source %r", source.name,
+                    "Chooser create action failed for source %r",
+                    source.name,
                 )
 
         AppHelper.callAfter(_run_create)
@@ -1035,19 +1005,26 @@ class ChooserPanel:
                     item.delete_action()
                 except Exception:
                     logger.exception(
-                        "Chooser delete action failed for %r", item.title,
+                        "Chooser delete action failed for %r",
+                        item.title,
                     )
-                self._fire_event("delete", {
-                    "title": item.title,
-                    "subtitle": item.subtitle,
-                    "item_id": item.item_id,
-                })
+                self._fire_event(
+                    "delete",
+                    {
+                        "title": item.title,
+                        "subtitle": item.subtitle,
+                        "item_id": item.item_id,
+                    },
+                )
                 self._current_items.pop(index)
                 # Keep selection at the same position (clamped by JS)
                 self._push_items_to_js(selected_index=index)
 
     def _execute_item(
-        self, index: int, version: int = 0, modifier: Optional[str] = None,
+        self,
+        index: int,
+        version: int = 0,
+        modifier: Optional[str] = None,
     ) -> None:
         """Execute item action. Uses modifier action if available."""
         if version and version != self._items_version:
@@ -1071,31 +1048,36 @@ class ChooserPanel:
             if self._query_history and self._last_query and self._last_query.strip():
                 self._query_history.record(self._last_query)
 
-            self._fire_event("select", {
-                "title": item.title,
-                "subtitle": item.subtitle,
-                "item_id": item.item_id,
-            })
+            self._fire_event(
+                "select",
+                {
+                    "title": item.title,
+                    "subtitle": item.subtitle,
+                    "item_id": item.item_id,
+                },
+            )
 
             from PyObjCTools import AppHelper
+
             AppHelper.callAfter(self.close)
             if action is not None:
                 import threading
 
                 def _deferred():
                     import time
+
                     time.sleep(self._DEFERRED_ACTION_DELAY)
                     try:
                         action()
                     except Exception:
-                        logger.exception(
-                            "Chooser action failed for %r", item.title
-                        )
+                        logger.exception("Chooser action failed for %r", item.title)
 
                 threading.Thread(target=_deferred, daemon=True).start()
 
     def _send_modifier_subtitle(
-        self, index: int, modifier: Optional[str],
+        self,
+        index: int,
+        modifier: Optional[str],
     ) -> None:
         """Send the modifier-specific subtitle to JS for live display."""
         if 0 <= index < len(self._current_items):
@@ -1103,10 +1085,7 @@ class ChooserPanel:
             subtitle = item.subtitle
             if modifier and item.modifiers and modifier in item.modifiers:
                 subtitle = item.modifiers[modifier].subtitle
-            self._eval_js(
-                f"setModifierSubtitle({index},"
-                f"{json.dumps(subtitle, ensure_ascii=False)})"
-            )
+            self._eval_js(f"setModifierSubtitle({index},{json.dumps(subtitle, ensure_ascii=False)})")
         else:
             self._eval_js(f"setModifierSubtitle({index},null)")
 
@@ -1160,6 +1139,7 @@ class ChooserPanel:
 
             if item.reveal_path:
                 import subprocess
+
                 subprocess.Popen(  # noqa: S603
                     ["open", "-R", item.reveal_path],
                     stdout=subprocess.DEVNULL,
@@ -1171,9 +1151,7 @@ class ChooserPanel:
                 try:
                     item.secondary_action()
                 except Exception:
-                    logger.exception(
-                        "Chooser secondary action failed for %r", item.title
-                    )
+                    logger.exception("Chooser secondary action failed for %r", item.title)
 
     def _send_preview(self, index: int) -> None:
         """Send preview data for the item at *index* to JS."""
@@ -1191,10 +1169,7 @@ class ChooserPanel:
                     # Cache the resolved result
                     item.preview = preview
                 if preview is not None:
-                    self._eval_js(
-                        f"setPreview("
-                        f"{json.dumps(preview, ensure_ascii=False)})"
-                    )
+                    self._eval_js(f"setPreview({json.dumps(preview, ensure_ascii=False)})")
                     return
         self._eval_js("setPreview(null)")
 
@@ -1234,9 +1209,7 @@ class ChooserPanel:
 
         # Apply custom placeholder (overrides prefix hints default)
         if self._pending_placeholder is not None:
-            self._eval_js(
-                f"setPlaceholder({json.dumps(self._pending_placeholder)})"
-            )
+            self._eval_js(f"setPlaceholder({json.dumps(self._pending_placeholder)})")
             self._pending_placeholder = None
 
         # Apply pending initial query (e.g. from source hotkey)
@@ -1250,13 +1223,13 @@ class ChooserPanel:
         hints = []
         for src in self._sources.values():
             if src.prefix:
-                hints.append({
-                    "prefix": src.prefix,
-                    "label": src.display_name or src.name,
-                })
-        self._eval_js(
-            f"setPrefixHints({json.dumps(hints, ensure_ascii=False)})"
-        )
+                hints.append(
+                    {
+                        "prefix": src.prefix,
+                        "label": src.display_name or src.name,
+                    }
+                )
+        self._eval_js(f"setPrefixHints({json.dumps(hints, ensure_ascii=False)})")
 
     @staticmethod
     def _ensure_edit_menu() -> None:
@@ -1292,7 +1265,9 @@ class ChooserPanel:
             edit_menu.addItemWithTitle_action_keyEquivalent_(title, action, key)
 
         edit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-            "Edit", None, "",
+            "Edit",
+            None,
+            "",
         )
         edit_item.setSubmenu_(edit_menu)
         main_menu.addItem_(edit_item)
@@ -1327,6 +1302,7 @@ class ChooserPanel:
 
         # Transparent background — the HTML provides its own
         from AppKit import NSColor
+
         panel.setBackgroundColor_(NSColor.clearColor())
 
         # Ensure the app has an Edit menu so Cmd+C/X/V/A key equivalents

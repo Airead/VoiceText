@@ -642,16 +642,14 @@ function _requestResize() {
 }
 
 function _checkPanelResize() {
-    var shouldExpand = searchInput.value.length > 0;
+    var shouldExpand = searchInput.value.length > 0 && items.length > 0;
     if (shouldExpand !== _panelExpanded) {
         _panelExpanded = shouldExpand;
         _requestResize();
     }
 }
 
-// --- Input handling (debounced) ---
-var _searchTimer = null;
-var _DEBOUNCE_MS = 150;
+// --- Input handling ---
 var searchSpinner = document.getElementById('search-spinner');
 
 searchInput.addEventListener('input', function() {
@@ -660,12 +658,7 @@ searchInput.addEventListener('input', function() {
         inHistoryMode = false;
         post('exitHistory');
     }
-    _checkPanelResize();
-    if (_searchTimer !== null) { clearTimeout(_searchTimer); }
-    _searchTimer = setTimeout(function() {
-        _searchTimer = null;
-        post('search', { query: searchInput.value });
-    }, _DEBOUNCE_MS);
+    post('search', { query: searchInput.value });
 });
 
 // --- Keyboard navigation ---
@@ -848,6 +841,7 @@ function setResults(newItems, version, selectedIdx) {
         resultList.scrollTop = 0;
     }
     renderItems();
+    _checkPanelResize();
     // Ensure selected item is visible after delete
     if (typeof selectedIdx === 'number' && selectedIndex >= 0) {
         var h = ITEM_HEIGHT || ITEM_HEIGHT_DEFAULT;
@@ -927,7 +921,6 @@ function clearInput() {
 function setInputValue(value) {
     searchInput.value = value;
     searchInput.setSelectionRange(value.length, value.length);
-    _checkPanelResize();
     post('search', { query: value });
 }
 
@@ -937,7 +930,6 @@ function setHistoryQuery(value) {
     searchInput.setSelectionRange(value.length, value.length);
     _settingHistoryValue = false;
     inHistoryMode = true;
-    _checkPanelResize();
     post('search', { query: value });
 }
 
