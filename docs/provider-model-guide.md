@@ -159,28 +159,35 @@ AI enhancement uses OpenAI-compatible LLM providers. You can configure multiple 
 
 1. Open **Settings...** → **LLM** tab → **Add Provider...**
 
-2. A text editor dialog appears with a template:
-
-   ```
-   name: my-provider
-   base_url: https://api.openai.com/v1
-   api_key: sk-xxx
-   models:
-     gpt-4o
-     gpt-4o-mini
-   extra_body: {"chat_template_kwargs": {"enable_thinking": false}}
-   ```
+2. Select a **Preset Provider** from the dropdown (optional):
+   - Selecting a preset auto-fills **Name** and **Base URL**
+   - A **model dropdown** appears with available models for easy selection
+   - Choose **Custom** for manual configuration
 
 3. Fill in your provider details:
-   - **name**: A unique identifier (e.g. `openai`, `deepseek`, `local-llama`)
-   - **base_url**: The OpenAI-compatible API endpoint
-   - **api_key**: Your API key
-   - **models**: List your available models, one per line under `models:`
-   - **extra_body** (optional): Additional JSON parameters sent with every request
+   - **Name**: A unique identifier (e.g. `openai`, `deepseek`, `local-llama`)
+   - **Base URL**: The OpenAI-compatible API endpoint
+   - **API Key**: Your API key
+   - **Models**: Available models, select from dropdown or type manually (one per line)
+   - **Extra Body** (optional): Additional JSON parameters sent with every request
 
 4. Click **Verify** — 闻字 will test the connection using the first model in your list.
 
 5. If verification passes, click **Save** to add the provider.
+
+#### Supported Preset Providers
+
+| Preset | Provider | Common Models |
+|--------|----------|---------------|
+| OpenAI | OpenAI | gpt-4o, gpt-4o-mini, gpt-4-turbo |
+| Qwen | Alibaba DashScope | qwen-max, qwen-plus, qwen-turbo, qwen-coder-plus |
+| Doubao | ByteDance Volcano | doubao-1-5-pro-32k, doubao-1-5-lite-32k |
+| DeepSeek | DeepSeek | deepseek-chat, deepseek-reasoner |
+| MiniMax | MiniMax | MiniMax-Text-01, abab6.5s-chat |
+| Zhipu | Zhipu AI | glm-4-plus, glm-4-9b, glm-4-flash |
+| Moonshot | Moonshot AI (Kimi) | moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k |
+| SiliconFlow | SiliconFlow | DeepSeek-V3, DeepSeek-R1, Qwen2.5-72B |
+| Ollama | Ollama (Local) | qwen2.5:7b, deepseek-r1:7b, llama3.2:3b |
 
 ### Provider Via Config File
 

@@ -1647,6 +1647,58 @@ function _sttProviderSaveResult(result) {
 }
 
 /* ------------------------------------------------------------------ */
+/* LLM Provider Presets                                                */
+/* ------------------------------------------------------------------ */
+
+var LLM_PROVIDER_PRESETS = {
+  'openai': {
+    name: 'OpenAI',
+    base_url: 'https://api.openai.com/v1',
+    models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo']
+  },
+  'qwen': {
+    name: 'Qwen (通义千问)',
+    base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    models: ['qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen-coder-plus', 'qwen-coder-turbo']
+  },
+  'doubao': {
+    name: 'Doubao (豆包)',
+    base_url: 'https://ark.cn-beijing.volces.com/api/v3',
+    models: ['doubao-1-5-pro-32k', 'doubao-1-5-lite-32k', 'doubao-pro-32k', 'doubao-lite-32k']
+  },
+  'deepseek': {
+    name: 'DeepSeek',
+    base_url: 'https://api.deepseek.com/v1',
+    models: ['deepseek-chat', 'deepseek-reasoner']
+  },
+  'minimax': {
+    name: 'MiniMax',
+    base_url: 'https://api.minimax.chat/v1',
+    models: ['MiniMax-Text-01', 'abab6.5s-chat', 'abab6.5-chat']
+  },
+  'zhipu': {
+    name: 'Zhipu (智谱AI)',
+    base_url: 'https://open.bigmodel.cn/api/paas/v4',
+    models: ['glm-4-plus', 'glm-4-9b', 'glm-4-flash', 'chatglm3-turbo']
+  },
+  'moonshot': {
+    name: 'Moonshot (月之暗面)',
+    base_url: 'https://api.moonshot.cn/v1',
+    models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k']
+  },
+  'siliconflow': {
+    name: 'SiliconFlow',
+    base_url: 'https://api.siliconflow.cn/v1',
+    models: ['deepseek-ai/DeepSeek-V3', 'deepseek-ai/DeepSeek-R1', 'Qwen/Qwen2.5-72B-Instruct', 'THUDM/GLM-4-9B-Chat']
+  },
+  'ollama': {
+    name: 'Ollama (Local)',
+    base_url: 'http://localhost:11434/v1',
+    models: ['qwen2.5:7b', 'qwen2.5:14b', 'deepseek-r1:7b', 'deepseek-r1:14b', 'llama3.2:3b']
+  }
+};
+
+/* ------------------------------------------------------------------ */
 /* LLM tab                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -1764,6 +1816,20 @@ function _showProviderForm(mode, providerName) {
   html += '  <span style="width:50px;"></span>';
   html += '</div>';
 
+  // Preset selector (only for add mode)
+  if (mode === 'add') {
+    html += '<div class="provider-form-group">';
+    html += '  <div class="provider-form-label">Preset Provider <span style="color:#86868b;font-weight:normal;">(optional)</span></div>';
+    html += '  <select class="provider-form-input" id="pf-preset" onchange="_onPresetProviderChange(this.value)" style="cursor:pointer;">';
+    html += '    <option value="">-- Custom --</option>';
+    for (var presetId in LLM_PROVIDER_PRESETS) {
+      var preset = LLM_PROVIDER_PRESETS[presetId];
+      html += '    <option value="' + _esc(presetId) + '">' + _esc(preset.name) + '</option>';
+    }
+    html += '  </select>';
+    html += '</div>';
+  }
+
   html += '<div class="provider-form-group">';
   html += '  <div class="provider-form-label">Name <span class="required">*</span></div>';
   html += '  <input class="provider-form-input" id="pf-name" type="text" value="' + nameVal + '"';
@@ -1792,8 +1858,12 @@ function _showProviderForm(mode, providerName) {
 
   html += '<div class="provider-form-group">';
   html += '  <div class="provider-form-label">Models <span class="required">*</span></div>';
+  // Model dropdown for preset providers
+  html += '  <select class="provider-form-input" id="pf-model-select" onchange="_onModelSelectChange(this.value)" style="display:none; margin-bottom:8px; cursor:pointer;">';
+  html += '    <option value="">-- Select a model --</option>';
+  html += '  </select>';
   html += '  <textarea class="provider-form-textarea" id="pf-models" placeholder="gpt-4o&#10;gpt-4o-mini">' + modelsVal + '</textarea>';
-  html += '  <div class="provider-form-hint">One model per line</div>';
+  html += '  <div class="provider-form-hint">One model per line (first model will be used for verification)</div>';
   html += '  <div class="provider-form-error" id="pf-models-err"></div>';
   html += '</div>';
 
@@ -1818,6 +1888,49 @@ function _showProviderForm(mode, providerName) {
 
 function _hideProviderForm() {
   document.getElementById('llm-prov-container').classList.remove('show-form');
+}
+
+// Handle preset provider selection
+function _onPresetProviderChange(presetId) {
+  var preset = LLM_PROVIDER_PRESETS[presetId];
+  var nameInput = document.getElementById('pf-name');
+  var urlInput = document.getElementById('pf-base-url');
+  var modelSelect = document.getElementById('pf-model-select');
+  var modelsTextarea = document.getElementById('pf-models');
+
+  if (preset) {
+    // Auto-fill name if empty
+    if (!nameInput.value.trim()) {
+      nameInput.value = presetId;
+    }
+    // Auto-fill base URL
+    urlInput.value = preset.base_url;
+    // Populate model dropdown
+    modelSelect.innerHTML = '<option value="">-- Select a model --</option>';
+    for (var i = 0; i < preset.models.length; i++) {
+      modelSelect.innerHTML += '<option value="' + _esc(preset.models[i]) + '">' + _esc(preset.models[i]) + '</option>';
+    }
+    modelSelect.style.display = 'block';
+  } else {
+    // Custom provider selected
+    modelSelect.style.display = 'none';
+    modelSelect.innerHTML = '<option value="">-- Select a model --</option>';
+  }
+}
+
+// Handle model dropdown selection
+function _onModelSelectChange(modelValue) {
+  if (!modelValue) return;
+  var modelsTextarea = document.getElementById('pf-models');
+  var currentModels = modelsTextarea.value.trim().split('\n').filter(function(m) { return m.trim(); });
+  // Add selected model if not already in list
+  if (currentModels.indexOf(modelValue) === -1) {
+    if (modelsTextarea.value.trim()) {
+      modelsTextarea.value += '\n' + modelValue;
+    } else {
+      modelsTextarea.value = modelValue;
+    }
+  }
 }
 
 // Event delegation for provider form view
