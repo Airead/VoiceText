@@ -494,6 +494,127 @@ class TapHotkeyListener:
 
 
 # ---------------------------------------------------------------------------
+# KeyRemapListener — remap one key to another via CGEventTap
+# ---------------------------------------------------------------------------
+
+class KeyRemapListener:
+    """Remap keys by intercepting events and synthesizing replacements.
+
+    Supports modifier-to-key (e.g. Right Shift → F19) and key-to-key
+    (e.g. Caps Lock → Escape) remappings.  A single CGEventTap handles
+    all registered remaps.
+    """
+
+    def __init__(self) -> None:
+        self._remaps: dict[int, tuple] = {}  # source_vk → (target_vk, is_modifier, mod_flag)
+        self._tap = None
+        self._loop = None
+        self._thread: Optional[threading.Thread] = None
+        self._prev_flags: int = 0
+
+    def add(self, source_vk: int, target_vk: int, is_modifier: bool, mod_flag: int) -> None:
+        """Add a remap.  Can be called while running."""
+        self._remaps[source_vk] = (target_vk, is_modifier, mod_flag)
+
+    def remove(self, source_vk: int) -> None:
+        """Remove a remap."""
+        self._remaps.pop(source_vk, None)
+
+    def _callback(self, proxy, event_type, event, refcon):
+        try:
+            import Quartz
+
+            if event_type == Quartz.kCGEventTapDisabledByTimeout:
+                logger.warning("KeyRemapListener tap disabled by timeout, re-enabling")
+                if self._tap is not None:
+                    Quartz.CGEventTapEnable(self._tap, True)
+                return event
+
+            if event_type == Quartz.kCGEventFlagsChanged:
+                keycode = Quartz.CGEventGetIntegerValueField(
+                    event, Quartz.kCGKeyboardEventKeycode
+                )
+                remap = self._remaps.get(keycode)
+                if remap and remap[1]:  # is_modifier source
+                    target_vk, _, mod_flag = remap
+                    flags = Quartz.CGEventGetFlags(event)
+                    was_down = bool(self._prev_flags & mod_flag)
+                    is_down = bool(flags & mod_flag)
+                    self._prev_flags = flags
+                    if is_down != was_down:
+                        evt = Quartz.CGEventCreateKeyboardEvent(None, target_vk, is_down)
+                        Quartz.CGEventPost(Quartz.kCGAnnotatedSessionEventTap, evt)
+                        return None  # Swallow the original modifier event
+                return event
+
+            if event_type in (Quartz.kCGEventKeyDown, Quartz.kCGEventKeyUp):
+                keycode = Quartz.CGEventGetIntegerValueField(
+                    event, Quartz.kCGKeyboardEventKeycode
+                )
+                remap = self._remaps.get(keycode)
+                if remap and not remap[1]:  # non-modifier source
+                    target_vk = remap[0]
+                    is_down = event_type == Quartz.kCGEventKeyDown
+                    evt = Quartz.CGEventCreateKeyboardEvent(None, target_vk, is_down)
+                    # Preserve modifier flags from the original event
+                    evt_flags = Quartz.CGEventGetFlags(event)
+                    Quartz.CGEventSetFlags(evt, evt_flags)
+                    Quartz.CGEventPost(Quartz.kCGAnnotatedSessionEventTap, evt)
+                    return None  # Swallow the original key event
+                return event
+
+            return event
+        except Exception:
+            logger.warning("[KeyRemap] _callback exception", exc_info=True)
+            return event
+
+    def start(self) -> None:
+        import Quartz
+        _pre_resolve_quartz()
+
+        def _run():
+            mask = (
+                Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)
+                | Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown)
+                | Quartz.CGEventMaskBit(Quartz.kCGEventKeyUp)
+            )
+            self._tap = Quartz.CGEventTapCreate(
+                Quartz.kCGSessionEventTap,
+                Quartz.kCGHeadInsertEventTap,
+                Quartz.kCGEventTapOptionDefault,
+                mask,
+                self._callback,
+                None,
+            )
+            if self._tap is None:
+                logger.error(
+                    "Failed to create CGEventTap for key remap. "
+                    "Check accessibility permissions."
+                )
+                return
+            source = Quartz.CFMachPortCreateRunLoopSource(None, self._tap, 0)
+            self._loop = Quartz.CFRunLoopGetCurrent()
+            Quartz.CFRunLoopAddSource(self._loop, source, Quartz.kCFRunLoopDefaultMode)
+            Quartz.CGEventTapEnable(self._tap, True)
+            logger.info("KeyRemapListener started with %d remap(s)", len(self._remaps))
+            Quartz.CFRunLoopRun()
+
+        self._thread = threading.Thread(target=_run, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        import Quartz
+
+        if self._tap is not None:
+            Quartz.CGEventTapEnable(self._tap, False)
+        if self._loop is not None:
+            Quartz.CFRunLoopStop(self._loop)
+            self._loop = None
+        self._tap = None
+        logger.info("KeyRemapListener stopped")
+
+
+# ---------------------------------------------------------------------------
 # HoldHotkeyListener — single key hold detection
 # ---------------------------------------------------------------------------
 

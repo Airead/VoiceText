@@ -3,7 +3,7 @@
 from unittest.mock import patch, MagicMock
 
 from wenzi.hotkey import _SPECIAL_VK, _VK_TO_NAME, _ALL_KEY_NAMES, unregister_custom_keys
-from wenzi.scripting.registry import LeaderMapping, ScriptingRegistry
+from wenzi.scripting.registry import LeaderMapping, RemapEntry, ScriptingRegistry
 from wenzi.scripting.api.hotkey import HotkeyAPI
 
 
@@ -149,3 +149,75 @@ class TestDefineKeys:
         result = api._on_press("kp+")
         assert result is True
         assert api._leader_triggered is True
+
+
+class TestRemap:
+    """Tests for HotkeyAPI.remap / unremap."""
+
+    def test_remap_registers_modifier_source(self):
+        reg = ScriptingRegistry()
+        api = HotkeyAPI(reg)
+        api.remap("shift_r", "f19")
+        assert 60 in reg.remaps  # shift_r vk = 60
+        entry = reg.remaps[60]
+        assert entry.source_name == "shift_r"
+        assert entry.target_name == "f19"
+        assert entry.source_vk == 60
+        assert entry.target_vk == 80  # f19 vk = 80
+        assert entry.is_modifier is True
+        assert entry.mod_flag == 0x020000  # shift flag
+
+    def test_remap_registers_regular_key(self):
+        reg = ScriptingRegistry()
+        api = HotkeyAPI(reg)
+        api.remap("f13", "esc")
+        assert 105 in reg.remaps  # f13 vk = 105
+        entry = reg.remaps[105]
+        assert entry.is_modifier is False
+        assert entry.mod_flag == 0
+
+    def test_unremap_removes(self):
+        reg = ScriptingRegistry()
+        api = HotkeyAPI(reg)
+        api.remap("shift_r", "f19")
+        assert 60 in reg.remaps
+        api.unremap("shift_r")
+        assert 60 not in reg.remaps
+
+    def test_unremap_nonexistent_is_noop(self):
+        reg = ScriptingRegistry()
+        api = HotkeyAPI(reg)
+        api.unremap("shift_r")  # should not raise
+
+    def test_remap_unknown_key_raises(self):
+        reg = ScriptingRegistry()
+        api = HotkeyAPI(reg)
+        import pytest
+        with pytest.raises(ValueError, match="Unknown key"):
+            api.remap("nonexistent", "f19")
+
+    @patch("wenzi.hotkey.KeyRemapListener")
+    def test_remap_starts_listener_when_started(self, mock_listener_cls):
+        mock_listener = MagicMock()
+        mock_listener._tap = None
+        mock_listener_cls.return_value = mock_listener
+
+        reg = ScriptingRegistry()
+        api = HotkeyAPI(reg)
+        api._started = True
+        api.remap("shift_r", "f19")
+
+        mock_listener.add.assert_called_once_with(60, 80, True, 0x020000)
+        mock_listener.start.assert_called_once()
+
+    def test_registry_clear_clears_remaps(self):
+        reg = ScriptingRegistry()
+        reg.register_remap(RemapEntry(
+            source_name="shift_r", target_name="f19",
+            source_vk=60, target_vk=80,
+            is_modifier=True, mod_flag=0x020000,
+        ))
+        reg.remap_listener = MagicMock()
+        reg.clear()
+        assert len(reg.remaps) == 0
+        assert reg.remap_listener is None

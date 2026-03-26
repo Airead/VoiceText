@@ -17,6 +17,7 @@ from wenzi.hotkey import (
     register_custom_key,
     unregister_custom_keys,
     HoldHotkeyListener,
+    KeyRemapListener,
     TapHotkeyListener,
     MultiHotkeyListener,
 )
@@ -976,3 +977,105 @@ class TestMultiHotkeyThreadSafety:
 
         with count_lock:
             assert call_count == 1
+
+
+class TestKeyRemapListener:
+    """Tests for KeyRemapListener callback logic (no real CGEventTap)."""
+
+    def test_add_and_remove(self):
+        listener = KeyRemapListener()
+        listener.add(60, 80, True, 0x020000)
+        assert 60 in listener._remaps
+        listener.remove(60)
+        assert 60 not in listener._remaps
+
+    def test_modifier_remap_keydown(self):
+        """FlagsChanged event for modifier press → synthesize target keydown."""
+        import Quartz
+
+        listener = KeyRemapListener()
+        listener.add(60, 80, True, 0x020000)  # shift_r → f19
+        listener._prev_flags = 0
+
+        posted_events = []
+
+        def mock_post(tap, evt):
+            vk = Quartz.CGEventGetIntegerValueField(evt, Quartz.kCGKeyboardEventKeycode)
+            is_down = Quartz.CGEventGetType(evt) == Quartz.kCGEventKeyDown
+            posted_events.append((vk, is_down))
+
+        # Build a FlagsChanged event with shift flag set (key down)
+        event = Quartz.CGEventCreateKeyboardEvent(None, 60, True)
+        Quartz.CGEventSetType(event, Quartz.kCGEventFlagsChanged)
+        Quartz.CGEventSetFlags(event, 0x020000)
+        Quartz.CGEventSetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode, 60)
+
+        import unittest.mock
+        with unittest.mock.patch.object(Quartz, "CGEventPost", side_effect=mock_post):
+            result = listener._callback(None, Quartz.kCGEventFlagsChanged, event, None)
+
+        assert result is None  # Swallowed
+        assert len(posted_events) == 1
+        assert posted_events[0] == (80, True)  # F19 keydown
+
+    def test_modifier_remap_keyup(self):
+        """FlagsChanged event for modifier release → synthesize target keyup."""
+        import Quartz
+
+        listener = KeyRemapListener()
+        listener.add(60, 80, True, 0x020000)
+        listener._prev_flags = 0x020000  # Was previously down
+
+        posted_events = []
+
+        def mock_post(tap, evt):
+            vk = Quartz.CGEventGetIntegerValueField(evt, Quartz.kCGKeyboardEventKeycode)
+            is_down = Quartz.CGEventGetType(evt) == Quartz.kCGEventKeyDown
+            posted_events.append((vk, is_down))
+
+        # Flags cleared → key up
+        event = Quartz.CGEventCreateKeyboardEvent(None, 60, False)
+        Quartz.CGEventSetType(event, Quartz.kCGEventFlagsChanged)
+        Quartz.CGEventSetFlags(event, 0)
+        Quartz.CGEventSetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode, 60)
+
+        import unittest.mock
+        with unittest.mock.patch.object(Quartz, "CGEventPost", side_effect=mock_post):
+            result = listener._callback(None, Quartz.kCGEventFlagsChanged, event, None)
+
+        assert result is None
+        assert len(posted_events) == 1
+        assert posted_events[0] == (80, False)  # F19 keyup
+
+    def test_unremapped_key_passes_through(self):
+        """Keys not in the remap table should pass through unchanged."""
+        import Quartz
+
+        listener = KeyRemapListener()
+        listener.add(60, 80, True, 0x020000)
+
+        event = Quartz.CGEventCreateKeyboardEvent(None, 0, True)  # 'a' key
+        result = listener._callback(None, Quartz.kCGEventKeyDown, event, None)
+        assert result is event  # Passed through
+
+    def test_regular_key_remap(self):
+        """KeyDown for regular key remap → synthesize target."""
+        import Quartz
+
+        listener = KeyRemapListener()
+        listener.add(105, 53, False, 0)  # f13 → esc
+
+        posted_events = []
+
+        def mock_post(tap, evt):
+            vk = Quartz.CGEventGetIntegerValueField(evt, Quartz.kCGKeyboardEventKeycode)
+            posted_events.append(vk)
+
+        event = Quartz.CGEventCreateKeyboardEvent(None, 105, True)
+
+        import unittest.mock
+        with unittest.mock.patch.object(Quartz, "CGEventPost", side_effect=mock_post):
+            result = listener._callback(None, Quartz.kCGEventKeyDown, event, None)
+
+        assert result is None
+        assert posted_events == [53]

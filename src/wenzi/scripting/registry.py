@@ -41,6 +41,18 @@ class HotkeyBinding:
 
 
 @dataclass
+class RemapEntry:
+    """A key remap binding (source keycode → target keycode)."""
+
+    source_name: str
+    target_name: str
+    source_vk: int
+    target_vk: int
+    is_modifier: bool  # True if source is a modifier key (FlagsChanged)
+    mod_flag: int = 0  # CGEventFlags bitmask for modifier sources
+
+
+@dataclass
 class TimerEntry:
     """A registered timer."""
 
@@ -62,6 +74,8 @@ class ScriptingRegistry:
         self._leaders: Dict[str, LeaderConfig] = {}
         self._hotkeys: List[HotkeyBinding] = []
         self._timers: Dict[str, TimerEntry] = {}
+        self._remaps: Dict[int, RemapEntry] = {}  # source_vk → RemapEntry
+        self._remap_listener: Any = None  # KeyRemapListener instance
         self._chooser_sources: Dict[str, Any] = {}  # name → ChooserSource
         self._event_listeners: Dict[str, List[Callable]] = {}
         self._lock = threading.Lock()
@@ -77,6 +91,18 @@ class ScriptingRegistry:
     @property
     def timers(self) -> Dict[str, TimerEntry]:
         return self._timers
+
+    @property
+    def remaps(self) -> Dict[int, RemapEntry]:
+        return self._remaps
+
+    @property
+    def remap_listener(self):
+        return self._remap_listener
+
+    @remap_listener.setter
+    def remap_listener(self, value):
+        self._remap_listener = value
 
     @property
     def chooser_sources(self) -> Dict[str, Any]:
@@ -113,6 +139,18 @@ class ScriptingRegistry:
             self._hotkeys.remove(binding)
         if to_remove:
             logger.info("Unregistered hotkey: %s", hotkey_str)
+
+    def register_remap(self, entry: RemapEntry) -> None:
+        """Register a key remap."""
+        self._remaps[entry.source_vk] = entry
+        logger.info("Registered remap: %s → %s", entry.source_name, entry.target_name)
+
+    def unregister_remap(self, source_vk: int) -> Optional[RemapEntry]:
+        """Remove a key remap. Returns the removed entry or None."""
+        entry = self._remaps.pop(source_vk, None)
+        if entry:
+            logger.info("Unregistered remap: %s → %s", entry.source_name, entry.target_name)
+        return entry
 
     def register_timer(
         self, interval: float, callback: Callable, repeating: bool = False
@@ -197,6 +235,14 @@ class ScriptingRegistry:
                     pass
         self._hotkeys.clear()
         self._leaders.clear()
+        # Stop remap listener
+        if self._remap_listener:
+            try:
+                self._remap_listener.stop()
+            except Exception:
+                pass
+            self._remap_listener = None
+        self._remaps.clear()
         self._chooser_sources.clear()
         self._event_listeners.clear()
         logger.info("Registry cleared")

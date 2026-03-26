@@ -7,7 +7,7 @@ import threading
 from typing import Callable, Optional
 
 from wenzi.scripting.api._async_util import wrap_async
-from wenzi.scripting.registry import LeaderConfig, LeaderMapping, ScriptingRegistry
+from wenzi.scripting.registry import LeaderConfig, LeaderMapping, RemapEntry, ScriptingRegistry
 from wenzi.scripting.ui.leader_alert import LeaderAlertPanel
 
 logger = logging.getLogger(__name__)
@@ -51,11 +51,52 @@ class HotkeyAPI:
         """Remove and stop a hotkey binding."""
         self._registry.unregister_hotkey(hotkey_str)
 
+    def remap(self, source: str, target: str) -> None:
+        """Remap one key to another.
+
+        Supports modifier keys (e.g. ``"shift_r"``) and regular keys.
+        The original key is swallowed and the target key is synthesized.
+
+        Example::
+
+            wz.hotkey.remap("shift_r", "f19")
+        """
+        from wenzi.hotkey import _MOD_VK, _name_to_vk
+
+        source_lower = source.strip().lower()
+        target_lower = target.strip().lower()
+        source_vk = _name_to_vk(source_lower)
+        target_vk = _name_to_vk(target_lower)
+        is_modifier = source_lower in _MOD_VK
+        mod_flag = _MOD_VK[source_lower][1] if is_modifier else 0
+
+        entry = RemapEntry(
+            source_name=source_lower,
+            target_name=target_lower,
+            source_vk=source_vk,
+            target_vk=target_vk,
+            is_modifier=is_modifier,
+            mod_flag=mod_flag,
+        )
+        self._registry.register_remap(entry)
+        if self._started:
+            self._start_remap_listener()
+
+    def unremap(self, source: str) -> None:
+        """Remove a key remap."""
+        from wenzi.hotkey import _name_to_vk
+
+        source_vk = _name_to_vk(source.strip().lower())
+        entry = self._registry.unregister_remap(source_vk)
+        if entry and self._registry.remap_listener:
+            self._registry.remap_listener.remove(source_vk)
+
     def start(self) -> None:
         """Start all hotkey and leader-key listeners."""
         self._started = True
         self._start_leader_listener()
         self._start_hotkey_listeners()
+        self._start_remap_listener()
 
     def stop(self) -> None:
         """Stop all listeners."""
@@ -67,6 +108,10 @@ class HotkeyAPI:
             if binding.listener:
                 binding.listener.stop()
                 binding.listener = None
+        # Stop remap listener
+        if self._registry.remap_listener:
+            self._registry.remap_listener.stop()
+            self._registry.remap_listener = None
         with self._lock:
             self._active_leader = None
             self._leader_triggered = False
@@ -113,6 +158,26 @@ class HotkeyAPI:
                 binding.listener = listener
             except Exception as exc:
                 logger.error("Failed to start hotkey %s: %s", binding.hotkey_str, exc)
+
+    def _start_remap_listener(self) -> None:
+        """Start (or update) the shared KeyRemapListener for registered remaps."""
+        if not self._registry.remaps:
+            return
+
+        from wenzi.hotkey import KeyRemapListener
+
+        listener = self._registry.remap_listener
+        if listener is None:
+            listener = KeyRemapListener()
+            self._registry.remap_listener = listener
+
+        # Sync all registered remaps into the listener
+        for entry in self._registry.remaps.values():
+            listener.add(entry.source_vk, entry.target_vk, entry.is_modifier, entry.mod_flag)
+
+        # Start if not already running
+        if listener._tap is None:
+            listener.start()
 
     def _on_press(self, name: str) -> bool:
         """Handle key press. Returns True to swallow the event."""
