@@ -84,6 +84,7 @@ class UniversalActionController:
             context_text=self._selected_text,
             exclusive_source=_UA_SOURCE_NAME,
             on_close=_on_close,
+            initial_query="",
             placeholder=t("chooser.ua.filter_placeholder"),
         )
 
