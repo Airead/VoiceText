@@ -1047,7 +1047,8 @@ class ResultPreviewPanel:
         elif msg_type == "addManualVocab":
             variant = body.get("variant", "")
             term = body.get("term", "")
-            source = body.get("source", "asr")
+            from wenzi.enhance.manual_vocabulary import SOURCE_ASR
+            source = body.get("source", SOURCE_ASR)
             if variant and term and self._on_add_manual_vocab is not None:
                 self._on_add_manual_vocab(variant, term, source)
 
@@ -1069,8 +1070,7 @@ class ResultPreviewPanel:
                 try:
                     from wenzi.enhance.text_diff import extract_word_pairs
                     pairs = extract_word_pairs(self._enhanced_text_cache, final_text)
-                    data = [{"variant": v, "term": t} for v, t in pairs]
-                    self._eval_js(f"setUserDiffs({json.dumps(data)})")
+                    self._eval_js(f"setUserDiffs({json.dumps(self._pairs_to_dicts(pairs))})")
                 except Exception as e:
                     logger.warning("Failed to compute user diffs: %s", e)
 
@@ -1078,15 +1078,17 @@ class ResultPreviewPanel:
     # Diff panel public API
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _pairs_to_dicts(pairs: list[tuple[str, str]]) -> list[dict]:
+        return [{"variant": v, "term": t} for v, t in pairs]
+
     def set_asr_diffs(self, pairs: list[tuple[str, str]]) -> None:
         """Push ASR→Enhanced diff pairs to the diff panel."""
-        data = [{"variant": v, "term": t} for v, t in pairs]
-        self._push_js(f"setAsrDiffs({json.dumps(data)})")
+        self._push_js(f"setAsrDiffs({json.dumps(self._pairs_to_dicts(pairs))})")
 
     def set_user_diffs(self, pairs: list[tuple[str, str]]) -> None:
         """Push Enhanced→Final diff pairs to the diff panel."""
-        data = [{"variant": v, "term": t} for v, t in pairs]
-        self._push_js(f"setUserDiffs({json.dumps(data)})")
+        self._push_js(f"setUserDiffs({json.dumps(self._pairs_to_dicts(pairs))})")
 
     def set_manual_vocab_state(self, entries: list[dict]) -> None:
         """Tell JS which diff pairs are already in manual vocab."""

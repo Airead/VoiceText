@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 
 _VERSION = 1
 
+# Allowed values for ManualVocabEntry.source
+SOURCE_ASR = "asr"
+SOURCE_LLM = "llm"
+SOURCE_USER = "user"
+
 
 @dataclass
 class ManualVocabEntry:
@@ -28,7 +33,7 @@ class ManualVocabEntry:
 
     term: str  # correct form ("Kubernetes")
     variant: str  # ASR / LLM erroneous form ("库伯尼特斯")
-    source: str = "asr"  # "asr" | "llm" | "user"
+    source: str = SOURCE_ASR
     frequency: int = 1  # times the user added/confirmed this pair
     hit_count: int = 0  # times this pair was actually used in correction
     first_seen: str = ""  # ISO 8601
@@ -64,7 +69,6 @@ class ManualVocabularyStore:
         self._path = path
         self._entries: dict[tuple[str, str], ManualVocabEntry] = {}
         self._lock = threading.Lock()
-        self.panel_open: bool = False
 
     # ------------------------------------------------------------------
     # Persistence
@@ -82,7 +86,7 @@ class ManualVocabularyStore:
                 entry = ManualVocabEntry(
                     term=_normalize(raw["term"]),
                     variant=_normalize(raw["variant"]),
-                    source=raw.get("source", "asr"),
+                    source=raw.get("source", SOURCE_ASR),
                     frequency=raw.get("frequency", 1),
                     hit_count=raw.get("hit_count", 0),
                     first_seen=raw.get("first_seen", ""),
@@ -107,7 +111,6 @@ class ManualVocabularyStore:
                     entries[k] = entry
             with self._lock:
                 self._entries = entries
-            self.panel_open = data.get("panel_open", False)
             logger.info("Manual vocabulary loaded: %d entries", len(entries))
         except Exception:
             logger.warning("Failed to load manual vocabulary", exc_info=True)
@@ -118,7 +121,6 @@ class ManualVocabularyStore:
             entries_list = list(self._entries.values())
         data = {
             "version": _VERSION,
-            "panel_open": self.panel_open,
             "entries": [asdict(e) for e in entries_list],
         }
         os.makedirs(os.path.dirname(self._path), exist_ok=True)
@@ -144,7 +146,7 @@ class ManualVocabularyStore:
         self,
         variant: str,
         term: str,
-        source: str = "asr",
+        source: str = SOURCE_ASR,
         *,
         app_bundle_id: str = "",
         asr_model: str = "",
@@ -165,7 +167,6 @@ class ManualVocabularyStore:
             if existing is not None:
                 existing.frequency += 1
                 existing.last_seen = now
-                # Update metadata to latest context
                 if app_bundle_id:
                     existing.app_bundle_id = app_bundle_id
                 if asr_model:

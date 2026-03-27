@@ -243,7 +243,6 @@ class TestNormalization:
         path = str(tmp_path / "manual_vocabulary.json")
         data = {
             "version": 1,
-            "panel_open": False,
             "entries": [
                 {"term": "Claude", "variant": "Cloud", "frequency": 2, "hit_count": 3,
                  "first_seen": "2026-01-01T00:00:00+00:00", "last_seen": "2026-01-02T00:00:00+00:00",

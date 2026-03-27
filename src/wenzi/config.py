@@ -340,6 +340,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     },
     "ui": {
         "settings_last_tab": "general",
+        "diff_panel_open": False,
     },
     "update_check": {
         "enabled": True,

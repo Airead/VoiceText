@@ -49,12 +49,15 @@ def build_hotword_list_detailed(
             )
             seen: set[str] = set()
             for term in manual_terms:
+                if len(result) >= max_count:
+                    break
                 lower = term.lower()
-                if lower not in seen and len(result) < max_count:
-                    seen.add(lower)
-                    result.append(HotwordDetail(
-                        term=term, layer=LAYER_MANUAL,
-                    ))
+                if lower in seen:
+                    continue
+                seen.add(lower)
+                result.append(HotwordDetail(
+                    term=term, layer=LAYER_MANUAL,
+                ))
         except Exception as e:
             logger.warning("Failed to get manual vocab hotwords: %s", e)
 

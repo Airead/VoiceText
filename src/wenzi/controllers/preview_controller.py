@@ -526,7 +526,7 @@ class PreviewController:
                     on_add_manual_vocab=self._on_add_manual_vocab,
                     on_remove_manual_vocab=self._on_remove_manual_vocab,
                     on_diff_panel_toggle=self._on_diff_panel_toggle,
-                    diff_panel_open=app._manual_vocab_store.panel_open,
+                    diff_panel_open=app._config.get("ui", {}).get("diff_panel_open", False),
                 )
                 if initial_history_index is not None:
                     # Load cached history record — skip STT and enhancement
@@ -889,7 +889,7 @@ class PreviewController:
                 on_add_manual_vocab=self._on_add_manual_vocab,
                 on_remove_manual_vocab=self._on_remove_manual_vocab,
                 on_diff_panel_toggle=self._on_diff_panel_toggle,
-                diff_panel_open=app._manual_vocab_store.panel_open,
+                diff_panel_open=app._config.get("ui", {}).get("diff_panel_open", False),
             )
             if use_enhance:
                 app._preview_panel.enhance_request_id += 1
@@ -998,9 +998,9 @@ class PreviewController:
 
     def _on_diff_panel_toggle(self, is_open: bool) -> None:
         """Persist the diff panel open/closed preference."""
-        store = self._app._manual_vocab_store
-        store.panel_open = is_open
-        store.save()
+        app = self._app
+        app._config.setdefault("ui", {})["diff_panel_open"] = is_open
+        save_config(app._config, app._config_path)
 
     def on_preview_mode_change(self, mode_id: str) -> None:
         """Handle mode switch from the preview panel's segmented control.
