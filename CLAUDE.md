@@ -28,6 +28,7 @@ Known dangerous defaults:
 - `ClipboardMonitor()` → `image_dir` defaults to `~/.config/WenZi/clipboard_images`. Calling `clear()` will delete all real images.
 - `ClipboardMonitor(persist_path=...)` → connects to real SQLite database.
 - `SnippetStore()` → `path` defaults to `~/.config/WenZi/snippets`.
+- `KeychainAPI()` → `vault_path` defaults to `~/.local/share/WenZi/keychain.json` and reads the real macOS Keychain master key. Always pass `vault_path=str(tmp_path / "keychain.json")` and mock `wenzi.keychain.keychain_get`/`keychain_set`.
 
 **Rule:** Always check what default paths a class uses before instantiating it in tests. Pass `tmp_path`-based paths for any file/directory parameters. Follow existing test patterns in the same file.
 
@@ -130,6 +131,23 @@ All `chat.completions.create` calls **must** include `max_tokens` to prevent run
 | `vocabulary_builder._extract_batch` | config `vocabulary.max_output_tokens` (default 4096) | Vocab extraction — ≤60 pipe-delimited lines |
 
 When adding a new LLM call, always set `max_tokens` to a reasonable upper bound for the expected output.
+
+## Plugin Secret Storage — `wz.keychain`
+
+Plugins must use `wz.keychain` (not `wz.store`) for sensitive data like API tokens and credentials. `wz.store` writes plaintext JSON; `wz.keychain` encrypts with AES-256-GCM.
+
+```python
+wz.keychain.set("raindrop.token", token)   # encrypt + store → returns bool
+token = wz.keychain.get("raindrop.token")   # decrypt + return → str or None
+wz.keychain.delete("raindrop.token")        # remove entry
+wz.keychain.keys()                          # list all keys
+```
+
+**Architecture:** A single AES-256-GCM master key is stored in macOS Keychain (account `scripting.vault.master_key`). Encrypted secrets are stored in `~/.local/share/WenZi/keychain.json`. The master key is auto-generated on first access.
+
+**Graceful degradation:** When macOS Keychain is unavailable (e.g. headless environments), `get()` returns None, `set()` returns False, `delete()` is a no-op. Plugins should handle None returns.
+
+**Note:** This is separate from the core app's `wenzi.keychain` module (`keychain_get`/`keychain_set`) which stores provider API keys directly in macOS Keychain. `wz.keychain` is for the plugin/scripting layer only.
 
 ## Usage Statistics
 
