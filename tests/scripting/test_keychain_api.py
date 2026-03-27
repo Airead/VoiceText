@@ -38,3 +38,73 @@ class TestKeychainAPIInit:
 
         api = KeychainAPI(vault_path=str(tmp_path / "keychain.json"))
         assert api._master_key is None
+
+
+class TestKeychainAPICRUD:
+    @patch("wenzi.scripting.api.keychain.keychain_set", return_value=True)
+    @patch("wenzi.scripting.api.keychain.keychain_get", return_value=MOCK_MASTER_KEY_B64)
+    def test_set_get_roundtrip(self, mock_get, mock_set, tmp_path):
+        from wenzi.scripting.api.keychain import KeychainAPI
+
+        api = KeychainAPI(vault_path=str(tmp_path / "keychain.json"))
+        assert api.set("token", "secret123") is True
+        assert api.get("token") == "secret123"
+
+    @patch("wenzi.scripting.api.keychain.keychain_set", return_value=True)
+    @patch("wenzi.scripting.api.keychain.keychain_get", return_value=MOCK_MASTER_KEY_B64)
+    def test_delete_removes_key(self, mock_get, mock_set, tmp_path):
+        from wenzi.scripting.api.keychain import KeychainAPI
+
+        api = KeychainAPI(vault_path=str(tmp_path / "keychain.json"))
+        api.set("token", "secret123")
+        api.delete("token")
+        assert api.get("token") is None
+
+    @patch("wenzi.scripting.api.keychain.keychain_set", return_value=True)
+    @patch("wenzi.scripting.api.keychain.keychain_get", return_value=MOCK_MASTER_KEY_B64)
+    def test_delete_missing_key_is_noop(self, mock_get, mock_set, tmp_path):
+        from wenzi.scripting.api.keychain import KeychainAPI
+
+        api = KeychainAPI(vault_path=str(tmp_path / "keychain.json"))
+        api.delete("nonexistent")
+
+    @patch("wenzi.scripting.api.keychain.keychain_set", return_value=True)
+    @patch("wenzi.scripting.api.keychain.keychain_get", return_value=MOCK_MASTER_KEY_B64)
+    def test_keys_returns_stored_keys(self, mock_get, mock_set, tmp_path):
+        from wenzi.scripting.api.keychain import KeychainAPI
+
+        api = KeychainAPI(vault_path=str(tmp_path / "keychain.json"))
+        api.set("a", "1")
+        api.set("b", "2")
+        assert sorted(api.keys()) == ["a", "b"]
+        api.delete("a")
+        assert api.keys() == ["b"]
+
+    @patch("wenzi.scripting.api.keychain.keychain_set", return_value=True)
+    @patch("wenzi.scripting.api.keychain.keychain_get", return_value=MOCK_MASTER_KEY_B64)
+    def test_get_missing_key_returns_none(self, mock_get, mock_set, tmp_path):
+        from wenzi.scripting.api.keychain import KeychainAPI
+
+        api = KeychainAPI(vault_path=str(tmp_path / "keychain.json"))
+        assert api.get("nonexistent") is None
+
+    @patch("wenzi.scripting.api.keychain.keychain_set", return_value=True)
+    @patch("wenzi.scripting.api.keychain.keychain_get", return_value=MOCK_MASTER_KEY_B64)
+    def test_set_overwrites_existing(self, mock_get, mock_set, tmp_path):
+        from wenzi.scripting.api.keychain import KeychainAPI
+
+        api = KeychainAPI(vault_path=str(tmp_path / "keychain.json"))
+        api.set("token", "old")
+        api.set("token", "new")
+        assert api.get("token") == "new"
+
+    @patch("wenzi.scripting.api.keychain.keychain_set", return_value=True)
+    @patch("wenzi.scripting.api.keychain.keychain_get", return_value=MOCK_MASTER_KEY_B64)
+    def test_degraded_mode_when_no_master_key(self, mock_get, mock_set, tmp_path):
+        from wenzi.scripting.api.keychain import KeychainAPI
+
+        api = KeychainAPI(vault_path=str(tmp_path / "keychain.json"))
+        api._master_key = None
+        assert api.get("token") is None
+        assert api.set("token", "value") is False
+        api.delete("token")
