@@ -72,13 +72,14 @@ class TestWZNamespace:
         assert len(result) == 10
         assert result[4] == "-"
 
-    def test_reload_callback(self):
+    @patch("PyObjCTools.AppHelper")
+    def test_reload_callback(self, mock_apphelper):
+        """reload() defers the callback via AppHelper.callAfter."""
         reg = ScriptingRegistry()
         wz = _WZNamespace(reg)
-        called = []
-        wz._reload_callback = lambda: called.append(1)
+        wz._reload_callback = lambda: None
         wz.reload()
-        assert called == [1]
+        mock_apphelper.callAfter.assert_called_once_with(wz._reload_callback)
 
     @patch("wenzi.statusbar.send_notification")
     def test_notify(self, mock_send):

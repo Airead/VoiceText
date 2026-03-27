@@ -226,11 +226,22 @@ class _WZNamespace:
         _submit_and_log(coro)
 
     def reload(self) -> None:
-        """Reload all scripts."""
-        if self._reload_callback:
-            self._reload_callback()
-        else:
+        """Reload all scripts.
+
+        The actual reload is deferred to the next main-loop iteration via
+        ``AppHelper.callAfter`` so that the caller (e.g. a chooser command
+        action) can finish before the chooser API is torn down and rebuilt.
+        """
+        if not self._reload_callback:
             logger.warning("Reload not available (engine not set)")
+            return
+        try:
+            from PyObjCTools import AppHelper
+
+            AppHelper.callAfter(self._reload_callback)
+        except Exception:
+            # Fallback: call directly (shouldn't happen in a running app)
+            self._reload_callback()
 
 
 # Module-level singleton — created and set by ScriptEngine
