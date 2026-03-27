@@ -43,6 +43,13 @@ class UniversalActionController:
 
     def _show_ua_panel(self) -> None:
         """Register temp source and show the chooser in UA mode.  Main thread."""
+        try:
+            self._show_ua_panel_inner()
+        except Exception:
+            logger.exception("Universal Action: _show_ua_panel failed")
+
+    def _show_ua_panel_inner(self) -> None:
+        """Inner implementation — separated so exceptions are always logged."""
         items = self._build_action_items()
         if not items:
             logger.info("Universal Action: no actions available")
@@ -93,14 +100,14 @@ class UniversalActionController:
             from wenzi.i18n import t
 
             subtitle = t("chooser.ua.enhance_subtitle")
-            for mode_id, mode_def in enhancer.modes.items():
+            for mode_id, label in enhancer.available_modes:
                 captured_mode = mode_id
 
                 def _enhance_action(m=captured_mode):
                     self._on_enhance_mode_selected(m)
 
                 items.append(ChooserItem(
-                    title=mode_def.label,
+                    title=label,
                     subtitle=subtitle,
                     item_id=f"ua:enhance:{mode_id}",
                     action=_enhance_action,

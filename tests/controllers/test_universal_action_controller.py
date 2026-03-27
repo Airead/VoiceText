@@ -11,10 +11,10 @@ class TestBuildActionItems:
     def _make_controller(self):
         app = MagicMock()
         app._enhancer = MagicMock()
-        app._enhancer.modes = {
-            "proofread": MagicMock(mode_id="proofread", label="纠错润色"),
-            "translate_en": MagicMock(mode_id="translate_en", label="Translate EN"),
-        }
+        app._enhancer.available_modes = [
+            ("proofread", "纠错润色"),
+            ("translate_en", "Translate EN"),
+        ]
         # Commands: one with UA, one without
         cmd_ua = MagicMock()
         cmd_ua.name = "define"
@@ -82,7 +82,7 @@ class TestTrigger:
         mock_get.return_value = "hello"
         app = MagicMock()
         app._enhancer = MagicMock()
-        app._enhancer.modes = {}
+        app._enhancer.available_modes = []
         app._script_engine._wz.chooser._command_source._commands = {}
         app._script_engine._wz.chooser._panel._sources = {}
         app._recording_controller._is_busy = False
