@@ -44,6 +44,7 @@ class ScriptEngine:
         self._snippet_expander = None
         self._system_settings_source = None
         self._system_settings_open_cb: Optional[Callable[[], None]] = None
+        self._ua_controller = None
         self._reloading = False
         self._post_reload_callback: Optional[Callable[[], None]] = None
         self._plugin_metas: Dict[str, PluginMeta] = {}
@@ -80,6 +81,7 @@ class ScriptEngine:
         self._bind_chooser_hotkey()
         self._bind_source_hotkeys()
         self._bind_new_snippet_hotkey()
+        self._bind_universal_action_hotkey()
         # Start hotkey/leader listeners after scripts register their bindings
         self._wz.hotkey.start()
         logger.info("Script engine started (script_dir=%s)", self._script_dir)
@@ -147,6 +149,7 @@ class ScriptEngine:
             self._bind_chooser_hotkey()
             self._bind_source_hotkeys()
             self._bind_new_snippet_hotkey()
+            self._bind_universal_action_hotkey()
             self._wz.hotkey.start()
             logger.info("Scripts reloaded")
             if self._plugin_load_errors:
@@ -177,6 +180,7 @@ class ScriptEngine:
         self._bind_chooser_hotkey()
         self._bind_source_hotkeys()
         self._bind_new_snippet_hotkey()
+        self._bind_universal_action_hotkey()
         self._wz.hotkey.start()
         logger.info("Chooser enabled at runtime")
 
@@ -701,6 +705,16 @@ class ScriptEngine:
             )
             logger.info("New snippet hotkey bound: %s", hotkey_str)
 
+    def _bind_universal_action_hotkey(self) -> None:
+        """Bind the Universal Action hotkey from config."""
+        chooser_config = self._config.get("chooser", {})
+        hotkey_str = chooser_config.get("universal_action_hotkey", "")
+        if hotkey_str:
+            ua_ctrl = self._ua_controller
+            if ua_ctrl is not None:
+                self._wz.hotkey.bind(hotkey_str, ua_ctrl.trigger)
+                logger.info("Universal Action hotkey bound: %s", hotkey_str)
+
     def rebind_new_snippet_hotkey(
         self, old_hotkey: str, new_hotkey: str,
     ) -> None:
@@ -713,6 +727,17 @@ class ScriptEngine:
                 lambda: self._snippet_source.create_snippet(""),
             )
             self._wz.hotkey.start()
+
+    def rebind_universal_action_hotkey(self, old_hotkey: str, new_hotkey: str) -> None:
+        """Unbind old UA hotkey and bind the new one at runtime."""
+        if old_hotkey:
+            self._wz.hotkey.unbind(old_hotkey)
+        if new_hotkey:
+            ua_ctrl = self._ua_controller
+            if ua_ctrl is not None:
+                self._wz.hotkey.bind(new_hotkey, ua_ctrl.trigger)
+                self._wz.hotkey.start()
+        logger.info("UA hotkey rebound: %s -> %s", old_hotkey, new_hotkey)
 
     def _purge_user_modules(self) -> None:
         """Remove cached user script and plugin modules so reload picks up changes."""
