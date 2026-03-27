@@ -611,7 +611,7 @@ function _requestResize() {
     Promise.resolve().then(function() {
         _resizePending = false;
         var w, h;
-        if (!_panelExpanded) {
+        if (!_panelExpanded && !_previewVisible) {
             w = PANEL_WIDTH_NARROW;
             h = _measureCollapsedHeight();
         } else {
