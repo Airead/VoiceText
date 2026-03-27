@@ -43,6 +43,7 @@ class CommandEntry:
         default=None, repr=False,
     )
     promoted: bool = False  # Also appear in unprefixed main search
+    universal_action: bool = False  # Opt-in to Universal Action mode
 
 
 class CommandSource:

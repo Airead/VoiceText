@@ -108,6 +108,7 @@ class ChooserSource:
     is_async: bool = False
     search_timeout: Optional[float] = None  # Async sources only; None = use global default
     debounce_delay: Optional[float] = None  # Async sources only; None = use global default, 0 = no debounce
+    universal_action: bool = False  # Opt-in to Universal Action mode
 
 
 # ---------------------------------------------------------------------------
