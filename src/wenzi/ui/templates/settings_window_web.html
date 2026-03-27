@@ -1899,10 +1899,8 @@ function _onPresetProviderChange(presetId) {
   var modelsTextarea = document.getElementById('pf-models');
 
   if (preset) {
-    // Auto-fill name if empty
-    if (!nameInput.value.trim()) {
-      nameInput.value = presetId;
-    }
+    // Auto-fill name with preset ID
+    nameInput.value = presetId;
     // Auto-fill base URL
     urlInput.value = preset.base_url;
     // Populate model dropdown
@@ -1911,6 +1909,13 @@ function _onPresetProviderChange(presetId) {
       modelSelect.innerHTML += '<option value="' + _esc(preset.models[i]) + '">' + _esc(preset.models[i]) + '</option>';
     }
     modelSelect.style.display = 'block';
+    // Set first model as textarea placeholder hint
+    modelsTextarea.value = '';
+    if (preset.models.length > 0) {
+      modelsTextarea.placeholder = preset.models[0];
+    } else {
+      modelsTextarea.placeholder = 'gpt-5.4';
+    }
   } else {
     // Custom provider selected
     modelSelect.style.display = 'none';
