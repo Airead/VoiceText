@@ -45,6 +45,7 @@ class ScriptEngine:
         self._system_settings_source = None
         self._system_settings_open_cb: Optional[Callable[[], None]] = None
         self._reloading = False
+        self._post_reload_callback: Optional[Callable[[], None]] = None
         self._plugin_metas: Dict[str, PluginMeta] = {}
         self._plugin_load_errors: Dict[str, Dict[str, str]] = {}
 
@@ -134,12 +135,15 @@ class ScriptEngine:
             self._wz._hotkey_api = None
             self._wz._chooser_api = None
             self._wz._ui_api = None
+            # Keep menubar items alive for reuse (avoids NSStatusBar flicker)
             if self._wz._menubar_api is not None:
-                self._wz._menubar_api.cleanup()
-                self._wz._menubar_api = None
+                self._wz._menubar_api.prepare_reload()
             self._register_builtin_sources()
             self._load_plugins()
             self._load_scripts()
+            # Destroy any menubar items that scripts didn't reclaim
+            if self._wz._menubar_api is not None:
+                self._wz._menubar_api.finish_reload()
             self._bind_chooser_hotkey()
             self._bind_source_hotkeys()
             self._bind_new_snippet_hotkey()
@@ -153,6 +157,13 @@ class ScriptEngine:
                 )
             else:
                 self._try_alert("Scripts reloaded", duration=1.5)
+            # Notify the app to refresh its own status-bar item.
+            # Deferred to the next run-loop iteration so that
+            # NSStatusBar has finished laying out script-created items.
+            if self._post_reload_callback is not None:
+                from PyObjCTools import AppHelper
+
+                AppHelper.callAfter(self._post_reload_callback)
         finally:
             self._reloading = False
 
@@ -251,6 +262,14 @@ class ScriptEngine:
         self._wz.pasteboard._set_monitor(None)
         self._wz.chooser.unregister_source("clipboard")
         logger.info("Clipboard monitor disabled at runtime")
+
+    def set_post_reload_callback(self, callback: Callable[[], None]) -> None:
+        """Set a callback invoked after each script reload completes.
+
+        The callback is deferred via ``callAfter`` so it runs on the next
+        run-loop iteration, after NSStatusBar has finished its layout pass.
+        """
+        self._post_reload_callback = callback
 
     def set_system_settings_open_callback(
         self, callback: Callable[[], None]

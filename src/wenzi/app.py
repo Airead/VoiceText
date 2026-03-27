@@ -728,6 +728,15 @@ class WenZiApp(StatusBarApp):
         else:
             self.title = display_text  # fallback to text-only if SF Symbols unavailable
 
+    def _refresh_status_bar(self) -> None:
+        """Re-apply the current status to the menubar icon.
+
+        Called on the next run-loop iteration after a script reload so
+        that macOS re-renders the status item even if the internal
+        NSStatusBar layout dropped it during the reload cycle.
+        """
+        self._set_status(self._current_status)
+
     def _start_recording_indicator(self) -> None:
         self._recording_controller.start_recording_indicator()
 
@@ -1455,6 +1464,9 @@ class WenZiApp(StatusBarApp):
 
             self._script_engine.set_system_settings_open_callback(
                 self._usage_stats.record_system_settings_open
+            )
+            self._script_engine.set_post_reload_callback(
+                self._refresh_status_bar
             )
 
         # Start clipboard enhance hotkey listener if configured
