@@ -520,6 +520,10 @@ class KeyRemapListener:
         """Remove a remap."""
         self._remaps.pop(source_vk, None)
 
+    def is_running(self) -> bool:
+        """Return True if the event tap is active."""
+        return self._tap is not None
+
     def _callback(self, proxy, event_type, event, refcon):
         try:
             import Quartz

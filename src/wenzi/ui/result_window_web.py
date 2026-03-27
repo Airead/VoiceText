@@ -11,6 +11,7 @@ import logging
 from typing import TYPE_CHECKING, Callable, List, Optional, Tuple
 
 from wenzi.ui.templates import load_template
+from wenzi.ui.web_utils import cleanup_webview_handler
 
 if TYPE_CHECKING:
     from wenzi.enhance.vocabulary import HotwordDetail
@@ -906,10 +907,7 @@ class ResultPreviewPanel:
             self._panel = None
         if self._webview is not None:
             self._webview.setNavigationDelegate_(None)
-            try:
-                self._webview.configuration().userContentController().removeScriptMessageHandlerForName_("action")
-            except Exception:
-                pass
+            cleanup_webview_handler(self._webview, "action")
         self._webview = None
         self._message_handler = None
         self._navigation_delegate = None

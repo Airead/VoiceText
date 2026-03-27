@@ -126,6 +126,18 @@ def _set_size(win, w: float, h: float):
     AXUIElementSetAttributeValue(win, "AXSize", val)
 
 
+def _apply_frame(win, x: float, y: float, w: float, h: float):
+    """Un-zoom, then set position → size → position.
+
+    The double position call corrects for apps that reposition the window
+    on resize (e.g. some Electron apps).
+    """
+    _unzoom_if_needed(win)
+    _set_position(win, x, y)
+    _set_size(win, w, h)
+    _set_position(win, x, y)
+
+
 def _visible_frame_ax(screen) -> tuple:
     """Return (x, y, w, h) of screen's visible area in AX coords.
 
@@ -178,14 +190,7 @@ class WindowAPI:
         win = _get_focused_window()
         if win is None:
             return
-        # Un-zoom first — some apps ignore AX changes while zoomed.
-        _unzoom_if_needed(win)
-        # Set position, then size, then position again.
-        # Some apps reposition the window on resize, so the second
-        # position call corrects for that.
-        _set_position(win, x, y)
-        _set_size(win, w, h)
-        _set_position(win, x, y)
+        _apply_frame(win, x, y, w, h)
 
     def screens(self) -> list[dict]:
         """Return visible area of each screen in AX coords.
@@ -241,19 +246,7 @@ class WindowAPI:
         w = fw * sw
         h = fh * sh
 
-        logger.debug(
-            "snap(%s): target x=%.0f y=%.0f w=%.0f h=%.0f "
-            "(before: pos=%s size=%s)",
-            position, x, y, w, h, _get_position(win), _get_size(win),
-        )
-        _unzoom_if_needed(win)
-        _set_position(win, x, y)
-        _set_size(win, w, h)
-        _set_position(win, x, y)
-        logger.debug(
-            "snap(%s): after: pos=%s size=%s",
-            position, _get_position(win), _get_size(win),
-        )
+        _apply_frame(win, x, y, w, h)
 
     def center(self) -> None:
         """Center the focused window on its current screen."""
@@ -312,7 +305,4 @@ class WindowAPI:
         new_w = rel_w * nsw
         new_h = rel_h * nsh
 
-        _unzoom_if_needed(win)
-        _set_position(win, new_x, new_y)
-        _set_size(win, new_w, new_h)
-        _set_position(win, new_x, new_y)
+        _apply_frame(win, new_x, new_y, new_w, new_h)

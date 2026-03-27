@@ -80,7 +80,7 @@ class HotkeyAPI:
         )
         self._registry.register_remap(entry)
         if self._started:
-            self._start_remap_listener()
+            self._start_remap_listener(entry)
 
     def unremap(self, source: str) -> None:
         """Remove a key remap."""
@@ -159,8 +159,13 @@ class HotkeyAPI:
             except Exception as exc:
                 logger.error("Failed to start hotkey %s: %s", binding.hotkey_str, exc)
 
-    def _start_remap_listener(self) -> None:
-        """Start (or update) the shared KeyRemapListener for registered remaps."""
+    def _start_remap_listener(self, new_entry: "RemapEntry | None" = None) -> None:
+        """Start (or update) the shared KeyRemapListener for registered remaps.
+
+        When *new_entry* is given only that single remap is added to the
+        listener.  On initial startup (``new_entry is None``) all registered
+        remaps are synced.
+        """
         if not self._registry.remaps:
             return
 
@@ -171,12 +176,16 @@ class HotkeyAPI:
             listener = KeyRemapListener()
             self._registry.remap_listener = listener
 
-        # Sync all registered remaps into the listener
-        for entry in self._registry.remaps.values():
-            listener.add(entry.source_vk, entry.target_vk, entry.is_modifier, entry.mod_flag)
+        if new_entry is not None:
+            listener.add(new_entry.source_vk, new_entry.target_vk,
+                         new_entry.is_modifier, new_entry.mod_flag)
+        else:
+            for entry in self._registry.remaps.values():
+                listener.add(entry.source_vk, entry.target_vk,
+                             entry.is_modifier, entry.mod_flag)
 
         # Start if not already running
-        if listener._tap is None:
+        if not listener.is_running():
             listener.start()
 
     def _on_press(self, name: str) -> bool:

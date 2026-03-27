@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from wenzi.ui.templates import load_template
+from wenzi.ui.web_utils import cleanup_webview_handler
 
 logger = logging.getLogger(__name__)
 
@@ -182,10 +183,7 @@ class HistoryBrowserPanel:
             self._panel = None
         if self._webview is not None:
             self._webview.setNavigationDelegate_(None)
-            try:
-                self._webview.configuration().userContentController().removeScriptMessageHandlerForName_("action")
-            except Exception:
-                pass
+            cleanup_webview_handler(self._webview, "action")
         self._webview = None
         self._message_handler = None
         self._navigation_delegate = None

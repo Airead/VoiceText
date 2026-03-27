@@ -199,7 +199,7 @@ class TestRemap:
     @patch("wenzi.hotkey.KeyRemapListener")
     def test_remap_starts_listener_when_started(self, mock_listener_cls):
         mock_listener = MagicMock()
-        mock_listener._tap = None
+        mock_listener.is_running.return_value = False
         mock_listener_cls.return_value = mock_listener
 
         reg = ScriptingRegistry()
