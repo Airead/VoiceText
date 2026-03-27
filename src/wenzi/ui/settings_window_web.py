@@ -444,6 +444,7 @@ class SettingsWebPanel:
         html_content = load_template(
             "settings_window_web.html",
             CONFIG=json.dumps(config_data, ensure_ascii=False),
+            MARKED_JS=load_template("vendor/marked.min.js"),
         )
         self._webview.loadHTMLString_baseURL_(
             html_content, NSURL.fileURLWithPath_("/")

@@ -253,6 +253,7 @@ class SettingsController:
             "on_plugin_uninstall": self._on_plugin_uninstall,
             "on_plugin_toggle": self._on_plugin_toggle,
             "on_plugin_reload": self._on_plugin_reload,
+            "on_plugin_readme": self._on_plugin_readme,
             "on_registry_add": self._on_registry_add,
             "on_registry_remove": self._on_registry_remove,
             "on_open_doc": self.open_doc_link,
@@ -1803,8 +1804,10 @@ class SettingsController:
         local_scan = scan_local_plugins(self._plugin_registry.plugins_dir)
         pinned_index: dict[str, str] = {}
         install_info_cache: dict[str, dict | None] = {}
+        local_path_index: dict[str, str] = {}
         for _name, path, meta in local_scan:
             if meta.id:
+                local_path_index[meta.id] = path
                 ii = load_install_info(path)
                 install_info_cache[meta.id] = ii
                 if ii and ii.get("pinned_ref"):
@@ -1829,6 +1832,9 @@ class SettingsController:
                     "is_official": info.is_official,
                     "enabled": is_enabled,
                     "pinned_ref": pinned_index.get(pid, ""),
+                    "has_readme": self._plugin_has_readme(
+                        local_path_index.get(pid)
+                    ),
                     **self._error_fields(load_errors, pid),
                 }
             )
@@ -1843,7 +1849,7 @@ class SettingsController:
     ) -> None:
         """Append locally-installed plugins that don't appear in any registry."""
         known_ids = {p["id"] for p in result}
-        for entry, _entry_path, meta in local_scan:
+        for entry, entry_path, meta in local_scan:
             pid = meta.id or entry
             if pid in known_ids:
                 continue
@@ -1874,6 +1880,53 @@ class SettingsController:
                     "is_official": False,
                     "enabled": is_enabled,
                     "pinned_ref": (ii.get("pinned_ref", "") if ii else ""),
+                    "has_readme": self._plugin_has_readme(entry_path),
                     **self._error_fields(load_errors, pid),
                 }
+            )
+
+    @staticmethod
+    def _plugin_has_readme(plugin_dir: str | None) -> bool:
+        """Check whether a plugin directory contains a README file."""
+        if not plugin_dir:
+            return False
+        return os.path.isfile(
+            os.path.join(plugin_dir, "README.md")
+        ) or os.path.isfile(os.path.join(plugin_dir, "README_zh.md"))
+
+    def _on_plugin_readme(self, plugin_id: str) -> None:
+        """Read the plugin README and send it to the UI for rendering."""
+        import json as _json
+
+        from wenzi.i18n import get_locale
+        from wenzi.scripting.plugin_meta import find_plugin_dir
+
+        plugin_dir = find_plugin_dir(
+            self._plugin_registry.plugins_dir, plugin_id
+        )
+        if not plugin_dir:
+            return
+
+        # Pick language: prefer Chinese README for zh locales
+        lang = get_locale()
+        readme_path = None
+        if lang.startswith("zh"):
+            zh_path = os.path.join(plugin_dir, "README_zh.md")
+            if os.path.isfile(zh_path):
+                readme_path = zh_path
+        if readme_path is None:
+            en_path = os.path.join(plugin_dir, "README.md")
+            if os.path.isfile(en_path):
+                readme_path = en_path
+        if readme_path is None:
+            return
+
+        with open(readme_path, encoding="utf-8") as f:
+            content = f.read()
+
+        panel = self._app._settings_panel
+        if panel and panel.is_visible:
+            payload = _json.dumps(content, ensure_ascii=False)
+            panel._webview.evaluateJavaScript_completionHandler_(
+                f"showReadmeModal({payload})", None
             )

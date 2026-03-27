@@ -21,4 +21,6 @@ files = [
     "vendor/github-dark.min.css",
     "vendor/highlight.min.js",
     "vendor/marked.min.js",
+    "README.md",
+    "README_zh.md",
 ]

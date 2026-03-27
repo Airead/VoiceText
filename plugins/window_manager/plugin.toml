@@ -8,4 +8,6 @@ url = "https://github.com/Airead/WenZi"
 min_wenzi_version = "0.1.14"
 files = [
     "__init__.py",
+    "README.md",
+    "README_zh.md",
 ]

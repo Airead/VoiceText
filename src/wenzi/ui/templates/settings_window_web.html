@@ -509,6 +509,43 @@ input[type="range"] {
 .modal-actions { display:flex; gap:8px; justify-content:center; }
 .modal-traceback { text-align:left; font-family:monospace; font-size:11px; background:#f5f5f7; border-radius:6px; padding:10px; max-height:300px; overflow:auto; white-space:pre-wrap; word-break:break-all; color:#1d1d1f; margin-bottom:16px; }
 
+/* README modal */
+.readme-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.3); z-index:1001; align-items:center; justify-content:center; }
+.readme-overlay.visible { display:flex; }
+.readme-box { background:#fff; border-radius:12px; padding:28px 32px; max-width:700px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 4px 20px rgba(0,0,0,0.15); text-align:left; color:#1d1d1f; font-size:14px; line-height:1.6; }
+.readme-box h1 { font-size:22px; margin:0 0 12px; border-bottom:1px solid #d2d2d7; padding-bottom:8px; }
+.readme-box h2 { font-size:17px; margin:20px 0 8px; border-bottom:1px solid #e8e8e8; padding-bottom:6px; }
+.readme-box h3 { font-size:15px; margin:16px 0 6px; }
+.readme-box p { margin:8px 0; }
+.readme-box ul, .readme-box ol { padding-left:20px; margin:8px 0; }
+.readme-box table { border-collapse:collapse; width:100%; margin:10px 0; }
+.readme-box th, .readme-box td { border:1px solid #d2d2d7; padding:6px 10px; font-size:13px; text-align:left; }
+.readme-box th { background:#f5f5f7; font-weight:600; }
+.readme-box code { background:#f5f5f7; padding:2px 5px; border-radius:3px; font-size:12px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+.readme-box pre { background:#f5f5f7; border-radius:6px; padding:12px; overflow-x:auto; margin:10px 0; }
+.readme-box pre code { background:none; padding:0; font-size:12px; }
+.readme-box strong { font-weight:600; }
+.readme-box hr { border:none; border-top:1px solid #d2d2d7; margin:16px 0; }
+.readme-box::-webkit-scrollbar { width:6px; }
+.readme-box::-webkit-scrollbar-track { background:transparent; }
+.readme-box::-webkit-scrollbar-thumb { background:rgba(0,0,0,0.15); border-radius:3px; }
+.btn-icon-readme { background:none; border:none; cursor:pointer; font-size:16px; padding:4px 6px; border-radius:6px; opacity:0.6; transition:opacity 0.15s; }
+.btn-icon-readme:hover { opacity:1; background:rgba(0,0,0,0.05); }
+
+@media (prefers-color-scheme: dark) {
+  .readme-overlay { background:rgba(0,0,0,0.5); }
+  .readme-box { background:#2a2a2a; color:#f5f5f7; }
+  .readme-box h1 { border-color:#3a3a3a; }
+  .readme-box h2 { border-color:#333; }
+  .readme-box th, .readme-box td { border-color:#3a3a3a; }
+  .readme-box th { background:#333; }
+  .readme-box code { background:#3a3a3a; color:#f5f5f7; }
+  .readme-box pre { background:#333; }
+  .readme-box hr { border-color:#3a3a3a; }
+  .readme-box::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.2); }
+  .btn-icon-readme:hover { background:rgba(255,255,255,0.08); }
+}
+
 /* Provider slide views (shared by LLM and STT tabs) */
 .prov-view-container {
   position: relative;
@@ -1099,6 +1136,34 @@ textarea.provider-form-textarea.error {
   </div>
 </div>
 
+<div id="readme-modal" class="readme-overlay" onclick="if(event.target===this)closeReadmeModal()">
+  <div class="readme-box">
+    <div id="readme-content"></div>
+  </div>
+</div>
+
+<script>__MARKED_JS__</script>
+<script>
+/* ------------------------------------------------------------------ */
+/* README modal                                                        */
+/* ------------------------------------------------------------------ */
+function showReadmeModal(markdown) {
+  var html = marked.parse(markdown);
+  document.getElementById('readme-content').innerHTML = html;
+  document.getElementById('readme-modal').classList.add('visible');
+}
+function closeReadmeModal() {
+  document.getElementById('readme-modal').classList.remove('visible');
+}
+document.addEventListener('keydown', function(e) {
+  if (e.isComposing || e.keyCode === 229) return;
+  if (e.key === 'Escape' && document.getElementById('readme-modal').classList.contains('visible')) {
+    e.preventDefault();
+    e.stopPropagation();
+    closeReadmeModal();
+  }
+}, true);
+</script>
 <script>
 /* ------------------------------------------------------------------ */
 /* i18n helper                                                         */
@@ -2486,6 +2551,9 @@ function renderPluginCard(p) {
   var bodyHtml = '<div class="plugin-body">' + _esc(p.description) + errorHtml
     + '<div class="plugin-progress"><div class="plugin-progress-bar"></div></div>'
     + '</div>';
+  var readmeBtn = p.has_readme
+    ? '<button class="btn-icon-readme" data-action="plugin-readme" data-id="' + _esc(p.id) + '" title="Documentation">&#x1F4D6;</button>'
+    : '';
   var incompatClass = (p.status === 'incompatible' && p.installed_version) ? ' plugin-card-incompatible' : '';
   return '<div class="plugin-card' + (p.load_error ? ' plugin-card-error' : '') + incompatClass + '" data-plugin-id="' + _esc(p.id) + '">'
     + '<div class="plugin-icon">&#x1F9E9;</div>'
@@ -2495,7 +2563,7 @@ function renderPluginCard(p) {
     + badge + '</div>'
     + '<div class="plugin-author"><span class="plugin-author-text">' + _esc(p.author) + ' \u00B7 ' + _esc(p.registry_name) + '</span>' + pinnedBadge + '</div>'
     + '</div>'
-    + '<div class="plugin-actions">' + actions + '</div>'
+    + '<div class="plugin-actions">' + readmeBtn + actions + '</div>'
     + bodyHtml
     + '</div>';
 }
@@ -2654,6 +2722,9 @@ function closeModal() {
             '<div class="modal-traceback">' + _esc(tb) + '</div>',
             [{ label: 'Close', cls: 'btn-secondary', action: closeModal }]
           );
+          break;
+        case 'plugin-readme':
+          postCallback('on_plugin_readme', id);
           break;
       }
     });
