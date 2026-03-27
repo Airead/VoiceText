@@ -1044,6 +1044,17 @@ textarea.provider-form-textarea.error {
             <button class="btn-small danger" data-i18n="launcher_tab.clear" onclick="postCallback('on_new_snippet_hotkey_clear')">Clear</button>
           </div>
         </div>
+        <div class="setting-row">
+          <div class="setting-left">
+            <div class="setting-label" data-i18n="launcher_tab.universal_action_label">Universal Action</div>
+            <div class="setting-desc" data-i18n="launcher_tab.universal_action_desc">Global hotkey to trigger Universal Action on selected text</div>
+          </div>
+          <div class="setting-right">
+            <span id="ctl-ua-hotkey" class="hotkey-badge">None</span>
+            <button class="btn-small" data-i18n="launcher_tab.record" onclick="postCallback('on_launcher_ua_hotkey_record')">Record</button>
+            <button class="btn-small danger" data-i18n="launcher_tab.clear" onclick="postCallback('on_launcher_ua_hotkey_clear')">Clear</button>
+          </div>
+        </div>
       </div>
 
       <div class="group-title group-title-row"><span data-i18n="launcher_tab.data_sources_section">Data Sources</span><span class="help-icon" data-doc="scripting.html#built-in-data-sources">?</span></div>
@@ -2435,6 +2446,10 @@ function _initState(config) {
   var snippetHk = document.getElementById('ctl-new-snippet-hotkey');
   if (snippetHk) snippetHk.textContent = launcher.new_snippet_hotkey || _t('launcher_tab.none', 'None');
 
+  // Universal Action hotkey
+  var uaHk = document.getElementById('ctl-ua-hotkey');
+  if (uaHk) uaHk.textContent = launcher.universal_action_hotkey || _t('launcher_tab.none', 'None');
+
   // Disable launcher controls based on scripting/launcher state
   updateLauncherDisabledState();
 
@@ -2847,6 +2862,8 @@ function _updateState(state) {
     renderLauncherSources();
     var snHk = document.getElementById('ctl-new-snippet-hotkey');
     if (snHk && launcher.new_snippet_hotkey !== undefined) snHk.textContent = launcher.new_snippet_hotkey || _t('launcher_tab.none', 'None');
+    var uaHkEl = document.getElementById('ctl-ua-hotkey');
+    if (uaHkEl && launcher.universal_action_hotkey !== undefined) uaHkEl.textContent = launcher.universal_action_hotkey || _t('launcher_tab.none', 'None');
   }
 
   // Update launcher disabled state if scripting or launcher changed

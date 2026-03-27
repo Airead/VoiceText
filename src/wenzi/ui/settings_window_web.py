@@ -231,6 +231,10 @@ class SettingsWebPanel:
         """Update the new snippet hotkey display."""
         self._set_element_text("ctl-new-snippet-hotkey", hotkey)
 
+    def update_universal_action_hotkey(self, hotkey: str) -> None:
+        """Update the UA hotkey badge in the settings panel."""
+        self._set_element_text("ctl-ua-hotkey", hotkey)
+
     # ------------------------------------------------------------------
     # Callbacks from JavaScript
     # ------------------------------------------------------------------

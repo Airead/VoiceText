@@ -233,6 +233,8 @@ class SettingsController:
             "on_launcher_source_hotkey_clear": self.launcher_source_hotkey_clear,
             "on_new_snippet_hotkey_record": self.new_snippet_hotkey_record,
             "on_new_snippet_hotkey_clear": self.new_snippet_hotkey_clear,
+            "on_launcher_ua_hotkey_record": self.launcher_ua_hotkey_record,
+            "on_launcher_ua_hotkey_clear": self.launcher_ua_hotkey_clear,
             "on_language_change": self.language_change,
             "on_plugins_tab_open": self._on_plugins_tab_open,
             "on_plugin_install_by_id": self._on_plugin_install_by_id,
@@ -1132,6 +1134,7 @@ class SettingsController:
             "usage_learning": chooser_cfg.get("usage_learning", True),
             "switch_english": chooser_cfg.get("switch_to_english", True),
             "new_snippet_hotkey": chooser_cfg.get("new_snippet_hotkey", ""),
+            "universal_action_hotkey": chooser_cfg.get("universal_action_hotkey", ""),
             "sources": sources,
             "registered_sources": registered_sources,
         }
@@ -1192,6 +1195,45 @@ class SettingsController:
 
         app._settings_panel.update_launcher_hotkey("")
         logger.info("Launcher hotkey cleared")
+
+    def launcher_ua_hotkey_record(self) -> None:
+        """Record a new Universal Action hotkey via modal dialog."""
+        app = self._app
+        recorded_key = app.record_combo_hotkey_modal()
+        if not recorded_key:
+            return
+
+        chooser_cfg = app._config.setdefault("scripting", {}).setdefault(
+            "chooser", {}
+        )
+        old_hotkey = chooser_cfg.get("universal_action_hotkey", "")
+        chooser_cfg["universal_action_hotkey"] = recorded_key
+        self._save_and_reload()
+
+        engine = getattr(app, "_script_engine", None)
+        if engine is not None:
+            engine.rebind_universal_action_hotkey(old_hotkey, recorded_key)
+
+        app._settings_panel.update_universal_action_hotkey(recorded_key)
+        logger.info("UA hotkey recorded: %s", recorded_key)
+
+    def launcher_ua_hotkey_clear(self) -> None:
+        """Clear the Universal Action hotkey."""
+        app = self._app
+        chooser_cfg = app._config.setdefault("scripting", {}).setdefault(
+            "chooser", {}
+        )
+        old_hotkey = chooser_cfg.get("universal_action_hotkey", "")
+        chooser_cfg["universal_action_hotkey"] = ""
+        self._save_and_reload()
+
+        if old_hotkey:
+            engine = getattr(app, "_script_engine", None)
+            if engine is not None:
+                engine.rebind_universal_action_hotkey(old_hotkey, "")
+
+        app._settings_panel.update_universal_action_hotkey("")
+        logger.info("UA hotkey cleared")
 
     def launcher_source_toggle(self, config_key: str, enabled: bool) -> None:
         """Handle launcher source toggle from Settings panel."""
