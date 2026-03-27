@@ -278,7 +278,8 @@ class TestCancel:
         """Cancel during recording should stop and not transcribe."""
         mock_ah.callAfter = lambda fn, *a, **kw: fn(*a, **kw)
         mock_app._sound_manager.enabled = False
-        mock_app._recorder.is_recording = True
+        # is_recording starts False (no orphan), becomes True after start()
+        mock_app._recorder.is_recording = False
 
         async def _test():
             await flow._handle_press("fn")
@@ -469,6 +470,65 @@ class TestStreaming:
 
         # Should fall back to batch transcription
         mock_app._transcriber.transcribe.assert_called_once()
+
+
+class TestStartTimeout:
+    @patch("wenzi.controllers.recording_flow.capture_input_context", return_value=None)
+    @patch("PyObjCTools.AppHelper")
+    def test_start_timeout_resets_to_idle(
+        self, mock_ah, _mock_ic, flow, mock_app, monkeypatch
+    ):
+        """When recorder.start() times out, session should reset to idle."""
+        mock_ah.callAfter = lambda fn, *a, **kw: fn(*a, **kw)
+        mock_app._sound_manager.enabled = False
+        monkeypatch.setattr(RecordingFlow, "_START_TIMEOUT", 0.1)
+
+        def hanging_start():
+            # Block until cancelled — simulates a hung PortAudio call
+            import time
+            time.sleep(5)
+
+        mock_app._recorder.start.side_effect = hanging_start
+
+        async def _test():
+            await flow._handle_press("fn")
+            # Wait for session to finish (via timeout)
+            for _ in range(100):
+                if not flow.is_busy:
+                    break
+                await asyncio.sleep(0.05)
+
+        run(_test())
+
+        mock_app._recorder.mark_tainted.assert_called_once()
+        mock_app._recording_indicator.hide.assert_called()
+        assert not flow.is_busy
+
+    @patch("wenzi.controllers.recording_flow.capture_input_context", return_value=None)
+    @patch("PyObjCTools.AppHelper")
+    def test_orphaned_recording_cleaned_up(
+        self, mock_ah, _mock_ic, flow, mock_app
+    ):
+        """An orphaned active recording should be stopped before starting."""
+        mock_ah.callAfter = lambda fn, *a, **kw: fn(*a, **kw)
+        mock_app._sound_manager.enabled = False
+        mock_app._recorder.is_recording = True
+        mock_app._recorder.start.return_value = "TestMic"
+        mock_app._transcriber.transcribe.return_value = (
+            f"[mock from {_FILE}::test_orphaned_recording_cleaned_up]"
+        )
+
+        async def _test():
+            await flow._handle_press("fn")
+            await asyncio.sleep(0.05)
+            flow._actions.put_nowait(Action.RELEASE)
+            await flow._current_task
+
+        run(_test())
+
+        # stop() should be called twice: once for orphan cleanup,
+        # once for the normal release
+        assert mock_app._recorder.stop.call_count == 2
 
 
 class TestConfigDegraded:

@@ -75,6 +75,7 @@ class RecordingFlow:
     """Coroutine-based controller for the hotkey → record → output flow."""
 
     _DELAYED_START_SECS = 0.35
+    _START_TIMEOUT = 5.0  # seconds to wait for Recorder.start()
 
     def __init__(self, app: WenZiApp) -> None:
         self._app = app
@@ -252,9 +253,31 @@ class RecordingFlow:
                     raise _RestartSession(key_name)
 
             # ③ Start recording (blocking I/O → executor)
-            dev_name = await self._loop.run_in_executor(
-                None, app._recorder.start
-            )
+            if app._recorder.is_recording:
+                logger.warning(
+                    "Recorder unexpectedly active, "
+                    "stopping orphaned session"
+                )
+                await self._loop.run_in_executor(
+                    None, app._recorder.stop
+                )
+
+            try:
+                dev_name = await asyncio.wait_for(
+                    self._loop.run_in_executor(
+                        None, app._recorder.start
+                    ),
+                    timeout=self._START_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                logger.error(
+                    "Recorder.start() timed out after %.0fs, "
+                    "aborting session",
+                    self._START_TIMEOUT,
+                )
+                app._recorder.mark_tainted()
+                AppHelper.callAfter(self._reset_to_idle)
+                return
             if dev_name and app._recording_indicator.show_device_name:
                 AppHelper.callAfter(
                     app._recording_indicator.update_device_name, dev_name

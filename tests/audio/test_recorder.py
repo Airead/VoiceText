@@ -271,6 +271,79 @@ class TestRecorder:
         r.stop()
 
     @patch("wenzi.audio.recorder.sd.RawInputStream")
+    @patch("wenzi.audio.recorder.sd._terminate")
+    @patch("wenzi.audio.recorder.sd._initialize")
+    def test_close_skips_stream_close_after_reinit(
+        self, mock_init, mock_term, mock_stream_cls, monkeypatch
+    ):
+        """_close_stream should skip stream.close() when PortAudio was re-initialized."""
+        monkeypatch.setattr(Recorder, "_CLOSE_WAIT_TIMEOUT", 0.01)
+
+        abort_entered = threading.Event()
+        abort_proceed = threading.Event()
+
+        mock_stream = MagicMock()
+
+        def hanging_abort():
+            abort_entered.set()
+            abort_proceed.wait()
+
+        mock_stream.abort.side_effect = hanging_abort
+        mock_stream_cls.return_value = mock_stream
+
+        r = Recorder(sample_rate=16000, block_ms=20)
+        r._query_device_name_enabled = False
+        r.start()
+        r._queue.put(np.full(320, 500, dtype=np.int16))
+
+        initial_gen = r._pa_generation
+        r.stop()
+
+        # Wait for background thread to enter abort
+        assert abort_entered.wait(timeout=2.0)
+
+        # Simulate PortAudio re-init (as Phase 0 of a new start() would)
+        r._reinit_portaudio()
+        assert r._pa_generation == initial_gen + 1
+
+        # Unblock abort — thread should skip close()
+        abort_proceed.set()
+        assert r._close_done.wait(timeout=2.0)
+
+        # stream.close() should NOT have been called
+        mock_stream.close.assert_not_called()
+
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
+    def test_mark_tainted_clears_starting_since(self, mock_stream_cls):
+        """mark_tainted() should set tainted and clear _starting_since."""
+        r = Recorder(sample_rate=16000, block_ms=20)
+        r._starting_since = time.monotonic()
+        r.mark_tainted()
+        assert r._tainted is True
+        assert r._starting_since is None
+
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
+    @patch("wenzi.audio.recorder.sd._terminate")
+    @patch("wenzi.audio.recorder.sd._initialize")
+    def test_tainted_recorder_reinits_on_next_start(
+        self, mock_init, mock_term, mock_stream_cls
+    ):
+        """A tainted recorder should force PortAudio re-init on next start()."""
+        mock_stream = MagicMock()
+        mock_stream_cls.return_value = mock_stream
+
+        r = Recorder(sample_rate=16000, block_ms=20)
+        r._query_device_name_enabled = False
+        r.mark_tainted()
+
+        r.start()
+        assert r.is_recording is True
+        assert r._tainted is False
+        mock_term.assert_called()
+        mock_init.assert_called()
+        r.stop()
+
+    @patch("wenzi.audio.recorder.sd.RawInputStream")
     def test_starting_flag_prevents_concurrent_start(self, mock_stream_cls):
         """A second start() should return immediately when _starting_since is set."""
         mock_stream = MagicMock()

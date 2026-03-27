@@ -63,6 +63,9 @@ class Recorder:
         # on init when there is no pending close).
         self._close_done = threading.Event()
         self._close_done.set()
+        # Tracks PortAudio re-init cycles; see _close_stream().
+        self._pa_generation: int = 0
+        self._tainted: bool = False
 
     @property
     def is_recording(self) -> bool:
@@ -99,9 +102,13 @@ class Recorder:
             self._close_done.set()
 
         # --- Phase 1: claim the "starting" slot (lock held briefly) -----
+        needs_tainted_reinit = False
         with self._lock:
             if self._recording:
                 return self._last_device_name
+            if self._tainted:
+                self._tainted = False
+                needs_tainted_reinit = True
             if self._starting_since is not None:
                 elapsed = time.monotonic() - self._starting_since
                 if elapsed > self._STARTING_STALE_SECS:
@@ -117,6 +124,13 @@ class Recorder:
             self._total_bytes = 0
             device = self.device
             last_name = self._last_device_name
+
+        if needs_tainted_reinit:
+            logger.info(
+                "Recorder tainted from previous timeout, "
+                "forcing PortAudio re-init"
+            )
+            self._reinit_portaudio()
 
         # --- Phase 2: device query & PortAudio re-init (lock free) ------
         current_name: Optional[str] = None
@@ -196,11 +210,18 @@ class Recorder:
         # subsequent start() know whether cleanup has finished.
         if stream is not None:
             self._close_done.clear()
+            gen = self._pa_generation
 
             def _close_stream() -> None:
                 try:
                     stream.abort()
-                    stream.close()
+                    if self._pa_generation != gen:
+                        logger.debug(
+                            "Skipping stream.close() – PortAudio was "
+                            "re-initialized during abort"
+                        )
+                    else:
+                        stream.close()
                 except Exception as e:
                     logger.warning("Error closing audio stream: %s", e)
                 finally:
@@ -280,12 +301,23 @@ class Recorder:
             except Exception:
                 logger.debug("Audio chunk callback error", exc_info=True)
 
-    @staticmethod
-    def _reinit_portaudio() -> None:
+    def mark_tainted(self) -> None:
+        """Mark the recorder as needing a PortAudio re-init on next start().
+
+        Called by RecordingFlow when start() times out.  Clears
+        ``_starting_since`` so the next start() is not blocked by the
+        stale flag from the timed-out call.
+        """
+        with self._lock:
+            self._tainted = True
+            self._starting_since = None
+
+    def _reinit_portaudio(self) -> None:
         """Force-terminate and re-initialize PortAudio."""
         try:
             sd._terminate()
             sd._initialize()
+            self._pa_generation += 1
         except Exception:
             logger.debug("PortAudio re-init failed, continuing", exc_info=True)
 
