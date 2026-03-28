@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Annotation</title>
+<script src="fabric.min.js"></script>
+<link rel="stylesheet" href="annotation.css">
+</head>
+<body>
+  <canvas id="annotation-canvas"></canvas>
+
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <!-- Drawing tools -->
+    <div class="tool-group">
+      <button class="tool-btn" data-tool="rect" title="Rectangle">▭</button>
+      <button class="tool-btn" data-tool="ellipse" title="Ellipse">○</button>
+      <button class="tool-btn" data-tool="arrow" title="Arrow">➝</button>
+      <button class="tool-btn" data-tool="line" title="Line">╱</button>
+      <button class="tool-btn" data-tool="pen" title="Pen">✎</button>
+      <button class="tool-btn" data-tool="mosaic" title="Mosaic">▦</button>
+      <button class="tool-btn" data-tool="text" title="Text">A</button>
+      <button class="tool-btn" data-tool="number" title="Number">①</button>
+    </div>
+
+    <div class="separator"></div>
+
+    <!-- Undo / Redo -->
+    <div class="tool-group">
+      <button class="tool-btn" id="btn-undo" title="Undo (⌘Z)">↩</button>
+      <button class="tool-btn" id="btn-redo" title="Redo (⌘⇧Z)">↪</button>
+    </div>
+
+    <div class="separator"></div>
+
+    <!-- Actions -->
+    <div class="tool-group">
+      <button class="tool-btn action-btn" id="btn-save" title="Save">⬇</button>
+      <button class="tool-btn action-btn action-cancel" id="btn-cancel" title="Cancel">✕</button>
+      <button class="tool-btn action-btn action-confirm" id="btn-confirm" title="Confirm">✓</button>
+    </div>
+  </div>
+
+  <!-- Secondary panel: color + thickness -->
+  <div id="secondary-panel" class="hidden">
+    <div class="panel-section" id="color-section">
+      <div class="color-dot selected" data-color="#ff4d4f" style="background:#ff4d4f"></div>
+      <div class="color-dot" data-color="#faad14" style="background:#faad14"></div>
+      <div class="color-dot" data-color="#1890ff" style="background:#1890ff"></div>
+      <div class="color-dot" data-color="#52c41a" style="background:#52c41a"></div>
+      <div class="color-dot" data-color="#ffffff" style="background:#ffffff"></div>
+      <div class="color-dot" data-color="#000000" style="background:#000000"></div>
+    </div>
+    <div class="panel-separator"></div>
+    <div class="panel-section" id="thickness-section">
+      <div class="thickness-btn" data-thickness="thin" title="Thin">
+        <div class="thickness-bar" style="height:2px"></div>
+      </div>
+      <div class="thickness-btn selected" data-thickness="medium" title="Medium">
+        <div class="thickness-bar" style="height:4px"></div>
+      </div>
+      <div class="thickness-btn" data-thickness="thick" title="Thick">
+        <div class="thickness-bar" style="height:6px"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="annotation.js"></script>
+</body>
+</html>
