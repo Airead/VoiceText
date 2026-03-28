@@ -763,6 +763,10 @@ textarea.provider-form-textarea.error {
       <span class="sidebar-icon">&#x1f9e9;</span>
       <span>Plugins</span>
     </div>
+    <div class="sidebar-item" data-tab="screenshot" onclick="switchTab('screenshot')">
+      <span class="sidebar-icon">&#x2702;</span>
+      <span>Screenshot</span>
+    </div>
   </div>
 
   <!-- Content -->
@@ -1111,6 +1115,36 @@ textarea.provider-form-textarea.error {
       <div id="reload-banner" style="display:none;" class="reload-banner">
         <span>Plugins changed. Reload to apply.</span>
         <button class="btn btn-primary" onclick="postCallback('on_plugin_reload')">Reload Now</button>
+      </div>
+    </div>
+
+    <div id="tab-screenshot" class="tab-content">
+      <div class="content-title">Screenshot</div>
+
+      <div class="section">
+        <div class="section-title">General</div>
+        <div class="setting-group">
+          <div class="setting-row">
+            <div class="setting-left">
+              <div class="setting-label">Enable Screenshot</div>
+              <div class="setting-desc">Enable screenshot capture and annotation tool</div>
+            </div>
+            <div class="setting-right">
+              <div id="ctl-screenshot-enabled" class="toggle" onclick="toggleClick(this, 'on_screenshot_toggle')"></div>
+            </div>
+          </div>
+          <div class="setting-row" id="screenshot-hotkey-row">
+            <div class="setting-left">
+              <div class="setting-label">Hotkey</div>
+              <div class="setting-desc">Global hotkey to trigger screenshot capture</div>
+            </div>
+            <div class="setting-right">
+              <span id="ctl-screenshot-hotkey" class="hotkey-badge">None</span>
+              <button class="btn-small" onclick="postCallback('on_screenshot_hotkey_record')">Record</button>
+              <button class="btn-small danger" onclick="postCallback('on_screenshot_hotkey_clear')">Clear</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2368,6 +2402,17 @@ function updateLauncherDisabledState() {
   }
 }
 
+function updateScreenshotDisabledState() {
+  var row = document.getElementById('screenshot-hotkey-row');
+  if (!row) return;
+  var enabled = (CONFIG.screenshot || {}).enabled;
+  var controls = row.querySelectorAll('.hotkey-badge, .btn-small');
+  controls.forEach(function(el) {
+    el.style.pointerEvents = enabled ? '' : 'none';
+    el.style.opacity = enabled ? '' : '0.4';
+  });
+}
+
 /* ------------------------------------------------------------------ */
 /* Initialization                                                      */
 /* ------------------------------------------------------------------ */
@@ -2452,6 +2497,13 @@ function _initState(config) {
 
   // Disable launcher controls based on scripting/launcher state
   updateLauncherDisabledState();
+
+  // Screenshot
+  var screenshot = config.screenshot || {};
+  setToggle('ctl-screenshot-enabled', screenshot.enabled);
+  var ssHk = document.getElementById('ctl-screenshot-hotkey');
+  if (ssHk) ssHk.textContent = screenshot.hotkey || 'None';
+  updateScreenshotDisabledState();
 
   // Restore last tab (skip on_tab_change to avoid redundant config save)
   if (config.last_tab && config.last_tab !== 'general') {
@@ -2877,6 +2929,16 @@ function _updateState(state) {
   if (state.plugins_error !== undefined) { showPluginsError(state.plugins_error); }
   if (state.show_reload_banner !== undefined) { showReloadBanner(state.show_reload_banner); }
   if (state.plugin_progress !== undefined) { updatePluginProgress(state.plugin_progress); }
+
+  // Screenshot
+  if (state.screenshot !== undefined) {
+    CONFIG.screenshot = state.screenshot;
+    var ss = state.screenshot;
+    if (ss.enabled !== undefined) setToggle('ctl-screenshot-enabled', ss.enabled);
+    var ssHk2 = document.getElementById('ctl-screenshot-hotkey');
+    if (ssHk2 && ss.hotkey !== undefined) ssHk2.textContent = ss.hotkey || 'None';
+    updateScreenshotDisabledState();
+  }
 }
 
 /* ------------------------------------------------------------------ */

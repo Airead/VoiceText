@@ -180,6 +180,10 @@ class SettingsController:
             ),
             "language": app._config.get("language", "auto"),
             "launcher": self._build_launcher_state(),
+            "screenshot": {
+                "enabled": app._config.get("screenshot", {}).get("enabled", False),
+                "hotkey": app._config.get("screenshot", {}).get("hotkey", ""),
+            },
         }
 
     def on_open_settings(self, _) -> None:
@@ -247,6 +251,9 @@ class SettingsController:
             "on_registry_add": self._on_registry_add,
             "on_registry_remove": self._on_registry_remove,
             "on_open_doc": self.open_doc_link,
+            "on_screenshot_toggle": self.screenshot_toggle,
+            "on_screenshot_hotkey_record": self.screenshot_hotkey_record,
+            "on_screenshot_hotkey_clear": self.screenshot_hotkey_clear,
             "_reopen": lambda: self.on_open_settings(None),
         }
 
@@ -1441,6 +1448,75 @@ class SettingsController:
             engine.wz.chooser._get_panel()._switch_english = enabled
 
         logger.info("Launcher switch-to-English set to: %s", enabled)
+
+    # ---------------------------------------------------------------------------
+    # Screenshot callbacks
+    # ---------------------------------------------------------------------------
+
+    def screenshot_toggle(self, enabled: bool) -> None:
+        """Handle screenshot enable/disable toggle."""
+        app = self._app
+        ss_cfg = app._config.setdefault("screenshot", {})
+        ss_cfg["enabled"] = enabled
+        self._save_and_reload()
+
+        # Start or stop the hotkey listener
+        if enabled:
+            hotkey = ss_cfg.get("hotkey", "")
+            if hotkey and not app._screenshot_hotkey_listener:
+                from wenzi.hotkey import TapHotkeyListener
+
+                app._screenshot_hotkey_listener = TapHotkeyListener(
+                    hotkey_str=hotkey,
+                    on_activate=app._on_screenshot,
+                )
+                app._screenshot_hotkey_listener.start()
+        else:
+            if app._screenshot_hotkey_listener:
+                app._screenshot_hotkey_listener.stop()
+                app._screenshot_hotkey_listener = None
+
+        logger.info("Screenshot set to: %s", enabled)
+
+    def screenshot_hotkey_record(self) -> None:
+        """Record a new screenshot hotkey via modal dialog."""
+        app = self._app
+        recorded_key = app.record_combo_hotkey_modal()
+        if not recorded_key:
+            return
+
+        ss_cfg = app._config.setdefault("screenshot", {})
+        ss_cfg["hotkey"] = recorded_key
+        self._save_and_reload()
+
+        # Rebind the hotkey listener if screenshot is enabled
+        if ss_cfg.get("enabled", False):
+            if app._screenshot_hotkey_listener:
+                app._screenshot_hotkey_listener.stop()
+            from wenzi.hotkey import TapHotkeyListener
+
+            app._screenshot_hotkey_listener = TapHotkeyListener(
+                hotkey_str=recorded_key,
+                on_activate=app._on_screenshot,
+            )
+            app._screenshot_hotkey_listener.start()
+
+        app._settings_panel.update_screenshot_hotkey(recorded_key)
+        logger.info("Screenshot hotkey recorded: %s", recorded_key)
+
+    def screenshot_hotkey_clear(self) -> None:
+        """Clear the screenshot hotkey."""
+        app = self._app
+        ss_cfg = app._config.setdefault("screenshot", {})
+        ss_cfg["hotkey"] = ""
+        self._save_and_reload()
+
+        if app._screenshot_hotkey_listener:
+            app._screenshot_hotkey_listener.stop()
+            app._screenshot_hotkey_listener = None
+
+        app._settings_panel.update_screenshot_hotkey("")
+        logger.info("Screenshot hotkey cleared")
 
     # ---------------------------------------------------------------------------
     # Plugin management callbacks

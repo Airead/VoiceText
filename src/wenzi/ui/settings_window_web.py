@@ -215,6 +215,10 @@ class SettingsWebPanel:
         """Update the launcher hotkey display."""
         self._set_element_text("ctl-launcher-hotkey", hotkey)
 
+    def update_screenshot_hotkey(self, hotkey: str) -> None:
+        """Update the screenshot hotkey display."""
+        self._set_element_text("ctl-screenshot-hotkey", hotkey or "None")
+
     def update_source_hotkey(self, source_key: str, hotkey: str) -> None:
         """Update a launcher source hotkey display."""
         if self._webview is None or not self.is_visible:

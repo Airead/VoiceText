@@ -22,7 +22,7 @@ def test_default_config_has_screenshot_section():
 def test_default_config_screenshot_hotkey():
     from wenzi.config import DEFAULT_CONFIG
 
-    assert DEFAULT_CONFIG["screenshot"]["hotkey"] == "cmd+shift+a"
+    assert DEFAULT_CONFIG["screenshot"]["hotkey"] == "cmd+ctrl+a"
 
 
 # ---------------------------------------------------------------------------

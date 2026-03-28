@@ -331,7 +331,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "hotkey": "ctrl+cmd+v",
     },
     "screenshot": {
-        "hotkey": "cmd+shift+a",
+        "enabled": False,
+        "hotkey": "cmd+ctrl+a",
     },
     "feedback": {
         "sound_enabled": True,

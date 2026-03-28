@@ -1471,10 +1471,10 @@ class WenZiApp(StatusBarApp):
             self._clipboard_hotkey_listener.start()
 
         # Start screenshot hotkey listener if configured
-        screenshot_hotkey = self._config.get("screenshot", {}).get("hotkey", "")
-        if screenshot_hotkey:
+        ss_cfg = self._config.get("screenshot", {})
+        if ss_cfg.get("enabled", False) and ss_cfg.get("hotkey", ""):
             self._screenshot_hotkey_listener = TapHotkeyListener(
-                hotkey_str=screenshot_hotkey,
+                hotkey_str=ss_cfg["hotkey"],
                 on_activate=self._on_screenshot,
             )
             self._screenshot_hotkey_listener.start()
