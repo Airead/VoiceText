@@ -1090,6 +1090,7 @@ class WenZiApp(StatusBarApp):
             image_path=image_path,
             on_done=self._on_screenshot_done,
             on_cancel=self._on_screenshot_cancel,
+            delete_on_close=True,
         )
 
     def _on_screenshot_done(self) -> None:

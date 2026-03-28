@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -59,4 +59,38 @@ class UIAPI:
             allowed_read_paths=allowed_read_paths,
             titlebar_hidden=titlebar_hidden,
             floating=floating,
+        )
+
+    def picture_editor(
+        self,
+        image_path: str,
+        on_done: Optional[Callable] = None,
+        on_cancel: Optional[Callable] = None,
+    ) -> None:
+        """Open the picture editor for an image file.
+
+        Supports PNG, JPG, GIF, BMP, WebP, TIFF, and other macOS-supported
+        formats.  The user can annotate with drawing tools (rectangle, ellipse,
+        arrow, line, pen, mosaic, text, numbered markers) and copy the result
+        to the clipboard or save to a file.
+
+        The original image file is **not** modified or deleted.
+
+        Args:
+            image_path: Path to the image file to edit.
+            on_done: Called after the annotated image is copied to clipboard.
+            on_cancel: Called when the user cancels or closes the editor.
+
+        Example::
+
+            wz.ui.picture_editor("/path/to/photo.jpg")
+        """
+        from wenzi.screenshot.annotation import AnnotationLayer
+
+        layer = AnnotationLayer()
+        layer.show(
+            image_path=image_path,
+            on_done=on_done or (lambda: None),
+            on_cancel=on_cancel or (lambda: None),
+            delete_on_close=False,
         )

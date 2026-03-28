@@ -42,12 +42,33 @@ def decode_data_url(data_url: str) -> Optional[bytes]:
 
 
 def get_image_dimensions(image_path: str) -> tuple[int, int]:
-    """Read width and height from a PNG header. Falls back to (800, 600)."""
+    """Read pixel width and height of an image file.
+
+    Uses NSImage (supports PNG/JPG/GIF/BMP/WebP/TIFF/etc.).
+    Falls back to manual PNG header parsing in environments without AppKit.
+    Returns (800, 600) if the image cannot be read.
+    """
+    # Try NSImage first — handles all macOS-supported formats
+    try:
+        from AppKit import NSImage
+
+        img = NSImage.alloc().initWithContentsOfFile_(image_path)
+        if img is not None:
+            reps = img.representations()
+            if reps and len(reps) > 0:
+                rep = reps[0]
+                w, h = int(rep.pixelsWide()), int(rep.pixelsHigh())
+                if w > 0 and h > 0:
+                    return (w, h)
+    except Exception:
+        pass
+
+    # Fallback: manual PNG header parsing (for test environments)
     try:
         with open(image_path, "rb") as f:
             if f.read(4) != b"\x89PNG":
                 return (800, 600)
-            f.read(12)  # rest of 8-byte sig + 4-byte chunk length + 4-byte "IHDR"
+            f.read(12)  # rest of 8-byte sig + 4-byte chunk length + "IHDR"
             return struct.unpack(">II", f.read(8))
     except Exception:
         return (800, 600)
@@ -70,6 +91,7 @@ class AnnotationLayer:
         self._on_done: Optional[Callable] = None
         self._on_cancel: Optional[Callable] = None
         self._image_path: Optional[str] = None
+        self._delete_on_close: bool = True
         self._pending_action: Optional[str] = None
 
     # ------------------------------------------------------------------
@@ -81,16 +103,26 @@ class AnnotationLayer:
         image_path: str,
         on_done: Callable,
         on_cancel: Callable,
+        delete_on_close: bool = True,
     ) -> None:
-        """Show annotation layer for the given screenshot image."""
+        """Show annotation layer for the given image.
+
+        Args:
+            image_path: Path to an image file (PNG, JPG, GIF, BMP, WebP, TIFF, etc.).
+            on_done: Called after the annotated image is copied to clipboard.
+            on_cancel: Called when the user cancels.
+            delete_on_close: If True, delete the image file when the editor closes.
+                Set to True for temporary screenshot files, False for user files.
+        """
         if not os.path.isfile(image_path):
-            logger.error("Screenshot image not found: %s", image_path)
+            logger.error("Image not found: %s", image_path)
             on_cancel()
             return
 
         self._on_done = on_done
         self._on_cancel = on_cancel
         self._image_path = image_path
+        self._delete_on_close = delete_on_close
 
         img_w, img_h = get_image_dimensions(image_path)
         screen_w, screen_h = self._get_screen_size()
@@ -127,18 +159,17 @@ class AnnotationLayer:
         )
 
     def close(self) -> None:
-        """Tear down the panel and clean up temp image."""
+        """Tear down the panel and clean up."""
         if self._panel is not None:
             self._panel.close()
             self._panel = None
 
-        if self._image_path is not None:
+        if self._delete_on_close and self._image_path is not None:
             try:
                 os.unlink(self._image_path)
             except OSError:
                 pass
-            self._image_path = None
-
+        self._image_path = None
         self._pending_action = None
 
     # ------------------------------------------------------------------
@@ -171,12 +202,12 @@ class AnnotationLayer:
         self._panel = None  # already closed by WebViewPanel
         callback = self._on_cancel
         self._on_cancel = None
-        if self._image_path:
+        if self._delete_on_close and self._image_path:
             try:
                 os.unlink(self._image_path)
             except OSError:
                 pass
-            self._image_path = None
+        self._image_path = None
         if callback:
             callback()
 
