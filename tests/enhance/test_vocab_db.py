@@ -168,6 +168,35 @@ class TestStats:
         )
         assert result == {}
 
+    def test_get_stats_summary_batch_exclude_app(self, db):
+        e1 = db.add("a", "A", "asr")
+        db.record_stats([
+            (e1["id"], "asr_miss", "asr:whisper"),
+            (e1["id"], "asr_miss", "app:com.example"),
+        ])
+        # Without exclude_app: sum both buckets
+        result = db.get_stats_summary_batch([e1["id"]], ["asr_miss"])
+        assert result[(e1["id"], "asr_miss")] == 2
+        # With exclude_app: only asr bucket
+        result = db.get_stats_summary_batch(
+            [e1["id"]], ["asr_miss"], exclude_app=True,
+        )
+        assert result[(e1["id"], "asr_miss")] == 1
+
+    def test_top_by_metric_global_exclude_app(self, db):
+        e1 = db.add("a", "A", "asr")
+        db.record_stats([
+            (e1["id"], "asr_miss", "asr:whisper"),
+            (e1["id"], "asr_miss", "asr:whisper"),
+            (e1["id"], "asr_miss", "app:com.example"),
+        ])
+        # Without exclude_app: count = 3
+        rows = db.top_by_metric_global("asr_miss", 10)
+        assert rows[0]["stat_count"] == 3
+        # With exclude_app: count = 2
+        rows = db.top_by_metric_global("asr_miss", 10, exclude_app=True)
+        assert rows[0]["stat_count"] == 2
+
     def test_cascade_delete(self, db):
         entry = db.add("派森", "Python", "asr")
         eid = entry["id"]

@@ -82,14 +82,13 @@ class ManualVocabularyStore:
 
     MAX_LLM_ENTRIES: int = 5
 
-    @staticmethod
     def _query_context_key(
-        prefix: str, model: Optional[str], app_bundle_id: Optional[str],
+        self, prefix: str, model: Optional[str], app_bundle_id: Optional[str],
     ) -> str:
         """Build a single context key for ranked queries (model takes priority)."""
         if model:
             return f"{prefix}:{model}"
-        if app_bundle_id:
+        if app_bundle_id and self._stats_include_app:
             return f"{CTX_APP}:{app_bundle_id}"
         return ""
 
@@ -101,14 +100,20 @@ class ManualVocabularyStore:
     }
     _SORT_KEY = {"asr": "miss", "llm": "hit"}
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, *, stats_include_app: bool = False) -> None:
         self._path = path
         self._db = VocabDB(path)
+        self._stats_include_app = stats_include_app
 
     @property
     def db(self) -> VocabDB:
         """Expose the underlying VocabDB for direct access."""
         return self._db
+
+    @property
+    def stats_include_app(self) -> bool:
+        """Whether APP dimension is included in stats extraction."""
+        return self._stats_include_app
 
     # ------------------------------------------------------------------
     # CRUD
@@ -308,7 +313,10 @@ class ManualVocabularyStore:
         """
         context_key = self._query_context_key(CTX_ASR, asr_model, app_bundle_id)
         limit = max_count if max_count > 0 else max(self._db.entry_count, 1)
-        ranked = self._db.top_with_fallback(METRIC_ASR_MISS, context_key, limit)
+        exclude_app = not self._stats_include_app
+        ranked = self._db.top_with_fallback(
+            METRIC_ASR_MISS, context_key, limit, exclude_app=exclude_app,
+        )
 
         seen: set[str] = set()
         result: list[str] = []
@@ -333,7 +341,10 @@ class ManualVocabularyStore:
         with cold-start fallback.  At most *max_entries* are returned.
         """
         context_key = self._query_context_key(CTX_LLM, llm_model, app_bundle_id)
-        ranked = self._db.top_with_fallback(METRIC_LLM_HIT, context_key, max_entries)
+        exclude_app = not self._stats_include_app
+        ranked = self._db.top_with_fallback(
+            METRIC_LLM_HIT, context_key, max_entries, exclude_app=exclude_app,
+        )
         return [_entry_from_row(d) for d in ranked]
 
     def get_entry_stats(self, variant: str, term: str) -> dict:
@@ -350,6 +361,8 @@ class ManualVocabularyStore:
 
         buckets: dict[str, dict[str, dict]] = {"asr": {}, "llm": {}}
         for s in stats:
+            if not self._stats_include_app and s["context_key"].startswith(f"{CTX_APP}:"):
+                continue
             mapping = self._DIMENSION_MAP.get(s["metric"])
             if not mapping:
                 continue
@@ -378,8 +391,11 @@ class ManualVocabularyStore:
         metrics: list[str],
         context_key: str = "",
     ) -> dict[tuple[int, str], int]:
-        """Batch fetch stats summaries — delegates to VocabDB."""
-        return self._db.get_stats_summary_batch(entry_ids, metrics, context_key)
+        """Batch fetch stats summaries, respecting the stats_include_app setting."""
+        return self._db.get_stats_summary_batch(
+            entry_ids, metrics, context_key,
+            exclude_app=not self._stats_include_app,
+        )
 
     def update_fields(self, entry_id: int, fields: dict) -> None:
         """Update specific fields on an entry by id (delegates to VocabDB)."""

@@ -247,12 +247,13 @@ class VocabController:
         """
         if not self._active_tags:
             return ""
+        include_app = self._app._manual_vocab_store.stats_include_app
         for e in self._all_entries:
             if e.asr_model and e.asr_model in self._active_tags:
                 return f"{CTX_ASR}:{e.asr_model}"
             if e.llm_model and e.llm_model in self._active_tags:
                 return f"{CTX_LLM}:{e.llm_model}"
-            if e.app_bundle_id and _app_display_name(e.app_bundle_id) in self._active_tags:
+            if include_app and e.app_bundle_id and _app_display_name(e.app_bundle_id) in self._active_tags:
                 return f"{CTX_APP}:{e.app_bundle_id}"
         return ""
 

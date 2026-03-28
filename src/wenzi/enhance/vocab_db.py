@@ -347,11 +347,14 @@ class VocabDB:
         entry_ids: list[int],
         metrics: list[str],
         context_key: str = "",
+        *,
+        exclude_app: bool = False,
     ) -> dict[tuple[int, str], int]:
         """Batch fetch stats summaries for multiple entries and metrics.
 
         When *context_key* is given, only that bucket is counted;
-        otherwise all buckets are summed.
+        otherwise all buckets are summed.  When *exclude_app* is True,
+        ``app:*`` context keys are excluded from aggregation.
 
         Returns a dict mapping ``(entry_id, metric)`` to the summed count.
         """
@@ -366,6 +369,8 @@ class VocabDB:
         if context_key:
             where += " AND context_key = ?"
             params.append(context_key)
+        elif exclude_app:
+            where += f" AND context_key NOT LIKE '{CTX_APP}:%'"
         with self._lock:
             rows = self._conn.execute(
                 f"SELECT entry_id, metric, COALESCE(SUM(count), 0) AS total "
@@ -426,22 +431,28 @@ class VocabDB:
         limit: int,
         *,
         exclude_ids: set[int] | None = None,
+        exclude_app: bool = False,
     ) -> list[dict]:
         """Return top-N entries ranked by global sum of *metric* across all buckets.
 
         Each returned dict has entry fields plus ``stat_count``.
+        When *exclude_app* is True, ``app:*`` context keys are excluded.
         """
         fetch_limit = limit + len(exclude_ids or set())
+        where = "s.metric = ?"
+        params: list = [metric]
+        if exclude_app:
+            where += f" AND s.context_key NOT LIKE '{CTX_APP}:%'"
         with self._lock:
             rows = self._conn.execute(
-                """SELECT e.*, COALESCE(SUM(s.count), 0) AS stat_count
+                f"""SELECT e.*, COALESCE(SUM(s.count), 0) AS stat_count
                    FROM vocab_stats s
                    JOIN vocab_entry e ON e.id = s.entry_id
-                   WHERE s.metric = ?
+                   WHERE {where}
                    GROUP BY s.entry_id
                    ORDER BY stat_count DESC
                    LIMIT ?""",
-                (metric, fetch_limit),
+                (*params, fetch_limit),
             ).fetchall()
         return self._collect_rows(rows, limit, exclude_ids)
 
@@ -469,6 +480,8 @@ class VocabDB:
         metric: str,
         context_key: str,
         limit: int,
+        *,
+        exclude_app: bool = False,
     ) -> list[dict]:
         """Three-tier ranked query with cold-start fallback.
 
@@ -488,7 +501,9 @@ class VocabDB:
         # Tier 2: global aggregation
         remaining = limit - len(result)
         if remaining > 0:
-            for d in self.top_by_metric_global(metric, remaining, exclude_ids=seen):
+            for d in self.top_by_metric_global(
+                metric, remaining, exclude_ids=seen, exclude_app=exclude_app,
+            ):
                 seen.add(d["id"])
                 result.append(d)
 

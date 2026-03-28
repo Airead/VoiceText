@@ -314,6 +314,74 @@ class TestExportImportWithStats:
         assert len(stats2["llm"]) == len(stats1["llm"])
 
 
+class TestStatsIncludeApp:
+    """Test stats_include_app configuration flag."""
+
+    @pytest.fixture
+    def store_no_app(self, tmp_path):
+        return ManualVocabularyStore(
+            path=str(tmp_path / "no_app.db"), stats_include_app=False,
+        )
+
+    @pytest.fixture
+    def store_with_app(self, tmp_path):
+        return ManualVocabularyStore(
+            path=str(tmp_path / "with_app.db"), stats_include_app=True,
+        )
+
+    def test_get_entry_stats_excludes_app_buckets(self, store_no_app):
+        store = store_no_app
+        entry = store.add("派森", "Python", "asr")
+        store.db.record_stats([
+            (entry.id, "asr_miss", "asr:whisper"),
+            (entry.id, "asr_miss", "app:com.example"),
+        ])
+        stats = store.get_entry_stats("派森", "Python")
+        contexts = [b["context"] for b in stats["asr"]]
+        assert "asr:whisper" in contexts
+        assert "app:com.example" not in contexts
+
+    def test_get_entry_stats_includes_app_buckets(self, store_with_app):
+        store = store_with_app
+        entry = store.add("派森", "Python", "asr")
+        store.db.record_stats([
+            (entry.id, "asr_miss", "asr:whisper"),
+            (entry.id, "asr_miss", "app:com.example"),
+        ])
+        stats = store.get_entry_stats("派森", "Python")
+        contexts = [b["context"] for b in stats["asr"]]
+        assert "asr:whisper" in contexts
+        assert "app:com.example" in contexts
+
+    def test_summary_batch_excludes_app(self, store_no_app):
+        store = store_no_app
+        entry = store.add("派森", "Python", "asr")
+        store.db.record_stats([
+            (entry.id, "asr_miss", "asr:whisper"),
+            (entry.id, "asr_miss", "app:com.example"),
+        ])
+        result = store.get_stats_summary_batch([entry.id], ["asr_miss"])
+        assert result[(entry.id, "asr_miss")] == 1
+
+    def test_summary_batch_includes_app(self, store_with_app):
+        store = store_with_app
+        entry = store.add("派森", "Python", "asr")
+        store.db.record_stats([
+            (entry.id, "asr_miss", "asr:whisper"),
+            (entry.id, "asr_miss", "app:com.example"),
+        ])
+        result = store.get_stats_summary_batch([entry.id], ["asr_miss"])
+        assert result[(entry.id, "asr_miss")] == 2
+
+    def test_query_context_key_ignores_app(self, store_no_app):
+        key = store_no_app._query_context_key("asr", None, "com.example")
+        assert key == ""
+
+    def test_query_context_key_uses_app(self, store_with_app):
+        key = store_with_app._query_context_key("asr", None, "com.example")
+        assert key == "app:com.example"
+
+
 class TestNormalization:
     """Entries should be stripped of leading/trailing whitespace and punctuation."""
 

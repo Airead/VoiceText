@@ -320,6 +320,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "max_retries": 2,
         "vocabulary": {
             "max_dynamic_hotwords": 10,
+            "stats_include_app": False,
         },
         "conversation_history": {
             "enabled": False,
@@ -572,6 +573,8 @@ def validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
          DEFAULT_CONFIG["scripting"]["chooser"]["switch_to_english"]),
         ("ai_enhance.vocabulary.max_dynamic_hotwords", int, lambda v: v > 0,
          DEFAULT_CONFIG["ai_enhance"]["vocabulary"]["max_dynamic_hotwords"]),
+        ("ai_enhance.vocabulary.stats_include_app", bool, None,
+         DEFAULT_CONFIG["ai_enhance"]["vocabulary"]["stats_include_app"]),
         ("ai_enhance.input_context", str, lambda v: v in {"off", "basic", "detailed"},
          DEFAULT_CONFIG["ai_enhance"]["input_context"]),
     ]
