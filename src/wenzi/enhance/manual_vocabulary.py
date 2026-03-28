@@ -65,6 +65,8 @@ def _key(variant: str, term: str) -> tuple[str, str]:
 class ManualVocabularyStore:
     """Thread-safe store for user-curated correction pairs."""
 
+    MAX_LLM_ENTRIES: int = 5
+
     def __init__(self, path: str) -> None:
         self._path = path
         self._entries: dict[tuple[str, str], ManualVocabEntry] = {}
@@ -326,25 +328,27 @@ class ManualVocabularyStore:
         self,
         *,
         app_bundle_id: Optional[str] = None,
+        max_entries: int = MAX_LLM_ENTRIES,
     ) -> list[ManualVocabEntry]:
         """Return entries for LLM prompt injection.
 
         Entries matching *app_bundle_id* are sorted first.
+        At most *max_entries* are returned to keep the prompt concise.
         """
         with self._lock:
             entries = list(self._entries.values())
 
-        if not app_bundle_id:
-            return entries
+        if app_bundle_id:
+            matching: list[ManualVocabEntry] = []
+            other: list[ManualVocabEntry] = []
+            for e in entries:
+                if e.app_bundle_id == app_bundle_id:
+                    matching.append(e)
+                else:
+                    other.append(e)
+            entries = matching + other
 
-        matching: list[ManualVocabEntry] = []
-        other: list[ManualVocabEntry] = []
-        for e in entries:
-            if e.app_bundle_id and e.app_bundle_id == app_bundle_id:
-                matching.append(e)
-            else:
-                other.append(e)
-        return matching + other
+        return entries[:max_entries]
 
     @property
     def entry_count(self) -> int:

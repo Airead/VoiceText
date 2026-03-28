@@ -204,6 +204,31 @@ class TestQueryHelpers:
         entries = store.get_llm_vocab()
         assert len(entries) == 1
 
+    def test_get_llm_vocab_max_entries_default(self, store):
+        for i in range(8):
+            store.add(f"var{i}", f"Term{i}", "llm")
+        entries = store.get_llm_vocab()
+        assert len(entries) == ManualVocabularyStore.MAX_LLM_ENTRIES
+
+    def test_get_llm_vocab_max_entries_custom(self, store):
+        for i in range(5):
+            store.add(f"var{i}", f"Term{i}", "llm")
+        entries = store.get_llm_vocab(max_entries=3)
+        assert len(entries) == 3
+
+    def test_get_llm_vocab_max_entries_app_priority(self, store):
+        """App-matching entries should be prioritized before truncation."""
+        for i in range(4):
+            store.add(f"other{i}", f"Other{i}", "llm")
+        store.add("target", "Target", "llm", app_bundle_id="com.app")
+        entries = store.get_llm_vocab(
+            app_bundle_id="com.app", max_entries=3,
+        )
+        # The app-matching entry should be in the result
+        terms = [e.term for e in entries]
+        assert "Target" in terms
+        assert len(entries) == 3
+
 
 class TestNormalization:
     """Entries should be stripped of leading/trailing whitespace and punctuation."""
