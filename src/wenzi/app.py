@@ -436,6 +436,12 @@ class WenZiApp(StatusBarApp):
             t("menu.enhance_clipboard"), callback=self._preview_controller.on_clipboard_enhance
         )
 
+        self._screenshot_item = StatusMenuItem(
+            "Screenshot", callback=self._on_screenshot
+        )
+        self._screenshot_hotkey_listener = None
+        self._screenshot_annotation = None
+
         # Feedback toggle items
         self._sound_feedback_item = StatusMenuItem(
             t("menu.sound_feedback"), callback=self._recording_controller.on_sound_feedback_toggle
@@ -495,6 +501,7 @@ class WenZiApp(StatusBarApp):
                 self._status_item,
                 None,
                 self._clipboard_enhance_item,
+                self._screenshot_item,
                 self._browse_history_item,
                 self._vocab_manager_item,
                 self._settings_item,
@@ -1035,6 +1042,65 @@ class WenZiApp(StatusBarApp):
             return
         self._settings_controller.on_open_settings(_)
 
+    # ── Screenshot ────────────────────────────────────────────────────────
+
+    def _on_screenshot(self, _=None) -> None:
+        """Handle screenshot hotkey press or menu item click.
+
+        May be called from a background thread (Quartz event tap).
+        Runs macOS ``screencapture -i`` in a background thread, then
+        opens the annotation UI on the main thread.
+        """
+        import threading
+
+        def _capture_and_show():
+            import subprocess
+            import tempfile
+
+            tmp_dir = os.path.expanduser("~/.cache/WenZi/screenshot_tmp")
+            os.makedirs(tmp_dir, exist_ok=True)
+            fd, tmp_path = tempfile.mkstemp(suffix=".png", dir=tmp_dir)
+            os.close(fd)
+
+            result = subprocess.run(
+                ["screencapture", "-i", tmp_path],
+                capture_output=True,
+            )
+
+            if result.returncode != 0 or not os.path.isfile(tmp_path) or os.path.getsize(tmp_path) == 0:
+                # User cancelled or screencapture failed
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                return
+
+            from PyObjCTools import AppHelper
+
+            AppHelper.callAfter(self._show_annotation_ui, tmp_path)
+
+        threading.Thread(target=_capture_and_show, daemon=True).start()
+
+    def _show_annotation_ui(self, image_path: str) -> None:
+        """Open the annotation UI for a captured screenshot (main thread)."""
+        from wenzi.screenshot import AnnotationLayer
+
+        self._screenshot_annotation = AnnotationLayer()
+        self._screenshot_annotation.show(
+            image_path=image_path,
+            on_done=self._on_screenshot_done,
+            on_cancel=self._on_screenshot_cancel,
+            delete_on_close=True,
+        )
+
+    def _on_screenshot_done(self) -> None:
+        """Screenshot completed — AnnotationLayer already closed itself."""
+        self._screenshot_annotation = None
+
+    def _on_screenshot_cancel(self) -> None:
+        """Screenshot cancelled — AnnotationLayer already closed itself."""
+        self._screenshot_annotation = None
+
     def _on_quit_click(self, _) -> None:
         self._update_controller.stop()
         if hasattr(self, "_script_engine") and self._script_engine:
@@ -1043,6 +1109,8 @@ class WenZiApp(StatusBarApp):
             self._hotkey_listener.stop()
         if self._clipboard_hotkey_listener:
             self._clipboard_hotkey_listener.stop()
+        if self._screenshot_hotkey_listener:
+            self._screenshot_hotkey_listener.stop()
         if self._settings_panel.is_visible:
             self._settings_panel.close()
         if self._vocab_controller is not None:
@@ -1402,6 +1470,15 @@ class WenZiApp(StatusBarApp):
                 on_activate=self._preview_controller.on_clipboard_enhance,
             )
             self._clipboard_hotkey_listener.start()
+
+        # Start screenshot hotkey listener if configured
+        ss_cfg = self._config.get("screenshot", {})
+        if ss_cfg.get("enabled", False) and ss_cfg.get("hotkey", ""):
+            self._screenshot_hotkey_listener = TapHotkeyListener(
+                hotkey_str=ss_cfg["hotkey"],
+                on_activate=self._on_screenshot,
+            )
+            self._screenshot_hotkey_listener.start()
 
         # Schedule warmup after the event loop starts to pre-create heavy
         # objects (WKWebView, NSSound) so the first user interaction is snappy.

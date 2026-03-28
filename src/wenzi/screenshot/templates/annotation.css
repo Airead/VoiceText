@@ -1,0 +1,218 @@
+/* annotation.css — Annotation canvas and toolbar styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  border: 1.5px solid rgba(128, 128, 128, 0.5);
+}
+
+/* ── Canvas ── */
+
+#annotation-canvas {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* ── Toolbar ── */
+
+#toolbar {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(40, 40, 40, 0.95);
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.separator {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 4px;
+}
+
+/* ── Tool Buttons ── */
+
+.tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
+}
+
+.tool-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.tool-btn.active {
+  background: rgba(24, 144, 255, 0.15);
+  color: #1890ff;
+}
+
+.tool-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.tool-btn:disabled:hover {
+  background: transparent;
+}
+
+/* Action button specific styles */
+.action-cancel {
+  color: #ff4d4f !important;
+}
+
+.action-cancel:hover {
+  background: rgba(255, 77, 79, 0.15) !important;
+}
+
+.action-confirm {
+  color: #52c41a !important;
+}
+
+.action-confirm:hover {
+  background: rgba(82, 196, 26, 0.15) !important;
+}
+
+/* ── Secondary Panel (Color + Thickness) ── */
+
+#secondary-panel {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(40, 40, 40, 0.95);
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  transition: opacity 0.15s;
+}
+
+#secondary-panel.hidden {
+  display: none;
+}
+
+.panel-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel-separator {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ── Color Dots ── */
+
+.color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.color-dot:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.color-dot.selected {
+  border-color: #ffffff;
+}
+
+/* Black/white dots need a visible outline on the dark panel */
+.color-dot[data-color="#000000"] {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+/* ── Thickness Indicators ── */
+
+.thickness-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.thickness-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.thickness-btn.selected {
+  background: rgba(24, 144, 255, 0.15);
+}
+
+.thickness-bar {
+  width: 18px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 1px;
+}
+
+/* ── Fabric.js overrides ── */
+
+.canvas-container {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+}
+
+/* Hide the default Fabric.js cursor when using custom tools */
+.upper-canvas {
+  cursor: crosshair !important;
+}
+
+/* Text editing cursor */
+.canvas-container.text-cursor .upper-canvas {
+  cursor: text !important;
+}
