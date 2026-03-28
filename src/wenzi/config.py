@@ -7,7 +7,7 @@ import logging
 import os
 from typing import Any, Dict, Optional
 
-from wenzi.keychain import keychain_get, keychain_set
+from wenzi.vault import get_vault
 
 logger = logging.getLogger(__name__)
 
@@ -632,15 +632,16 @@ def is_keychain_enabled(config: Dict[str, Any]) -> bool:
 
 
 def sync_secrets_to_keychain(config: Dict[str, Any]) -> bool:
-    """Sync sensitive provider fields with macOS Keychain.
+    """Sync sensitive provider fields with the encrypted vault.
 
-    - Plaintext values → write to Keychain (value stays in memory as-is)
-    - Sentinel values → read from Keychain, inject real value into memory
+    - Plaintext values → write to vault (value stays in memory as-is)
+    - Sentinel values → read from vault, inject real value into memory
 
     The in-memory config always holds real values, never sentinels.
-    Returns True if any plaintext was written to Keychain (caller should
+    Returns True if any plaintext was written to vault (caller should
     re-save to disk so the sentinels are persisted).
     """
+    vault = get_vault()
     dirty = False
     for section in SECRET_SECTIONS:
         providers = config.get(section, {}).get("providers", {})
@@ -652,27 +653,29 @@ def sync_secrets_to_keychain(config: Dict[str, Any]) -> bool:
                 account = f"{section}.providers.{name}.{field}"
 
                 if value == KEYCHAIN_SENTINEL:
-                    # Read real value from Keychain into memory
-                    secret = keychain_get(account)
+                    # Read real value from vault into memory
+                    secret = vault.get(account)
                     if secret:
                         pcfg[field] = secret
                 else:
-                    # Write plaintext to Keychain; keep real value in memory
-                    if keychain_set(account, value):
+                    # Write plaintext to vault; keep real value in memory
+                    if vault.set(account, value):
                         dirty = True
                     else:
                         logger.warning(
-                            "Failed to migrate %s to Keychain, keeping plaintext",
+                            "Failed to store %s in vault, keeping plaintext",
                             account,
                         )
+    if dirty:
+        vault.flush_sync()
     return dirty
 
 
 def _scrub_secrets_for_disk(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Return a config copy with secret fields replaced by Keychain sentinels.
+    """Return a config copy with secret fields replaced by vault sentinels.
 
     When Keychain is disabled, returns the original dict unchanged (no copy).
-    When enabled, deep-copies the config, writes each secret to Keychain, and
+    When enabled, deep-copies the config, writes each secret to the vault, and
     replaces the value with ``KEYCHAIN_SENTINEL`` on success.
     """
     if not is_keychain_enabled(config):
@@ -680,7 +683,9 @@ def _scrub_secrets_for_disk(config: Dict[str, Any]) -> Dict[str, Any]:
 
     import copy
 
+    vault = get_vault()
     scrubbed = copy.deepcopy(config)
+    any_written = False
     for section in SECRET_SECTIONS:
         providers = scrubbed.get(section, {}).get("providers", {})
         for name, pcfg in providers.items():
@@ -688,8 +693,11 @@ def _scrub_secrets_for_disk(config: Dict[str, Any]) -> Dict[str, Any]:
                 if field not in pcfg or pcfg[field] == KEYCHAIN_SENTINEL:
                     continue
                 account = f"{section}.providers.{name}.{field}"
-                if keychain_set(account, pcfg[field]):
+                if vault.set(account, pcfg[field]):
                     pcfg[field] = KEYCHAIN_SENTINEL
+                    any_written = True
+    if any_written:
+        vault.flush_sync()
     return scrubbed
 
 

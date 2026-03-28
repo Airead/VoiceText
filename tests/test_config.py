@@ -648,11 +648,12 @@ def test_validate_config_language_invalid_resets():
 class TestSyncSecretsToKeychain:
     """Tests for sync_secrets_to_keychain."""
 
-    @patch("wenzi.config.keychain_set")
-    @patch("wenzi.config.keychain_get")
-    def test_plaintext_written_to_keychain_kept_in_memory(self, mock_get, mock_set):
-        """Plaintext values are written to Keychain but stay in memory."""
-        mock_set.return_value = True
+    @patch("wenzi.config.get_vault")
+    def test_plaintext_written_to_keychain_kept_in_memory(self, mock_get_vault):
+        """Plaintext values are written to vault but stay in memory."""
+        mock_vault = MagicMock()
+        mock_get_vault.return_value = mock_vault
+        mock_vault.set.return_value = True
         config = {
             "ai_enhance": {
                 "providers": {
@@ -670,14 +671,16 @@ class TestSyncSecretsToKeychain:
         assert config["ai_enhance"]["providers"]["openai"]["api_key"] == "sk-real-key"
         assert config["ai_enhance"]["providers"]["openai"]["base_url"] == "https://api.openai.com/v1"
         assert config["ai_enhance"]["providers"]["openai"]["models"] == ["gpt-4o"]
-        mock_set.assert_any_call("ai_enhance.providers.openai.api_key", "sk-real-key")
-        mock_set.assert_any_call("ai_enhance.providers.openai.base_url", "https://api.openai.com/v1")
+        mock_vault.set.assert_any_call("ai_enhance.providers.openai.api_key", "sk-real-key")
+        mock_vault.set.assert_any_call("ai_enhance.providers.openai.base_url", "https://api.openai.com/v1")
+        mock_vault.flush_sync.assert_called_once()
 
-    @patch("wenzi.config.keychain_set")
-    @patch("wenzi.config.keychain_get")
-    def test_sentinel_reads_from_keychain(self, mock_get, mock_set):
-        """@keychain sentinel triggers a Keychain read into memory."""
-        mock_get.return_value = "sk-from-keychain"
+    @patch("wenzi.config.get_vault")
+    def test_sentinel_reads_from_keychain(self, mock_get_vault):
+        """@keychain sentinel triggers a vault read into memory."""
+        mock_vault = MagicMock()
+        mock_get_vault.return_value = mock_vault
+        mock_vault.get.return_value = "sk-from-keychain"
         config = {
             "ai_enhance": {
                 "providers": {
@@ -694,13 +697,14 @@ class TestSyncSecretsToKeychain:
         assert dirty is False
         assert config["ai_enhance"]["providers"]["openai"]["api_key"] == "sk-from-keychain"
         assert config["ai_enhance"]["providers"]["openai"]["base_url"] == "sk-from-keychain"
-        mock_set.assert_not_called()
+        mock_vault.set.assert_not_called()
 
-    @patch("wenzi.config.keychain_set")
-    @patch("wenzi.config.keychain_get")
-    def test_sentinel_with_empty_keychain_stays_sentinel(self, mock_get, mock_set):
-        """@keychain with no Keychain value stays as sentinel in memory."""
-        mock_get.return_value = None
+    @patch("wenzi.config.get_vault")
+    def test_sentinel_with_empty_keychain_stays_sentinel(self, mock_get_vault):
+        """@keychain with no vault value stays as sentinel in memory."""
+        mock_vault = MagicMock()
+        mock_get_vault.return_value = mock_vault
+        mock_vault.get.return_value = None
         config = {
             "ai_enhance": {
                 "providers": {
@@ -713,11 +717,12 @@ class TestSyncSecretsToKeychain:
         assert dirty is False
         assert config["ai_enhance"]["providers"]["openai"]["api_key"] == KEYCHAIN_SENTINEL
 
-    @patch("wenzi.config.keychain_set")
-    @patch("wenzi.config.keychain_get")
-    def test_keychain_set_failure_keeps_plaintext_not_dirty(self, mock_get, mock_set):
-        """If keychain_set returns False, dirty remains False."""
-        mock_set.return_value = False
+    @patch("wenzi.config.get_vault")
+    def test_keychain_set_failure_keeps_plaintext_not_dirty(self, mock_get_vault):
+        """If vault.set returns False, dirty remains False."""
+        mock_vault = MagicMock()
+        mock_get_vault.return_value = mock_vault
+        mock_vault.set.return_value = False
         config = {
             "ai_enhance": {
                 "providers": {
@@ -729,11 +734,13 @@ class TestSyncSecretsToKeychain:
         dirty = sync_secrets_to_keychain(config)
         assert dirty is False
         assert config["ai_enhance"]["providers"]["openai"]["api_key"] == "sk-real-key"
+        mock_vault.flush_sync.assert_not_called()
 
-    @patch("wenzi.config.keychain_set")
-    @patch("wenzi.config.keychain_get")
-    def test_no_providers_returns_not_dirty(self, mock_get, mock_set):
+    @patch("wenzi.config.get_vault")
+    def test_no_providers_returns_not_dirty(self, mock_get_vault):
         """Config with no providers should return dirty=False."""
+        mock_vault = MagicMock()
+        mock_get_vault.return_value = mock_vault
         config = {
             "ai_enhance": {"providers": {}},
             "asr": {"providers": {}},
@@ -741,11 +748,12 @@ class TestSyncSecretsToKeychain:
         dirty = sync_secrets_to_keychain(config)
         assert dirty is False
 
-    @patch("wenzi.config.keychain_set")
-    @patch("wenzi.config.keychain_get")
-    def test_asr_providers_also_synced(self, mock_get, mock_set):
+    @patch("wenzi.config.get_vault")
+    def test_asr_providers_also_synced(self, mock_get_vault):
         """ASR providers are synced just like AI enhance providers."""
-        mock_set.return_value = True
+        mock_vault = MagicMock()
+        mock_get_vault.return_value = mock_vault
+        mock_vault.set.return_value = True
         config = {
             "ai_enhance": {"providers": {}},
             "asr": {
@@ -760,13 +768,15 @@ class TestSyncSecretsToKeychain:
         dirty = sync_secrets_to_keychain(config)
         assert dirty is True
         assert config["asr"]["providers"]["groq"]["api_key"] == "gsk-xxx"
-        mock_set.assert_any_call("asr.providers.groq.api_key", "gsk-xxx")
+        mock_vault.set.assert_any_call("asr.providers.groq.api_key", "gsk-xxx")
+        mock_vault.flush_sync.assert_called_once()
 
-    @patch("wenzi.config.keychain_set")
-    @patch("wenzi.config.keychain_get")
-    def test_non_secret_fields_untouched(self, mock_get, mock_set):
+    @patch("wenzi.config.get_vault")
+    def test_non_secret_fields_untouched(self, mock_get_vault):
         """Fields not in SECRET_FIELDS are not touched."""
-        mock_set.return_value = True
+        mock_vault = MagicMock()
+        mock_get_vault.return_value = mock_vault
+        mock_vault.set.return_value = True
         config = {
             "ai_enhance": {
                 "providers": {
@@ -803,9 +813,12 @@ class TestIsKeychainEnabled:
 class TestSaveConfigWithSecrets:
     """Tests for save_config_with_secrets."""
 
-    @patch("wenzi.config.keychain_set", return_value=True)
-    def test_in_memory_config_not_mutated(self, mock_set, tmp_path):
+    @patch("wenzi.config.get_vault")
+    def test_in_memory_config_not_mutated(self, mock_get_vault, tmp_path):
         """save_config_with_secrets must not modify the in-memory config dict."""
+        mock_vault = MagicMock()
+        mock_vault.set.return_value = True
+        mock_get_vault.return_value = mock_vault
         config = {
             "ai_enhance": {
                 "providers": {
@@ -824,9 +837,12 @@ class TestSaveConfigWithSecrets:
         assert config["ai_enhance"]["providers"]["openai"]["api_key"] == "sk-real-key"
         assert config["ai_enhance"]["providers"]["openai"]["base_url"] == "https://api.openai.com/v1"
 
-    @patch("wenzi.config.keychain_set", return_value=True)
-    def test_on_disk_file_has_sentinels(self, mock_set, tmp_path):
+    @patch("wenzi.config.get_vault")
+    def test_on_disk_file_has_sentinels(self, mock_get_vault, tmp_path):
         """The saved file should have @keychain sentinels for secret fields."""
+        mock_vault = MagicMock()
+        mock_vault.set.return_value = True
+        mock_get_vault.return_value = mock_vault
         config = {
             "ai_enhance": {
                 "providers": {
@@ -847,9 +863,12 @@ class TestSaveConfigWithSecrets:
         assert saved["ai_enhance"]["providers"]["openai"]["base_url"] == KEYCHAIN_SENTINEL
         assert saved["ai_enhance"]["providers"]["openai"]["models"] == ["gpt-4o"]
 
-    @patch("wenzi.config.keychain_set", return_value=False)
-    def test_keychain_set_failure_preserves_plaintext_on_disk(self, mock_set, tmp_path):
-        """If keychain_set fails, plaintext is preserved in the saved file."""
+    @patch("wenzi.config.get_vault")
+    def test_keychain_set_failure_preserves_plaintext_on_disk(self, mock_get_vault, tmp_path):
+        """If vault.set fails, plaintext is preserved in the saved file."""
+        mock_vault = MagicMock()
+        mock_vault.set.return_value = False
+        mock_get_vault.return_value = mock_vault
         config = {
             "ai_enhance": {
                 "providers": {
@@ -864,9 +883,12 @@ class TestSaveConfigWithSecrets:
         saved = json.loads(open(path).read())
         assert saved["ai_enhance"]["providers"]["openai"]["api_key"] == "sk-real-key"
 
-    @patch("wenzi.config.keychain_set", return_value=True)
-    def test_non_secret_fields_preserved(self, mock_set, tmp_path):
+    @patch("wenzi.config.get_vault")
+    def test_non_secret_fields_preserved(self, mock_get_vault, tmp_path):
         """Non-secret fields are saved as-is."""
+        mock_vault = MagicMock()
+        mock_vault.set.return_value = True
+        mock_get_vault.return_value = mock_vault
         config = {
             "ai_enhance": {
                 "providers": {
@@ -887,7 +909,7 @@ class TestSaveConfigWithSecrets:
         assert saved["ai_enhance"]["providers"]["openai"]["extra_body"] == {"temperature": 0.5}
 
     def test_keychain_disabled_saves_plaintext(self, tmp_path):
-        """When keychain is disabled, save_config_with_secrets saves plaintext without touching Keychain."""
+        """When keychain is disabled, save_config_with_secrets saves plaintext without touching vault."""
         config = {
             "ai_enhance": {
                 "providers": {
@@ -902,9 +924,9 @@ class TestSaveConfigWithSecrets:
             "keychain": {"enabled": False},
         }
         path = str(tmp_path / "config.json")
-        with patch("wenzi.config.keychain_set") as mock_set:
+        with patch("wenzi.config.get_vault") as mock_get_vault:
             save_config_with_secrets(config, path)
-            mock_set.assert_not_called()
+            mock_get_vault.assert_not_called()
         saved = json.loads(open(path).read())
         assert saved["ai_enhance"]["providers"]["openai"]["api_key"] == "sk-real-key"
         assert saved["ai_enhance"]["providers"]["openai"]["base_url"] == "https://api.openai.com/v1"
@@ -920,9 +942,9 @@ class TestSaveConfigWithSecrets:
             "asr": {"providers": {}},
         }
         path = str(tmp_path / "config.json")
-        with patch("wenzi.config.keychain_set") as mock_set:
+        with patch("wenzi.config.get_vault") as mock_get_vault:
             save_config_with_secrets(config, path)
-            mock_set.assert_not_called()
+            mock_get_vault.assert_not_called()
         saved = json.loads(open(path).read())
         assert saved["ai_enhance"]["providers"]["openai"]["api_key"] == "sk-real-key"
 
