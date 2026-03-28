@@ -347,28 +347,13 @@ class VocabController:
         store = self._app._manual_vocab_store
         old_entry = store.get(old_variant, old_term)
 
-        store.remove_batch([(old_variant, old_term)], persist=False)
-        if old_entry is not None:
-            entry = store.add(
-                variant=new_variant,
-                term=new_term,
-                source=old_entry.source,
-                app_bundle_id=old_entry.app_bundle_id,
-                asr_model=old_entry.asr_model,
-                llm_model=old_entry.llm_model,
-                enhance_mode=old_entry.enhance_mode,
-                persist=False,
-            )
-            entry.frequency = old_entry.frequency
-            entry.hit_count = old_entry.hit_count
-            entry.first_seen = old_entry.first_seen
-            entry.last_hit = old_entry.last_hit
-            store.save()
+        if old_entry is not None and old_entry.id:
+            store.rename_entry(old_entry.id, new_variant, new_term)
         else:
+            store.remove_batch([(old_variant, old_term)])
             from wenzi.enhance.manual_vocabulary import SOURCE_USER
 
-            store.add(variant=new_variant, term=new_term, source=SOURCE_USER, persist=False)
-            store.save()
+            store.add(variant=new_variant, term=new_term, source=SOURCE_USER)
 
         self._reload_data()
 
@@ -382,13 +367,9 @@ class VocabController:
         entry = store.get(variant, term)
         if entry is None:
             return
-        changed = False
-        for field, value in fields.items():
-            if field in self._EDITABLE_FIELDS:
-                setattr(entry, field, value)
-                changed = True
-        if changed:
-            store.save()
+        updates = {f: v for f, v in fields.items() if f in self._EDITABLE_FIELDS}
+        if updates:
+            store.update_fields(entry.id, updates)
             self._reload_data()
 
     # ------------------------------------------------------------------
@@ -456,14 +437,11 @@ class VocabController:
                     asr_model=raw.get("asr_model", ""),
                     llm_model=raw.get("llm_model", ""),
                     enhance_mode=raw.get("enhance_mode", ""),
-                    persist=False,
                 )
                 if existed:
                     update_count += 1
                 else:
                     new_count += 1
-            if new_count or update_count:
-                store.save()
 
             logger.info(
                 "Imported vocabulary: %d new, %d updated from %s",

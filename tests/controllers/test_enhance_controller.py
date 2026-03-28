@@ -676,3 +676,160 @@ class TestRunWrapper:
         event_loop.run_until_complete(
             controller._run_wrapper(_cancelled(), request_id=1)
         )
+
+
+# ---------------------------------------------------------------------------
+# Tests: two-phase hit detection
+# ---------------------------------------------------------------------------
+
+
+class TestTwoPhaseHitDetection:
+    """Verify that ASR phase runs before LLM and LLM phase runs after."""
+
+    def _make_tracked_mode(self):
+        mode_def = MagicMock()
+        mode_def.track_corrections = True
+        mode_def.steps = []
+        return mode_def
+
+    def test_asr_phase_called_before_llm(
+        self, controller, mock_enhancer, mock_panel, event_loop,
+    ):
+        """record_asr_phase should be called before enhance_stream starts."""
+        call_order = []
+
+        mock_store = MagicMock()
+        mock_store.record_asr_phase.return_value = []
+        mock_store.find_hits_in_text.return_value = []
+        mock_store.get_all_for_state.return_value = []
+
+        def _record_asr(*args, **kwargs):
+            call_order.append("asr_phase")
+            return []
+        mock_store.record_asr_phase.side_effect = _record_asr
+
+        def _enhance_stream(*args, **kwargs):
+            call_order.append("enhance_stream")
+            return _make_async_gen([
+                ("result", {"prompt_tokens": 5, "completion_tokens": 3, "total_tokens": 8}, False),
+            ])
+        mock_enhancer.enhance_stream = MagicMock(side_effect=_enhance_stream)
+
+        controller._manual_vocab_store = mock_store
+        mode_def = self._make_tracked_mode()
+        mock_enhancer.get_mode_definition.return_value = mode_def
+
+        event_loop.run_until_complete(
+            controller._run_single_async("asr text", 1, {}, track_corrections=True)
+        )
+
+        assert call_order == ["asr_phase", "enhance_stream"]
+
+    def test_llm_phase_receives_asr_miss_entries(
+        self, controller, mock_enhancer, mock_panel, event_loop,
+    ):
+        """record_llm_phase should receive the asr_miss entries from phase 1."""
+        mock_entry = MagicMock()
+        mock_entry.variant = "派森"
+        mock_entry.term = "Python"
+
+        mock_store = MagicMock()
+        mock_store.record_asr_phase.return_value = [mock_entry]
+        mock_store.find_hits_in_text.return_value = []
+        mock_store.get_all_for_state.return_value = []
+
+        chunks = [
+            ("Python result", {"prompt_tokens": 5, "completion_tokens": 3, "total_tokens": 8}, False),
+        ]
+        mock_enhancer.enhance_stream = MagicMock(
+            return_value=_make_async_gen(chunks)
+        )
+
+        controller._manual_vocab_store = mock_store
+        mode_def = self._make_tracked_mode()
+        mock_enhancer.get_mode_definition.return_value = mode_def
+
+        event_loop.run_until_complete(
+            controller._run_single_async("asr text", 1, {}, track_corrections=True)
+        )
+
+        mock_store.record_llm_phase.assert_called_once()
+        call_args = mock_store.record_llm_phase.call_args
+        assert call_args[0][0] == [mock_entry]  # asr_miss_entries
+        assert "Python result" in call_args[0][1]  # enhanced_text
+
+    def test_no_phase_tracking_when_not_tracked(
+        self, controller, mock_enhancer, mock_panel, event_loop,
+    ):
+        """Phase tracking should not run when track_corrections=False."""
+        mock_store = MagicMock()
+        controller._manual_vocab_store = mock_store
+
+        chunks = [
+            ("result", {"prompt_tokens": 5, "completion_tokens": 3, "total_tokens": 8}, False),
+        ]
+        mock_enhancer.enhance_stream = MagicMock(
+            return_value=_make_async_gen(chunks)
+        )
+
+        event_loop.run_until_complete(
+            controller._run_single_async("asr text", 1, {}, track_corrections=False)
+        )
+
+        mock_store.record_asr_phase.assert_not_called()
+        mock_store.record_llm_phase.assert_not_called()
+
+    def test_display_only_does_not_record(
+        self, controller, mock_enhancer, mock_panel, monkeypatch,
+    ):
+        """Display-only mode should not call record methods."""
+        mock_store = MagicMock()
+        mock_store.find_hits_in_text.return_value = []
+        mock_store.get_all_for_state.return_value = []
+        controller._manual_vocab_store = mock_store
+
+        mode_def = self._make_tracked_mode()
+        mock_enhancer.get_mode_definition.return_value = mode_def
+        controller._last_pushed_asr_text = "text"
+        mock_panel.enhanced_text = "enhanced"
+
+        monkeypatch.setattr(
+            "wenzi.enhance.text_diff.extract_word_pairs",
+            lambda a, b: [],
+        )
+        controller._push_diffs_display_only("text", "enhanced")
+
+        mock_store.record_asr_phase.assert_not_called()
+        mock_store.record_llm_phase.assert_not_called()
+
+    def test_chain_mode_two_phase(
+        self, controller, mock_enhancer, mock_panel, event_loop,
+    ):
+        """Chain mode should also run two-phase detection."""
+        mock_entry = MagicMock()
+        mock_entry.variant = "派森"
+        mock_entry.term = "Python"
+
+        mock_store = MagicMock()
+        mock_store.record_asr_phase.return_value = [mock_entry]
+        mock_store.find_hits_in_text.return_value = []
+        mock_store.get_all_for_state.return_value = []
+        controller._manual_vocab_store = mock_store
+
+        mock_enhancer.enhance_stream = MagicMock(
+            return_value=_make_async_gen([
+                ("out", {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}, False),
+            ])
+        )
+        step_def = MagicMock()
+        step_def.label = "Step"
+        mock_enhancer.get_mode_definition = MagicMock(return_value=step_def)
+
+        event_loop.run_until_complete(
+            controller._run_chain_async(
+                "input", 1, {}, ["s1"], "chain_mode", track_corrections=True,
+            )
+        )
+
+        mock_store.record_asr_phase.assert_called_once()
+        mock_store.record_llm_phase.assert_called_once()

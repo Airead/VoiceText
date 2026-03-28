@@ -5,6 +5,13 @@ from .enhancer import MODE_OFF, TextEnhancer, create_enhancer
 from .mode_loader import ModeDefinition, get_sorted_modes, load_modes
 from .preview_history import PreviewHistoryStore, PreviewRecord
 from .manual_vocabulary import ManualVocabEntry, ManualVocabularyStore
+from .vocab_db import (
+    METRIC_ASR_HIT,
+    METRIC_ASR_MISS,
+    METRIC_LLM_HIT,
+    METRIC_LLM_MISS,
+    VocabDB,
+)
 from .vocabulary import (
     HotwordDetail,
     build_hotword_list_detailed,
@@ -17,6 +24,11 @@ __all__ = [
     "PreviewHistoryStore",
     "PreviewRecord",
     "TextEnhancer",
+    "METRIC_ASR_HIT",
+    "METRIC_ASR_MISS",
+    "METRIC_LLM_HIT",
+    "METRIC_LLM_MISS",
+    "VocabDB",
     "build_hotword_list_detailed",
     "create_enhancer",
     "get_sorted_modes",

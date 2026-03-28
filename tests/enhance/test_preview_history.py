@@ -192,7 +192,7 @@ class TestPreviewHistoryStore:
     def test_hotwords_detail_stored(self):
         from wenzi.enhance.vocabulary import HotwordDetail
 
-        details = [HotwordDetail(term="API", source="asr", hit_count=5)]
+        details = [HotwordDetail(term="API", source="asr", asr_miss_count=5)]
         store = PreviewHistoryStore()
         store.add(_make_record(hotwords_detail=details))
         rec = store.get(0)

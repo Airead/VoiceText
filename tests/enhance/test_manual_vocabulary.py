@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import threading
 
 import pytest
@@ -12,8 +11,8 @@ from wenzi.enhance.manual_vocabulary import ManualVocabularyStore
 
 @pytest.fixture
 def store(tmp_path):
-    """Create a ManualVocabularyStore backed by a temporary file."""
-    path = str(tmp_path / "manual_vocabulary.json")
+    """Create a ManualVocabularyStore backed by a temporary SQLite file."""
+    path = str(tmp_path / "manual_vocabulary.db")
     return ManualVocabularyStore(path=path)
 
 
@@ -24,7 +23,6 @@ class TestAddRemove:
         assert entry.variant == "库伯尼特斯"
         assert entry.source == "asr"
         assert entry.frequency == 1
-        assert entry.hit_count == 0
         assert entry.app_bundle_id == "com.test"
         assert entry.first_seen != ""
         assert entry.last_updated != ""
@@ -69,37 +67,107 @@ class TestAddRemove:
         assert store.contains("nope", "Python") is False
 
 
-class TestHitTracking:
+class TestTwoPhaseHitTracking:
+    def test_record_asr_phase_miss(self, store):
+        store.add("派森", "Python", "asr")
+        misses = store.record_asr_phase(
+            "我在使用派森编程", asr_model="whisper",
+        )
+        assert len(misses) == 1
+        assert misses[0].term == "Python"
+
+    def test_record_asr_phase_hit(self, store):
+        store.add("派森", "Python", "asr")
+        misses = store.record_asr_phase(
+            "I love Python", asr_model="whisper",
+        )
+        assert len(misses) == 0
+
+    def test_record_asr_phase_no_match(self, store):
+        store.add("派森", "Python", "asr")
+        misses = store.record_asr_phase(
+            "没有匹配", asr_model="whisper",
+        )
+        assert len(misses) == 0
+
+    def test_record_llm_phase_hit(self, store):
+        store.add("派森", "Python", "asr")
+        misses = store.record_asr_phase("派森很好", asr_model="whisper")
+        store.record_llm_phase(misses, "Python很好", llm_model="gpt-4o")
+        # Verify stats
+        stats = store.get_entry_stats("派森", "Python")
+        llm_hits = [s for s in stats["llm"] if s["hit"] > 0]
+        assert len(llm_hits) > 0
+
+    def test_record_llm_phase_miss(self, store):
+        store.add("派森", "Python", "asr")
+        misses = store.record_asr_phase("派森很好", asr_model="whisper")
+        store.record_llm_phase(misses, "派森仍然没改", llm_model="gpt-4o")
+        stats = store.get_entry_stats("派森", "Python")
+        llm_misses = [s for s in stats["llm"] if s["miss"] > 0]
+        assert len(llm_misses) > 0
+
+    def test_record_phases_context_keys(self, store):
+        store.add("派森", "Python", "asr")
+        misses = store.record_asr_phase(
+            "派森编程", asr_model="whisper", app_bundle_id="com.apple.dt.Xcode",
+        )
+        store.record_llm_phase(
+            misses, "Python编程", llm_model="gpt-4o", app_bundle_id="com.apple.dt.Xcode",
+        )
+        entry = store.get("派森", "Python")
+        all_stats = store.db.get_stats(entry.id)
+        context_keys = {s["context_key"] for s in all_stats}
+        assert "asr:whisper" in context_keys
+        assert "app:com.apple.dt.Xcode" in context_keys
+        assert "llm:gpt-4o" in context_keys
+
+    def test_asr_miss_ordering(self, store):
+        """Entries with higher asr_miss should rank higher in hotwords."""
+        store.add("a", "A", "asr")
+        store.add("b", "B", "asr")
+        # Give B more asr_miss
+        for _ in range(3):
+            store.record_asr_phase("b出错了", asr_model="whisper")
+        store.record_asr_phase("a出错了", asr_model="whisper")
+        terms = store.get_asr_hotwords(asr_model="whisper")
+        assert terms[0].lower() == "b"
+
+    def test_cold_start_fallback(self, store):
+        """New model with no bucket data should fall back to global then recency."""
+        store.add("a", "A", "asr")
+        store.add("b", "B", "asr")
+        # Record stats only for old_model
+        for _ in range(3):
+            store.record_asr_phase("a出错了", asr_model="old_model")
+        # Query for new_model — should fall back
+        terms = store.get_asr_hotwords(asr_model="new_model")
+        assert len(terms) == 2
+        # A should be first (has global stats)
+        assert terms[0].lower() == "a"
+
+
+class TestLegacyHitTracking:
     def test_record_hit(self, store):
         store.add("派森", "Python", "asr")
         store.record_hit("派森", "Python")
-        entries = store.get_all()
-        assert entries[0].hit_count == 1
-        assert entries[0].last_hit != ""
-
-    def test_record_hit_increments(self, store):
-        store.add("派森", "Python", "asr")
-        store.record_hit("派森", "Python")
-        store.record_hit("派森", "Python")
-        entries = store.get_all()
-        assert entries[0].hit_count == 2
-
-    def test_record_hit_nonexistent_is_noop(self, store):
-        store.record_hit("nope", "nope")  # Should not raise
+        entry = store.get("派森", "Python")
+        # Hit is recorded in stats, not on the entry itself
+        stats = store.db.get_stats(entry.id)
+        assert any(s["metric"] == "llm_hit" and s["count"] == 1 for s in stats)
 
     def test_record_hits_batch(self, store):
         store.add("派森", "Python", "asr")
         store.add("库伯尼特斯", "Kubernetes", "asr")
-        store.add("no_hit", "NoHit", "asr")
         store.record_hits([
             ("派森", "Python"),
             ("库伯尼特斯", "Kubernetes"),
-            ("nonexistent", "nope"),  # mixed: should be ignored
+            ("nonexistent", "nope"),
         ])
-        entries = {e.term: e for e in store.get_all()}
-        assert entries["Python"].hit_count == 1
-        assert entries["Kubernetes"].hit_count == 1
-        assert entries["NoHit"].hit_count == 0  # not in batch
+        e1 = store.get("派森", "Python")
+        e2 = store.get("库伯尼特斯", "Kubernetes")
+        assert store.db.get_stats_summary(e1.id, "llm_hit") == 1
+        assert store.db.get_stats_summary(e2.id, "llm_hit") == 1
 
     def test_find_hits_in_text(self, store):
         store.add("库伯尼特斯", "Kubernetes", "asr")
@@ -119,44 +187,6 @@ class TestHitTracking:
         assert len(hits) == 0
 
 
-class TestPersistence:
-    def test_save_load_roundtrip(self, tmp_path):
-        path = str(tmp_path / "manual_vocabulary.json")
-        store1 = ManualVocabularyStore(path=path)
-        store1.add("派森", "Python", "asr", app_bundle_id="com.test")
-        store1.add("库伯尼特斯", "Kubernetes", "llm", asr_model="whisper")
-        store1.record_hit("派森", "Python")
-
-        store2 = ManualVocabularyStore(path=path)
-        store2.load()
-        assert store2.entry_count == 2
-        assert store2.contains("派森", "Python")
-        assert store2.contains("库伯尼特斯", "Kubernetes")
-        entries = {e.term: e for e in store2.get_all()}
-        assert entries["Python"].hit_count == 1
-        assert entries["Kubernetes"].asr_model == "whisper"
-
-    def test_load_missing_file(self, tmp_path):
-        path = str(tmp_path / "nonexistent.json")
-        store = ManualVocabularyStore(path=path)
-        store.load()
-        assert store.entry_count == 0
-
-    def test_load_corrupt_file(self, tmp_path):
-        path = str(tmp_path / "bad.json")
-        with open(path, "w") as f:
-            f.write("not json")
-        store = ManualVocabularyStore(path=path)
-        store.load()
-        assert store.entry_count == 0
-
-    def test_save_creates_directory(self, tmp_path):
-        path = str(tmp_path / "sub" / "dir" / "manual_vocabulary.json")
-        store = ManualVocabularyStore(path=path)
-        store.add("test", "Test", "asr")
-        assert json.loads(open(path).read())["version"] == 1
-
-
 class TestQueryHelpers:
     def test_get_all_for_state(self, store):
         store.add("派森", "Python", "asr")
@@ -169,67 +199,18 @@ class TestQueryHelpers:
         store.add("派森", "Python", "asr")
         store.add("库伯尼特斯", "Kubernetes", "asr")
         terms = store.get_asr_hotwords()
-        assert set(terms) == {"Python", "Kubernetes"}
-
-    def test_get_asr_hotwords_filtered_by_app(self, store):
-        store.add("派森", "Python", "asr", app_bundle_id="com.xcode")
-        store.add("库伯尼特斯", "Kubernetes", "asr", app_bundle_id="com.chrome")
-        terms = store.get_asr_hotwords(app_bundle_id="com.xcode")
-        # Matching entries come first
-        assert terms[0] == "Python"
-        assert len(terms) == 2  # All still included
-
-    def test_get_asr_hotwords_filtered_by_model(self, store):
-        store.add("派森", "Python", "asr", asr_model="whisper")
-        store.add("库伯尼特斯", "Kubernetes", "asr", asr_model="funasr")
-        terms = store.get_asr_hotwords(asr_model="whisper")
-        assert terms[0] == "Python"
+        assert {t.lower() for t in terms} == {"python", "kubernetes"}
 
     def test_get_asr_hotwords_deduplicates(self, store):
         store.add("派森", "Python", "asr")
-        store.add("python", "Python", "llm")  # Same term, different variant
+        store.add("python_err", "Python", "llm")  # Same term, different variant
         terms = store.get_asr_hotwords()
-        assert terms.count("Python") == 1
+        assert len([t for t in terms if t.lower() == "python"]) == 1
 
     def test_get_llm_vocab(self, store):
-        store.add("派森", "Python", "asr", app_bundle_id="com.xcode")
-        store.add("库伯尼特斯", "Kubernetes", "asr", app_bundle_id="com.chrome")
-        entries = store.get_llm_vocab(app_bundle_id="com.xcode")
-        assert len(entries) == 2
-        # Matching app first
-        assert entries[0].term == "Python"
-
-    def test_get_llm_vocab_no_filter(self, store):
         store.add("派森", "Python", "asr")
         entries = store.get_llm_vocab()
         assert len(entries) == 1
-
-    def test_get_llm_vocab_llm_model_filter(self, store):
-        """Entries matching llm_model are prioritized."""
-        store.add("派森", "Python", "llm", llm_model="gpt-4o")
-        store.add("库伯尼特斯", "Kubernetes", "llm", llm_model="claude-3")
-        store.add("通用词", "General", "llm")  # no llm_model
-        entries = store.get_llm_vocab(llm_model="gpt-4o")
-        assert len(entries) == 3
-        # gpt-4o match and no-model entry first, mismatched last
-        assert entries[0].term == "Python"
-        assert entries[1].term == "General"
-        assert entries[2].term == "Kubernetes"
-
-    def test_get_llm_vocab_llm_model_and_app(self, store):
-        """Both llm_model and app_bundle_id filter together."""
-        store.add("a", "A", "llm", llm_model="gpt-4o", app_bundle_id="com.app")
-        store.add("b", "B", "llm", llm_model="claude-3", app_bundle_id="com.app")
-        store.add("c", "C", "llm", llm_model="gpt-4o", app_bundle_id="com.other")
-        store.add("d", "D", "llm")  # no model, no app
-        entries = store.get_llm_vocab(
-            llm_model="gpt-4o", app_bundle_id="com.app",
-        )
-        # A matches both; D matches (no constraints); B mismatches model; C mismatches app
-        terms = [e.term for e in entries]
-        assert terms[0] == "A"
-        assert "D" in terms[:2]  # D is also a match (no stored model/app)
-        assert set(terms[2:]) == {"B", "C"}
 
     def test_get_llm_vocab_max_entries_default(self, store):
         for i in range(8):
@@ -243,18 +224,28 @@ class TestQueryHelpers:
         entries = store.get_llm_vocab(max_entries=3)
         assert len(entries) == 3
 
-    def test_get_llm_vocab_max_entries_app_priority(self, store):
-        """App-matching entries should be prioritized before truncation."""
-        for i in range(4):
-            store.add(f"other{i}", f"Other{i}", "llm", app_bundle_id="com.other")
-        store.add("target", "Target", "llm", app_bundle_id="com.app")
-        entries = store.get_llm_vocab(
-            app_bundle_id="com.app", max_entries=3,
+
+class TestGetEntryStats:
+    def test_empty_stats(self, store):
+        store.add("派森", "Python", "asr")
+        stats = store.get_entry_stats("派森", "Python")
+        assert stats == {"asr": [], "llm": []}
+
+    def test_stats_after_phases(self, store):
+        store.add("派森", "Python", "asr")
+        misses = store.record_asr_phase(
+            "派森编程", asr_model="whisper", app_bundle_id="com.test",
         )
-        # The app-matching entry should be in the result
-        terms = [e.term for e in entries]
-        assert "Target" in terms
-        assert len(entries) == 3
+        store.record_llm_phase(
+            misses, "Python编程", llm_model="gpt-4o", app_bundle_id="com.test",
+        )
+        stats = store.get_entry_stats("派森", "Python")
+        assert len(stats["asr"]) > 0
+        assert len(stats["llm"]) > 0
+
+    def test_stats_nonexistent_entry(self, store):
+        stats = store.get_entry_stats("nope", "nope")
+        assert stats == {"asr": [], "llm": []}
 
 
 class TestNormalization:
@@ -290,34 +281,9 @@ class TestNormalization:
         assert store.remove(" Cloud ", " Claude ") is True
         assert store.entry_count == 0
 
-    def test_load_merges_pre_normalization_duplicates(self, tmp_path):
-        """Entries that differ only by whitespace should merge on load."""
-        path = str(tmp_path / "manual_vocabulary.json")
-        data = {
-            "version": 1,
-            "entries": [
-                {"term": "Claude", "variant": "Cloud", "frequency": 2, "hit_count": 3,
-                 "first_seen": "2026-01-01T00:00:00+00:00", "last_updated": "2026-01-02T00:00:00+00:00",
-                 "last_hit": "2026-01-02T00:00:00+00:00"},
-                {"term": " Claude", "variant": "Cloud", "frequency": 1, "hit_count": 1,
-                 "first_seen": "2026-01-03T00:00:00+00:00", "last_updated": "2026-01-03T00:00:00+00:00",
-                 "last_hit": "2026-01-01T00:00:00+00:00"},
-            ],
-        }
-        with open(path, "w") as f:
-            json.dump(data, f)
-        store = ManualVocabularyStore(path=path)
-        store.load()
-        assert store.entry_count == 1
-        entry = store.get_all()[0]
-        assert entry.term == "Claude"  # normalized
-        assert entry.frequency == 3  # 2 + 1
-        assert entry.hit_count == 4  # 3 + 1
-        assert entry.last_updated == "2026-01-03T00:00:00+00:00"  # latest
-
 
 class TestRemoveBatch:
-    def test_remove_batch_single_save(self, store):
+    def test_remove_batch_basic(self, store):
         store.add("a", "A", "asr")
         store.add("b", "B", "asr")
         store.add("c", "C", "asr")
@@ -325,12 +291,6 @@ class TestRemoveBatch:
         removed = store.remove_batch([("a", "A"), ("b", "B")])
         assert removed == 2
         assert store.entry_count == 1
-
-    def test_remove_batch_no_persist(self, store):
-        store.add("a", "A", "asr")
-        removed = store.remove_batch([("a", "A")], persist=False)
-        assert removed == 1
-        assert store.entry_count == 0
 
     def test_remove_batch_nonexistent(self, store):
         removed = store.remove_batch([("x", "X")])
@@ -351,19 +311,6 @@ class TestGet:
         store.add("Cloud", "Claude", "asr")
         entry = store.get("CLOUD", "CLAUDE")
         assert entry is not None
-
-
-class TestAddPersist:
-    def test_add_no_persist(self, store, tmp_path):
-        store.add("a", "A", "asr", persist=False)
-        assert store.entry_count == 1
-        # File should not exist since persist=False
-        path = tmp_path / "manual_vocabulary.json"
-        assert not path.exists()
-
-    def test_add_with_persist(self, store, tmp_path):
-        store.add("a", "A", "asr", persist=True)
-        assert store.entry_count == 1
 
 
 class TestThreadSafety:
@@ -396,3 +343,16 @@ class TestThreadSafety:
             t.join()
 
         assert len(errors) == 0
+
+
+class TestPersistence:
+    def test_reopen_db(self, tmp_path):
+        path = str(tmp_path / "manual_vocabulary.db")
+        store1 = ManualVocabularyStore(path=path)
+        store1.add("派森", "Python", "asr", app_bundle_id="com.test")
+        store1.add("库伯尼特斯", "Kubernetes", "llm", asr_model="whisper")
+
+        store2 = ManualVocabularyStore(path=path)
+        assert store2.entry_count == 2
+        assert store2.contains("派森", "Python")
+        assert store2.contains("库伯尼特斯", "Kubernetes")

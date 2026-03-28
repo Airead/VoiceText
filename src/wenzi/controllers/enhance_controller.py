@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from wenzi.enhance.enhancer import TextEnhancer
-    from wenzi.enhance.manual_vocabulary import ManualVocabularyStore
+    from wenzi.enhance.manual_vocabulary import ManualVocabEntry, ManualVocabularyStore
     from wenzi.input_context import InputContext
     from wenzi.ui.result_window_web import ResultPreviewPanel
     from wenzi.usage_stats import UsageStats
@@ -139,14 +139,22 @@ class EnhanceController:
 
         self._push_vocab_hits_display_only(asr_text, enhanced)
 
-    def _push_diffs_and_hits(self, asr_text: str, enhanced: str) -> None:
+    def _push_diffs_and_hits(
+        self,
+        asr_text: str,
+        enhanced: str,
+        asr_miss_entries: "list[ManualVocabEntry] | None" = None,
+        *,
+        llm_model: str = "",
+        app_bundle_id: str = "",
+    ) -> None:
         """Compute word-level diffs and vocab hits, push to the preview panel."""
         from wenzi.enhance.text_diff import extract_word_pairs
 
         self._last_pushed_asr_text = asr_text
         self._preview_panel.cache_enhanced_text(enhanced)
 
-        # ASR → Enhanced diffs
+        # ASR -> Enhanced diffs
         try:
             pairs = extract_word_pairs(asr_text, enhanced)
             if pairs:
@@ -163,28 +171,36 @@ class EnhanceController:
             except Exception as e:
                 logger.warning("Failed to sync manual vocab state: %s", e)
 
-        # Vocab hit detection
-        self._push_vocab_hits(asr_text, enhanced)
+        # Phase 2: LLM hit detection and display
+        self._push_vocab_hits(
+            asr_text, enhanced,
+            asr_miss_entries=asr_miss_entries,
+            llm_model=llm_model,
+            app_bundle_id=app_bundle_id,
+        )
+
+    @staticmethod
+    def _entries_to_hit_dicts(
+        entries: "list[ManualVocabEntry]", enhanced_lower: str,
+    ) -> list[dict]:
+        """Convert matched entries to display dicts, filtered by term in enhanced text."""
+        return [
+            {"variant": e.variant, "term": e.term,
+             "source": "manual", "frequency": e.frequency}
+            for e in entries
+            if e.term.lower() in enhanced_lower
+        ]
 
     def _find_vocab_hits(self, asr_text: str, enhanced: str) -> list[dict]:
         """Find vocabulary hits without recording them."""
-        hits: list[dict] = []
         if self._manual_vocab_store is None:
-            return hits
-        enhanced_lower = enhanced.lower()
+            return []
         try:
             manual_hits = self._manual_vocab_store.find_hits_in_text(asr_text)
-            for h in manual_hits:
-                if h.term.lower() in enhanced_lower:
-                    hits.append({
-                        "variant": h.variant, "term": h.term,
-                        "source": "manual",
-                        "hitCount": h.hit_count,
-                        "frequency": h.frequency,
-                    })
+            return self._entries_to_hit_dicts(manual_hits, enhanced.lower())
         except Exception as e:
             logger.warning("Failed to detect manual vocab hits: %s", e)
-        return hits
+            return []
 
     def _push_vocab_hits_display_only(self, asr_text: str, enhanced: str) -> None:
         """Push vocab hits to the panel without recording them."""
@@ -192,18 +208,76 @@ class EnhanceController:
         if hits:
             self._preview_panel.set_vocab_hits(hits)
 
-    def _push_vocab_hits(self, asr_text: str, enhanced: str) -> None:
-        """Detect, record, and push vocabulary hits to the side panel."""
-        hits = self._find_vocab_hits(asr_text, enhanced)
-        if hits:
+    def _push_vocab_hits(
+        self,
+        asr_text: str,
+        enhanced: str,
+        asr_miss_entries: "list[ManualVocabEntry] | None" = None,
+        *,
+        llm_model: str = "",
+        app_bundle_id: str = "",
+    ) -> None:
+        """Detect, record phase-2, and push vocabulary hits to the side panel."""
+        if asr_miss_entries and self._manual_vocab_store is not None:
             try:
-                self._manual_vocab_store.record_hits([
-                    (h["variant"], h["term"]) for h in hits
-                ])
+                self._manual_vocab_store.record_llm_phase(
+                    asr_miss_entries, enhanced,
+                    llm_model=llm_model,
+                    app_bundle_id=app_bundle_id,
+                )
             except Exception as e:
-                logger.warning("Failed to record vocab hits: %s", e)
+                logger.warning("Failed to record LLM phase stats: %s", e)
+
+        # Reuse phase-1 results when available to avoid redundant scan.
+        if asr_miss_entries is not None:
+            hits = self._entries_to_hit_dicts(asr_miss_entries, enhanced.lower())
+        else:
+            hits = self._find_vocab_hits(asr_text, enhanced)
+
         if hits:
             self._preview_panel.set_vocab_hits(hits)
+
+    @staticmethod
+    def _get_app_bundle_id(input_context: "InputContext | None") -> str:
+        return getattr(input_context, "bundle_id", None) or ""
+
+    def _get_llm_model(self) -> str:
+        return self._enhancer.model_name if self._enhancer else ""
+
+    def _run_asr_phase(
+        self,
+        asr_text: str,
+        input_context: "InputContext | None",
+    ) -> "list[ManualVocabEntry]":
+        """Run phase 1 of hit detection: ASR output analysis.
+
+        Returns the list of asr_miss entries for phase 2.
+        """
+        if self._manual_vocab_store is None:
+            return []
+        try:
+            return self._manual_vocab_store.record_asr_phase(
+                asr_text,
+                app_bundle_id=self._get_app_bundle_id(input_context),
+            )
+        except Exception as e:
+            logger.warning("Failed to record ASR phase stats: %s", e)
+            return []
+
+    def _track_corrections(
+        self,
+        asr_text: str,
+        enhanced: str,
+        asr_miss_entries: "list[ManualVocabEntry]",
+        input_context: "InputContext | None",
+    ) -> None:
+        """Run phase 2 tracking and push diffs to the preview panel."""
+        self._push_diffs_and_hits(
+            asr_text, enhanced,
+            asr_miss_entries=asr_miss_entries,
+            llm_model=self._get_llm_model(),
+            app_bundle_id=self._get_app_bundle_id(input_context),
+        )
 
     def cancel(self) -> None:
         """Cancel any in-flight enhancement.  Thread-safe."""
@@ -354,6 +428,11 @@ class EnhanceController:
         track_corrections: bool = False,
     ) -> None:
         """Run a single-step streaming enhancement as a coroutine."""
+        # Phase 1: ASR hit detection (before LLM enhancement)
+        asr_miss_entries: list[ManualVocabEntry] = []
+        if track_corrections:
+            asr_miss_entries = self._run_asr_phase(asr_text, input_context)
+
         gen = self._enhancer.enhance_stream(asr_text, input_context=input_context)
         result = await self._consume_stream(gen, request_id)
 
@@ -384,7 +463,9 @@ class EnhanceController:
                 final_text=enhanced,
             )
             if track_corrections:
-                self._push_diffs_and_hits(asr_text, enhanced)
+                self._track_corrections(
+                    asr_text, enhanced, asr_miss_entries, input_context,
+                )
         else:
             self._preview_panel.set_enhance_label(
                 "Connection failed", request_id=request_id,
@@ -402,6 +483,11 @@ class EnhanceController:
         track_corrections: bool = False,
     ) -> None:
         """Run a multi-step chain enhancement as a coroutine."""
+        # Phase 1: ASR hit detection (before LLM enhancement)
+        asr_miss_entries: list[ManualVocabEntry] = []
+        if track_corrections:
+            asr_miss_entries = self._run_asr_phase(asr_text, input_context)
+
         total_steps = len(chain_steps)
         input_text = asr_text
         total_usage: dict[str, int] = {
@@ -482,6 +568,8 @@ class EnhanceController:
                 final_text=enhanced,
             )
             if track_corrections:
-                self._push_diffs_and_hits(asr_text, enhanced)
+                self._track_corrections(
+                    asr_text, enhanced, asr_miss_entries, input_context,
+                )
         finally:
             self._enhancer.mode = original_mode_id

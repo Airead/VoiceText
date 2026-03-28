@@ -17,8 +17,8 @@ class TestHotwordDetail:
         assert d.term == "API"
         assert d.variant == ""
         assert d.source == ""
-        assert d.hit_count == 0
-        assert d.last_hit == ""
+        assert d.asr_miss_count == 0
+        assert d.llm_hit_count == 0
         assert d.first_seen == ""
 
     def test_full_fields(self):
@@ -26,14 +26,15 @@ class TestHotwordDetail:
             term="Kubernetes",
             variant="库伯尼特斯",
             source="asr",
-            hit_count=5,
-            last_hit="2024-01-01T00:00:00",
+            asr_miss_count=5,
+            llm_hit_count=3,
             first_seen="2023-06-15T00:00:00",
         )
         assert d.term == "Kubernetes"
         assert d.variant == "库伯尼特斯"
         assert d.source == "asr"
-        assert d.hit_count == 5
+        assert d.asr_miss_count == 5
+        assert d.llm_hit_count == 3
 
 
 class TestBuildHotwordListDetailed:
@@ -41,8 +42,9 @@ class TestBuildHotwordListDetailed:
         store = MagicMock()
         store.get_asr_hotwords.return_value = terms
         if entries is None:
-            entries = [ManualVocabEntry(term=t, variant=t) for t in terms]
+            entries = [ManualVocabEntry(term=t, variant=t, id=i + 1) for i, t in enumerate(terms)]
         store.get_all.return_value = entries
+        store.get_stats_summary_batch.return_value = {}
         return store
 
     def test_empty_without_store(self):
@@ -55,8 +57,8 @@ class TestBuildHotwordListDetailed:
 
     def test_returns_manual_hotwords(self):
         entries = [
-            ManualVocabEntry(term="Claude", variant="克劳德", source="asr", hit_count=3),
-            ManualVocabEntry(term="Kubernetes", variant="库伯尼特斯", source="llm"),
+            ManualVocabEntry(term="Claude", variant="克劳德", source="asr", id=1),
+            ManualVocabEntry(term="Kubernetes", variant="库伯尼特斯", source="llm", id=2),
         ]
         store = self._make_mock_store(
             ["Claude", "Kubernetes"], entries=entries,
@@ -66,7 +68,6 @@ class TestBuildHotwordListDetailed:
         assert result[0].term == "Claude"
         assert result[0].variant == "克劳德"
         assert result[0].source == "asr"
-        assert result[0].hit_count == 3
         assert result[1].term == "Kubernetes"
 
     def test_respects_max_count(self):
@@ -97,18 +98,24 @@ class TestBuildHotwordListDetailed:
         result = build_hotword_list_detailed(manual_vocab_store=store)
         assert result == []
 
-    def test_populates_fields_from_entry(self):
+    def test_populates_stats_fields(self):
         entries = [
             ManualVocabEntry(
                 term="API", variant="a p i", source="llm",
-                hit_count=7, last_hit="2024-06-01T00:00:00",
                 first_seen="2024-01-01T00:00:00",
+                id=1,
             ),
         ]
         store = self._make_mock_store(["API"], entries=entries)
+
+        store.get_stats_summary_batch.return_value = {
+            (1, "asr_miss"): 7,
+            (1, "llm_hit"): 3,
+        }
+
         result = build_hotword_list_detailed(manual_vocab_store=store)
         assert result[0].variant == "a p i"
         assert result[0].source == "llm"
-        assert result[0].hit_count == 7
-        assert result[0].last_hit == "2024-06-01T00:00:00"
+        assert result[0].asr_miss_count == 7
+        assert result[0].llm_hit_count == 3
         assert result[0].first_seen == "2024-01-01T00:00:00"

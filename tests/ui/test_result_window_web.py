@@ -1114,7 +1114,7 @@ class TestBuildHotwordsHtml:
 
         defaults = dict(
             term="API", variant="a p i", source="asr",
-            hit_count=5, last_hit="", first_seen="",
+            asr_miss_count=5, llm_hit_count=0, first_seen="",
         )
         defaults.update(kwargs)
         return HotwordDetail(**defaults)
@@ -1132,13 +1132,13 @@ class TestBuildHotwordsHtml:
         from wenzi.ui.result_window_web import _build_hotwords_html
 
         details = [self._make_detail(
-            term="Claude", variant="克劳德", source="llm", hit_count=3,
+            term="Claude", variant="克劳德", source="llm", asr_miss_count=3,
         )]
         html = _build_hotwords_html(details)
         assert "Claude" in html
         assert "克劳德" in html  # variant
         assert "llm" in html  # source
-        assert ">3<" in html  # hit_count
+        assert ">3<" in html  # asr_miss_count
 
     def test_html_escaping(self):
         from wenzi.ui.result_window_web import _build_hotwords_html
@@ -1171,13 +1171,10 @@ class TestBuildHotwordsHtml:
     def test_time_rendered_via_js(self):
         from wenzi.ui.result_window_web import _build_hotwords_html
 
-        details = [self._make_detail(
-            last_hit="2024-06-01T12:00:00", first_seen="2024-01-01T00:00:00",
-        )]
+        details = [self._make_detail(first_seen="2024-01-01T00:00:00")]
         html = _build_hotwords_html(details)
         # Times are rendered client-side via JS fmtDate
         assert "data-ts" in html
-        assert "2024-06-01T12:00:00" in html
         assert "2024-01-01T00:00:00" in html
         assert "fmtDate" in html
 
@@ -1302,7 +1299,7 @@ class TestBuildContextPanelHtml:
     def test_time_rendered_via_js(self):
         from wenzi.ui.result_window_web import _build_context_panel_html
 
-        entries = [self._make_entry(last_hit="2024-06-01T00:00:00")]
+        entries = [self._make_entry(first_seen="2024-06-01T00:00:00")]
         html = _build_context_panel_html("", entries)
         assert "data-ts" in html
         assert "fmtDate" in html

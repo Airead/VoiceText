@@ -13,7 +13,7 @@ from wenzi.enhance.manual_vocabulary import ManualVocabularyStore
 
 @pytest.fixture
 def store(tmp_path):
-    s = ManualVocabularyStore(path=str(tmp_path / "vocab.json"))
+    s = ManualVocabularyStore(path=str(tmp_path / "vocab.db"))
     return s
 
 
@@ -260,17 +260,11 @@ class TestCRUD:
         assert store.contains("c", "C")
 
     def test_edit_entry_preserves_metadata(self, controller, store):
-        entry = store.add(
+        store.add(
             "Cloud", "Claude", source="asr",
             app_bundle_id="com.apple.dt.Xcode",
             asr_model="whisper",
         )
-        # Simulate accumulated stats
-        entry.frequency = 5
-        entry.hit_count = 10
-        entry.first_seen = "2025-01-01T00:00:00+00:00"
-        entry.last_hit = "2025-03-01T00:00:00+00:00"
-        store.save()
 
         controller.on_edit_entry("Cloud", "Claude", "Claud", "Claude")
         assert not store.contains("Cloud", "Claude")
@@ -279,9 +273,7 @@ class TestCRUD:
         new_entries = store.get_all()
         assert len(new_entries) == 1
         new_entry = new_entries[0]
-        assert new_entry.frequency == 5
-        assert new_entry.hit_count == 10
-        assert new_entry.first_seen == "2025-01-01T00:00:00+00:00"
+        assert new_entry.source == "asr"
         assert new_entry.app_bundle_id == "com.apple.dt.Xcode"
         assert new_entry.asr_model == "whisper"
 

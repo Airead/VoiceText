@@ -145,7 +145,9 @@ document.querySelectorAll('.cell-time[data-ts]').forEach(function(el) {
 </script>"""
 
 
-def _build_vocab_table_html(entries: List[ManualVocabEntry]) -> tuple[str, str]:
+def _build_vocab_table_html(
+    entries: "List[HotwordDetail] | List[ManualVocabEntry]",
+) -> tuple[str, str]:
     """Build vocab table rows (tbody) and header row (thead tr) HTML."""
     from wenzi.i18n import t
 
@@ -154,15 +156,16 @@ def _build_vocab_table_html(entries: List[ManualVocabEntry]) -> tuple[str, str]:
         term = html.escape(e.term)
         variant = html.escape(e.variant)
         source = html.escape(e.source)
-        last_hit_attr = html.escape(e.last_hit, quote=True)
-        first_seen_attr = html.escape(e.first_seen, quote=True)
+        first_seen_attr = html.escape(getattr(e, "first_seen", ""), quote=True)
+        asr_miss = getattr(e, "asr_miss_count", 0)
+        llm_hit = getattr(e, "llm_hit_count", 0)
         rows.append(
             f"<tr>"
             f"<td class='cell-term'>{term}</td>"
             f"<td class='cell-variant'>{variant}</td>"
             f"<td class='cell-source'>{source}</td>"
-            f"<td class='cell-num'>{e.hit_count}</td>"
-            f'<td class="cell-time" data-ts="{last_hit_attr}"></td>'
+            f"<td class='cell-num'>{asr_miss}</td>"
+            f"<td class='cell-num'>{llm_hit}</td>"
             f'<td class="cell-time" data-ts="{first_seen_attr}"></td>'
             f"</tr>"
         )
@@ -170,12 +173,12 @@ def _build_vocab_table_html(entries: List[ManualVocabEntry]) -> tuple[str, str]:
     th_term = html.escape(t("preview.hotwords_table.term"))
     th_variant = html.escape(t("preview.hotwords_table.variant"))
     th_source = html.escape(t("preview.hotwords_table.source"))
-    th_hits = html.escape(t("preview.hotwords_table.hits"))
-    th_last_hit = html.escape(t("preview.hotwords_table.last_hit"))
+    th_asr_miss = html.escape(t("preview.hotwords_table.asr_miss"))
+    th_llm_hit = html.escape(t("preview.hotwords_table.llm_hit"))
     th_first_seen = html.escape(t("preview.hotwords_table.first_seen"))
     thead = (
         f"<th>{th_term}</th><th>{th_variant}</th><th>{th_source}</th>"
-        f"<th>{th_hits}</th><th>{th_last_hit}</th><th>{th_first_seen}</th>"
+        f"<th>{th_asr_miss}</th><th>{th_llm_hit}</th><th>{th_first_seen}</th>"
     )
     return "\n".join(rows), thead
 

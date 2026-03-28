@@ -1,25 +1,30 @@
 """Manual vocabulary store — user-curated correction pairs.
 
-Each entry represents a single variant→term pair that the user has explicitly
+Each entry represents a single variant->term pair that the user has explicitly
 confirmed.  Entries carry rich metadata (app, model, timestamps) and are
-persisted as JSON at ``~/.local/share/WenZi/manual_vocabulary.json``.
+persisted in a SQLite database via :class:`VocabDB`.
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 import string
-import tempfile
-import threading
-from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from dataclasses import dataclass
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+from wenzi.enhance.vocab_db import (
+    CTX_APP,
+    CTX_ASR,
+    CTX_LLM,
+    METRIC_ASR_HIT,
+    METRIC_ASR_MISS,
+    METRIC_LLM_HIT,
+    METRIC_LLM_MISS,
+    VocabDB,
+    build_context_keys,
+)
 
-_VERSION = 1
+logger = logging.getLogger(__name__)
 
 # Allowed values for ManualVocabEntry.source
 SOURCE_ASR = "asr"
@@ -35,18 +40,13 @@ class ManualVocabEntry:
     variant: str  # ASR / LLM erroneous form ("库伯尼特斯")
     source: str = SOURCE_ASR
     frequency: int = 1  # times the user added/confirmed this pair
-    hit_count: int = 0  # times this pair was actually used in correction
     first_seen: str = ""  # ISO 8601
     last_updated: str = ""  # ISO 8601
-    last_hit: str = ""  # ISO 8601, last time this pair was hit
     app_bundle_id: str = ""  # e.g. "com.apple.dt.Xcode"
     asr_model: str = ""
     llm_model: str = ""
     enhance_mode: str = ""
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    id: int = 0  # database primary key
 
 
 _STRIP_CHARS = string.whitespace + string.punctuation + "\u3000\u3001\u3002\uff0c\uff01\uff1f"
@@ -57,88 +57,58 @@ def _normalize(s: str) -> str:
     return s.strip(_STRIP_CHARS)
 
 
-def _key(variant: str, term: str) -> tuple[str, str]:
-    """Canonical key: (normalized + lowercased variant, normalized + lowercased term)."""
-    return (_normalize(variant).lower(), _normalize(term).lower())
+def _entry_from_row(row: dict) -> ManualVocabEntry:
+    """Convert a VocabDB row dict to a ManualVocabEntry."""
+    return ManualVocabEntry(
+        term=row["term"],
+        variant=row["variant"],
+        source=row.get("source", SOURCE_ASR),
+        frequency=row.get("frequency", 1),
+        first_seen=row.get("first_seen", ""),
+        last_updated=row.get("last_updated", ""),
+        app_bundle_id=row.get("app_bundle_id", ""),
+        asr_model=row.get("asr_model", ""),
+        llm_model=row.get("llm_model", ""),
+        enhance_mode=row.get("enhance_mode", ""),
+        id=row.get("id", 0),
+    )
 
 
 class ManualVocabularyStore:
-    """Thread-safe store for user-curated correction pairs."""
+    """SQLite-backed store for user-curated correction pairs.
+
+    Thread safety is provided by the underlying :class:`VocabDB`.
+    """
 
     MAX_LLM_ENTRIES: int = 5
 
+    @staticmethod
+    def _query_context_key(
+        prefix: str, model: Optional[str], app_bundle_id: Optional[str],
+    ) -> str:
+        """Build a single context key for ranked queries (model takes priority)."""
+        if model:
+            return f"{prefix}:{model}"
+        if app_bundle_id:
+            return f"{CTX_APP}:{app_bundle_id}"
+        return ""
+
+    _DIMENSION_MAP = {
+        METRIC_ASR_MISS: ("asr", "miss"),
+        METRIC_ASR_HIT: ("asr", "hit"),
+        METRIC_LLM_HIT: ("llm", "hit"),
+        METRIC_LLM_MISS: ("llm", "miss"),
+    }
+    _SORT_KEY = {"asr": "miss", "llm": "hit"}
+
     def __init__(self, path: str) -> None:
         self._path = path
-        self._entries: dict[tuple[str, str], ManualVocabEntry] = {}
-        self._lock = threading.Lock()
+        self._db = VocabDB(path)
 
-    # ------------------------------------------------------------------
-    # Persistence
-    # ------------------------------------------------------------------
-
-    def load(self) -> None:
-        """Load entries from disk.  Missing / corrupt file → empty store."""
-        if not os.path.exists(self._path):
-            return
-        try:
-            with open(self._path, encoding="utf-8") as f:
-                data = json.load(f)
-            entries: dict[tuple[str, str], ManualVocabEntry] = {}
-            for raw in data.get("entries", []):
-                entry = ManualVocabEntry(
-                    term=_normalize(raw["term"]),
-                    variant=_normalize(raw["variant"]),
-                    source=raw.get("source", SOURCE_ASR),
-                    frequency=raw.get("frequency", 1),
-                    hit_count=raw.get("hit_count", 0),
-                    first_seen=raw.get("first_seen", ""),
-                    last_updated=raw.get("last_updated", ""),
-                    last_hit=raw.get("last_hit", ""),
-                    app_bundle_id=raw.get("app_bundle_id", ""),
-                    asr_model=raw.get("asr_model", ""),
-                    llm_model=raw.get("llm_model", ""),
-                    enhance_mode=raw.get("enhance_mode", ""),
-                )
-                k = _key(entry.variant, entry.term)
-                existing = entries.get(k)
-                if existing is not None:
-                    # Merge duplicates caused by pre-normalization data
-                    existing.frequency += entry.frequency
-                    existing.hit_count += entry.hit_count
-                    if entry.last_updated > existing.last_updated:
-                        existing.last_updated = entry.last_updated
-                    if entry.last_hit > existing.last_hit:
-                        existing.last_hit = entry.last_hit
-                else:
-                    entries[k] = entry
-            with self._lock:
-                self._entries = entries
-            logger.info("Manual vocabulary loaded: %d entries", len(entries))
-        except Exception:
-            logger.warning("Failed to load manual vocabulary", exc_info=True)
-
-    def save(self) -> None:
-        """Atomically persist entries to disk."""
-        with self._lock:
-            entries_list = list(self._entries.values())
-        data = {
-            "version": _VERSION,
-            "entries": [asdict(e) for e in entries_list],
-        }
-        os.makedirs(os.path.dirname(self._path), exist_ok=True)
-        fd, tmp = tempfile.mkstemp(
-            dir=os.path.dirname(self._path), suffix=".tmp",
-        )
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            os.replace(tmp, self._path)
-        except Exception:
-            logger.warning("Failed to save manual vocabulary", exc_info=True)
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
+    @property
+    def db(self) -> VocabDB:
+        """Expose the underlying VocabDB for direct access."""
+        return self._db
 
     # ------------------------------------------------------------------
     # CRUD
@@ -154,122 +124,140 @@ class ManualVocabularyStore:
         asr_model: str = "",
         llm_model: str = "",
         enhance_mode: str = "",
-        persist: bool = True,
+        persist: bool = True,  # accepted for API compat, no effect
     ) -> ManualVocabEntry:
         """Add or update a correction pair.
 
         If the (variant, term) pair already exists, increment *frequency*
         and update *last_updated*.  Returns the (possibly updated) entry.
-
-        When *persist* is False the caller is responsible for calling save().
         """
         variant = _normalize(variant)
         term = _normalize(term)
-        k = _key(variant, term)
-        now = _now_iso()
-        with self._lock:
-            existing = self._entries.get(k)
-            if existing is not None:
-                existing.frequency += 1
-                existing.last_updated = now
-                if app_bundle_id:
-                    existing.app_bundle_id = app_bundle_id
-                if asr_model:
-                    existing.asr_model = asr_model
-                if llm_model:
-                    existing.llm_model = llm_model
-                if enhance_mode:
-                    existing.enhance_mode = enhance_mode
-                entry = existing
-            else:
-                entry = ManualVocabEntry(
-                    term=term,
-                    variant=variant,
-                    source=source,
-                    frequency=1,
-                    hit_count=0,
-                    first_seen=now,
-                    last_updated=now,
-                    last_hit="",
-                    app_bundle_id=app_bundle_id,
-                    asr_model=asr_model,
-                    llm_model=llm_model,
-                    enhance_mode=enhance_mode,
-                )
-                self._entries[k] = entry
-        if persist:
-            self.save()
-        return entry
+        row = self._db.add(
+            variant, term, source,
+            app_bundle_id=app_bundle_id,
+            asr_model=asr_model,
+            llm_model=llm_model,
+            enhance_mode=enhance_mode,
+        )
+        if row is None:
+            return ManualVocabEntry(term=term, variant=variant, source=source)
+        return _entry_from_row(row)
 
     def remove(self, variant: str, term: str) -> bool:
         """Remove a correction pair.  Returns True if it existed."""
-        k = _key(variant, term)
-        with self._lock:
-            removed = self._entries.pop(k, None)
-        if removed is not None:
-            self.save()
-            return True
-        return False
+        return self._db.remove(_normalize(variant), _normalize(term))
 
-    def remove_batch(self, pairs: list[tuple[str, str]], *, persist: bool = True) -> int:
-        """Remove multiple correction pairs.  Returns count removed.
-
-        When *persist* is False the caller is responsible for calling save().
-        """
-        count = 0
-        with self._lock:
-            for variant, term in pairs:
-                k = _key(variant, term)
-                if self._entries.pop(k, None) is not None:
-                    count += 1
-        if count and persist:
-            self.save()
-        return count
+    def remove_batch(
+        self, pairs: list[tuple[str, str]],
+        *, persist: bool = True,  # accepted for API compat, no effect
+    ) -> int:
+        """Remove multiple correction pairs.  Returns count removed."""
+        normalized = [(_normalize(v), _normalize(t)) for v, t in pairs]
+        return self._db.remove_batch(normalized)
 
     def get(self, variant: str, term: str) -> Optional[ManualVocabEntry]:
         """Return the entry for a (variant, term) pair, or None."""
-        k = _key(variant, term)
-        with self._lock:
-            return self._entries.get(k)
+        row = self._db.get(_normalize(variant), _normalize(term))
+        return _entry_from_row(row) if row else None
 
     def contains(self, variant: str, term: str) -> bool:
         """Check whether a (variant, term) pair exists."""
-        return self.get(variant, term) is not None
+        return self._db.contains(_normalize(variant), _normalize(term))
 
     # ------------------------------------------------------------------
-    # Hit tracking
+    # Two-phase hit tracking
+    # ------------------------------------------------------------------
+
+    def record_asr_phase(
+        self,
+        asr_text: str,
+        *,
+        asr_model: str = "",
+        app_bundle_id: str = "",
+    ) -> list[ManualVocabEntry]:
+        """Phase 1: detect ASR hits/misses before LLM enhancement.
+
+        Scans *asr_text* against all entries.  Records ``asr_miss`` when the
+        variant appears (ASR got it wrong) and ``asr_hit`` when the term
+        appears (ASR got it right).
+
+        Returns the list of entries that were ``asr_miss``.
+        """
+        entries = self.get_all()
+        asr_text_lower = asr_text.lower()
+        context_keys = build_context_keys(
+            model_prefix=CTX_ASR, model_name=asr_model,
+            app_bundle_id=app_bundle_id,
+        )
+
+        asr_miss_entries: list[ManualVocabEntry] = []
+        stats_batch: list[tuple[int, str, str]] = []
+
+        for entry in entries:
+            if entry.variant.lower() in asr_text_lower:
+                for key in context_keys:
+                    stats_batch.append((entry.id, METRIC_ASR_MISS, key))
+                asr_miss_entries.append(entry)
+            elif entry.term.lower() in asr_text_lower:
+                for key in context_keys:
+                    stats_batch.append((entry.id, METRIC_ASR_HIT, key))
+
+        if stats_batch:
+            self._db.record_stats(stats_batch)
+
+        return asr_miss_entries
+
+    def record_llm_phase(
+        self,
+        asr_miss_entries: list[ManualVocabEntry],
+        enhanced_text: str,
+        *,
+        llm_model: str = "",
+        app_bundle_id: str = "",
+    ) -> None:
+        """Phase 2: detect LLM correction results after enhancement.
+
+        For each entry that was ``asr_miss`` in phase 1, checks whether the
+        LLM successfully corrected it (``llm_hit``) or not (``llm_miss``).
+        """
+        enhanced_lower = enhanced_text.lower()
+        context_keys = build_context_keys(
+            model_prefix=CTX_LLM, model_name=llm_model,
+            app_bundle_id=app_bundle_id,
+        )
+
+        stats_batch: list[tuple[int, str, str]] = []
+        for entry in asr_miss_entries:
+            metric = METRIC_LLM_HIT if entry.term.lower() in enhanced_lower else METRIC_LLM_MISS
+            for key in context_keys:
+                stats_batch.append((entry.id, metric, key))
+
+        if stats_batch:
+            self._db.record_stats(stats_batch)
+
+    # ------------------------------------------------------------------
+    # Legacy hit tracking (compatibility shim)
     # ------------------------------------------------------------------
 
     def record_hit(self, variant: str, term: str) -> None:
-        """Record that this pair was used in a correction.
-
-        Increments *hit_count* and updates *last_hit*.
-        """
+        """Record that this pair was used in a correction (legacy)."""
         self.record_hits([(variant, term)])
 
     def record_hits(self, pairs: list[tuple[str, str]]) -> None:
-        """Record multiple hits in a single save operation."""
-        now = _now_iso()
-        changed = False
-        with self._lock:
-            for variant, term in pairs:
-                entry = self._entries.get(_key(variant, term))
-                if entry is not None:
-                    entry.hit_count += 1
-                    entry.last_hit = now
-                    changed = True
-        if changed:
-            self.save()
+        """Record multiple hits in a single operation (legacy)."""
+        stats_batch: list[tuple[int, str, str]] = []
+        for variant, term in pairs:
+            entry = self.get(variant, term)
+            if entry is not None:
+                stats_batch.append((entry.id, METRIC_LLM_HIT, "legacy"))
+        if stats_batch:
+            self._db.record_stats(stats_batch)
 
     def find_hits_in_text(self, text: str) -> list[ManualVocabEntry]:
         """Return entries whose *variant* appears in *text* (case-insensitive)."""
         text_lower = text.lower()
-        hits: list[ManualVocabEntry] = []
-        with self._lock:
-            for entry in self._entries.values():
-                if entry.variant.lower() in text_lower:
-                    hits.append(entry)
-        return hits
+        return [e for e in self.get_all() if e.variant.lower() in text_lower]
 
     # ------------------------------------------------------------------
     # Query helpers
@@ -277,52 +265,41 @@ class ManualVocabularyStore:
 
     def get_all(self) -> list[ManualVocabEntry]:
         """Return a snapshot of all entries."""
-        with self._lock:
-            return list(self._entries.values())
+        return [_entry_from_row(r) for r in self._db.get_all()]
 
     def get_all_for_state(self) -> list[dict]:
         """Return ``[{variant, term}]`` for JS-side state synchronization."""
-        with self._lock:
-            return [
-                {"variant": e.variant, "term": e.term}
-                for e in self._entries.values()
-            ]
+        return [
+            {"variant": r["variant"], "term": r["term"]}
+            for r in self._db.get_all()
+        ]
 
     def get_asr_hotwords(
         self,
         *,
         asr_model: Optional[str] = None,
         app_bundle_id: Optional[str] = None,
+        max_count: int = 0,
     ) -> list[str]:
         """Return *term* strings for ASR hotword injection.
 
-        When *app_bundle_id* or *asr_model* is given, entries matching the
-        filter are returned first, followed by non-matching entries.  This
-        ensures context-specific hotwords have higher priority while still
-        exposing the full manual vocabulary.
+        Entries are ranked by ``asr_miss`` count in the corresponding bucket,
+        with cold-start fallback to global stats then recency.
+        When *max_count* is 0, all entries are returned.
         """
-        with self._lock:
-            entries = list(self._entries.values())
+        context_key = self._query_context_key(CTX_ASR, asr_model, app_bundle_id)
+        limit = max_count if max_count > 0 else max(self._db.entry_count, 1)
+        ranked = self._db.top_with_fallback(METRIC_ASR_MISS, context_key, limit)
 
-        # Partition into matching vs non-matching
-        matching: list[str] = []
-        other: list[str] = []
         seen: set[str] = set()
-        for e in entries:
-            term_lower = e.term.lower()
-            if term_lower in seen:
-                continue
-            seen.add(term_lower)
-            is_match = True
-            if app_bundle_id and e.app_bundle_id and e.app_bundle_id != app_bundle_id:
-                is_match = False
-            if asr_model and e.asr_model and e.asr_model != asr_model:
-                is_match = False
-            if is_match:
-                matching.append(e.term)
-            else:
-                other.append(e.term)
-        return matching + other
+        result: list[str] = []
+        for d in ranked:
+            term_lower = d["term"].lower()
+            if term_lower not in seen:
+                seen.add(term_lower)
+                result.append(d["term"])
+
+        return result
 
     def get_llm_vocab(
         self,
@@ -333,31 +310,59 @@ class ManualVocabularyStore:
     ) -> list[ManualVocabEntry]:
         """Return entries for LLM prompt injection.
 
-        When *llm_model* or *app_bundle_id* is given, entries matching the
-        filter are returned first, followed by non-matching entries.  This
-        ensures context-specific vocabulary has higher priority while still
-        exposing the full manual vocabulary.
-        At most *max_entries* are returned to keep the prompt concise.
+        Entries are ranked by ``llm_hit`` count in the corresponding bucket,
+        with cold-start fallback.  At most *max_entries* are returned.
         """
-        with self._lock:
-            entries = list(self._entries.values())
+        context_key = self._query_context_key(CTX_LLM, llm_model, app_bundle_id)
+        ranked = self._db.top_with_fallback(METRIC_LLM_HIT, context_key, max_entries)
+        return [_entry_from_row(d) for d in ranked]
 
-        matching: list[ManualVocabEntry] = []
-        other: list[ManualVocabEntry] = []
-        for e in entries:
-            is_match = True
-            if app_bundle_id and e.app_bundle_id and e.app_bundle_id != app_bundle_id:
-                is_match = False
-            if llm_model and e.llm_model and e.llm_model != llm_model:
-                is_match = False
-            if is_match:
-                matching.append(e)
-            else:
-                other.append(e)
+    def get_entry_stats(self, variant: str, term: str) -> dict:
+        """Return full bucketed statistics for an entry.
 
-        return (matching + other)[:max_entries]
+        Returns ``{"asr": [...], "llm": [...]}`` where each list item has
+        ``context``, ``miss``, ``hit``, ``last`` keys.
+        """
+        entry = self.get(variant, term)
+        if entry is None:
+            return {"asr": [], "llm": []}
+
+        stats = self._db.get_stats(entry.id)
+
+        buckets: dict[str, dict[str, dict]] = {"asr": {}, "llm": {}}
+        for s in stats:
+            mapping = self._DIMENSION_MAP.get(s["metric"])
+            if not mapping:
+                continue
+            dim, field = mapping
+            bucket = buckets[dim].setdefault(
+                s["context_key"],
+                {"context": s["context_key"], "miss": 0, "hit": 0, "last": ""},
+            )
+            bucket[field] = s["count"]
+            if s["last_time"] > bucket["last"]:
+                bucket["last"] = s["last_time"]
+
+        return {
+            dim: sorted(dim_buckets.values(), key=lambda b: b[self._SORT_KEY[dim]], reverse=True)
+            for dim, dim_buckets in buckets.items()
+        }
+
+    def rename_entry(self, entry_id: int, new_variant: str, new_term: str) -> Optional[ManualVocabEntry]:
+        """Rename an entry's variant/term in place, preserving stats and frequency."""
+        row = self._db.rename_entry(entry_id, _normalize(new_variant), _normalize(new_term))
+        return _entry_from_row(row) if row else None
+
+    def get_stats_summary_batch(
+        self, entry_ids: list[int], metrics: list[str],
+    ) -> dict[tuple[int, str], int]:
+        """Batch fetch stats summaries — delegates to VocabDB."""
+        return self._db.get_stats_summary_batch(entry_ids, metrics)
+
+    def update_fields(self, entry_id: int, fields: dict) -> None:
+        """Update specific fields on an entry by id (delegates to VocabDB)."""
+        self._db.update_fields(entry_id, fields)
 
     @property
     def entry_count(self) -> int:
-        with self._lock:
-            return len(self._entries)
+        return self._db.entry_count

@@ -438,6 +438,8 @@
   "preview.hotwords_table.variant": "Variant",
   "preview.hotwords_table.source": "Source",
   "preview.hotwords_table.hits": "Hits",
+  "preview.hotwords_table.asr_miss": "ASR Miss",
+  "preview.hotwords_table.llm_hit": "LLM Hit",
   "preview.hotwords_table.last_hit": "Last Hit",
   "preview.hotwords_table.first_seen": "First Seen",
   "preview.context_panel.title": "Context & LLM Vocabulary",

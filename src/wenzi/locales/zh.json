@@ -438,6 +438,8 @@
   "preview.hotwords_table.variant": "变体",
   "preview.hotwords_table.source": "来源",
   "preview.hotwords_table.hits": "命中",
+  "preview.hotwords_table.asr_miss": "ASR Miss",
+  "preview.hotwords_table.llm_hit": "LLM Hit",
   "preview.hotwords_table.last_hit": "最后命中",
   "preview.hotwords_table.first_seen": "最早出现",
   "preview.context_panel.title": "上下文 & LLM 词库",

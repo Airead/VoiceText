@@ -969,7 +969,7 @@ function setVocabHits(hits) {
                 '<span class="hit-arrow">←</span>' +
                 '<span class="hit-variant">' + _escHtml(h.variant) + '</span>' +
             '</div>' +
-            '<div class="hit-stats">hits: ' + (h.hitCount || 0) + '  freq: ' + (h.frequency || 0) + '</div>';
+            '<div class="hit-stats">freq: ' + (h.frequency || 0) + '</div>';
         container.appendChild(card);
     });
     _updateDiffCount();
