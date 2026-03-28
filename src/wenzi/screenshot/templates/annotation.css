@@ -36,9 +36,12 @@ html, body {
   align-items: center;
   gap: 4px;
   padding: 6px 10px;
-  background: transparent;
+  background: rgba(40, 40, 40, 0.95);
   border-radius: 6px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 1000;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 
 .tool-group {
@@ -119,9 +122,12 @@ html, body {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: transparent;
+  background: rgba(40, 40, 40, 0.95);
   border-radius: 6px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 1000;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
   transition: opacity 0.15s;
 }
 

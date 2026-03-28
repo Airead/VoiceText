@@ -472,18 +472,6 @@ class AnnotationLayer:
         panel.setHasShadow_(True)
         panel.setHidesOnDeactivate_(False)
 
-        # Border + rounded corners via CALayer
-        content_view = panel.contentView()
-        content_view.setWantsLayer_(True)
-        layer = content_view.layer()
-        layer.setCornerRadius_(8.0)
-        layer.setBorderWidth_(1.0)
-        from AppKit import NSColor
-        layer.setBorderColor_(
-            NSColor.colorWithSRGBRed_green_blue_alpha_(0.5, 0.5, 0.5, 0.6).CGColor()
-        )
-        layer.setMasksToBounds_(True)
-
         # WKWebView configuration
         content_controller = WKUserContentController.alloc().init()
 
