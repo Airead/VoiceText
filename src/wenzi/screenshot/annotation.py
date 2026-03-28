@@ -181,7 +181,7 @@ class AnnotationLayer:
         if self._panel is None:
             return
         self._panel.send("init", {
-            "imageUrl": f"wz-file://{self._image_path}",
+            "imageUrl": f"file://{self._image_path}",
             "width": canvas_w,
             "height": canvas_h,
         })
