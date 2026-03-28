@@ -59,7 +59,7 @@
     });
 
     // Load background image
-    fabric.FabricImage.fromURL(imageUrl, { crossOrigin: "anonymous" }).then(
+    fabric.FabricImage.fromURL(imageUrl).then(
       function (img) {
         bgImage = img;
         img.set({
