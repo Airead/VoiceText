@@ -275,23 +275,22 @@
     var cos = Math.cos(angle);
     var sin = Math.sin(angle);
 
-    // Dimensions: narrow tail, tapered body, wide head
-    var tailW = sw * 0.6;
-    var headW = sw * 3;
-    var headLen = Math.min(len * 0.35, sw * 6);
+    // Dimensions: sharp tail → tapered body → wide head
+    var tailW = sw * 0.15;
+    var bodyW = sw * 1.2;
+    var headW = sw * 5;
+    var headLen = Math.min(len * 0.4, sw * 8);
     var bodyLen = len - headLen;
 
-    // Build polygon points in local coords (arrow along +X axis),
-    // then rotate and translate to world position.
-    // Shape: narrow tail → widens slightly → head notch → tip
+    // Polygon points in local coords (arrow along +X axis)
+    // Shape: near-point tail → widens through body → notch → wide head → tip
     var pts = [
-      [0, -tailW],                  // tail top
-      [bodyLen, -tailW * 1.5],      // body top (slightly wider)
+      [0, 0],                       // tail point (sharp)
+      [bodyLen, -bodyW],            // body top
       [bodyLen, -headW],            // head notch top
       [len, 0],                     // tip
       [bodyLen, headW],             // head notch bottom
-      [bodyLen, tailW * 1.5],       // body bottom
-      [0, tailW],                   // tail bottom
+      [bodyLen, bodyW],             // body bottom
     ];
 
     var worldPts = [];
