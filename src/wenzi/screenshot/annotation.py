@@ -690,7 +690,9 @@ class AnnotationLayer:
             logger.warning("Exported event with no data")
             return
 
-        data_url = data.get("dataUrl") if isinstance(data, dict) else None
+        # data may be a Python dict or an NSDictionary from the WKWebView bridge;
+        # both support .get(), so use hasattr rather than isinstance(data, dict).
+        data_url = data.get("dataUrl") if hasattr(data, "get") else None
         if not data_url:
             logger.warning("Exported event missing dataUrl")
             return
