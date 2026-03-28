@@ -268,22 +268,27 @@
 
   function createArrow(x1, y1, x2, y2) {
     var sw = getThickness();
-    var headLen = sw * 4;
+    var headWidth = Math.max(sw * 6, 18);
+    var headHeight = Math.max(sw * 8, 24);
     var angle = Math.atan2(y2 - y1, x2 - x1);
 
-    var line = new fabric.Line([x1, y1, x2, y2], {
+    // Shorten the line so it doesn't poke through the arrowhead
+    var shortenBy = headHeight * 0.4;
+    var lx2 = x2 - Math.cos(angle) * shortenBy;
+    var ly2 = y2 - Math.sin(angle) * shortenBy;
+
+    var line = new fabric.Line([x1, y1, lx2, ly2], {
       stroke: currentColor,
       strokeWidth: sw,
       selectable: false,
       evented: false,
     });
 
-    // Arrowhead triangle positioned at the endpoint, rotated to match the line
     var head = new fabric.Triangle({
       left: x2,
       top: y2,
-      width: headLen,
-      height: headLen,
+      width: headWidth,
+      height: headHeight,
       fill: currentColor,
       selectable: false,
       evented: false,
