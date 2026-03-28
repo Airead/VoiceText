@@ -14,7 +14,6 @@ html, body {
   overflow: hidden;
   background: transparent;
   font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-  border: 1.5px solid rgba(128, 128, 128, 0.5);
 }
 
 /* ── Canvas ── */
