@@ -436,6 +436,13 @@ class WenZiApp(StatusBarApp):
             t("menu.enhance_clipboard"), callback=self._preview_controller.on_clipboard_enhance
         )
 
+        self._screenshot_item = StatusMenuItem(
+            "Screenshot", callback=self._on_screenshot
+        )
+        self._screenshot_hotkey_listener = None
+        self._screenshot_overlay = None
+        self._screenshot_annotation = None
+
         # Feedback toggle items
         self._sound_feedback_item = StatusMenuItem(
             t("menu.sound_feedback"), callback=self._recording_controller.on_sound_feedback_toggle
@@ -495,6 +502,7 @@ class WenZiApp(StatusBarApp):
                 self._status_item,
                 None,
                 self._clipboard_enhance_item,
+                self._screenshot_item,
                 self._browse_history_item,
                 self._vocab_manager_item,
                 self._settings_item,
@@ -1035,6 +1043,55 @@ class WenZiApp(StatusBarApp):
             return
         self._settings_controller.on_open_settings(_)
 
+    # ── Screenshot ────────────────────────────────────────────────────────
+
+    def _on_screenshot(self, _=None) -> None:
+        """Handle screenshot hotkey press or menu item click."""
+        from wenzi.screenshot import capture_screen, ScreenshotOverlay, AnnotationLayer
+
+        try:
+            screen_data = capture_screen()
+        except Exception:
+            logger.exception("Screenshot capture failed")
+            return
+
+        self._screenshot_overlay = ScreenshotOverlay(screen_data)
+        self._screenshot_annotation = AnnotationLayer()
+
+        def on_region_selected(region_rect, cropped_image):
+            self._screenshot_overlay.close()
+            self._screenshot_annotation.show(
+                region_rect=region_rect,
+                cropped_image=cropped_image,
+                on_done=self._on_screenshot_done,
+                on_cancel=self._on_screenshot_cancel,
+            )
+
+        def on_region_cancel():
+            self._screenshot_overlay.close()
+            self._screenshot_overlay = None
+
+        self._screenshot_overlay.show(
+            on_complete=on_region_selected,
+            on_cancel=on_region_cancel,
+        )
+
+    def _on_screenshot_done(self) -> None:
+        """Screenshot completed — clean up."""
+        if self._screenshot_annotation:
+            self._screenshot_annotation.close()
+            self._screenshot_annotation = None
+        self._screenshot_overlay = None
+
+    def _on_screenshot_cancel(self) -> None:
+        """Screenshot annotation cancelled."""
+        if self._screenshot_annotation:
+            self._screenshot_annotation.close()
+            self._screenshot_annotation = None
+        if self._screenshot_overlay:
+            self._screenshot_overlay.close()
+            self._screenshot_overlay = None
+
     def _on_quit_click(self, _) -> None:
         self._update_controller.stop()
         if hasattr(self, "_script_engine") and self._script_engine:
@@ -1043,6 +1100,8 @@ class WenZiApp(StatusBarApp):
             self._hotkey_listener.stop()
         if self._clipboard_hotkey_listener:
             self._clipboard_hotkey_listener.stop()
+        if self._screenshot_hotkey_listener:
+            self._screenshot_hotkey_listener.stop()
         if self._settings_panel.is_visible:
             self._settings_panel.close()
         if self._vocab_controller is not None:
@@ -1402,6 +1461,15 @@ class WenZiApp(StatusBarApp):
                 on_activate=self._preview_controller.on_clipboard_enhance,
             )
             self._clipboard_hotkey_listener.start()
+
+        # Start screenshot hotkey listener if configured
+        screenshot_hotkey = self._config.get("screenshot", {}).get("hotkey", "")
+        if screenshot_hotkey:
+            self._screenshot_hotkey_listener = TapHotkeyListener(
+                hotkey_str=screenshot_hotkey,
+                on_activate=self._on_screenshot,
+            )
+            self._screenshot_hotkey_listener.start()
 
         # Schedule warmup after the event loop starts to pre-create heavy
         # objects (WKWebView, NSSound) so the first user interaction is snappy.

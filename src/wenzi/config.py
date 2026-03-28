@@ -330,6 +330,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "clipboard_enhance": {
         "hotkey": "ctrl+cmd+v",
     },
+    "screenshot": {
+        "hotkey": "cmd+shift+a",
+        "save_directory": "~/Desktop",
+        "sound_enabled": True,
+    },
     "feedback": {
         "sound_enabled": True,
         "sound_volume": 0.4,
