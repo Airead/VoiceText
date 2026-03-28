@@ -44,6 +44,20 @@ def _keychain_set(account: str, value: str) -> bool:
     return _kc_set(account, value)
 
 
+def _keychain_list(prefix: str = "") -> list[str]:
+    from wenzi.keychain import _keychain_list as _kc_list
+
+    return _kc_list(prefix)
+
+
+def _keychain_delete(account: str) -> None:
+    from wenzi.keychain import _keychain_delete as _kc_delete
+
+    _kc_delete(account)
+
+
+_MIGRATE_PREFIXES = ("ai_enhance.providers.", "asr.providers.")
+
 # ---------------------------------------------------------------------------
 # Vault class
 # ---------------------------------------------------------------------------
@@ -60,7 +74,7 @@ class Vault:
         self._path = vault_path or _DEFAULT_PATH
         self._data: dict[str, str] = {}
         self._loaded = False
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._dirty = False
         self._flush_timer: Optional[threading.Timer] = None
         self._master_key: Optional[bytes] = self._init_master_key()
@@ -98,15 +112,47 @@ class Vault:
             return
         self._loaded = True
         if not os.path.isfile(self._path):
+            pass
+        else:
+            try:
+                with open(self._path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    self._data = data
+                logger.debug("Loaded vault: %d keys", len(self._data))
+            except Exception:
+                logger.warning("Failed to load vault", exc_info=True)
+        self._migrate_from_keychain()
+
+    def _migrate_from_keychain(self) -> None:
+        """One-time migration: move old per-secret Keychain entries to vault."""
+        if self._master_key is None:
             return
         try:
-            with open(self._path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, dict):
-                self._data = data
-            logger.debug("Loaded vault: %d keys", len(self._data))
+            old_accounts: list[str] = []
+            for prefix in _MIGRATE_PREFIXES:
+                old_accounts.extend(_keychain_list(prefix))
+            if not old_accounts:
+                return
+
+            self._ensure_loaded()
+            migrated = 0
+            for account in old_accounts:
+                if account not in self._data:
+                    old_value = _keychain_get(account)
+                    if old_value:
+                        self.set(account, old_value)
+                        migrated += 1
+                _keychain_delete(account)
+
+            if migrated:
+                self.flush_sync()
+                logger.info(
+                    "Migrated %d secrets from macOS Keychain to vault",
+                    migrated,
+                )
         except Exception:
-            logger.warning("Failed to load vault", exc_info=True)
+            logger.warning("Keychain migration failed", exc_info=True)
 
     # -- encryption ---------------------------------------------------------
 

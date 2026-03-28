@@ -137,6 +137,68 @@ class TestVaultFlush:
         assert v2.get("token") == "persisted"
 
 
+class TestVaultMigration:
+    @patch("wenzi.vault._keychain_delete")
+    @patch("wenzi.vault._keychain_list")
+    @patch("wenzi.vault._keychain_set", return_value=True)
+    @patch("wenzi.vault._keychain_get")
+    def test_migrates_old_entries(self, mock_get, mock_set, mock_list, mock_delete, tmp_path):
+        from wenzi.vault import Vault
+
+        mock_get.side_effect = lambda acct: {
+            "scripting.vault.master_key": MOCK_MASTER_KEY_B64,
+            "ai_enhance.providers.openai.api_key": "sk-old-key",
+            "asr.providers.groq.api_key": "gsk-old-key",
+        }.get(acct)
+        mock_list.side_effect = lambda prefix: {
+            "ai_enhance.providers.": ["ai_enhance.providers.openai.api_key"],
+            "asr.providers.": ["asr.providers.groq.api_key"],
+        }.get(prefix, [])
+
+        v = Vault(vault_path=str(tmp_path / "vault.json"))
+        assert v.get("ai_enhance.providers.openai.api_key") == "sk-old-key"
+        assert v.get("asr.providers.groq.api_key") == "gsk-old-key"
+        assert mock_delete.call_count == 2
+
+    @patch("wenzi.vault._keychain_delete")
+    @patch("wenzi.vault._keychain_list")
+    @patch("wenzi.vault._keychain_set", return_value=True)
+    @patch("wenzi.vault._keychain_get", return_value=MOCK_MASTER_KEY_B64)
+    def test_migration_skips_when_no_old_entries(self, mock_get, mock_set, mock_list, mock_delete, tmp_path):
+        from wenzi.vault import Vault
+
+        mock_list.return_value = []
+        v = Vault(vault_path=str(tmp_path / "vault.json"))
+        # Trigger _ensure_loaded by reading
+        v.keys()
+        mock_delete.assert_not_called()
+
+    @patch("wenzi.vault._keychain_delete")
+    @patch("wenzi.vault._keychain_list")
+    @patch("wenzi.vault._keychain_set", return_value=True)
+    @patch("wenzi.vault._keychain_get")
+    def test_migration_skips_already_existing_keys(self, mock_get, mock_set, mock_list, mock_delete, tmp_path):
+        from wenzi.vault import Vault
+
+        mock_get.side_effect = lambda acct: {
+            "scripting.vault.master_key": MOCK_MASTER_KEY_B64,
+            "ai_enhance.providers.openai.api_key": "sk-old",
+        }.get(acct)
+        mock_list.return_value = ["ai_enhance.providers.openai.api_key"]
+
+        # Pre-create vault file with existing entry
+        v_setup = Vault(vault_path=str(tmp_path / "vault.json"))
+        v_setup.set("ai_enhance.providers.openai.api_key", "sk-new")
+        v_setup.flush_sync()
+
+        # New instance should NOT overwrite existing key
+        mock_list.return_value = ["ai_enhance.providers.openai.api_key"]
+        v = Vault(vault_path=str(tmp_path / "vault.json"))
+        assert v.get("ai_enhance.providers.openai.api_key") == "sk-new"
+        # Should still delete old Keychain entry
+        mock_delete.assert_called_with("ai_enhance.providers.openai.api_key")
+
+
 class TestGetVault:
     @patch("wenzi.vault._keychain_set", return_value=True)
     @patch("wenzi.vault._keychain_get", return_value=MOCK_MASTER_KEY_B64)
