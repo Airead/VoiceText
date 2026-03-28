@@ -197,6 +197,10 @@ class SettingsWebPanel:
             f"_updateSttSelection({payload})", None
         )
 
+    def update_enhance_mode(self, mode_id: str) -> None:
+        """Update enhance mode selection in the webview."""
+        self.update_state({"current_enhance_mode": mode_id})
+
     def _set_element_text(self, element_id: str, value: str) -> None:
         """Set textContent of a DOM element by ID."""
         if self._webview is None or not self.is_visible:
