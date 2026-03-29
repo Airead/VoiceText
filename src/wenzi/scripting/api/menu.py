@@ -39,6 +39,24 @@ def _build_shortcut(cmd_char: str, modifiers: int) -> str:
     return "".join(parts)
 
 
+# macOS virtual keycodes for common characters (US keyboard layout)
+_KEYCODE_MAP = {
+    "A": 0, "B": 11, "C": 8, "D": 2, "E": 14, "F": 3, "G": 5,
+    "H": 4, "I": 34, "J": 38, "K": 40, "L": 37, "M": 46, "N": 45,
+    "O": 31, "P": 35, "Q": 12, "R": 15, "S": 1, "T": 17, "U": 32,
+    "V": 9, "W": 13, "X": 7, "Y": 16, "Z": 6,
+    "0": 29, "1": 18, "2": 19, "3": 20, "4": 21, "5": 23,
+    "6": 22, "7": 26, "8": 28, "9": 25,
+    ",": 43, ".": 47, "/": 44, ";": 41, "'": 39,
+    "[": 33, "]": 30, "\\": 42, "-": 27, "=": 24, "`": 50,
+}
+
+
+def _char_to_keycode(char: str):
+    """Map a character to its macOS virtual keycode, or None."""
+    return _KEYCODE_MAP.get(char.upper())
+
+
 class MenuAPI:
     """Enumerate and trigger the app's statusbar menu items — ``wz.menu``."""
 
@@ -223,28 +241,73 @@ class MenuAPI:
     def app_menu_trigger(self, item, pid=None):
         """Trigger an app menu item obtained from ``app_menu()``.
 
-        Reactivates the target application, waits for it to become
-        frontmost, then re-locates the menu item by path and performs
-        AXPress.  The stored ``_ax_element`` is not reused because it
-        becomes stale when the app loses focus.
+        Strategy:
+          1. If the item has a keyboard shortcut, send it directly to the
+             target process via ``CGEventPostToPid`` — instant, no
+             activation needed.
+          2. Otherwise, activate the app, wait for it to become frontmost,
+             re-find the menu item via AX, and perform AXPress.
 
         Args:
-            item: A dict from ``app_menu()`` (must contain ``path``).
+            item: A dict from ``app_menu()``.
             pid: Target process ID.  Must be provided — the chooser's
                  ``_previous_app`` is cleared before the action runs.
 
         Returns True if the action was dispatched.
         """
-        path = item.get("path")
-        if not path:
-            return False
-
         if pid is None:
             pid = self._get_previous_pid()
         if pid is None:
             return False
 
-        # Activate the target app first
+        cmd_char = item.get("_cmd_char", "")
+        cmd_mods = item.get("_cmd_mods", 0)
+
+        if cmd_char:
+            return self._trigger_via_keystroke(pid, cmd_char, cmd_mods)
+        return self._trigger_via_axpress(pid, item.get("path", ""))
+
+    def _trigger_via_keystroke(self, pid: int, cmd_char: str, cmd_mods: int) -> bool:
+        """Send a keyboard shortcut directly to a process via CGEventPostToPid."""
+        try:
+            import Quartz
+
+            keycode = _char_to_keycode(cmd_char)
+            if keycode is None:
+                logger.debug("No keycode mapping for %r", cmd_char)
+                return False
+
+            # Build CGEvent modifier flags
+            # AX cmd_mods: bit0=Shift, bit1=Ctrl, bit2=Option
+            # Cmd is always implied
+            flags = Quartz.kCGEventFlagMaskCommand
+            if cmd_mods & 1:
+                flags |= Quartz.kCGEventFlagMaskShift
+            if cmd_mods & 2:
+                flags |= Quartz.kCGEventFlagMaskControl
+            if cmd_mods & 4:
+                flags |= Quartz.kCGEventFlagMaskAlternate
+
+            event_down = Quartz.CGEventCreateKeyboardEvent(None, keycode, True)
+            Quartz.CGEventSetFlags(event_down, flags)
+            Quartz.CGEventPostToPid(pid, event_down)
+
+            event_up = Quartz.CGEventCreateKeyboardEvent(None, keycode, False)
+            Quartz.CGEventSetFlags(event_up, flags)
+            Quartz.CGEventPostToPid(pid, event_up)
+
+            logger.info("app_menu_trigger keystroke: pid=%s char=%s mods=%s", pid, cmd_char, cmd_mods)
+            return True
+        except Exception:
+            logger.info("app_menu_trigger keystroke failed", exc_info=True)
+            return False
+
+    def _trigger_via_axpress(self, pid: int, path: str) -> bool:
+        """Activate the app, re-find the menu item by path, and AXPress."""
+        if not path:
+            return False
+
+        # Activate the target app
         try:
             from AppKit import NSRunningApplication
 
@@ -252,14 +315,15 @@ class MenuAPI:
             if app:
                 app.activateWithOptions_(2)  # IgnoringOtherApps
         except Exception:
-            logger.debug("Failed to activate app for menu trigger", exc_info=True)
+            logger.debug("Failed to activate app", exc_info=True)
 
         import time
         time.sleep(0.15)
 
-        # Re-find the menu item by path and press it
+        # Re-find and press
         try:
             from ApplicationServices import (
+                AXUIElementCopyAttributeValue,
                 AXUIElementCreateApplication,
                 AXUIElementPerformAction,
             )
@@ -269,58 +333,46 @@ class MenuAPI:
             if ax_menu_bar is None:
                 return False
 
-            ax_item = self._find_ax_item(ax_menu_bar, path)
-            if ax_item is None:
-                logger.debug("Menu item not found: %s", path)
+            # Navigate the AX tree by path segments
+            parts = [p.strip() for p in path.split(" > ")]
+            current = ax_menu_bar
+            target = None
+
+            for i, part in enumerate(parts):
+                err, children = AXUIElementCopyAttributeValue(
+                    current, "AXChildren", None,
+                )
+                if err != 0 or not children:
+                    return False
+                found = None
+                for child in children:
+                    err, title = AXUIElementCopyAttributeValue(
+                        child, "AXTitle", None,
+                    )
+                    if err == 0 and str(title) == part:
+                        found = child
+                        break
+                if found is None:
+                    return False
+                if i < len(parts) - 1:
+                    err, subs = AXUIElementCopyAttributeValue(
+                        found, "AXChildren", None,
+                    )
+                    if err != 0 or not subs:
+                        return False
+                    current = subs[0]
+                else:
+                    target = found
+
+            if target is None:
                 return False
 
-            AXUIElementPerformAction(ax_item, "AXPress")
+            AXUIElementPerformAction(target, "AXPress")
+            logger.info("app_menu_trigger AXPress: pid=%s path=%r", pid, path)
             return True
         except Exception:
-            logger.debug("Failed to trigger app menu item: %s", path, exc_info=True)
+            logger.info("app_menu_trigger AXPress failed: %s", path, exc_info=True)
             return False
-
-    def _find_ax_item(self, ax_menu_bar, path: str):
-        """Find an AXUIElement menu item by its path (e.g. ``"Tab > Pin Tab"``)."""
-        from ApplicationServices import AXUIElementCopyAttributeValue
-
-        parts = [p.strip() for p in path.split(" > ")]
-        current = ax_menu_bar
-
-        for i, part in enumerate(parts):
-            err, children = AXUIElementCopyAttributeValue(
-                current, "AXChildren", None,
-            )
-            if err != 0 or not children:
-                return None
-
-            found = None
-            for child in children:
-                err, title = AXUIElementCopyAttributeValue(
-                    child, "AXTitle", None,
-                )
-                if err != 0 or not title:
-                    continue
-                if str(title) == part:
-                    found = child
-                    break
-
-            if found is None:
-                return None
-
-            if i < len(parts) - 1:
-                # Intermediate level — descend into submenu
-                err, subs = AXUIElementCopyAttributeValue(
-                    found, "AXChildren", None,
-                )
-                if err != 0 or not subs or len(subs) == 0:
-                    return None
-                current = subs[0]  # AXMenu container
-            else:
-                # Final level — this is the target item
-                return found
-
-        return None
 
     def _get_previous_pid(self):
         """Get pid of app that was frontmost before chooser opened."""
@@ -378,6 +430,8 @@ class MenuAPI:
                     "path": path,
                     "enabled": enabled,
                     "shortcut": shortcut,
+                    "_cmd_char": cmd_char,
+                    "_cmd_mods": cmd_mods,
                     "_ax_element": child,
                 })
 
