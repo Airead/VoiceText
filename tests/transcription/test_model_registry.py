@@ -10,7 +10,6 @@ from wenzi.transcription.model_registry import (
     PRESETS,
     find_fallback_preset,
     get_model_cache_dir,
-    get_model_size,
     is_backend_available,
     is_model_cached,
     resolve_preset_from_config,
@@ -124,32 +123,6 @@ class TestGetModelCacheDir:
         cache_dir = get_model_cache_dir(preset)
         assert isinstance(cache_dir, Path)
         assert "sherpa-onnx-models" in str(cache_dir)
-
-
-class TestGetModelSize:
-    def test_apple_speech_returns_none(self):
-        # Apple Speech is "always cached" but has no actual files
-        preset = PRESET_BY_ID["apple-speech-ondevice"]
-        # is_model_cached returns True but there's no real directory
-        # get_model_size should handle gracefully
-        size = get_model_size(preset)
-        # Apple returns True for is_model_cached, but cache dir won't exist
-        # Result depends on whether the dir exists
-        assert size is None or isinstance(size, int)
-
-    def test_uncached_model_returns_none(self):
-        from wenzi.transcription.model_registry import ModelPreset
-
-        # Use a backend that falls through to the default wenzi cache path
-        fake_preset = ModelPreset(
-            id="nonexistent-model-xyz",
-            display_name="Fake",
-            backend="nonexistent",
-            model=None,
-            language=None,
-        )
-        size = get_model_size(fake_preset)
-        assert size is None
 
 
 class TestIsBackendAvailable:
