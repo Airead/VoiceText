@@ -28,23 +28,10 @@ def _format_timestamp(ts: str) -> str:
 # NSObject subclasses (lazy-created, unique class names)
 # ---------------------------------------------------------------------------
 
-_HistoryBrowserWebCloseDelegate = None
-
-
 def _get_panel_close_delegate_class():
-    global _HistoryBrowserWebCloseDelegate
-    if _HistoryBrowserWebCloseDelegate is None:
-        from Foundation import NSObject
+    from wenzi.ui.web_utils import make_panel_close_delegate_class
 
-        class HistoryBrowserWebCloseDelegate(NSObject):
-            _panel_ref = None
-
-            def windowWillClose_(self, notification):
-                if self._panel_ref is not None:
-                    self._panel_ref.close()
-
-        _HistoryBrowserWebCloseDelegate = HistoryBrowserWebCloseDelegate
-    return _HistoryBrowserWebCloseDelegate
+    return make_panel_close_delegate_class("HistoryBrowserWebCloseDelegate")
 
 
 _HistoryBrowserWebNavigationDelegate = None

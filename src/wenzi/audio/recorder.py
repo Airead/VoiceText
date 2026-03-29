@@ -244,7 +244,7 @@ class Recorder:
 
         audio = np.concatenate(frames)
         duration = len(audio) / self.sample_rate
-        rms = int(np.sqrt(np.mean(audio.astype(np.float64) ** 2)))
+        rms = int(np.sqrt(np.mean(audio.astype(np.int32) ** 2)))
         logger.info(
             "Recording stopped, captured %d samples (%.1fs), RMS=%d",
             len(audio), duration, rms,
@@ -286,7 +286,7 @@ class Recorder:
             logger.warning("Max session size reached, dropping frames")
             return
 
-        self._current_rms = float(np.sqrt(np.mean(frame.astype(np.float64) ** 2)))
+        self._current_rms = float(np.sqrt(np.mean(frame.astype(np.int32) ** 2)))
         self._total_bytes += frame_bytes
         copied = frame.copy()
         try:

@@ -434,6 +434,38 @@ class RecordingIndicatorPanel:
         except Exception as e:
             logger.warning("Failed to hide recording indicator: %s", e)
 
+    def _rebuild_content_view(self, new_width: int, new_height: int) -> None:
+        """Resize the panel, recreate the content view, re-center, and restart the timer.
+
+        Shared helper for update_mode() and update_device_name().
+        """
+        from AppKit import NSScreen
+        from Foundation import NSTimer
+
+        self._clear_view_backref()
+        content_view = self._indicator_view.create_view(new_width, new_height)
+        self._panel.setContentSize_((float(new_width), float(new_height)))
+        self._panel.setContentView_(content_view)
+
+        # Re-center on screen
+        screen = NSScreen.mainScreen()
+        if screen:
+            sf = screen.visibleFrame()
+            x = sf.origin.x + (sf.size.width - new_width) / 2
+            y = sf.origin.y + (sf.size.height - new_height) / 2
+            self._panel.setFrameOrigin_((x, y))
+
+        # Restart refresh timer with new content view
+        if self._timer is not None:
+            self._timer.invalidate()
+        self._timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            _REFRESH_INTERVAL,
+            content_view,
+            b"refresh:",
+            None,
+            True,
+        )
+
     def update_mode(self, name: str, can_prev: bool, can_next: bool) -> None:
         """Update the mode label and nav arrow state on the indicator.
 
@@ -455,41 +487,11 @@ class RecordingIndicatorPanel:
 
         if self._panel is not None:
             try:
-                from AppKit import NSScreen
-
                 current_width = self._panel.frame().size.width
                 if current_width < _PANEL_WIDTH_WITH_MODE:
-                    current_height = self._panel.frame().size.height
-                    self._panel.setContentSize_(
-                        (float(_PANEL_WIDTH_WITH_MODE), float(current_height))
-                    )
-                    # Clear old view's back-reference before creating new one
-                    self._clear_view_backref()
-                    # Recreate content view at new width
-                    content_view = self._indicator_view.create_view(
-                        _PANEL_WIDTH_WITH_MODE, int(current_height)
-                    )
-                    self._panel.setContentView_(content_view)
-
-                    # Re-center on screen
-                    screen = NSScreen.mainScreen()
-                    if screen:
-                        sf = screen.visibleFrame()
-                        x = sf.origin.x + (sf.size.width - _PANEL_WIDTH_WITH_MODE) / 2
-                        y = sf.origin.y + (sf.size.height - current_height) / 2
-                        self._panel.setFrameOrigin_((x, y))
-
-                    # Restart refresh timer with new content view
-                    from Foundation import NSTimer
-
-                    if self._timer is not None:
-                        self._timer.invalidate()
-                    self._timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-                        _REFRESH_INTERVAL,
-                        content_view,
-                        b"refresh:",
-                        None,
-                        True,
+                    current_height = int(self._panel.frame().size.height)
+                    self._rebuild_content_view(
+                        _PANEL_WIDTH_WITH_MODE, current_height
                     )
             except Exception:
                 logger.debug("Failed to resize panel for mode display", exc_info=True)
@@ -513,41 +515,12 @@ class RecordingIndicatorPanel:
             return
 
         try:
-            from AppKit import NSScreen
-            from Foundation import NSTimer
-
             self._indicator_view._device_name = device_name
             # Reset cached label attrs so they are rebuilt on next draw
             self._indicator_view._label_attrs = None
 
-            new_height = _PANEL_HEIGHT_WITH_LABEL
             current_width = int(self._panel.frame().size.width)
-
-            # Clear old view's back-reference before creating new one
-            self._clear_view_backref()
-            # Resize panel and content view (preserve current width)
-            content_view = self._indicator_view.create_view(current_width, new_height)
-            self._panel.setContentSize_((float(current_width), float(new_height)))
-            self._panel.setContentView_(content_view)
-
-            # Re-center on screen
-            screen = NSScreen.mainScreen()
-            if screen:
-                sf = screen.visibleFrame()
-                x = sf.origin.x + (sf.size.width - current_width) / 2
-                y = sf.origin.y + (sf.size.height - new_height) / 2
-                self._panel.setFrameOrigin_((x, y))
-
-            # Restart refresh timer with new content view
-            if self._timer is not None:
-                self._timer.invalidate()
-            self._timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-                _REFRESH_INTERVAL,
-                content_view,
-                b"refresh:",
-                None,
-                True,
-            )
+            self._rebuild_content_view(current_width, _PANEL_HEIGHT_WITH_LABEL)
 
             logger.debug("Recording indicator updated with device: %s", device_name)
         except Exception:

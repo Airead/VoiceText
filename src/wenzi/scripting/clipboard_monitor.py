@@ -331,15 +331,6 @@ class _ClipboardDB:
         row = cur.fetchone()
         return row[0] if row else ""
 
-    def latest_image_path(self) -> str:
-        """Return the image_path of the most recent entry, or ''."""
-        cur = self._conn.execute(
-            "SELECT image_path FROM entries ORDER BY timestamp DESC LIMIT 1",
-        )
-        row = cur.fetchone()
-        return row[0] if row else ""
-
-
 # ---------------------------------------------------------------------------
 # JSON migration helper
 # ---------------------------------------------------------------------------
@@ -466,11 +457,6 @@ class ClipboardMonitor:
     def image_dir(self) -> str:
         """Return the image directory used by this monitor instance."""
         return self._image_dir
-
-    @staticmethod
-    def default_image_dir() -> str:
-        """Return the default directory for clipboard image storage."""
-        return _DEFAULT_IMAGE_DIR
 
     @property
     def icon_cache_dir(self) -> str:

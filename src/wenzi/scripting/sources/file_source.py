@@ -46,6 +46,47 @@ def _icon_png_path_for_folder(icon_cache_dir: str, path: str) -> str:
     return os.path.join(icon_cache_dir, f"folder_{h}.png")
 
 
+def _resize_icon_to_png(icon, png_path: str, icon_cache_dir: str) -> None:
+    """Resize an NSImage icon to _ICON_SIZE and write it as PNG.
+
+    *icon* is an ``NSImage`` obtained from NSWorkspace.  The caller is
+    responsible for checking the disk cache beforehand.
+    """
+    from AppKit import (
+        NSBitmapImageRep,
+        NSCompositingOperationCopy,
+        NSDeviceRGBColorSpace,
+        NSGraphicsContext,
+        NSPNGFileType,
+    )
+    from Foundation import NSMakeRect, NSZeroRect
+
+    sz = _ICON_SIZE
+    rep = NSBitmapImageRep.alloc() \
+        .initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(  # noqa: E501
+            None, sz, sz, 8, 4, True, False,
+            NSDeviceRGBColorSpace, 0, 0,
+        )
+    if rep is None:
+        return
+    ctx = NSGraphicsContext.graphicsContextWithBitmapImageRep_(rep)
+    if ctx is None:
+        return
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.setCurrentContext_(ctx)
+    icon.drawInRect_fromRect_operation_fraction_(
+        NSMakeRect(0, 0, sz, sz), NSZeroRect,
+        NSCompositingOperationCopy, 1.0,
+    )
+    NSGraphicsContext.restoreGraphicsState()
+
+    png_data = rep.representationUsingType_properties_(NSPNGFileType, None)
+    if png_data:
+        os.makedirs(icon_cache_dir, exist_ok=True)
+        with open(png_path, "wb") as f:
+            f.write(bytes(png_data))
+
+
 def _extract_filetype_icon(ext: str, icon_cache_dir: str) -> None:
     """Extract icon for a file extension and write to disk cache.
 
@@ -56,37 +97,12 @@ def _extract_filetype_icon(ext: str, icon_cache_dir: str) -> None:
     if os.path.isfile(png_path):
         return
     try:
-        from AppKit import (
-            NSBitmapImageRep,
-            NSCompositingOperationCopy,
-            NSImage,
-            NSPNGFileType,
-            NSWorkspace,
-        )
-        from Foundation import NSMakeRect, NSSize
+        from AppKit import NSWorkspace
 
-        ws = NSWorkspace.sharedWorkspace()
-        icon = ws.iconForFileType_(ext)
+        icon = NSWorkspace.sharedWorkspace().iconForFileType_(ext)
         if icon is None:
             return
-
-        size = NSSize(_ICON_SIZE, _ICON_SIZE)
-        target = NSImage.alloc().initWithSize_(size)
-        target.lockFocus()
-        icon.drawInRect_fromRect_operation_fraction_(
-            NSMakeRect(0, 0, _ICON_SIZE, _ICON_SIZE),
-            NSMakeRect(0, 0, icon.size().width, icon.size().height),
-            NSCompositingOperationCopy,
-            1.0,
-        )
-        target.unlockFocus()
-
-        rep = NSBitmapImageRep.imageRepWithData_(target.TIFFRepresentation())
-        png_data = rep.representationUsingType_properties_(NSPNGFileType, None)
-        if png_data:
-            os.makedirs(icon_cache_dir, exist_ok=True)
-            with open(png_path, "wb") as f:
-                f.write(bytes(png_data))
+        _resize_icon_to_png(icon, png_path, icon_cache_dir)
     except Exception:
         logger.debug("Failed to extract icon for extension %s", ext, exc_info=True)
 
@@ -102,37 +118,12 @@ def _extract_folder_icon(path: str, icon_cache_dir: str) -> None:
     if os.path.isfile(png_path):
         return
     try:
-        from AppKit import (
-            NSBitmapImageRep,
-            NSCompositingOperationCopy,
-            NSImage,
-            NSPNGFileType,
-            NSWorkspace,
-        )
-        from Foundation import NSMakeRect, NSSize
+        from AppKit import NSWorkspace
 
-        ws = NSWorkspace.sharedWorkspace()
-        icon = ws.iconForFile_(path)
+        icon = NSWorkspace.sharedWorkspace().iconForFile_(path)
         if icon is None:
             return
-
-        size = NSSize(_ICON_SIZE, _ICON_SIZE)
-        target = NSImage.alloc().initWithSize_(size)
-        target.lockFocus()
-        icon.drawInRect_fromRect_operation_fraction_(
-            NSMakeRect(0, 0, _ICON_SIZE, _ICON_SIZE),
-            NSMakeRect(0, 0, icon.size().width, icon.size().height),
-            NSCompositingOperationCopy,
-            1.0,
-        )
-        target.unlockFocus()
-
-        rep = NSBitmapImageRep.imageRepWithData_(target.TIFFRepresentation())
-        png_data = rep.representationUsingType_properties_(NSPNGFileType, None)
-        if png_data:
-            os.makedirs(icon_cache_dir, exist_ok=True)
-            with open(png_path, "wb") as f:
-                f.write(bytes(png_data))
+        _resize_icon_to_png(icon, png_path, icon_cache_dir)
     except Exception:
         logger.debug("Failed to extract folder icon for %s", path, exc_info=True)
 

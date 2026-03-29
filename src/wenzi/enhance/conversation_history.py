@@ -7,7 +7,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from wenzi.config import DEFAULT_DATA_DIR
 from wenzi.enhance.text_diff import inline_diff
@@ -509,6 +509,64 @@ class ConversationHistory:
         """
         return self.update_record(timestamp, final_text=new_final_text)
 
+    def _rewrite_matching_record(
+        self,
+        timestamp: str,
+        transform: Callable[[Dict[str, Any]], Optional[str]],
+    ) -> bool:
+        """Find a record by timestamp and rewrite the file with a transform.
+
+        Reads all lines, finds the first record matching *timestamp*, calls
+        *transform(record)* on the parsed dict.  If transform returns a
+        string, it replaces the original line; if it returns ``None``, the
+        line is dropped (deleted).
+
+        Uses atomic file replacement via a temporary file + ``os.replace()``.
+
+        Returns:
+            True if a matching record was found (and the file rewritten).
+        """
+        if not os.path.exists(self._history_path):
+            return False
+
+        try:
+            with open(self._history_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        except Exception as e:
+            logger.warning("Failed to read conversation history: %s", e)
+            return False
+
+        found = False
+        new_lines: List[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                new_lines.append(line)
+                continue
+            try:
+                record = json.loads(stripped)
+            except json.JSONDecodeError:
+                new_lines.append(line)
+                continue
+
+            if record.get("timestamp") == timestamp and not found:
+                found = True
+                replacement = transform(record)
+                if replacement is not None:
+                    new_lines.append(replacement)
+            else:
+                new_lines.append(line)
+
+        if not found:
+            return False
+
+        tmp_path = self._history_path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+        os.replace(tmp_path, self._history_path)
+
+        return True
+
     def update_record(self, timestamp: str, **fields: Any) -> bool:
         """Update one or more fields of a record identified by timestamp.
 
@@ -524,46 +582,17 @@ class ConversationHistory:
         """
         if not fields:
             return False
-        if not os.path.exists(self._history_path):
-            return False
 
-        try:
-            with open(self._history_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-        except Exception as e:
-            logger.warning("Failed to read conversation history: %s", e)
-            return False
-
-        found = False
         edit_ts = datetime.now(timezone.utc).isoformat()
-        new_lines: List[str] = []
-        for line in lines:
-            stripped = line.strip()
-            if not stripped:
-                new_lines.append(line)
-                continue
-            try:
-                record = json.loads(stripped)
-            except json.JSONDecodeError:
-                new_lines.append(line)
-                continue
 
-            if record.get("timestamp") == timestamp and not found:
-                for key, value in fields.items():
-                    record[key] = value
-                record["edited_at"] = edit_ts
-                new_lines.append(json.dumps(record, ensure_ascii=False) + "\n")
-                found = True
-            else:
-                new_lines.append(line)
+        def _transform(record: Dict[str, Any]) -> Optional[str]:
+            for key, value in fields.items():
+                record[key] = value
+            record["edited_at"] = edit_ts
+            return json.dumps(record, ensure_ascii=False) + "\n"
 
-        if not found:
+        if not self._rewrite_matching_record(timestamp, _transform):
             return False
-
-        tmp_path = self._history_path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-        os.replace(tmp_path, self._history_path)
 
         cache_fields = {**fields, "edited_at": edit_ts}
         self._update_cache_record(timestamp, cache_fields)
@@ -583,42 +612,12 @@ class ConversationHistory:
         Returns:
             True if record was found and deleted, False otherwise.
         """
-        if not os.path.exists(self._history_path):
+
+        def _transform(record: Dict[str, Any]) -> Optional[str]:
+            return None
+
+        if not self._rewrite_matching_record(timestamp, _transform):
             return False
-
-        try:
-            with open(self._history_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-        except Exception as e:
-            logger.warning("Failed to read conversation history: %s", e)
-            return False
-
-        found = False
-        new_lines: List[str] = []
-        for line in lines:
-            stripped = line.strip()
-            if not stripped:
-                new_lines.append(line)
-                continue
-            try:
-                record = json.loads(stripped)
-            except json.JSONDecodeError:
-                new_lines.append(line)
-                continue
-
-            if record.get("timestamp") == timestamp and not found:
-                found = True
-                # Skip this line (delete)
-            else:
-                new_lines.append(line)
-
-        if not found:
-            return False
-
-        tmp_path = self._history_path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-        os.replace(tmp_path, self._history_path)
 
         self._delete_cache_record(timestamp)
         if self._full_cache is not None:

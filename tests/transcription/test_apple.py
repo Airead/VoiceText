@@ -8,7 +8,6 @@ import pytest
 from wenzi.transcription.base import BaseTranscriber
 from wenzi.transcription.apple import (
     AppleSpeechTranscriber,
-    SIRI_SETTINGS_URL,
     _LANG_TO_LOCALE,
     _resolve_locale,
 )
@@ -143,12 +142,6 @@ class TestAppleSpeechTranscriberLanguageMapping:
     def test_full_locale_preserved(self):
         t = AppleSpeechTranscriber(language="en-GB")
         assert t._locale_id == "en-GB"
-
-
-class TestSiriSettingsUrl:
-    def test_url_is_string(self):
-        assert isinstance(SIRI_SETTINGS_URL, str)
-        assert SIRI_SETTINGS_URL.startswith("x-apple.systempreferences:")
 
 
 class TestCheckSiriAvailable:

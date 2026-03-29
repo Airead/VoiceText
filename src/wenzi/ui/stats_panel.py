@@ -17,25 +17,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Close delegate (lazy-created to avoid PyObjC import at module level)
+# Close delegate (shared factory from web_utils)
 # ---------------------------------------------------------------------------
-_PanelCloseDelegate = None
 
 
 def _get_panel_close_delegate_class():
-    global _PanelCloseDelegate
-    if _PanelCloseDelegate is None:
-        from Foundation import NSObject
+    from wenzi.ui.web_utils import make_panel_close_delegate_class
 
-        class StatsChartCloseDelegate(NSObject):
-            _panel_ref = None
-
-            def windowWillClose_(self, notification):
-                if self._panel_ref is not None:
-                    self._panel_ref.close()
-
-        _PanelCloseDelegate = StatsChartCloseDelegate
-    return _PanelCloseDelegate
+    return make_panel_close_delegate_class("StatsChartCloseDelegate")
 
 
 def build_stats_payload(

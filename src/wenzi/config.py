@@ -23,22 +23,6 @@ MODIFIER_KEY_CHOICES = [
 _VALID_MODIFIER_KEYS = {k for k, _ in MODIFIER_KEY_CHOICES}
 
 
-def get_modifier_key_choices():
-    """Return modifier key choices with translated display labels."""
-    from wenzi.i18n import t
-    return [
-        ("space", t("config.modifier_key.space")),
-        ("cmd", t("config.modifier_key.cmd")),
-        ("cmd_r", t("config.modifier_key.cmd_r")),
-        ("ctrl", t("config.modifier_key.ctrl")),
-        ("ctrl_r", t("config.modifier_key.ctrl_r")),
-        ("alt", t("config.modifier_key.alt")),
-        ("alt_r", t("config.modifier_key.alt_r")),
-        ("shift", t("config.modifier_key.shift")),
-        ("shift_r", t("config.modifier_key.shift_r")),
-        ("esc", t("config.modifier_key.esc")),
-    ]
-
 # XDG Base Directory paths
 DEFAULT_CONFIG_DIR = os.path.join("~", ".config", "WenZi")
 DEFAULT_DATA_DIR = os.path.join("~", ".local", "share", "WenZi")
@@ -65,8 +49,6 @@ DEFAULT_CHOOSER_USAGE_PATH = os.path.join(DEFAULT_DATA_DIR, "chooser_usage.json"
 DEFAULT_CHOOSER_HISTORY_PATH = os.path.join(DEFAULT_DATA_DIR, "chooser_history.json")
 DEFAULT_SCRIPT_DATA_PATH = os.path.join(DEFAULT_DATA_DIR, "script_data.json")
 DEFAULT_SNIPPET_LAST_CATEGORY_PATH = os.path.join(DEFAULT_DATA_DIR, "snippet_last_category")
-DEFAULT_KEYCHAIN_VAULT_PATH = os.path.join(DEFAULT_DATA_DIR, "keychain.json")
-
 # Cache files (can be safely deleted and regenerated)
 DEFAULT_ICON_CACHE_DIR = os.path.join(DEFAULT_CACHE_DIR, "icon_cache")
 

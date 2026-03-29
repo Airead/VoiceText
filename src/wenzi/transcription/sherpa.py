@@ -194,8 +194,11 @@ class SherpaOnnxTranscriber(BaseTranscriber):
         import wave
 
         with wave.open(io.BytesIO(wav_data), "rb") as wf:
-            assert wf.getnchannels() == 1
-            assert wf.getsampwidth() == 2
+            if wf.getnchannels() != 1:
+                raise ValueError(f"Expected mono audio, got {wf.getnchannels()} channels")
+            if wf.getsampwidth() != 2:
+                raise ValueError(f"Expected 16-bit audio, got {wf.getsampwidth() * 8}-bit")
+
             sample_rate = wf.getframerate()
             raw = wf.readframes(wf.getnframes())
 

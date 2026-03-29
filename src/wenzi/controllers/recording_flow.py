@@ -1125,15 +1125,6 @@ class RecordingFlow:
         if not animate:
             AppHelper.callAfter(self._app._recording_indicator.hide)
 
-    def start_recording_indicator(self, device_name: str | None = None) -> None:
-        """Show visual indicator (for external callers)."""
-        from PyObjCTools import AppHelper
-        AppHelper.callAfter(self._app._recording_indicator.show, device_name)
-
-    def stop_recording_indicator(self, animate: bool = False) -> None:
-        """Stop polling and optionally hide indicator (for external callers)."""
-        self._stop_indicator(animate)
-
     def _reset_to_idle(self) -> None:
         """Common cleanup: hide overlays/indicator and restore idle status."""
         self._app._busy = False

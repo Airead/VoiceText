@@ -631,23 +631,8 @@ class LogViewerPanel:
             logger.exception("Failed to copy log path")
 
 
-_PanelCloseDelegate = None
-
-
 def _get_panel_close_delegate_class():
     """Lazily create and cache the NSObject subclass for NSWindowDelegate."""
-    global _PanelCloseDelegate
-    if _PanelCloseDelegate is None:
-        from Foundation import NSObject
+    from wenzi.ui.web_utils import make_panel_close_delegate_class
 
-        class LogViewerCloseDelegate(NSObject):
-            """NSWindowDelegate that closes the log viewer when X is clicked."""
-
-            _panel_ref = None
-
-            def windowWillClose_(self, notification):
-                if self._panel_ref is not None:
-                    self._panel_ref.close()
-
-        _PanelCloseDelegate = LogViewerCloseDelegate
-    return _PanelCloseDelegate
+    return make_panel_close_delegate_class("LogViewerCloseDelegate")

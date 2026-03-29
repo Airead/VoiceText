@@ -29,7 +29,7 @@ _DEFAULT_ICON_CACHE_DIR = os.path.expanduser(_CFG_ICON_CACHE_DIR)
 class Bookmark:
     """A single browser bookmark."""
 
-    __slots__ = ("name", "url", "folder_path", "browser", "profile")
+    __slots__ = ("name", "url", "folder_path", "browser", "profile", "_domain")
 
     def __init__(
         self,
@@ -44,15 +44,19 @@ class Bookmark:
         self.folder_path = folder_path
         self.browser = browser
         self.profile = profile
+        self._domain: Optional[str] = None
 
     def domain(self) -> str:
-        """Extract the domain from the URL."""
+        """Extract the domain from the URL (cached)."""
+        if self._domain is not None:
+            return self._domain
         try:
             from urllib.parse import urlparse
 
-            return urlparse(self.url).netloc
+            self._domain = urlparse(self.url).netloc
         except Exception:
-            return ""
+            self._domain = ""
+        return self._domain
 
 
 # ---------------------------------------------------------------------------

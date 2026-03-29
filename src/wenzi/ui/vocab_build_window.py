@@ -120,33 +120,6 @@ class VocabBuildProgressPanel:
 
         AppHelper.callAfter(_append)
 
-    def update_token_usage(
-        self, input_tokens: int, cached_tokens: int, output_tokens: int, total: int
-    ) -> None:
-        """Update the token usage label with confirmed totals. Thread-safe.
-
-        Resets the streaming character counter since the batch is done.
-        """
-        self._confirmed_tokens = total
-        self._stream_chars = 0
-        from PyObjCTools import AppHelper
-
-        def _update():
-            if self._token_label is not None:
-                cached_info = (
-                    t("vocab_build.tokens_cached", cached=f"{cached_tokens:,}")
-                    if cached_tokens else ""
-                )
-                self._token_label.setStringValue_(
-                    t("vocab_build.tokens_detail",
-                      total=f"{total:,}",
-                      input=f"{input_tokens:,}",
-                      cached_info=cached_info,
-                      output=f"{output_tokens:,}")
-                )
-
-        AppHelper.callAfter(_update)
-
     def clear_stream_text(self) -> None:
         """Clear the streaming output view and reset stream char counter. Thread-safe."""
         self._stream_chars = 0
@@ -294,23 +267,10 @@ class VocabBuildProgressPanel:
             callback()
 
 
-_PanelCloseDelegate = None
-
-
 def _get_panel_close_delegate_class():
     """Lazily create and cache the NSObject subclass for NSWindowDelegate."""
-    global _PanelCloseDelegate
-    if _PanelCloseDelegate is None:
-        from Foundation import NSObject
+    from wenzi.ui.web_utils import make_panel_close_delegate_class
 
-        class VocabBuildPanelCloseDelegate(NSObject):
-            """NSWindowDelegate that triggers cancel when the panel close button is clicked."""
-
-            _panel_ref = None
-
-            def windowWillClose_(self, notification):
-                if self._panel_ref is not None:
-                    self._panel_ref._on_close_button()
-
-        _PanelCloseDelegate = VocabBuildPanelCloseDelegate
-    return _PanelCloseDelegate
+    return make_panel_close_delegate_class(
+        "VocabBuildPanelCloseDelegate", close_method="_on_close_button"
+    )

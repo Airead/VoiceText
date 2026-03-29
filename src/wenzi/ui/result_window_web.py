@@ -340,25 +340,16 @@ def _get_navigation_delegate_class():
 
 
 # ---------------------------------------------------------------------------
-# Close delegate (lazy-created to avoid PyObjC import at module level)
+# Close delegate (shared factory from web_utils)
 # ---------------------------------------------------------------------------
-_PanelCloseDelegate = None
 
 
 def _get_panel_close_delegate_class():
-    global _PanelCloseDelegate
-    if _PanelCloseDelegate is None:
-        from Foundation import NSObject
+    from wenzi.ui.web_utils import make_panel_close_delegate_class
 
-        class WebResultPanelCloseDelegate(NSObject):
-            _panel_ref = None
-
-            def windowWillClose_(self, notification):
-                if self._panel_ref is not None:
-                    self._panel_ref.cancelClicked_(None)
-
-        _PanelCloseDelegate = WebResultPanelCloseDelegate
-    return _PanelCloseDelegate
+    return make_panel_close_delegate_class(
+        "WebResultPanelCloseDelegate", close_method="cancelClicked_"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1015,12 +1006,6 @@ class ResultPreviewPanel:
     @property
     def is_visible(self) -> bool:
         return self._panel is not None and self._panel.isVisible()
-
-    def bring_to_front(self) -> None:
-        if self._panel is not None and self._panel.isVisible():
-            self._panel.makeKeyAndOrderFront_(None)
-            from AppKit import NSApp
-            NSApp.activateIgnoringOtherApps_(True)
 
     def close(self) -> None:
         """Close the panel."""

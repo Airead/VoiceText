@@ -61,6 +61,16 @@ _VK_TO_NAME.update({vk: name for name, (vk, _flag) in _MOD_VK.items()})
 # All known key names (for validation)
 _ALL_KEY_NAMES = set(_KEYCODE_MAP) | set(_SPECIAL_VK) | set(_MOD_VK) | {"option", "command"}
 
+def _normalize_key_name(name: str) -> str:
+    """Normalize a key name: strip, lowercase, and map aliases."""
+    n = name.strip().lower()
+    if n == "option":
+        n = "alt"
+    elif n == "command":
+        n = "cmd"
+    return n
+
+
 # Snapshot built-in maps so script-registered keys can be cleanly reverted
 _BUILTIN_SPECIAL_VK = dict(_SPECIAL_VK)
 _BUILTIN_VK_TO_NAME = dict(_VK_TO_NAME)
@@ -101,11 +111,7 @@ def unregister_custom_keys() -> None:
 
 def _name_to_vk(name: str) -> int:
     """Convert a key name to its macOS virtual keycode."""
-    name = name.strip().lower()
-    if name == "option":
-        name = "alt"
-    elif name == "command":
-        name = "cmd"
+    name = _normalize_key_name(name)
     if name in _KEYCODE_MAP:
         return _KEYCODE_MAP[name]
     if name in _SPECIAL_VK:
@@ -120,11 +126,6 @@ def _is_fn_key(name: str) -> bool:
 
 
 _MODIFIER_VKS = frozenset(vk for vk, _flag in _MOD_VK.values())
-
-
-def _is_modifier_vk(vk: int) -> bool:
-    """Check if a virtual keycode is a modifier key."""
-    return vk in _MODIFIER_VKS
 
 
 def _is_modifier_like_vk(vk: int) -> bool:
@@ -151,10 +152,7 @@ def _parse_hotkey_for_quartz(hotkey_str: str) -> tuple[int, int]:
     mod_flags = 0
     trigger_keys = []
     for part in parts:
-        if part == "option":
-            part = "alt"
-        elif part == "command":
-            part = "cmd"
+        part = _normalize_key_name(part)
         if part in _MOD_FLAGS:
             mod_flags |= _MOD_FLAGS[part]
         elif part in _KEYCODE_MAP:
@@ -727,11 +725,7 @@ class MultiHotkeyListener:
 
         self._has_non_modifier_trigger = False
         for name in key_names:
-            n = name.strip().lower()
-            if n == "option":
-                n = "alt"
-            elif n == "command":
-                n = "cmd"
+            n = _normalize_key_name(name)
             vk = _name_to_vk(n)
             self._target_vks[vk] = n
             self._enabled_names.add(n)
@@ -836,11 +830,7 @@ class MultiHotkeyListener:
 
     def enable_key(self, key_name: str) -> None:
         """Enable a key dynamically."""
-        n = key_name.strip().lower()
-        if n == "option":
-            n = "alt"
-        elif n == "command":
-            n = "cmd"
+        n = _normalize_key_name(key_name)
         vk = _name_to_vk(n)
         self._target_vks[vk] = n
         self._enabled_names.add(n)
@@ -848,11 +838,7 @@ class MultiHotkeyListener:
 
     def disable_key(self, key_name: str) -> None:
         """Disable a key dynamically."""
-        n = key_name.strip().lower()
-        if n == "option":
-            n = "alt"
-        elif n == "command":
-            n = "cmd"
+        n = _normalize_key_name(key_name)
         vk = _name_to_vk(n)
         self._target_vks.pop(vk, None)
         self._enabled_names.discard(n)
@@ -862,21 +848,13 @@ class MultiHotkeyListener:
 
     def set_restart_key(self, key_name: str) -> None:
         """Change the restart key at runtime."""
-        n = key_name.strip().lower()
-        if n == "option":
-            n = "alt"
-        elif n == "command":
-            n = "cmd"
+        n = _normalize_key_name(key_name)
         self._restart_key = n
         logger.info("Restart key set to: %s", n)
 
     def set_cancel_key(self, key_name: str) -> None:
         """Change the cancel key at runtime."""
-        n = key_name.strip().lower()
-        if n == "option":
-            n = "alt"
-        elif n == "command":
-            n = "cmd"
+        n = _normalize_key_name(key_name)
         self._cancel_key = n
         logger.info("Cancel key set to: %s", n)
 

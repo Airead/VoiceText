@@ -19,23 +19,10 @@ logger = logging.getLogger(__name__)
 # NSObject subclasses (lazy-created, unique class names)
 # ---------------------------------------------------------------------------
 
-_VocabManagerCloseDelegate = None
-
-
 def _get_panel_close_delegate_class():
-    global _VocabManagerCloseDelegate
-    if _VocabManagerCloseDelegate is None:
-        from Foundation import NSObject
+    from wenzi.ui.web_utils import make_panel_close_delegate_class
 
-        class VocabManagerCloseDelegate(NSObject):
-            _panel_ref = None
-
-            def windowWillClose_(self, notification):
-                if self._panel_ref is not None:
-                    self._panel_ref.close()
-
-        _VocabManagerCloseDelegate = VocabManagerCloseDelegate
-    return _VocabManagerCloseDelegate
+    return make_panel_close_delegate_class("VocabManagerCloseDelegate")
 
 
 _VocabManagerNavigationDelegate = None

@@ -79,30 +79,38 @@ def _get_app_icon_png(path: str) -> Optional[bytes]:
         from AppKit import (
             NSBitmapImageRep,
             NSCompositingOperationCopy,
-            NSImage,
+            NSDeviceRGBColorSpace,
+            NSGraphicsContext,
             NSPNGFileType,
             NSWorkspace,
         )
-        from Foundation import NSMakeRect, NSSize
+        from Foundation import NSMakeRect, NSZeroRect
 
         ws = NSWorkspace.sharedWorkspace()
         icon = ws.iconForFile_(path)
         if icon is None:
             return None
 
-        # Render into a fixed-size image to control pixel output
-        size = NSSize(_ICON_SIZE, _ICON_SIZE)
-        target = NSImage.alloc().initWithSize_(size)
-        target.lockFocus()
+        # Render into a bitmap rep (thread-safe, no deprecated lockFocus)
+        sz = _ICON_SIZE
+        rep = NSBitmapImageRep.alloc() \
+            .initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(  # noqa: E501
+                None, sz, sz, 8, 4, True, False,
+                NSDeviceRGBColorSpace, 0, 0,
+            )
+        if rep is None:
+            return None
+        ctx = NSGraphicsContext.graphicsContextWithBitmapImageRep_(rep)
+        if ctx is None:
+            return None
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.setCurrentContext_(ctx)
         icon.drawInRect_fromRect_operation_fraction_(
-            NSMakeRect(0, 0, _ICON_SIZE, _ICON_SIZE),
-            NSMakeRect(0, 0, icon.size().width, icon.size().height),
-            NSCompositingOperationCopy,
-            1.0,
+            NSMakeRect(0, 0, sz, sz), NSZeroRect,
+            NSCompositingOperationCopy, 1.0,
         )
-        target.unlockFocus()
+        NSGraphicsContext.restoreGraphicsState()
 
-        rep = NSBitmapImageRep.imageRepWithData_(target.TIFFRepresentation())
         png_data = rep.representationUsingType_properties_(NSPNGFileType, None)
         return bytes(png_data) if png_data else None
     except Exception:
@@ -168,21 +176,39 @@ def _scan_apps() -> list[dict]:
     return apps
 
 
+_running_apps_cache: set[str] = set()
+_running_apps_time: float = 0.0
+_RUNNING_APPS_TTL: float = 2.0  # seconds
+
+
 def _get_running_app_names() -> set[str]:
-    """Return a set of currently running application names."""
+    """Return a set of currently running application names.
+
+    Results are cached for ``_RUNNING_APPS_TTL`` seconds so that rapid
+    keystroke-driven searches don't re-query NSWorkspace every time.
+    """
+    global _running_apps_cache, _running_apps_time
+
+    now = time.monotonic()
+    if now - _running_apps_time < _RUNNING_APPS_TTL:
+        return _running_apps_cache
+
     try:
         from AppKit import NSWorkspace
 
         workspace = NSWorkspace.sharedWorkspace()
         running = workspace.runningApplications()
-        return {
+        _running_apps_cache = {
             str(app.localizedName())
             for app in running
             if app.localizedName()
         }
     except Exception:
         logger.debug("Failed to get running apps", exc_info=True)
-        return set()
+        _running_apps_cache = set()
+
+    _running_apps_time = now
+    return _running_apps_cache
 
 
 def _launch_app(path: str) -> None:
