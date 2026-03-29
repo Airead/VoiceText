@@ -1,7 +1,7 @@
 """Singleton asyncio event loop running on a dedicated daemon thread.
 
 All async work (LLM streaming, vocabulary building, provider verification)
-is submitted to this shared loop via :func:`submit` or :func:`call_soon`.
+is submitted to this shared loop via :func:`submit`.
 The loop is created lazily on first access and runs until :func:`shutdown`
 is called (typically during app quit).
 """
@@ -11,7 +11,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
-from collections.abc import Callable
 from typing import Any, Coroutine, TypeVar
 
 T = TypeVar("T")
@@ -60,11 +59,6 @@ def submit(coro: Coroutine[Any, Any, T]) -> asyncio.Future[T]:
     retrieve the result from a synchronous context.
     """
     return asyncio.run_coroutine_threadsafe(coro, get_loop())
-
-
-def call_soon(callback: Callable[..., Any], *args: Any) -> None:
-    """Schedule a plain callback on the shared loop (thread-safe)."""
-    get_loop().call_soon_threadsafe(callback, *args)
 
 
 def shutdown_sync(timeout: float = 5.0) -> None:

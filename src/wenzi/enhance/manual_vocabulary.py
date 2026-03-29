@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import string
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
 
 from wenzi.enhance.vocab_db import (
     CTX_APP,
@@ -106,6 +106,7 @@ class ManualVocabularyStore:
         self._path = path
         self._db = VocabDB(path)
         self._stats_include_app = stats_include_app
+        self._cache: Optional[List[ManualVocabEntry]] = None
 
     @property
     def db(self) -> VocabDB:
@@ -140,6 +141,7 @@ class ManualVocabularyStore:
         """
         variant = _normalize(variant)
         term = _normalize(term)
+        self._cache = None
         row = self._db.add(
             variant, term, source,
             app_bundle_id=app_bundle_id,
@@ -153,6 +155,7 @@ class ManualVocabularyStore:
 
     def remove(self, variant: str, term: str) -> bool:
         """Remove a correction pair.  Returns True if it existed."""
+        self._cache = None
         return self._db.remove(_normalize(variant), _normalize(term))
 
     def remove_batch(
@@ -160,6 +163,7 @@ class ManualVocabularyStore:
         *, persist: bool = True,  # accepted for API compat, no effect
     ) -> int:
         """Remove multiple correction pairs.  Returns count removed."""
+        self._cache = None
         normalized = [(_normalize(v), _normalize(t)) for v, t in pairs]
         return self._db.remove_batch(normalized)
 
@@ -243,24 +247,6 @@ class ManualVocabularyStore:
         if stats_batch:
             self._db.record_stats(stats_batch)
 
-    # ------------------------------------------------------------------
-    # Legacy hit tracking (compatibility shim)
-    # ------------------------------------------------------------------
-
-    def record_hit(self, variant: str, term: str) -> None:
-        """Record that this pair was used in a correction (legacy)."""
-        self.record_hits([(variant, term)])
-
-    def record_hits(self, pairs: list[tuple[str, str]]) -> None:
-        """Record multiple hits in a single operation (legacy)."""
-        stats_batch: list[tuple[int, str, str]] = []
-        for variant, term in pairs:
-            entry = self.get(variant, term)
-            if entry is not None:
-                stats_batch.append((entry.id, METRIC_LLM_HIT, "legacy"))
-        if stats_batch:
-            self._db.record_stats(stats_batch)
-
     def find_hits_in_text(self, text: str) -> list[ManualVocabEntry]:
         """Return entries whose *variant* appears in *text* (case-insensitive)."""
         text_lower = text.lower()
@@ -271,8 +257,10 @@ class ManualVocabularyStore:
     # ------------------------------------------------------------------
 
     def get_all(self) -> list[ManualVocabEntry]:
-        """Return a snapshot of all entries."""
-        return [_entry_from_row(r) for r in self._db.get_all()]
+        """Return a snapshot of all entries (cached until next mutation)."""
+        if self._cache is None:
+            self._cache = [_entry_from_row(r) for r in self._db.get_all()]
+        return list(self._cache)
 
     def export_all_with_stats(self) -> list[dict]:
         """Return all entries with their stats for export.
@@ -394,6 +382,7 @@ class ManualVocabularyStore:
 
     def rename_entry(self, entry_id: int, new_variant: str, new_term: str) -> Optional[ManualVocabEntry]:
         """Rename an entry's variant/term in place, preserving stats and frequency."""
+        self._cache = None
         row = self._db.rename_entry(entry_id, _normalize(new_variant), _normalize(new_term))
         return _entry_from_row(row) if row else None
 
@@ -411,6 +400,7 @@ class ManualVocabularyStore:
 
     def update_fields(self, entry_id: int, fields: dict) -> None:
         """Update specific fields on an entry by id (delegates to VocabDB)."""
+        self._cache = None
         self._db.update_fields(entry_id, fields)
 
     @property

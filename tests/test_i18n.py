@@ -80,22 +80,6 @@ class TestTranslationLookup:
 
 
 class TestLocaleManagement:
-    def test_set_and_get_locale(self, locale_dir):
-        from wenzi.i18n import get_locale, init_i18n, set_locale
-
-        init_i18n(locale="en", locales_dir=locale_dir)
-        assert get_locale() == "en"
-        set_locale("zh")
-        assert get_locale() == "zh"
-
-    def test_set_locale_updates_translations(self, locale_dir):
-        from wenzi.i18n import init_i18n, set_locale, t
-
-        init_i18n(locale="en", locales_dir=locale_dir)
-        assert t("app.name") == "WenZi"
-        set_locale("zh")
-        assert t("app.name") == "\u95fb\u5b57"
-
     def test_init_with_auto_detects_system(self, locale_dir, monkeypatch):
         from wenzi.i18n import get_locale, init_i18n
 

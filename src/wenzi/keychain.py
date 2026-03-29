@@ -226,8 +226,4 @@ def _keychain_list(prefix: str = "") -> List[str]:
     return [a for a in all_accounts if a.startswith(prefix)]
 
 
-def _keychain_clear_prefix(prefix: str) -> None:
-    """Delete all Keychain accounts whose names start with *prefix*."""
-    for account in _keychain_list(prefix):
-        _keychain_delete(account)
 

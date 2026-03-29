@@ -22,7 +22,6 @@ from .enhance_mode_controller import EnhanceModeController  # noqa: E402
 from .menu_builder import MenuBuilder  # noqa: E402
 from .model_controller import ModelController, migrate_asr_config  # noqa: E402
 from .preview_controller import PreviewController  # noqa: E402
-from .recording_controller import RecordingController  # noqa: E402
 from .recording_flow import Action, RecordingFlow  # noqa: E402
 from .settings_controller import SettingsController  # noqa: E402
 from .update_controller import UpdateController  # noqa: E402
@@ -37,7 +36,6 @@ __all__ = [
     "ModelController",
     "PreviewController",
     "Action",
-    "RecordingController",
     "RecordingFlow",
     "SettingsController",
     "UpdateController",

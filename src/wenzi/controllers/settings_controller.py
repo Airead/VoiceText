@@ -31,7 +31,6 @@ from wenzi.transcription.model_registry import (
 from wenzi.scripting.plugin_installer import PluginInstaller
 from wenzi.scripting.plugin_registry import PluginInfo, PluginRegistry, PluginStatus
 from wenzi.statusbar import send_notification
-from wenzi.transcription.base import create_transcriber
 from wenzi.ui_helpers import restore_accessory, topmost_alert
 
 logger = logging.getLogger(__name__)
@@ -861,16 +860,7 @@ class SettingsController:
                 else:
                     app._set_status("statusbar.status.loading")
 
-                asr_cfg = app._config["asr"]
-                new_transcriber = create_transcriber(
-                    backend=preset.backend,
-                    use_vad=asr_cfg.get("use_vad", True),
-                    use_punc=asr_cfg.get("use_punc", True),
-                    language=preset.language or asr_cfg.get("language"),
-                    model=preset.model,
-                    temperature=asr_cfg.get("temperature"),
-                    hotwords=app._load_hotwords(),
-                )
+                new_transcriber = app._create_transcriber_for_preset(preset)
                 new_transcriber.initialize()
 
                 stop_event.set()
@@ -953,16 +943,7 @@ class SettingsController:
             )
             monitor_thread.start()
 
-            asr_cfg = app._config["asr"]
-            new_transcriber = create_transcriber(
-                backend=preset.backend,
-                use_vad=asr_cfg.get("use_vad", True),
-                use_punc=asr_cfg.get("use_punc", True),
-                language=preset.language or asr_cfg.get("language"),
-                model=preset.model,
-                temperature=asr_cfg.get("temperature"),
-                hotwords=app._load_hotwords(),
-            )
+            new_transcriber = app._create_transcriber_for_preset(preset)
             new_transcriber.initialize()
 
             stop_event.set()
@@ -1043,14 +1024,11 @@ class SettingsController:
                 app._set_status("statusbar.status.switching")
                 old_transcriber.cleanup()
 
-                new_transcriber = create_transcriber(
-                    backend="whisper-api",
+                new_transcriber = app._create_transcriber_for_remote(
                     base_url=pcfg["base_url"],
                     api_key=pcfg["api_key"],
                     model=model,
-                    language=asr_cfg.get("language"),
-                    temperature=asr_cfg.get("temperature"),
-                    hotwords=app._load_hotwords(),
+                    asr_cfg=asr_cfg,
                 )
                 new_transcriber.initialize()
 
@@ -1091,42 +1069,53 @@ class SettingsController:
             if item:
                 app._model_controller.on_asr_remove_provider(item)
 
-    def stt_verify_save(self, data: dict) -> None:
-        """Handle verify & save from WebView STT provider form.
+    # ── Shared verify-and-save plumbing ─────────────────────────────
 
-        Spawns a background thread for the network call.
-        Posts result back to JS via evaluateJavaScript.
+    def _verify_and_save(
+        self,
+        *,
+        flag_attr: str,
+        id_attr: str,
+        operation: Callable[[dict], dict],
+        js_callback: str,
+        log_prefix: str,
+        data: dict,
+    ) -> None:
+        """Generic verify-and-save that guards, threads, and posts result to JS.
+
+        Parameters:
+            flag_attr: name of the ``_*_verify_in_progress`` bool attribute
+            id_attr: name of the ``_*_verify_request_id`` int attribute
+            operation: sync callable(data) -> result dict
+            js_callback: JS function name to call with the result payload
+            log_prefix: label for error logging
+            data: form data dict forwarded to *operation*
         """
-        if self._stt_verify_in_progress:
+        if getattr(self, flag_attr):
             return
-        self._stt_verify_in_progress = True
-        self._stt_verify_request_id += 1
-        request_id = self._stt_verify_request_id
+        setattr(self, flag_attr, True)
+        new_id = getattr(self, id_attr) + 1
+        setattr(self, id_attr, new_id)
+        request_id = new_id
         app = self._app
 
         def _do():
             import json as _json
             try:
-                result = app._model_controller.do_verify_and_save_stt_provider(
-                    name=data["name"],
-                    base_url=data["base_url"],
-                    api_key=data["api_key"],
-                    models=data["models"],
-                    mode=data.get("mode", "add"),
-                )
+                result = operation(data)
             except Exception as e:
-                logger.error("STT verify/save failed: %s", e, exc_info=True)
+                logger.error("%s verify/save failed: %s", log_prefix, e, exc_info=True)
                 result = {"ok": False, "error": str(e)}
 
             def _callback():
-                if self._stt_verify_request_id != request_id:
+                if getattr(self, id_attr) != request_id:
                     return
-                self._stt_verify_in_progress = False
+                setattr(self, flag_attr, False)
                 panel = app._settings_panel
                 if panel and panel.is_visible:
                     payload = _json.dumps(result, ensure_ascii=False)
                     panel._webview.evaluateJavaScript_completionHandler_(
-                        f"_sttProviderSaveResult({payload})", None
+                        f"{js_callback}({payload})", None
                     )
                     if result.get("ok"):
                         self._refresh_panel()
@@ -1135,6 +1124,23 @@ class SettingsController:
             AppHelper.callAfter(_callback)
 
         threading.Thread(target=_do, daemon=True).start()
+
+    # ── STT verify/save ──────────────────────────────────────────
+
+    def stt_verify_save(self, data: dict) -> None:
+        """Handle verify & save from WebView STT provider form.
+
+        Spawns a background thread for the network call.
+        Posts result back to JS via evaluateJavaScript.
+        """
+        self._verify_and_save(
+            flag_attr="_stt_verify_in_progress",
+            id_attr="_stt_verify_request_id",
+            operation=self._do_stt_verify_save,
+            js_callback="_sttProviderSaveResult",
+            log_prefix="STT",
+            data=data,
+        )
 
     def _do_stt_verify_save(self, data: dict) -> dict:
         """Synchronous verify+save for testing. Returns result dict."""
@@ -1203,45 +1209,14 @@ class SettingsController:
         Spawns a background thread for the network call.
         Posts result back to JS via evaluateJavaScript.
         """
-        if self._verify_in_progress:
-            return
-        self._verify_in_progress = True
-        self._verify_request_id += 1
-        request_id = self._verify_request_id
-        app = self._app
-
-        def _do():
-            import json as _json
-            try:
-                result = app._model_controller.do_verify_and_save_provider(
-                    name=data["name"],
-                    base_url=data["base_url"],
-                    api_key=data["api_key"],
-                    models=data["models"],
-                    extra_body=data.get("extra_body", {}),
-                    mode=data.get("mode", "add"),
-                )
-            except Exception as e:
-                logger.error("Verify/save failed: %s", e, exc_info=True)
-                result = {"ok": False, "error": str(e)}
-
-            def _callback():
-                if self._verify_request_id != request_id:
-                    return
-                self._verify_in_progress = False
-                panel = app._settings_panel
-                if panel and panel.is_visible:
-                    payload = _json.dumps(result, ensure_ascii=False)
-                    panel._webview.evaluateJavaScript_completionHandler_(
-                        f"_providerSaveResult({payload})", None
-                    )
-                    if result.get("ok"):
-                        self._refresh_panel()
-
-            from PyObjCTools import AppHelper
-            AppHelper.callAfter(_callback)
-
-        threading.Thread(target=_do, daemon=True).start()
+        self._verify_and_save(
+            flag_attr="_verify_in_progress",
+            id_attr="_verify_request_id",
+            operation=self._do_llm_verify_save,
+            js_callback="_providerSaveResult",
+            log_prefix="LLM",
+            data=data,
+        )
 
     def _do_llm_verify_save(self, data: dict) -> dict:
         """Synchronous verify+save for testing. Returns result dict."""

@@ -1,8 +1,7 @@
 """UI subpackage — panels, windows, and overlays."""
 
 _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
-    "HistoryBrowserPanel": (".history_browser_window", "HistoryBrowserPanel"),
-    "WebHistoryBrowserPanel": (".history_browser_window_web", "HistoryBrowserPanel"),
+    "HistoryBrowserPanel": (".history_browser_window_web", "HistoryBrowserPanel"),
     "LiveTranscriptionOverlay": (".live_transcription_overlay", "LiveTranscriptionOverlay"),
     "LogViewerPanel": (".log_viewer_window", "LogViewerPanel"),
     "ResultPreviewPanel": (".result_window_web", "ResultPreviewPanel"),

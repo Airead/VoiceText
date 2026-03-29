@@ -148,27 +148,6 @@ class TestTwoPhaseHitTracking:
 
 
 class TestLegacyHitTracking:
-    def test_record_hit(self, store):
-        store.add("派森", "Python", "asr")
-        store.record_hit("派森", "Python")
-        entry = store.get("派森", "Python")
-        # Hit is recorded in stats, not on the entry itself
-        stats = store.db.get_stats(entry.id)
-        assert any(s["metric"] == "llm_hit" and s["count"] == 1 for s in stats)
-
-    def test_record_hits_batch(self, store):
-        store.add("派森", "Python", "asr")
-        store.add("库伯尼特斯", "Kubernetes", "asr")
-        store.record_hits([
-            ("派森", "Python"),
-            ("库伯尼特斯", "Kubernetes"),
-            ("nonexistent", "nope"),
-        ])
-        e1 = store.get("派森", "Python")
-        e2 = store.get("库伯尼特斯", "Kubernetes")
-        assert store.db.get_stats_summary(e1.id, "llm_hit") == 1
-        assert store.db.get_stats_summary(e2.id, "llm_hit") == 1
-
     def test_find_hits_in_text(self, store):
         store.add("库伯尼特斯", "Kubernetes", "asr")
         store.add("派森", "Python", "asr")

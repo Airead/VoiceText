@@ -19,7 +19,9 @@ def stats_dir(tmp_path):
 
 @pytest.fixture
 def stats(stats_dir):
-    return UsageStats(data_dir=stats_dir)
+    s = UsageStats(data_dir=stats_dir)
+    yield s
+    s.shutdown()
 
 
 class TestInitialState:
@@ -169,6 +171,7 @@ class TestGetTodayStats:
 class TestDailyFiles:
     def test_daily_file_created(self, stats, stats_dir):
         stats.record_transcription(mode="direct")
+        stats.flush()
         today = date.today().isoformat()
         daily_path = os.path.join(stats_dir, "usage_stats", f"{today}.json")
         assert os.path.exists(daily_path)
@@ -184,12 +187,14 @@ class TestDailyFiles:
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
             stats.record_transcription(mode="direct")
 
-        # Record on "day 2"
+        # Record on "day 2" — day change triggers flush of day 1
         with patch("wenzi.usage_stats.date") as mock_date:
             mock_date.today.return_value = date(2026, 1, 2)
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
             stats.record_transcription(mode="preview")
             stats.record_transcription(mode="preview")
+
+        stats.flush()
 
         day1_path = os.path.join(stats_dir, "usage_stats", "2026-01-01.json")
         day2_path = os.path.join(stats_dir, "usage_stats", "2026-01-02.json")
@@ -215,6 +220,7 @@ class TestPersistence:
         s1.record_transcription(mode="direct", enhance_mode="proofread")
         s1.record_confirm(modified=False)
         s1.record_token_usage({"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15})
+        s1.shutdown()
 
         s2 = UsageStats(data_dir=stats_dir)
         s2.record_transcription(mode="preview", enhance_mode="translate_en")
@@ -225,26 +231,30 @@ class TestPersistence:
         assert data["token_usage"]["total_tokens"] == 15
         assert data["enhance_mode_usage"]["proofread"] == 1
         assert data["enhance_mode_usage"]["translate_en"] == 1
+        s2.shutdown()
 
 
 class TestCorruptedFile:
     def test_corrupted_file_recovery(self, stats, stats_dir):
         # Write valid data first
         stats.record_transcription(mode="direct")
+        stats.flush()
 
-        # Corrupt the cumulative file
+        # Corrupt the cumulative file and force reload by creating a new instance
         cum_path = os.path.join(stats_dir, "usage_stats.json")
         with open(cum_path, "w") as f:
             f.write("{invalid json")
 
+        stats2 = UsageStats(data_dir=stats_dir)
         # Should recover gracefully (starts from empty)
-        s = stats.get_stats()
+        s = stats2.get_stats()
         assert s["totals"]["transcriptions"] == 0
 
         # Should be able to write again
-        stats.record_transcription(mode="preview")
-        s = stats.get_stats()
+        stats2.record_transcription(mode="preview")
+        s = stats2.get_stats()
         assert s["totals"]["transcriptions"] == 1
+        stats2.shutdown()
 
 
 class TestDirectoryCreation:
@@ -252,7 +262,9 @@ class TestDirectoryCreation:
         deep_dir = str(tmp_path / "a" / "b" / "c")
         s = UsageStats(data_dir=deep_dir)
         s.record_transcription(mode="direct")
+        s.flush()
         assert os.path.exists(os.path.join(deep_dir, "usage_stats.json"))
+        s.shutdown()
 
 
 class TestInitialStateNewCounters:
@@ -479,12 +491,14 @@ class TestFilePermissions:
     def test_cumulative_file_is_owner_only(self, stats):
         """Stats files should be owner-only readable (0o600)."""
         stats.record_transcription(mode="direct")
+        stats.flush()
         mode = stat.S_IMODE(os.stat(stats._cumulative_path).st_mode)
         assert mode == 0o600
 
     def test_daily_file_is_owner_only(self, stats):
         """Daily stats files should be owner-only readable (0o600)."""
         stats.record_transcription(mode="direct")
+        stats.flush()
         today = date.today().isoformat()
         daily_path = stats._daily_path(today)
         mode = stat.S_IMODE(os.stat(daily_path).st_mode)
@@ -565,3 +579,70 @@ class TestThreadSafety:
         s = stats.get_stats()
         assert s["totals"]["transcriptions"] == n_threads * n_ops
         assert s["totals"]["direct_mode"] == n_threads * n_ops
+
+
+class TestFlush:
+    def test_flush_writes_to_disk(self, stats, stats_dir):
+        """flush() should write in-memory data to disk."""
+        stats.record_transcription(mode="direct")
+        # Not on disk yet
+        cum_path = os.path.join(stats_dir, "usage_stats.json")
+        assert not os.path.exists(cum_path)
+
+        stats.flush()
+        assert os.path.exists(cum_path)
+        with open(cum_path) as f:
+            data = json.load(f)
+        assert data["totals"]["transcriptions"] == 1
+
+    def test_flush_noop_when_clean(self, stats, stats_dir):
+        """flush() on a clean instance should not create files."""
+        stats.flush()
+        cum_path = os.path.join(stats_dir, "usage_stats.json")
+        assert not os.path.exists(cum_path)
+
+    def test_data_persists_after_flush_and_reload(self, stats_dir):
+        """Data written by flush() should be loadable by a new instance."""
+        s1 = UsageStats(data_dir=stats_dir)
+        s1.record_transcription(mode="direct", enhance_mode="proofread")
+        s1.record_token_usage({"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150})
+        s1.record_sound_feedback()
+        s1.flush()
+        s1.shutdown()
+
+        s2 = UsageStats(data_dir=stats_dir)
+        data = s2.get_stats()
+        assert data["totals"]["transcriptions"] == 1
+        assert data["totals"]["sound_feedback_plays"] == 1
+        assert data["token_usage"]["total_tokens"] == 150
+        assert data["enhance_mode_usage"]["proofread"] == 1
+        s2.shutdown()
+
+    def test_no_disk_write_on_record(self, stats, stats_dir):
+        """record_* should NOT write to disk immediately."""
+        stats.record_transcription(mode="direct")
+        stats.record_sound_feedback()
+        stats.record_confirm(modified=False)
+        cum_path = os.path.join(stats_dir, "usage_stats.json")
+        assert not os.path.exists(cum_path)
+
+
+class TestShutdown:
+    def test_shutdown_flushes_dirty_data(self, stats_dir):
+        """shutdown() should flush pending data to disk."""
+        s = UsageStats(data_dir=stats_dir)
+        s.record_transcription(mode="preview")
+        s.shutdown()
+
+        cum_path = os.path.join(stats_dir, "usage_stats.json")
+        assert os.path.exists(cum_path)
+        with open(cum_path) as f:
+            data = json.load(f)
+        assert data["totals"]["transcriptions"] == 1
+
+    def test_shutdown_idempotent(self, stats_dir):
+        """Calling shutdown() multiple times should not error."""
+        s = UsageStats(data_dir=stats_dir)
+        s.record_transcription(mode="direct")
+        s.shutdown()
+        s.shutdown()  # second call should be harmless

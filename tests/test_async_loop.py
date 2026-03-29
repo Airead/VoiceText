@@ -96,13 +96,6 @@ class TestSubmit:
             future.result(timeout=2)
 
 
-class TestCallSoon:
-    def test_call_soon_executes(self):
-        event = threading.Event()
-        async_loop.call_soon(event.set)
-        assert event.wait(timeout=2)
-
-
 class TestShutdown:
     def test_shutdown_cancels_pending_tasks(self):
         cancelled = threading.Event()

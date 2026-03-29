@@ -205,20 +205,6 @@ def is_model_cached(preset: ModelPreset) -> bool:
     return False
 
 
-def get_model_size(preset: ModelPreset) -> Optional[int]:
-    """Return the total size in bytes of cached model files, or None if not cached."""
-    if not is_model_cached(preset):
-        return None
-    cache_dir = get_model_cache_dir(preset)
-    if not cache_dir.exists():
-        return None
-    total = 0
-    for f in cache_dir.rglob("*"):
-        if f.is_file():
-            total += f.stat().st_size
-    return total
-
-
 def find_fallback_preset() -> Optional[ModelPreset]:
     """Find the best non-Apple preset to fall back to.
 

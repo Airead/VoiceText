@@ -84,12 +84,6 @@ class TestCRUD:
     def test_get_nonexistent(self, db):
         assert db.get("x", "X") is None
 
-    def test_get_by_id(self, db):
-        db.add("派森", "Python", "asr")
-        entry = db.get("派森", "Python")
-        by_id = db.get_by_id(entry["id"])
-        assert by_id["term"] == "Python"
-
     def test_contains(self, db):
         db.add("派森", "Python", "asr")
         assert db.contains("派森", "Python") is True

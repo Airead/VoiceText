@@ -247,14 +247,11 @@ class WenZiApp(StatusBarApp):
             pcfg = providers.get(default_provider, {})
             if pcfg and default_model in pcfg.get("models", []):
                 self._current_remote_asr = (default_provider, default_model)
-                self._transcriber = create_transcriber(
-                    backend="whisper-api",
+                self._transcriber = self._create_transcriber_for_remote(
                     base_url=pcfg["base_url"],
                     api_key=pcfg["api_key"],
                     model=default_model,
-                    language=asr_cfg.get("language"),
-                    temperature=asr_cfg.get("temperature"),
-                    hotwords=hotwords,
+                    asr_cfg=asr_cfg,
                 )
             else:
                 # Provider/model not found, fall back to local
@@ -596,6 +593,40 @@ class WenZiApp(StatusBarApp):
             hotwords=hotwords,
         )
 
+    def _create_transcriber_for_preset(self, preset, asr_cfg=None):
+        """Create a transcriber from a ModelPreset with common config.
+
+        Reads use_vad, use_punc, temperature, and hotwords from asr_cfg.
+        Language falls back from preset to config.
+        """
+        if asr_cfg is None:
+            asr_cfg = self._config["asr"]
+        return create_transcriber(
+            backend=preset.backend,
+            use_vad=asr_cfg.get("use_vad", True),
+            use_punc=asr_cfg.get("use_punc", True),
+            language=preset.language or asr_cfg.get("language"),
+            model=preset.model,
+            temperature=asr_cfg.get("temperature"),
+            hotwords=self._load_hotwords(),
+        )
+
+    def _create_transcriber_for_remote(
+        self, base_url, api_key, model, asr_cfg=None
+    ):
+        """Create a whisper-api transcriber for a remote ASR provider."""
+        if asr_cfg is None:
+            asr_cfg = self._config["asr"]
+        return create_transcriber(
+            backend="whisper-api",
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            language=asr_cfg.get("language"),
+            temperature=asr_cfg.get("temperature"),
+            hotwords=self._load_hotwords(),
+        )
+
     def _load_hotwords(self):
         """Load manual vocabulary hotwords for static ASR injection."""
         try:
@@ -682,12 +713,6 @@ class WenZiApp(StatusBarApp):
         NSStatusBar layout dropped it during the reload cycle.
         """
         self._set_status(self._current_status)
-
-    def _start_recording_indicator(self) -> None:
-        self._recording_controller.start_recording_indicator()
-
-    def _stop_recording_indicator(self, animate: bool = False) -> None:
-        self._recording_controller.stop_recording_indicator(animate=animate)
 
     # ------------------------------------------------------------------
     # Hotkey management
@@ -1000,15 +1025,6 @@ class WenZiApp(StatusBarApp):
     def _on_log_level_change(self, level_name: str) -> None:
         self._config_controller.on_log_level_change(level_name)
 
-    def _on_print_prompt_change(self, enabled: bool) -> None:
-        self._config_controller.on_print_prompt_change(enabled)
-
-    def _on_print_request_body_change(self, enabled: bool) -> None:
-        self._config_controller.on_print_request_body_change(enabled)
-
-    def _build_config_info(self) -> str:
-        return self._config_controller.build_config_info()
-
     def _on_show_config(self, _) -> None:
         self._config_controller.on_show_config(_)
 
@@ -1151,6 +1167,11 @@ class WenZiApp(StatusBarApp):
                 self._screenshot_annotation.close()
         except Exception:
             logger.debug("Screenshot annotation close failed", exc_info=True)
+        # Flush usage stats to disk before shutting down
+        try:
+            self._usage_stats.shutdown()
+        except Exception:
+            logger.debug("Usage stats shutdown failed", exc_info=True)
         # Flush encrypted vault to disk before shutting down
         try:
             from wenzi.vault import shutdown_vault
@@ -1232,16 +1253,7 @@ class WenZiApp(StatusBarApp):
         Called from _init_models() when the configured backend is
         unavailable or Siri/Dictation is disabled.
         """
-        asr_cfg = self._config["asr"]
-        self._transcriber = create_transcriber(
-            backend=fallback.backend,
-            use_vad=asr_cfg.get("use_vad", True),
-            use_punc=asr_cfg.get("use_punc", True),
-            language=fallback.language or asr_cfg.get("language"),
-            model=fallback.model,
-            temperature=asr_cfg.get("temperature"),
-            hotwords=self._load_hotwords(),
-        )
+        self._transcriber = self._create_transcriber_for_preset(fallback)
         self._current_preset_id = fallback.id
         self._menu_builder.update_model_checkmarks()
 
@@ -1351,16 +1363,7 @@ class WenZiApp(StatusBarApp):
                 )
                 monitor_thread.start()
                 self._transcriber.cleanup()
-                asr_cfg = self._config["asr"]
-                self._transcriber = create_transcriber(
-                    backend=preset.backend,
-                    use_vad=asr_cfg.get("use_vad", True),
-                    use_punc=asr_cfg.get("use_punc", True),
-                    language=preset.language or asr_cfg.get("language"),
-                    model=preset.model,
-                    temperature=asr_cfg.get("temperature"),
-                    hotwords=self._load_hotwords(),
-                )
+                self._transcriber = self._create_transcriber_for_preset(preset)
                 self._transcriber.initialize()
                 stop_event.set()
                 monitor_thread.join(timeout=2)

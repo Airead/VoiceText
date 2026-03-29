@@ -260,13 +260,17 @@ Each app menu item dict contains: `title`, `path`, `enabled`, `shortcut`, `_ax_e
 
 ## Usage Statistics
 
-When adding new user-facing behaviors or interactions, always add corresponding tracking to `UsageStats` (`src/wenzi/usage_stats.py`):
+`UsageStats` (`src/wenzi/usage_stats.py`) buffers data in memory and flushes to disk periodically (every 30s) or on `shutdown()`. This avoids disk I/O on every event.
+
+When adding new user-facing behaviors or interactions, always add corresponding tracking:
 
 1. Add counter(s) to `_empty_totals()`
 2. Add a `record_*()` method in `UsageStats`
 3. Call the method at the appropriate point in `app.py`
 4. Update the stats display in `_on_show_usage_stats()`
-5. Add tests in `tests/test_usage_stats.py`
+5. Add tests in `tests/test_usage_stats.py` — call `flush()` or `shutdown()` before asserting on-disk state
+
+**Important:** `shutdown()` must be called on app quit (already wired in `app.py:_on_quit_click`). In tests, always call `shutdown()` in teardown to cancel the flush timer.
 
 ## Worktree Management
 

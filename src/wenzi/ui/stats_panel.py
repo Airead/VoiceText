@@ -62,9 +62,7 @@ def get_daily_range(
     result = []
     for i in range(days - 1, -1, -1):
         day_str = (today - timedelta(days=i)).isoformat()
-        # Access internals through the lock-protected _load_daily
-        with usage_stats._lock:
-            data = usage_stats._load_daily(day_str)
+        data = usage_stats.get_daily(day_str)
         result.append(data)
     return result
 

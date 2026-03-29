@@ -186,14 +186,6 @@ class VocabDB:
             ).fetchone()
         return dict(row) if row else None
 
-    def get_by_id(self, entry_id: int) -> Optional[dict]:
-        """Return a single entry by its id, or None."""
-        with self._lock:
-            row = self._conn.execute(
-                "SELECT * FROM vocab_entry WHERE id = ?", (entry_id,),
-            ).fetchone()
-        return dict(row) if row else None
-
     def contains(self, variant: str, term: str) -> bool:
         with self._lock:
             row = self._conn.execute(

@@ -1072,12 +1072,15 @@ class RecordingFlow:
         from PyObjCTools import AppHelper
 
         app = self._app
+        last_level = -1.0
         try:
             while True:
                 level = app._recorder.current_level
-                AppHelper.callAfter(
-                    app._recording_indicator.update_level, level
-                )
+                if abs(level - last_level) > 0.02:
+                    AppHelper.callAfter(
+                        app._recording_indicator.update_level, level
+                    )
+                    last_level = level
                 await asyncio.sleep(0.05)
         except asyncio.CancelledError:
             pass

@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import os
 import threading
 from datetime import date, datetime, timezone
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Union
 
 from .config import DEFAULT_DATA_DIR
 
 logger = logging.getLogger(__name__)
 
+_FLUSH_INTERVAL = 30  # seconds
 
-def _empty_totals() -> Dict[str, int]:
+
+def _empty_totals() -> Dict[str, Union[int, float]]:
     return {
         "transcriptions": 0,
         "direct_mode": 0,
@@ -69,13 +72,27 @@ def _empty_daily(day: str) -> Dict[str, Any]:
 
 
 class UsageStats:
-    """Thread-safe usage statistics with cumulative + daily file storage."""
+    """Thread-safe usage statistics with cumulative + daily in-memory storage.
+
+    Data is kept in memory and flushed to disk periodically (every 30s)
+    and on shutdown, rather than on every single event.
+    """
 
     def __init__(self, data_dir: str = DEFAULT_DATA_DIR) -> None:
         self._base_dir = os.path.expanduser(data_dir)
         self._cumulative_path = os.path.join(self._base_dir, "usage_stats.json")
         self._daily_dir = os.path.join(self._base_dir, "usage_stats")
         self._lock = threading.Lock()
+
+        # In-memory state — loaded lazily on first access
+        self._cumulative: Dict[str, Any] | None = None
+        self._daily: Dict[str, Any] | None = None
+        self._daily_date: str | None = None
+        self._dirty = False
+
+        # Periodic flush timer
+        self._flush_timer: threading.Timer | None = None
+        self._stopped = False
 
     def _daily_path(self, day: str) -> str:
         return os.path.join(self._daily_dir, f"{day}.json")
@@ -96,11 +113,30 @@ class UsageStats:
         os.chmod(tmp, 0o600)
         os.replace(tmp, path)
 
-    def _load_cumulative(self) -> Dict[str, Any]:
-        data = self._read_json(self._cumulative_path)
-        if data is None:
-            return _empty_cumulative()
-        # Ensure all expected keys exist
+    def _ensure_loaded(self) -> None:
+        """Load data from disk into memory if not yet loaded. Must hold _lock."""
+        if self._cumulative is None:
+            data = self._read_json(self._cumulative_path)
+            if data is None:
+                self._cumulative = _empty_cumulative()
+            else:
+                self._cumulative = self._backfill(data)
+
+        day = self._today()
+        if self._daily is None or self._daily_date != day:
+            # Day changed — flush old daily data first, then load new day
+            if self._daily is not None and self._daily_date != day and self._dirty:
+                self._flush_locked()
+            self._daily_date = day
+            data = self._read_json(self._daily_path(day))
+            if data is None:
+                self._daily = _empty_daily(day)
+            else:
+                self._daily = self._backfill_daily(data, day)
+
+    @staticmethod
+    def _backfill(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Ensure all expected keys exist in cumulative data."""
         for key, factory in [("totals", _empty_totals), ("token_usage", _empty_token_usage)]:
             if key not in data or not isinstance(data[key], dict):
                 data[key] = factory()
@@ -110,10 +146,10 @@ class UsageStats:
         data.setdefault("enhance_mode_usage", {})
         return data
 
-    def _load_daily(self, day: str) -> Dict[str, Any]:
-        data = self._read_json(self._daily_path(day))
-        if data is None:
-            return _empty_daily(day)
+    @staticmethod
+    def _backfill_daily(data: Dict[str, Any], day: str) -> Dict[str, Any]:
+        """Ensure all expected keys exist in daily data."""
+        data["date"] = day
         for key, factory in [("totals", _empty_totals), ("token_usage", _empty_token_usage)]:
             if key not in data or not isinstance(data[key], dict):
                 data[key] = factory()
@@ -129,28 +165,75 @@ class UsageStats:
     def _today(self) -> str:
         return date.today().isoformat()
 
+    def _start_flush_timer(self) -> None:
+        """Schedule the next periodic flush. Must hold _lock."""
+        if self._stopped:
+            return
+        self._flush_timer = threading.Timer(_FLUSH_INTERVAL, self._periodic_flush)
+        self._flush_timer.daemon = True
+        self._flush_timer.start()
+
+    def _cancel_flush_timer(self) -> None:
+        """Cancel any pending flush timer. Must hold _lock."""
+        if self._flush_timer is not None:
+            self._flush_timer.cancel()
+            self._flush_timer = None
+
+    def _periodic_flush(self) -> None:
+        """Called by the timer thread to flush dirty data."""
+        with self._lock:
+            if self._dirty and not self._stopped:
+                self._flush_locked()
+            if not self._stopped:
+                self._start_flush_timer()
+
+    def _flush_locked(self) -> None:
+        """Write in-memory data to disk. Must hold _lock."""
+        if self._cumulative is not None:
+            self._write_json(self._cumulative_path, self._cumulative)
+        if self._daily is not None and self._daily_date is not None:
+            self._write_json(self._daily_path(self._daily_date), self._daily)
+        self._dirty = False
+
+    def flush(self) -> None:
+        """Write in-memory data to disk."""
+        with self._lock:
+            if self._dirty:
+                self._flush_locked()
+
+    def shutdown(self) -> None:
+        """Cancel the flush timer and write any pending data to disk."""
+        with self._lock:
+            self._stopped = True
+            self._cancel_flush_timer()
+            if self._dirty:
+                self._flush_locked()
+
     def _record(
         self,
         updater: Callable[[Dict[str, Any]], None],
         set_first_recorded: bool = False,
     ) -> None:
-        """Apply *updater* to both cumulative and daily data, then persist."""
+        """Apply *updater* to both cumulative and daily data in memory."""
         with self._lock:
+            self._ensure_loaded()
             now = self._now_iso()
-            day = self._today()
 
-            cum = self._load_cumulative()
-            daily = self._load_daily(day)
+            assert self._cumulative is not None  # noqa: S101 — guaranteed by _ensure_loaded
+            assert self._daily is not None  # noqa: S101
 
-            for data in (cum, daily):
+            for data in (self._cumulative, self._daily):
                 updater(data)
 
-            if set_first_recorded and cum.get("first_recorded") is None:
-                cum["first_recorded"] = now
-            cum["last_updated"] = now
+            if set_first_recorded and self._cumulative.get("first_recorded") is None:
+                self._cumulative["first_recorded"] = now
+            self._cumulative["last_updated"] = now
 
-            self._write_json(self._cumulative_path, cum)
-            self._write_json(self._daily_path(day), daily)
+            if not self._dirty:
+                self._dirty = True
+                # Start the periodic flush timer on first dirty write
+                if self._flush_timer is None and not self._stopped:
+                    self._start_flush_timer()
 
     def record_transcription(self, mode: str, enhance_mode: str = "") -> None:
         """Record a transcription event. mode is 'direct' or 'preview'."""
@@ -278,9 +361,29 @@ class UsageStats:
     def get_stats(self) -> Dict[str, Any]:
         """Return cumulative statistics."""
         with self._lock:
-            return self._load_cumulative()
+            self._ensure_loaded()
+            assert self._cumulative is not None  # noqa: S101
+            return copy.deepcopy(self._cumulative)
 
     def get_today_stats(self) -> Dict[str, Any]:
         """Return today's statistics."""
         with self._lock:
-            return self._load_daily(self._today())
+            self._ensure_loaded()
+            assert self._daily is not None  # noqa: S101
+            return copy.deepcopy(self._daily)
+
+    def get_daily(self, day: str) -> Dict[str, Any]:
+        """Return statistics for a specific day (YYYY-MM-DD).
+
+        For today's date, returns the in-memory data. For other dates,
+        reads from the daily JSON file on disk.
+        """
+        with self._lock:
+            self._ensure_loaded()
+            if day == self._daily_date:
+                assert self._daily is not None  # noqa: S101
+                return copy.deepcopy(self._daily)
+            data = self._read_json(self._daily_path(day))
+            if data is None:
+                return _empty_daily(day)
+            return self._backfill_daily(data, day)

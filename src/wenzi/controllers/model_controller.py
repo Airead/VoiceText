@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import threading
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from wenzi import async_loop
@@ -27,7 +28,6 @@ from wenzi.transcription.model_registry import (
     resolve_preset_from_config,
 )
 from wenzi.statusbar import send_notification
-from wenzi.transcription.base import create_transcriber
 from wenzi.ui_helpers import (
     activate_for_dialog,
     restore_accessory,
@@ -273,6 +273,77 @@ models:
         except Exception as e:
             logger.debug("Could not remove ASR provider draft: %s", e)
 
+    # ── Shared verify-and-save logic ────────────────────────────────
+
+    def _do_verify_and_save(
+        self,
+        *,
+        config_section: str,
+        name: str,
+        base_url: str,
+        api_key: str,
+        models: list,
+        mode: str,
+        existing_names: list,
+        verify_fn: Callable[..., Optional[str]],
+        save_fn: Callable[[str, str, str, list], None],
+    ) -> dict:
+        """Shared verify-and-save logic for both STT and LLM providers.
+
+        Returns {ok: True} or {ok: False, error: str}.
+
+        Parameters:
+            config_section: config key for vault lookup ("asr" or "ai_enhance")
+            existing_names: current provider names (for duplicate check)
+            verify_fn: callable(base_url, api_key, model) -> error str or None
+            save_fn: callable(name, base_url, api_key, models) -> None;
+                     must save config and update menus
+        """
+        app = self._app
+
+        # Validate name format
+        name_err = validate_provider_name(name)
+        if name_err:
+            return {"ok": False, "error": name_err}
+
+        # Check duplicate in add mode
+        if mode == "add" and name in existing_names:
+            return {"ok": False, "error": f"Provider '{name}' already exists"}
+
+        # In edit mode, resolve API key
+        actual_api_key = api_key
+        if mode == "edit" and not api_key:
+            existing = (
+                app._config.get(config_section, {})
+                .get("providers", {})
+                .get(name, {})
+            )
+            actual_api_key = existing.get("api_key", "")
+            if not actual_api_key and is_keychain_enabled(app._config):
+                from wenzi.vault import get_vault
+
+                actual_api_key = (
+                    get_vault().get(
+                        f"{config_section}.providers.{name}.api_key"
+                    )
+                    or ""
+                )
+            if not actual_api_key:
+                return {
+                    "ok": False,
+                    "error": "No existing API key found and none provided",
+                }
+
+        # Verify connection
+        err = verify_fn(base_url, actual_api_key, models[0])
+        if err:
+            return {"ok": False, "error": err}
+
+        # Save config and update menus
+        save_fn(name, base_url, actual_api_key, models)
+
+        return {"ok": True}
+
     def do_verify_and_save_stt_provider(
         self,
         name: str,
@@ -286,59 +357,35 @@ models:
         Called from a background thread by settings_controller.
         """
         app = self._app
-
-        # Validate name format
-        name_err = validate_provider_name(name)
-        if name_err:
-            return {"ok": False, "error": name_err}
-
         providers = app._config.get("asr", {}).get("providers", {})
 
-        # Check duplicate in add mode
-        if mode == "add" and name in providers:
-            return {"ok": False, "error": f"Provider '{name}' already exists"}
+        def _verify(base_url, api_key, model):
+            from wenzi.transcription.whisper_api import WhisperAPITranscriber
 
-        # In edit mode, resolve API key
-        actual_api_key = api_key
-        if mode == "edit" and not api_key:
-            existing = providers.get(name, {})
-            actual_api_key = existing.get("api_key", "")
-            if not actual_api_key and is_keychain_enabled(app._config):
-                from wenzi.vault import get_vault
+            return WhisperAPITranscriber.verify_provider(base_url, api_key, model)
 
-                actual_api_key = (
-                    get_vault().get(f"asr.providers.{name}.api_key") or ""
-                )
-            if not actual_api_key:
-                return {
-                    "ok": False,
-                    "error": "No existing API key found and none provided",
-                }
+        def _save(name, base_url, actual_api_key, models):
+            app._config.setdefault("asr", {})
+            providers_cfg = app._config["asr"].setdefault("providers", {})
+            providers_cfg[name] = {
+                "base_url": base_url,
+                "api_key": actual_api_key,
+                "models": models,
+            }
+            save_config(app._config, app._config_path)
+            app._menu_builder.build_model_menu()
 
-        # Verify connection
-        from wenzi.transcription.whisper_api import WhisperAPITranscriber
-
-        err = WhisperAPITranscriber.verify_provider(
-            base_url, actual_api_key, models[0]
+        return self._do_verify_and_save(
+            config_section="asr",
+            name=name,
+            base_url=base_url,
+            api_key=api_key,
+            models=models,
+            mode=mode,
+            existing_names=list(providers),
+            verify_fn=_verify,
+            save_fn=_save,
         )
-
-        if err:
-            return {"ok": False, "error": err}
-
-        # Save config
-        app._config.setdefault("asr", {})
-        providers_cfg = app._config["asr"].setdefault("providers", {})
-        providers_cfg[name] = {
-            "base_url": base_url,
-            "api_key": actual_api_key,
-            "models": models,
-        }
-        save_config(app._config, app._config_path)
-
-        # Update menus
-        app._menu_builder.build_model_menu()
-
-        return {"ok": True}
 
     def do_verify_and_save_provider(
         self,
@@ -359,79 +406,58 @@ models:
         if not app._enhancer:
             return {"ok": False, "error": "LLM enhancer not initialized"}
 
-        # Validate name format
-        name_err = validate_provider_name(name)
-        if name_err:
-            return {"ok": False, "error": name_err}
-
-        # Check duplicate in add mode
-        if mode == "add" and name in app._enhancer.provider_names:
-            return {"ok": False, "error": f"Provider '{name}' already exists"}
-
-        # In edit mode, resolve API key
-        actual_api_key = api_key
-        if mode == "edit" and not api_key:
-            existing = (
-                app._config.get("ai_enhance", {}).get("providers", {}).get(name, {})
-            )
-            actual_api_key = existing.get("api_key", "")
-            if not actual_api_key and is_keychain_enabled(app._config):
-                from wenzi.vault import get_vault
-
-                actual_api_key = (
-                    get_vault().get(f"ai_enhance.providers.{name}.api_key") or ""
+        def _verify(base_url, api_key, model):
+            return async_loop.submit(
+                app._enhancer.verify_provider(
+                    base_url,
+                    api_key,
+                    model,
+                    extra_body=extra_body or None,
                 )
-            if not actual_api_key:
-                return {
-                    "ok": False,
-                    "error": "No existing API key found and none provided",
-                }
+            ).result(timeout=15)
 
-        # Verify connection
-        err = async_loop.submit(
-            app._enhancer.verify_provider(
+        def _save(name, base_url, actual_api_key, models):
+            # In edit mode, remove old provider first
+            if mode == "edit":
+                app._enhancer.remove_provider(name)
+
+            success = app._enhancer.add_provider(
+                name,
                 base_url,
                 actual_api_key,
-                models[0],
+                models,
                 extra_body=extra_body or None,
             )
-        ).result(timeout=15)
+            if not success:
+                raise RuntimeError("Failed to initialize provider client")
 
-        if err:
-            return {"ok": False, "error": err}
+            app._config.setdefault("ai_enhance", {})
+            providers_cfg = app._config["ai_enhance"].setdefault("providers", {})
+            pcfg_save: Dict[str, Any] = {
+                "base_url": base_url,
+                "api_key": actual_api_key,
+                "models": models,
+            }
+            if extra_body:
+                pcfg_save["extra_body"] = extra_body
+            providers_cfg[name] = pcfg_save
+            save_config(app._config, app._config_path)
+            app._menu_builder.build_llm_model_menu()
 
-        # In edit mode, remove old provider first
-        if mode == "edit":
-            app._enhancer.remove_provider(name)
-
-        # Add provider
-        success = app._enhancer.add_provider(
-            name,
-            base_url,
-            actual_api_key,
-            models,
-            extra_body=extra_body or None,
-        )
-        if not success:
-            return {"ok": False, "error": "Failed to initialize provider client"}
-
-        # Save config
-        app._config.setdefault("ai_enhance", {})
-        providers_cfg = app._config["ai_enhance"].setdefault("providers", {})
-        pcfg_save: Dict[str, Any] = {
-            "base_url": base_url,
-            "api_key": actual_api_key,
-            "models": models,
-        }
-        if extra_body:
-            pcfg_save["extra_body"] = extra_body
-        providers_cfg[name] = pcfg_save
-        save_config(app._config, app._config_path)
-
-        # Update menus
-        app._menu_builder.build_llm_model_menu()
-
-        return {"ok": True}
+        try:
+            return self._do_verify_and_save(
+                config_section="ai_enhance",
+                name=name,
+                base_url=base_url,
+                api_key=api_key,
+                models=models,
+                mode=mode,
+                existing_names=list(app._enhancer.provider_names),
+                verify_fn=_verify,
+                save_fn=_save,
+            )
+        except RuntimeError as e:
+            return {"ok": False, "error": str(e)}
 
     # ── Local model selection ─────────────────────────────────────────
 
@@ -501,16 +527,7 @@ models:
                 else:
                     app._set_status("statusbar.status.loading")
 
-                asr_cfg = app._config["asr"]
-                new_transcriber = create_transcriber(
-                    backend=preset.backend,
-                    use_vad=asr_cfg.get("use_vad", True),
-                    use_punc=asr_cfg.get("use_punc", True),
-                    language=preset.language or asr_cfg.get("language"),
-                    model=preset.model,
-                    temperature=asr_cfg.get("temperature"),
-                    hotwords=self._app._load_hotwords(),
-                )
+                new_transcriber = app._create_transcriber_for_preset(preset)
                 new_transcriber.initialize()
 
                 stop_event.set()
@@ -661,16 +678,7 @@ models:
         try:
             logger.info("Restoring previous model: %s", old_preset.display_name)
             app._set_status("statusbar.status.restoring")
-            asr_cfg = app._config["asr"]
-            restored = create_transcriber(
-                backend=old_preset.backend,
-                use_vad=asr_cfg.get("use_vad", True),
-                use_punc=asr_cfg.get("use_punc", True),
-                language=old_preset.language or asr_cfg.get("language"),
-                model=old_preset.model,
-                temperature=asr_cfg.get("temperature"),
-                hotwords=self._app._load_hotwords(),
-            )
+            restored = app._create_transcriber_for_preset(old_preset)
             restored.initialize()
             app._transcriber = restored
             app._current_preset_id = old_preset_id
@@ -700,16 +708,7 @@ models:
             )
             monitor_thread.start()
 
-            asr_cfg = app._config["asr"]
-            new_transcriber = create_transcriber(
-                backend=preset.backend,
-                use_vad=asr_cfg.get("use_vad", True),
-                use_punc=asr_cfg.get("use_punc", True),
-                language=preset.language or asr_cfg.get("language"),
-                model=preset.model,
-                temperature=asr_cfg.get("temperature"),
-                hotwords=self._app._load_hotwords(),
-            )
+            new_transcriber = app._create_transcriber_for_preset(preset)
             new_transcriber.initialize()
 
             stop_event.set()
@@ -778,15 +777,10 @@ models:
                 app._set_status("statusbar.status.switching")
                 old_transcriber.cleanup()
 
-                asr_cfg = app._config["asr"]
-                new_transcriber = create_transcriber(
-                    backend="whisper-api",
+                new_transcriber = app._create_transcriber_for_remote(
                     base_url=rm.base_url,
                     api_key=rm.api_key,
                     model=rm.model,
-                    language=asr_cfg.get("language"),
-                    temperature=asr_cfg.get("temperature"),
-                    hotwords=self._app._load_hotwords(),
                 )
                 new_transcriber.initialize()
 
@@ -974,14 +968,8 @@ models:
             if app._current_remote_asr and app._current_remote_asr[0] == pname:
                 app._transcriber.cleanup()
                 asr_cfg = app._config["asr"]
-                app._transcriber = create_transcriber(
-                    backend=asr_cfg.get("backend", "funasr"),
-                    use_vad=asr_cfg.get("use_vad", True),
-                    use_punc=asr_cfg.get("use_punc", True),
-                    language=asr_cfg.get("language"),
-                    model=asr_cfg.get("model"),
-                    temperature=asr_cfg.get("temperature"),
-                    hotwords=self._app._load_hotwords(),
+                app._transcriber = app._create_local_transcriber(
+                    asr_cfg, "funasr", app._load_hotwords()
                 )
                 app._current_remote_asr = None
                 app._current_preset_id = resolve_preset_from_config(

@@ -347,63 +347,6 @@ class ConversationHistory:
         except Exception:
             return 0
 
-    def correction_count(self) -> int:
-        """Return the number of user-corrected records."""
-        if not os.path.exists(self._history_path):
-            return 0
-        try:
-            count = 0
-            with open(self._history_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        record = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    if self._is_corrected(record):
-                        count += 1
-            return count
-        except Exception:
-            return 0
-
-    def get_corrections(self, since: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Return records where the user made corrections.
-
-        For records with an explicit ``user_corrected`` field, that value is
-        used.  For legacy records without the field, correction is inferred
-        when ``enhanced_text`` differs from ``final_text``.
-
-        Args:
-            since: If provided, only return records with timestamp > since.
-
-        Returns:
-            List of correction records in chronological order.
-        """
-        if not os.path.exists(self._history_path):
-            return []
-
-        records: List[Dict[str, Any]] = []
-        try:
-            with open(self._history_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        record = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    if since and record.get("timestamp", "") <= since:
-                        continue
-                    if self._is_corrected(record):
-                        records.append(record)
-        except Exception as e:
-            logger.warning("Failed to read corrections: %s", e)
-
-        return records
-
     @staticmethod
     def _is_corrected(record: Dict[str, Any]) -> bool:
         """Determine whether a record represents a user correction.

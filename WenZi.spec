@@ -89,7 +89,6 @@ a = Analysis(
         'wenzi.ui.settings_window_web',
         'wenzi.ui.templates',
         'wenzi.ui.log_viewer_window',
-        'wenzi.ui.history_browser_window',
         'wenzi.ui.history_browser_window_web',
         'wenzi.ui.live_transcription_overlay',
         'wenzi.ui.streaming_overlay',
@@ -99,7 +98,6 @@ a = Analysis(
         'wenzi.ui.vocab_build_window',
         # wenzi.controllers
         'wenzi.controllers',
-        'wenzi.controllers.recording_controller',
         'wenzi.controllers.model_controller',
         'wenzi.controllers.enhance_controller',
         'wenzi.controllers.enhance_mode_controller',

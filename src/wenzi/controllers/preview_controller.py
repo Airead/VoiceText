@@ -28,7 +28,6 @@ from wenzi.transcription.model_registry import (
     build_remote_asr_models,
     is_backend_available,
 )
-from wenzi.transcription.base import create_transcriber
 from wenzi.ui_helpers import (
     activate_for_dialog,
     get_frontmost_app,
@@ -380,21 +379,96 @@ class PreviewController:
         self._preview_history.move_to_front(history_index)
 
     # ------------------------------------------------------------------
-    # Preview with transcription (hotkey → record → preview)
+    # Shared preview flow helpers
     # ------------------------------------------------------------------
 
-    def do_transcribe_with_preview(
-        self, asr_text: str | None, use_enhance: bool,
-        audio_duration: float, wav_data: bytes | None = None,
-        initial_history_index: int | None = None,
+    def _build_available_modes(self) -> list:
+        """Build mode list for the segmented control."""
+        app = self._app
+        if app._enhancer:
+            return [("off", "Off")] + app._enhancer.available_modes
+        return []
+
+    def _build_llm_model_list(self) -> tuple:
+        """Build LLM model list for the popup.
+
+        Returns:
+            (llm_models, llm_model_keys, llm_current_index)
+        """
+        app = self._app
+        llm_models: List[str] = []
+        llm_model_keys: list = []
+        llm_current_index = 0
+
+        if app._enhancer:
+            providers_with = app._enhancer.providers_with_models
+            current_llm = (app._enhancer.provider_name, app._enhancer.model_name)
+            for pname, models in providers_with.items():
+                for mname in models:
+                    key = (pname, mname)
+                    llm_models.append(f"{pname} / {mname}")
+                    llm_model_keys.append(key)
+                    if key == current_llm:
+                        llm_current_index = len(llm_models) - 1
+
+        app._preview_llm_keys = llm_model_keys
+        return llm_models, llm_model_keys, llm_current_index
+
+    def _build_enhance_info(self) -> str:
+        """Build enhance info string (provider / model)."""
+        app = self._app
+        if app._enhancer:
+            parts = []
+            if app._enhancer.provider_name:
+                parts.append(app._enhancer.provider_name)
+            if app._enhancer.model_name:
+                parts.append(app._enhancer.model_name)
+            return " / ".join(parts)
+        return ""
+
+    def _run_preview_flow(
+        self,
+        *,
+        source: str,
+        display_asr_text: str,
+        use_enhance: bool,
+        wav_data: bytes | None,
+        audio_duration: float,
+        asr_info: str,
+        stt_models: list | None,
+        stt_current_index: int,
+        show_fn: callable,
+        on_confirm_stats: callable | None = None,
+        on_cancel_stats: callable | None = None,
+        on_result_stats: callable | None = None,
+        correction_tracked: bool = False,
     ) -> None:
-        """Show preview with ASR text (or run STT in background).
+        """Shared preview panel flow for both voice and clipboard sources.
 
-        If *initial_history_index* is set, the panel loads that history
-        record immediately after opening (no STT / enhancement).
+        This handles the full lifecycle: create result holder, show the
+        panel (via *show_fn*), wait for user decision, then output text
+        or handle cancellation.
 
-        If *asr_text* is ``None``, STT runs in a background thread
-        and STT runs in the background.
+        Args:
+            source: "voice" or "clipboard" — used for history records.
+            display_asr_text: Text to display in the ASR pane.
+            use_enhance: Whether AI enhancement is active.
+            wav_data: Audio data (None for clipboard).
+            audio_duration: Duration in seconds (0.0 for clipboard).
+            asr_info: ASR info string to display.
+            stt_models: STT model list for popup (None for clipboard).
+            stt_current_index: Current STT model index.
+            show_fn: Callable(result_holder, result_event, on_confirm,
+                on_cancel, panel_kwargs) that schedules the panel show
+                on the main thread.  Receives pre-built common panel
+                kwargs plus the callbacks; responsible for voice-specific
+                extras (indicator animation, STT thread, etc.).
+            on_confirm_stats: Called on confirm with (correction_info).
+            on_cancel_stats: Called on cancel (no args).
+            on_result_stats: Called after outputting confirmed text with
+                (copy_to_clipboard=bool).
+            correction_tracked: Whether to track corrections for this
+                mode (voice-only, based on mode definition).
         """
         from PyObjCTools import AppHelper
 
@@ -403,16 +477,8 @@ class PreviewController:
         # Save the frontmost app before we steal focus with the preview panel.
         # Used later to reactivate only the focused window (not all windows).
         previous_app = get_frontmost_app()
-        self._apply_input_context(app._recording_controller.input_context)
 
-        try:
-            app._usage_stats.record_transcription(
-                mode="preview", enhance_mode=app._enhance_mode
-            )
-        except Exception as e:
-            logger.error("Failed to record usage stats: %s", e)
-
-        app._current_preview_asr_text = asr_text or ""
+        app._current_preview_asr_text = display_asr_text
         app._enhance_controller.clear_cache()
 
         result_event = threading.Event()
@@ -430,252 +496,79 @@ class PreviewController:
             result_holder["user_corrected"] = correction_info is not None
             # Stop any in-flight streaming enhancement to save tokens
             app._enhance_controller.cancel()
-            try:
-                app._usage_stats.record_confirm(modified=correction_info is not None)
-            except Exception as e:
-                logger.error("Failed to record usage stats: %s", e)
+            if on_confirm_stats:
+                try:
+                    on_confirm_stats(correction_info)
+                except Exception as e:
+                    logger.error("Failed to record usage stats: %s", e)
             result_event.set()
 
         def on_cancel() -> None:
             result_holder["confirmed"] = False
             # Stop any in-flight streaming enhancement
             app._enhance_controller.cancel()
-            try:
-                app._usage_stats.record_cancel()
-            except Exception as e:
-                logger.error("Failed to record usage stats: %s", e)
+            if on_cancel_stats:
+                try:
+                    on_cancel_stats()
+                except Exception as e:
+                    logger.error("Failed to record usage stats: %s", e)
             result_event.set()
 
-        # Build mode list for the segmented control
-        available_modes = []
-        if app._enhancer:
-            available_modes = [("off", "Off")] + app._enhancer.available_modes
+        # Build common panel parameters
+        available_modes = self._build_available_modes()
+        llm_models, llm_model_keys, llm_current_index = self._build_llm_model_list()
+        enhance_info = self._build_enhance_info()
 
-        # Build ASR info string (duration only when popup available, else model+duration)
-        asr_info_parts = []
-        if audio_duration > 0:
-            asr_info_parts.append(f"{audio_duration:.1f}s")
-        # Store duration for re-transcription info updates
-        app._preview_audio_duration = audio_duration
+        panel_kwargs = dict(
+            asr_text=display_asr_text,
+            show_enhance=use_enhance,
+            on_confirm=on_confirm,
+            on_cancel=on_cancel,
+            available_modes=available_modes,
+            current_mode=app._enhance_mode,
+            on_mode_change=self.on_preview_mode_change,
+            asr_info=asr_info,
+            asr_wav_data=wav_data,
+            enhance_info=enhance_info,
+            stt_models=stt_models if stt_models else None,
+            stt_current_index=stt_current_index,
+            on_stt_model_change=self.on_preview_stt_change if stt_models else None,
+            llm_models=llm_models if llm_models else None,
+            llm_current_index=llm_current_index,
+            on_llm_model_change=(
+                self.on_preview_llm_change if llm_models else None
+            ),
+            thinking_enabled=(
+                app._enhancer.thinking if app._enhancer else False
+            ),
+            on_thinking_toggle=(
+                self.on_preview_thinking_toggle if app._enhancer else None
+            ),
+            on_google_translate=(
+                lambda: app._usage_stats.record_google_translate_open()
+            ),
+            on_select_history=self.on_select_history,
+            preview_history_items=self._build_history_items(),
+            on_add_manual_vocab=self._on_add_manual_vocab,
+            on_remove_manual_vocab=self._on_remove_manual_vocab,
+            on_diff_panel_toggle=self._on_diff_panel_toggle,
+            diff_panel_open=app._config.get("ui", {}).get(
+                "diff_panel_open", False
+            ),
+        )
 
-        # Build STT model list for popup
-        stt_models: List[str] = []
-        stt_model_keys: list = []
-        stt_current_index = 0
-
-        if wav_data:
-            # Local presets (only available backends)
-            for preset in PRESETS:
-                if is_backend_available(preset.backend):
-                    stt_models.append(preset.display_name)
-                    stt_model_keys.append(("preset", preset.id))
-                    if preset.id == app._current_preset_id and not app._current_remote_asr:
-                        stt_current_index = len(stt_models) - 1
-
-            # Remote ASR models
-            asr_cfg = app._config.get("asr", {})
-            providers = asr_cfg.get("providers", {})
-            remote_models = build_remote_asr_models(providers)
-            for rm in remote_models:
-                stt_models.append(rm.display_name)
-                stt_model_keys.append(("remote", (rm.provider, rm.model)))
-                if app._current_remote_asr == (rm.provider, rm.model):
-                    stt_current_index = len(stt_models) - 1
-
-        app._preview_stt_keys = stt_model_keys
-
-        # Add model name to asr_info when no popup (backward compat)
-        if not stt_models:
-            try:
-                asr_info_parts.insert(0, app._transcriber.model_display_name)
-            except Exception:
-                pass
-        asr_info = "  ".join(asr_info_parts)
-
-        # Build LLM model list for popup
-        llm_models: List[str] = []
-        llm_model_keys: list = []
-        llm_current_index = 0
-
-        if app._enhancer:
-            providers_with = app._enhancer.providers_with_models
-            current_llm = (app._enhancer.provider_name, app._enhancer.model_name)
-            for pname, models in providers_with.items():
-                for mname in models:
-                    key = (pname, mname)
-                    llm_models.append(f"{pname} / {mname}")
-                    llm_model_keys.append(key)
-                    if key == current_llm:
-                        llm_current_index = len(llm_models) - 1
-
-        app._preview_llm_keys = llm_model_keys
-
-        # Build enhance info string
-        enhance_info = ""
-        if app._enhancer:
-            parts = []
-            if app._enhancer.provider_name:
-                parts.append(app._enhancer.provider_name)
-            if app._enhancer.model_name:
-                parts.append(app._enhancer.model_name)
-            enhance_info = " / ".join(parts)
-
-        # Determine whether STT needs to run in background
-        need_stt = asr_text is None
-        display_asr_text = "" if need_stt else asr_text
-
-        # Show panel on main thread, then start enhancement/STT after panel is built
-        def _show():
-            activate_for_dialog()
-
-            # Get indicator frame for transition animation before animating it out
-            indicator_frame = app._recording_indicator.current_frame
-
-            def _show_preview():
-                app._preview_panel.show(
-                    asr_text=display_asr_text,
-                    show_enhance=use_enhance,
-                    on_confirm=on_confirm,
-                    on_cancel=on_cancel,
-                    available_modes=available_modes,
-                    current_mode=app._enhance_mode,
-                    on_mode_change=self.on_preview_mode_change,
-                    asr_info=asr_info if not need_stt else "",
-                    asr_wav_data=wav_data,
-                    enhance_info=enhance_info,
-                    stt_models=stt_models if stt_models else None,
-                    stt_current_index=stt_current_index,
-                    on_stt_model_change=self.on_preview_stt_change if stt_models else None,
-                    llm_models=llm_models if llm_models else None,
-                    llm_current_index=llm_current_index,
-                    on_llm_model_change=self.on_preview_llm_change if llm_models else None,
-                    punc_enabled=not app._transcriber.skip_punc,
-                    on_punc_toggle=self.on_preview_punc_toggle if wav_data else None,
-                    thinking_enabled=app._enhancer.thinking if app._enhancer else False,
-                    on_thinking_toggle=self.on_preview_thinking_toggle if app._enhancer else None,
-                    on_google_translate=lambda: app._usage_stats.record_google_translate_open(),
-                    on_select_history=self.on_select_history,
-                    preview_history_items=self._build_history_items(),
-                    animate_from_frame=indicator_frame,
-                    on_add_manual_vocab=self._on_add_manual_vocab,
-                    on_remove_manual_vocab=self._on_remove_manual_vocab,
-                    on_diff_panel_toggle=self._on_diff_panel_toggle,
-                    diff_panel_open=app._config.get("ui", {}).get("diff_panel_open", False),
-                )
-                if initial_history_index is not None:
-                    # Load cached history record — skip STT and enhancement
-                    self.on_select_history(initial_history_index)
-                elif need_stt:
-                    # Show loading state and disable STT popup during transcription
-                    app._preview_panel.set_asr_loading()
-                    if use_enhance:
-                        app._preview_panel.set_enhance_loading()
-                    # Start STT thread AFTER panel is built to avoid race condition
-                    # where fast models (e.g. FunASR) complete before panel exists
-                    threading.Thread(target=_do_stt, daemon=True).start()
-                elif use_enhance:
-                    # ASR already available, start enhancement immediately
-                    app._preview_panel.set_enhance_loading()
-                    app._preview_panel.enhance_request_id += 1
-                    app._enhance_controller.run(
-                        asr_text, app._preview_panel.enhance_request_id, result_holder,
-                        input_context=self._input_context,
-                    )
-
-            if indicator_frame is not None:
-                app._recording_indicator.animate_out(completion=_show_preview)
-            else:
-                _show_preview()
-
-        # Define STT background task (started inside _show_preview after panel is built)
-        def _do_stt():
-            try:
-                from wenzi.transcription.base import BaseTranscriber
-
-                audio_dur = BaseTranscriber.wav_duration_seconds(wav_data)
-                app._preview_audio_duration = audio_dur
-                app._transcriber.skip_punc = bool(
-                    app._enhancer and app._enhancer.is_active
-                )
-                hotwords, hotwords_detail = app._build_dynamic_hotwords()
-                text = app._transcriber.transcribe(wav_data, hotwords=hotwords)
-                if text and text.strip():
-                    stt_text = text.strip()
-                else:
-                    stt_text = "(empty)"
-                    logger.warning("Transcription returned empty text")
-
-                app._current_preview_asr_text = stt_text
-                app._enhance_controller.clear_cache()
-
-                self._fire_scripting_event("transcription_done", asr_text=stt_text)
-
-                # Build ASR info
-                parts = []
-                if not stt_models:
-                    try:
-                        parts.insert(0, app._transcriber.model_display_name)
-                    except Exception:
-                        pass
-                if audio_dur > 0:
-                    parts.append(f"{audio_dur:.1f}s")
-                new_asr_info = "  ".join(parts)
-
-                def _on_stt_done():
-                    app._preview_panel.set_hotwords(hotwords_detail)
-                    app._preview_panel.set_asr_result(
-                        stt_text, asr_info=new_asr_info, request_id=0,
-                    )
-                    # Start enhancement now that ASR is ready
-                    if use_enhance and stt_text != "(empty)":
-                        app._preview_panel.enhance_request_id += 1
-                        app._enhance_controller.run(
-                            stt_text, app._preview_panel.enhance_request_id,
-                            result_holder,
-                            input_context=self._input_context,
-                        )
-                    elif use_enhance:
-                        # Empty text — clear enhance loading
-                        app._preview_panel.set_enhance_off()
-
-                AppHelper.callAfter(_on_stt_done)
-            except Exception as e:
-                logger.error("Background STT failed: %s", e)
-                from wenzi.transcription.model_registry import PRESET_BY_ID
-
-                preset_id = app._current_preset_id
-                preset = PRESET_BY_ID.get(preset_id) if preset_id else None
-                has_cache = (
-                    preset is not None
-                    and preset.backend not in ("apple", "whisper-api")
-                )
-                if has_cache:
-                    hint = (
-                        "This may be caused by corrupted cache files from "
-                        "an interrupted download. Try clearing cache via "
-                        "the model load error alert, or switch to a "
-                        "different model from the menu."
-                    )
-                else:
-                    hint = (
-                        "Please try switching to a different model "
-                        "from the menu."
-                    )
-                app._preview_panel.set_asr_result(
-                    f"(error: {e})\n\n{hint}",
-                    request_id=0,
-                )
-
-        AppHelper.callAfter(_show)
+        # Delegate to the source-specific show function
+        show_fn(result_holder, result_event, on_confirm, on_cancel, panel_kwargs)
         app._set_status("statusbar.status.preview")
 
         # Wait for user decision
         result_event.wait()
         app._busy = False
 
-        # Reactivate the previous app's focused window, then restore accessory mode.
-        # Order matters: activate first (without AllWindows) so macOS doesn't
-        # trigger its own all-windows activation when we drop to accessory.
+        # Reactivate the previous app's focused window, then restore accessory
+        # mode.  Order matters: activate first (without AllWindows) so macOS
+        # doesn't trigger its own all-windows activation when we drop to
+        # accessory.
         def _activate_prev():
             reactivate_app(previous_app)
 
@@ -703,8 +596,16 @@ class PreviewController:
                 )
             app._set_status("statusbar.status.ready")
 
+            if on_result_stats:
+                try:
+                    on_result_stats(copy_to_clipboard=copy_to_clip)
+                except Exception as e:
+                    logger.error("Failed to record usage stats: %s", e)
+
             try:
-                app._usage_stats.record_output_method(copy_to_clipboard=copy_to_clip)
+                app._usage_stats.record_output_method(
+                    copy_to_clipboard=copy_to_clip,
+                )
             except Exception as e:
                 logger.error("Failed to record output method: %s", e)
 
@@ -712,17 +613,11 @@ class PreviewController:
                 # Confirming from a history record
                 self._handle_history_confirm(
                     viewing_idx, result_holder, wav_data,
-                    getattr(app, "_preview_audio_duration", 0.0), "voice",
+                    getattr(app, "_preview_audio_duration", 0.0), source,
                 )
             else:
-                # Normal confirm — log to conversation history, then save to preview history
-                mode_def = (
-                    app._enhancer.get_mode_definition(app._enhance_mode)
-                    if app._enhancer
-                    else None
-                )
-                should_track = mode_def is not None and mode_def.track_corrections
-
+                # Normal confirm — log to conversation history, then
+                # save to preview history
                 ts = None
                 try:
                     ts = self._log_with_chain_steps(
@@ -730,8 +625,10 @@ class PreviewController:
                         result_holder=result_holder,
                         asr_text=app._current_preview_asr_text,
                         final_text=final_text,
-                        audio_duration=getattr(app, "_preview_audio_duration", 0.0),
-                        correction_tracked=should_track,
+                        audio_duration=getattr(
+                            app, "_preview_audio_duration", 0.0,
+                        ),
+                        correction_tracked=correction_tracked,
                     )
                 except Exception as e:
                     logger.error("Failed to log conversation: %s", e)
@@ -739,7 +636,7 @@ class PreviewController:
                 action = "copy" if copy_to_clip else "confirm"
                 self._save_to_preview_history(
                     ts, action, result_holder, wav_data,
-                    getattr(app, "_preview_audio_duration", 0.0), "voice",
+                    getattr(app, "_preview_audio_duration", 0.0), source,
                 )
         else:
             app._set_status("statusbar.status.ready")
@@ -748,8 +645,262 @@ class PreviewController:
             if viewing_idx is None:
                 self._save_to_preview_history(
                     None, "cancel", result_holder, wav_data,
-                    getattr(app, "_preview_audio_duration", 0.0), "voice",
+                    getattr(app, "_preview_audio_duration", 0.0), source,
                 )
+
+    # ------------------------------------------------------------------
+    # Preview with transcription (hotkey -> record -> preview)
+    # ------------------------------------------------------------------
+
+    def do_transcribe_with_preview(
+        self, asr_text: str | None, use_enhance: bool,
+        audio_duration: float, wav_data: bytes | None = None,
+        initial_history_index: int | None = None,
+    ) -> None:
+        """Show preview with ASR text (or run STT in background).
+
+        If *initial_history_index* is set, the panel loads that history
+        record immediately after opening (no STT / enhancement).
+
+        If *asr_text* is ``None``, STT runs in a background thread
+        and STT runs in the background.
+        """
+        from PyObjCTools import AppHelper
+
+        app = self._app
+
+        self._apply_input_context(app._recording_controller.input_context)
+
+        try:
+            app._usage_stats.record_transcription(
+                mode="preview", enhance_mode=app._enhance_mode
+            )
+        except Exception as e:
+            logger.error("Failed to record usage stats: %s", e)
+
+        # Store duration for re-transcription info updates
+        app._preview_audio_duration = audio_duration
+
+        # Build ASR info string (duration only when popup available,
+        # else model+duration)
+        asr_info_parts = []
+        if audio_duration > 0:
+            asr_info_parts.append(f"{audio_duration:.1f}s")
+
+        # Build STT model list for popup
+        stt_models: List[str] = []
+        stt_model_keys: list = []
+        stt_current_index = 0
+
+        if wav_data:
+            # Local presets (only available backends)
+            for preset in PRESETS:
+                if is_backend_available(preset.backend):
+                    stt_models.append(preset.display_name)
+                    stt_model_keys.append(("preset", preset.id))
+                    if (
+                        preset.id == app._current_preset_id
+                        and not app._current_remote_asr
+                    ):
+                        stt_current_index = len(stt_models) - 1
+
+            # Remote ASR models
+            asr_cfg = app._config.get("asr", {})
+            providers = asr_cfg.get("providers", {})
+            remote_models = build_remote_asr_models(providers)
+            for rm in remote_models:
+                stt_models.append(rm.display_name)
+                stt_model_keys.append(("remote", (rm.provider, rm.model)))
+                if app._current_remote_asr == (rm.provider, rm.model):
+                    stt_current_index = len(stt_models) - 1
+
+        app._preview_stt_keys = stt_model_keys
+
+        # Add model name to asr_info when no popup (backward compat)
+        if not stt_models:
+            try:
+                asr_info_parts.insert(0, app._transcriber.model_display_name)
+            except Exception:
+                pass
+        asr_info = "  ".join(asr_info_parts)
+
+        # Determine whether STT needs to run in background
+        need_stt = asr_text is None
+        display_asr_text = "" if need_stt else asr_text
+
+        # Compute correction_tracked before entering the flow
+        mode_def = (
+            app._enhancer.get_mode_definition(app._enhance_mode)
+            if app._enhancer
+            else None
+        )
+        should_track = mode_def is not None and mode_def.track_corrections
+
+        def _voice_show(result_holder, result_event, on_confirm, on_cancel, panel_kwargs):
+            """Schedule voice-specific panel show on main thread."""
+
+            def _do_stt():
+                try:
+                    from wenzi.transcription.base import BaseTranscriber
+
+                    audio_dur = BaseTranscriber.wav_duration_seconds(wav_data)
+                    app._preview_audio_duration = audio_dur
+                    app._transcriber.skip_punc = bool(
+                        app._enhancer and app._enhancer.is_active
+                    )
+                    hotwords, hotwords_detail = app._build_dynamic_hotwords()
+                    text = app._transcriber.transcribe(
+                        wav_data, hotwords=hotwords,
+                    )
+                    if text and text.strip():
+                        stt_text = text.strip()
+                    else:
+                        stt_text = "(empty)"
+                        logger.warning("Transcription returned empty text")
+
+                    app._current_preview_asr_text = stt_text
+                    app._enhance_controller.clear_cache()
+
+                    self._fire_scripting_event(
+                        "transcription_done", asr_text=stt_text,
+                    )
+
+                    # Build ASR info
+                    parts = []
+                    if not stt_models:
+                        try:
+                            parts.insert(
+                                0, app._transcriber.model_display_name,
+                            )
+                        except Exception:
+                            pass
+                    if audio_dur > 0:
+                        parts.append(f"{audio_dur:.1f}s")
+                    new_asr_info = "  ".join(parts)
+
+                    def _on_stt_done():
+                        app._preview_panel.set_hotwords(hotwords_detail)
+                        app._preview_panel.set_asr_result(
+                            stt_text,
+                            asr_info=new_asr_info,
+                            request_id=0,
+                        )
+                        # Start enhancement now that ASR is ready
+                        if use_enhance and stt_text != "(empty)":
+                            app._preview_panel.enhance_request_id += 1
+                            app._enhance_controller.run(
+                                stt_text,
+                                app._preview_panel.enhance_request_id,
+                                result_holder,
+                                input_context=self._input_context,
+                            )
+                        elif use_enhance:
+                            # Empty text -- clear enhance loading
+                            app._preview_panel.set_enhance_off()
+
+                    AppHelper.callAfter(_on_stt_done)
+                except Exception as e:
+                    logger.error("Background STT failed: %s", e)
+
+                    preset_id = app._current_preset_id
+                    preset = (
+                        PRESET_BY_ID.get(preset_id) if preset_id else None
+                    )
+                    has_cache = (
+                        preset is not None
+                        and preset.backend not in ("apple", "whisper-api")
+                    )
+                    if has_cache:
+                        hint = (
+                            "This may be caused by corrupted cache files"
+                            " from an interrupted download. Try clearing"
+                            " cache via the model load error alert, or"
+                            " switch to a different model from the menu."
+                        )
+                    else:
+                        hint = (
+                            "Please try switching to a different model"
+                            " from the menu."
+                        )
+                    app._preview_panel.set_asr_result(
+                        f"(error: {e})\n\n{hint}", request_id=0,
+                    )
+
+            def _show():
+                activate_for_dialog()
+
+                # Get indicator frame for transition animation
+                indicator_frame = app._recording_indicator.current_frame
+
+                def _show_preview():
+                    # Add voice-specific params
+                    panel_kwargs["asr_info"] = (
+                        asr_info if not need_stt else ""
+                    )
+                    panel_kwargs["punc_enabled"] = (
+                        not app._transcriber.skip_punc
+                    )
+                    panel_kwargs["on_punc_toggle"] = (
+                        self.on_preview_punc_toggle if wav_data else None
+                    )
+                    panel_kwargs["animate_from_frame"] = indicator_frame
+
+                    app._preview_panel.show(**panel_kwargs)
+
+                    if initial_history_index is not None:
+                        # Load cached history record -- skip STT and
+                        # enhancement
+                        self.on_select_history(initial_history_index)
+                    elif need_stt:
+                        # Show loading state and disable STT popup
+                        # during transcription
+                        app._preview_panel.set_asr_loading()
+                        if use_enhance:
+                            app._preview_panel.set_enhance_loading()
+                        # Start STT thread AFTER panel is built to
+                        # avoid race condition where fast models (e.g.
+                        # FunASR) complete before panel exists
+                        threading.Thread(
+                            target=_do_stt, daemon=True,
+                        ).start()
+                    elif use_enhance:
+                        # ASR already available, start enhancement
+                        # immediately
+                        app._preview_panel.set_enhance_loading()
+                        app._preview_panel.enhance_request_id += 1
+                        app._enhance_controller.run(
+                            asr_text,
+                            app._preview_panel.enhance_request_id,
+                            result_holder,
+                            input_context=self._input_context,
+                        )
+
+                if indicator_frame is not None:
+                    app._recording_indicator.animate_out(
+                        completion=_show_preview,
+                    )
+                else:
+                    _show_preview()
+
+            AppHelper.callAfter(_show)
+
+        self._run_preview_flow(
+            source="voice",
+            display_asr_text=display_asr_text,
+            use_enhance=use_enhance,
+            wav_data=wav_data,
+            audio_duration=audio_duration,
+            asr_info=asr_info,
+            stt_models=stt_models if stt_models else None,
+            stt_current_index=stt_current_index,
+            show_fn=_voice_show,
+            on_confirm_stats=lambda ci: app._usage_stats.record_confirm(
+                modified=ci is not None,
+            ),
+            on_cancel_stats=lambda: app._usage_stats.record_cancel(),
+            on_result_stats=None,  # voice has no extra result stats
+            correction_tracked=should_track,
+        )
 
     # ------------------------------------------------------------------
     # Clipboard enhance
@@ -826,185 +977,54 @@ class PreviewController:
 
         app = self._app
 
-        # Save the frontmost app before we steal focus with the preview panel.
-        previous_app = get_frontmost_app()
-
         try:
             app._usage_stats.record_clipboard_enhance(app._enhance_mode)
         except Exception as e:
             logger.error("Failed to record clipboard enhance: %s", e)
 
-        app._current_preview_asr_text = clipboard_text
-        app._enhance_controller.clear_cache()
-
-        result_event = threading.Event()
-        result_holder = {"text": None, "confirmed": False, "enhanced_text": None}
-        self._result_holder = result_holder
-
-        def on_confirm(
-            text: str,
-            correction_info: dict | None = None,
-            copy_to_clipboard: bool = False,
-        ) -> None:
-            result_holder["text"] = text
-            result_holder["confirmed"] = True
-            result_holder["copy_to_clipboard"] = copy_to_clipboard
-            result_holder["user_corrected"] = correction_info is not None
-            # Stop any in-flight streaming enhancement to save tokens
-            app._enhance_controller.cancel()
-            result_event.set()
-
-        def on_cancel() -> None:
-            result_holder["confirmed"] = False
-            # Stop any in-flight streaming enhancement
-            app._enhance_controller.cancel()
-            result_event.set()
-
-        # Build mode list for the segmented control
-        available_modes = []
-        if app._enhancer:
-            available_modes = [("off", "Off")] + app._enhancer.available_modes
-
-        # Build LLM model list for popup
-        llm_models: List[str] = []
-        llm_model_keys: list = []
-        llm_current_index = 0
-
-        if app._enhancer:
-            providers_with = app._enhancer.providers_with_models
-            current_llm = (app._enhancer.provider_name, app._enhancer.model_name)
-            for pname, models in providers_with.items():
-                for mname in models:
-                    key = (pname, mname)
-                    llm_models.append(f"{pname} / {mname}")
-                    llm_model_keys.append(key)
-                    if key == current_llm:
-                        llm_current_index = len(llm_models) - 1
-
-        app._preview_llm_keys = llm_model_keys
-
-        # Build enhance info string
-        enhance_info = ""
-        if app._enhancer:
-            parts = []
-            if app._enhancer.provider_name:
-                parts.append(app._enhancer.provider_name)
-            if app._enhancer.model_name:
-                parts.append(app._enhancer.model_name)
-            enhance_info = " / ".join(parts)
-
         use_enhance = bool(app._enhancer and app._enhancer.is_active)
 
-        def _show():
-            activate_for_dialog()
-            app._preview_panel.show(
-                asr_text=clipboard_text,
-                show_enhance=use_enhance,
-                on_confirm=on_confirm,
-                on_cancel=on_cancel,
-                available_modes=available_modes,
-                current_mode=app._enhance_mode,
-                on_mode_change=self.on_preview_mode_change,
-                asr_info="",
-                asr_wav_data=None,
-                enhance_info=enhance_info,
-                stt_models=None,
-                stt_current_index=0,
-                on_stt_model_change=None,
-                llm_models=llm_models if llm_models else None,
-                llm_current_index=llm_current_index,
-                on_llm_model_change=self.on_preview_llm_change if llm_models else None,
-                source="clipboard",
-                thinking_enabled=app._enhancer.thinking if app._enhancer else False,
-                on_thinking_toggle=self.on_preview_thinking_toggle if app._enhancer else None,
-                on_google_translate=lambda: app._usage_stats.record_google_translate_open(),
-                on_select_history=self.on_select_history,
-                preview_history_items=self._build_history_items(),
-                on_add_manual_vocab=self._on_add_manual_vocab,
-                on_remove_manual_vocab=self._on_remove_manual_vocab,
-                on_diff_panel_toggle=self._on_diff_panel_toggle,
-                diff_panel_open=app._config.get("ui", {}).get("diff_panel_open", False),
-            )
-            if use_enhance:
-                app._preview_panel.enhance_request_id += 1
-                app._enhance_controller.run(
-                    clipboard_text, app._preview_panel.enhance_request_id, result_holder,
-                    input_context=None,
-                )
+        def _clipboard_show(
+            result_holder, result_event, on_confirm, on_cancel, panel_kwargs,
+        ):
+            """Schedule clipboard-specific panel show on main thread."""
 
-        AppHelper.callAfter(_show)
-        app._set_status("statusbar.status.preview")
+            def _show():
+                activate_for_dialog()
+                # Add clipboard-specific params
+                panel_kwargs["source"] = "clipboard"
+                app._preview_panel.show(**panel_kwargs)
+                if use_enhance:
+                    app._preview_panel.enhance_request_id += 1
+                    app._enhance_controller.run(
+                        clipboard_text,
+                        app._preview_panel.enhance_request_id,
+                        result_holder,
+                        input_context=None,
+                    )
 
-        result_event.wait()
+            AppHelper.callAfter(_show)
 
-        def _activate_prev():
-            reactivate_app(previous_app)
-
-        def _go_accessory():
-            restore_accessory()
-
-        AppHelper.callAfter(_activate_prev)
-        AppHelper.callAfter(_go_accessory)
-        time.sleep(0.15)
-
-        viewing_idx = self._viewing_history_index
-        self._viewing_history_index = None
-
-        if result_holder["confirmed"] and result_holder["text"]:
-            final_text = result_holder["text"].strip()
-            copy_to_clip = bool(result_holder.get("copy_to_clipboard"))
-            if copy_to_clip:
-                set_clipboard_text(final_text)
-                logger.info("Text copied to clipboard (%d chars)", len(final_text))
-            else:
-                type_text(
-                    final_text,
-                    append_newline=app._append_newline,
-                    method=app._output_method,
-                )
-            app._set_status("statusbar.status.ready")
-
+        def _on_clipboard_result(*, copy_to_clipboard: bool) -> None:
             try:
                 app._usage_stats.record_clipboard_confirm()
             except Exception as e:
                 logger.error("Failed to record clipboard confirm: %s", e)
 
-            try:
-                app._usage_stats.record_output_method(copy_to_clipboard=copy_to_clip)
-            except Exception as e:
-                logger.error("Failed to record output method: %s", e)
-
-            if viewing_idx is not None:
-                self._handle_history_confirm(
-                    viewing_idx, result_holder, None, 0.0, "clipboard",
-                )
-            else:
-                ts = None
-                try:
-                    ts = self._log_with_chain_steps(
-                        app,
-                        result_holder=result_holder,
-                        asr_text=clipboard_text,
-                        final_text=final_text,
-                        audio_duration=0.0,
-                    )
-                except Exception as e:
-                    logger.error("Failed to log conversation: %s", e)
-                action = "copy" if copy_to_clip else "confirm"
-                self._save_to_preview_history(
-                    ts, action, result_holder, None, 0.0, "clipboard",
-                )
-        else:
-            app._set_status("statusbar.status.ready")
-            try:
-                app._usage_stats.record_clipboard_cancel()
-            except Exception as e:
-                logger.error("Failed to record clipboard cancel: %s", e)
-            logger.info("Clipboard enhance cancelled by user")
-            if viewing_idx is None:
-                self._save_to_preview_history(
-                    None, "cancel", result_holder, None, 0.0, "clipboard",
-                )
+        self._run_preview_flow(
+            source="clipboard",
+            display_asr_text=clipboard_text,
+            use_enhance=use_enhance,
+            wav_data=None,
+            audio_duration=0.0,
+            asr_info="",
+            stt_models=None,
+            stt_current_index=0,
+            show_fn=_clipboard_show,
+            on_confirm_stats=None,
+            on_cancel_stats=lambda: app._usage_stats.record_clipboard_cancel(),
+            on_result_stats=_on_clipboard_result,
+        )
 
     # ------------------------------------------------------------------
     # Preview panel callbacks
@@ -1172,27 +1192,18 @@ class PreviewController:
                 asr_cfg = app._config.get("asr", {})
                 if key_type == "preset":
                     preset = PRESET_BY_ID[key_value]
-                    new_transcriber = create_transcriber(
-                        backend=preset.backend,
-                        use_vad=asr_cfg.get("use_vad", True),
-                        use_punc=asr_cfg.get("use_punc", True),
-                        language=preset.language or asr_cfg.get("language"),
-                        model=preset.model,
-                        temperature=asr_cfg.get("temperature"),
-                        hotwords=app._load_hotwords(),
+                    new_transcriber = app._create_transcriber_for_preset(
+                        preset, asr_cfg=asr_cfg
                     )
                 else:
                     prov, mod = key_value
                     providers = asr_cfg.get("providers", {})
                     pcfg = providers.get(prov, {})
-                    new_transcriber = create_transcriber(
-                        backend="whisper-api",
+                    new_transcriber = app._create_transcriber_for_remote(
                         base_url=pcfg.get("base_url"),
                         api_key=pcfg.get("api_key"),
                         model=mod,
-                        language=asr_cfg.get("language"),
-                        temperature=asr_cfg.get("temperature"),
-                        hotwords=app._load_hotwords(),
+                        asr_cfg=asr_cfg,
                     )
 
                 new_transcriber.initialize()

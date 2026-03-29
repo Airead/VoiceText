@@ -137,7 +137,6 @@ crashes with `objc.error: PanelCloseDelegate is overriding existing Objective-C 
 
 ```
 WebResultPanelCloseDelegate        (result_window_web.py)
-HistoryBrowserCloseDelegate        (history_browser_window.py)
 HistoryBrowserWebCloseDelegate     (history_browser_window_web.py)
 ```
 

@@ -113,17 +113,6 @@ def t(_key: str, **kwargs: Any) -> str:
     return value
 
 
-def set_locale(locale: str) -> None:
-    """Switch locale at runtime (takes effect on next t() call)."""
-    global _current_locale, _strings
-
-    _current_locale = locale
-    if locale == "en":
-        _strings = _fallback_strings
-    else:
-        _strings = _load_json(os.path.join(_active_locales_dir, f"{locale}.json"))
-
-
 def get_locale() -> str:
     """Return the current locale code."""
     return _current_locale

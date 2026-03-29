@@ -298,10 +298,9 @@ class TextEnhancer:
             if self._active_model not in models and models:
                 self._active_model = models[0]
 
-        # Connection pool monitor
+        # Connection pool monitor (started lazily on first enhance() call)
         self._pool_monitor = PoolMonitor(self._providers, self._providers_config)
-        if self._providers:
-            self._pool_monitor.start_periodic(interval=60.0)
+        self._pool_monitor_started = False
 
     def _init_providers(self) -> None:
         """Initialize all configured providers."""
@@ -966,12 +965,13 @@ class TextEnhancer:
             kwargs = self._build_request_kwargs(text, system_content)
             client, _, _ = self._providers[self._active_provider]
 
-            self._pool_monitor.log_stats("enhance:before_request", self._active_provider)
+            if not self._pool_monitor_started:
+                self._pool_monitor.start_periodic(interval=60.0)
+                self._pool_monitor_started = True
             response = await asyncio.wait_for(
                 client.chat.completions.create(**kwargs),
                 timeout=self._timeout,
             )
-            self._pool_monitor.log_stats("enhance:after_response", self._active_provider)
             enhanced = response.choices[0].message.content
             if enhanced:
                 enhanced = strip_think_tags(enhanced)
