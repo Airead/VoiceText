@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 from wenzi.statusbar import StatusMenuItem
 
 from wenzi.scripting.api.menu import MenuAPI
@@ -160,3 +162,205 @@ class TestWZNamespaceIntegration:
         registry = ScriptingRegistry()
         wz = _WZNamespace(registry)
         assert wz.menu is wz.menu
+
+
+class TestAppMenu:
+    def test_app_menu_returns_empty_when_no_permission(self, monkeypatch):
+        import ApplicationServices as _as
+
+        api = MenuAPI()
+        monkeypatch.setattr(
+            _as, "AXUIElementCreateApplication",
+            MagicMock(side_effect=Exception("no permission")),
+        )
+        result = api.app_menu(pid=12345)
+        assert result == []
+
+    def test_app_menu_returns_empty_for_none_pid(self):
+        api = MenuAPI()
+        assert api.app_menu() == []
+
+    def test_walk_ax_menu_builds_flat_list(self, monkeypatch):
+        import ApplicationServices as _as
+
+        api = MenuAPI()
+
+        ax_save = MagicMock()
+        ax_quit = MagicMock()
+        ax_file_children = MagicMock()
+
+        def _copy_attr_save(attr, _):
+            return {
+                "AXTitle": (0, "Save"),
+                "AXEnabled": (0, True),
+                "AXMenuItemCmdChar": (0, "S"),
+                "AXMenuItemCmdModifiers": (0, 0),
+                "AXChildren": (-25212, None),
+            }.get(attr, (-25212, None))
+
+        def _copy_attr_quit(attr, _):
+            return {
+                "AXTitle": (0, "Quit"),
+                "AXEnabled": (0, True),
+                "AXMenuItemCmdChar": (0, "Q"),
+                "AXMenuItemCmdModifiers": (0, 0),
+                "AXChildren": (-25212, None),
+            }.get(attr, (-25212, None))
+
+        def _copy_attr_file_children(attr, _):
+            return {
+                "AXChildren": (0, [ax_save, ax_quit]),
+            }.get(attr, (-25212, None))
+
+        ax_save._copy = _copy_attr_save
+        ax_quit._copy = _copy_attr_quit
+        ax_file_children._copy = _copy_attr_file_children
+
+        ax_file = MagicMock()
+
+        def _copy_attr_file(attr, _):
+            return {
+                "AXTitle": (0, "File"),
+                "AXEnabled": (0, True),
+                "AXMenuItemCmdChar": (0, ""),
+                "AXMenuItemCmdModifiers": (0, 0),
+                "AXChildren": (0, [ax_file_children]),
+            }.get(attr, (-25212, None))
+
+        ax_file._copy = _copy_attr_file
+
+        ax_menu_bar = MagicMock()
+
+        def _copy_attr_bar(attr, _):
+            return {
+                "AXChildren": (0, [ax_file]),
+            }.get(attr, (-25212, None))
+
+        ax_menu_bar._copy = _copy_attr_bar
+
+        monkeypatch.setattr(
+            _as, "AXUIElementCopyAttributeValue",
+            lambda el, attr, _: el._copy(attr, _),
+        )
+        items = api._walk_ax_menu(ax_menu_bar)
+
+        assert len(items) == 2
+        assert items[0]["title"] == "Save"
+        assert items[0]["path"] == "File > Save"
+        assert items[0]["enabled"] is True
+        assert items[0]["shortcut"] == "⌘S"
+        assert items[1]["title"] == "Quit"
+        assert items[1]["path"] == "File > Quit"
+        assert items[1]["shortcut"] == "⌘Q"
+
+    def test_walk_ax_menu_skips_separators_and_empty_titles(self, monkeypatch):
+        import ApplicationServices as _as
+
+        api = MenuAPI()
+
+        ax_sep = MagicMock()
+        ax_sep._copy = lambda attr, _: {
+            "AXTitle": (0, ""),
+            "AXEnabled": (0, False),
+            "AXMenuItemCmdChar": (0, ""),
+            "AXMenuItemCmdModifiers": (0, 0),
+            "AXChildren": (-25212, None),
+        }.get(attr, (-25212, None))
+
+        ax_real = MagicMock()
+        ax_real._copy = lambda attr, _: {
+            "AXTitle": (0, "About"),
+            "AXEnabled": (0, True),
+            "AXMenuItemCmdChar": (0, ""),
+            "AXMenuItemCmdModifiers": (0, 0),
+            "AXChildren": (-25212, None),
+        }.get(attr, (-25212, None))
+
+        ax_sub = MagicMock()
+        ax_sub._copy = lambda attr, _: {
+            "AXChildren": (0, [ax_sep, ax_real]),
+        }.get(attr, (-25212, None))
+
+        ax_menu = MagicMock()
+        ax_menu._copy = lambda attr, _: {
+            "AXTitle": (0, "App"),
+            "AXEnabled": (0, True),
+            "AXMenuItemCmdChar": (0, ""),
+            "AXMenuItemCmdModifiers": (0, 0),
+            "AXChildren": (0, [ax_sub]),
+        }.get(attr, (-25212, None))
+
+        ax_bar = MagicMock()
+        ax_bar._copy = lambda attr, _: {
+            "AXChildren": (0, [ax_menu]),
+        }.get(attr, (-25212, None))
+
+        monkeypatch.setattr(
+            _as, "AXUIElementCopyAttributeValue",
+            lambda el, attr, _: el._copy(attr, _),
+        )
+        items = api._walk_ax_menu(ax_bar)
+
+        titles = [i["title"] for i in items]
+        assert "About" in titles
+        assert "" not in titles
+        assert len(items) == 1
+
+    def test_app_menu_uses_previous_app_pid(self, monkeypatch):
+        import ApplicationServices as _as
+
+        api = MenuAPI()
+        mock_chooser = MagicMock()
+        mock_chooser.panel._previous_app.processIdentifier.return_value = 99
+        api._set_chooser_api(mock_chooser)
+
+        mock_create = MagicMock()
+        monkeypatch.setattr(_as, "AXUIElementCreateApplication", mock_create)
+        monkeypatch.setattr(
+            _as, "AXUIElementCopyAttributeValue",
+            lambda el, attr, _: (-25212, None),
+        )
+
+        api.app_menu()
+        mock_create.assert_called_once_with(99)
+
+    def test_shortcut_with_shift(self, monkeypatch):
+        import ApplicationServices as _as
+
+        api = MenuAPI()
+
+        ax_item = MagicMock()
+        ax_item._copy = lambda attr, _: {
+            "AXTitle": (0, "Redo"),
+            "AXEnabled": (0, True),
+            "AXMenuItemCmdChar": (0, "Z"),
+            "AXMenuItemCmdModifiers": (0, 1),
+            "AXChildren": (-25212, None),
+        }.get(attr, (-25212, None))
+
+        ax_sub = MagicMock()
+        ax_sub._copy = lambda attr, _: {
+            "AXChildren": (0, [ax_item]),
+        }.get(attr, (-25212, None))
+
+        ax_parent = MagicMock()
+        ax_parent._copy = lambda attr, _: {
+            "AXTitle": (0, "Edit"),
+            "AXEnabled": (0, True),
+            "AXMenuItemCmdChar": (0, ""),
+            "AXMenuItemCmdModifiers": (0, 0),
+            "AXChildren": (0, [ax_sub]),
+        }.get(attr, (-25212, None))
+
+        ax_bar = MagicMock()
+        ax_bar._copy = lambda attr, _: {
+            "AXChildren": (0, [ax_parent]),
+        }.get(attr, (-25212, None))
+
+        monkeypatch.setattr(
+            _as, "AXUIElementCopyAttributeValue",
+            lambda el, attr, _: el._copy(attr, _),
+        )
+        items = api._walk_ax_menu(ax_bar)
+
+        assert items[0]["shortcut"] == "⇧⌘Z"
