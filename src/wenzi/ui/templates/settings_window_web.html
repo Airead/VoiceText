@@ -928,6 +928,10 @@ textarea.provider-form-textarea.error {
       <div class="setting-group" id="permissions-group">
         <!-- Dynamically populated by renderPermissions() -->
       </div>
+
+      <div style="margin-top:12px; display:flex; justify-content:flex-end;">
+        <button class="btn btn-danger" onclick="postCallback('on_revoke_all_permissions')" data-i18n="security_tab.revoke_all">Revoke All Permissions</button>
+      </div>
     </div>
 
     <!-- Speech Tab -->
@@ -2477,7 +2481,8 @@ var _PERM_DEFS = [
   {id: 'microphone',         i18nName: 'security_tab.perm_microphone',          i18nDesc: 'security_tab.perm_microphone_desc'},
   {id: 'speech_recognition', i18nName: 'security_tab.perm_speech_recognition',  i18nDesc: 'security_tab.perm_speech_recognition_desc'},
   {id: 'screen_recording',   i18nName: 'security_tab.perm_screen_recording',    i18nDesc: 'security_tab.perm_screen_recording_desc'},
-  {id: 'automation',         i18nName: 'security_tab.perm_automation',          i18nDesc: 'security_tab.perm_automation_desc'}
+  {id: 'automation',         i18nName: 'security_tab.perm_automation',          i18nDesc: 'security_tab.perm_automation_desc'},
+  {id: 'full_disk_access',   i18nName: 'security_tab.perm_full_disk_access',    i18nDesc: 'security_tab.perm_full_disk_access_desc'}
 ];
 
 function _permStatusLabel(status) {

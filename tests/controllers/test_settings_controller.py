@@ -662,7 +662,7 @@ class TestPermissionStatus:
     """Tests for permission status collection."""
 
     def test_collect_permission_status_returns_all_permissions(self, ctrl):
-        """All 5 permission IDs should be present."""
+        """All 6 permission IDs should be present."""
         perms = ctrl._collect_permission_status()
         ids = [p["id"] for p in perms]
         assert ids == [
@@ -671,6 +671,7 @@ class TestPermissionStatus:
             "speech_recognition",
             "screen_recording",
             "automation",
+            "full_disk_access",
         ]
 
     def test_each_permission_has_valid_status(self, ctrl):
@@ -681,18 +682,24 @@ class TestPermissionStatus:
                 f"{p['id']} has unexpected status: {p['status']}"
             )
 
-    def test_automation_always_unknown(self, ctrl):
-        """Automation has no runtime check API — always unknown."""
+    def test_automation_has_valid_status(self, ctrl):
+        """Automation uses AEDeterminePermissionToAutomateTarget — should return a valid status."""
         perms = ctrl._collect_permission_status()
         auto = next(p for p in perms if p["id"] == "automation")
-        assert auto["status"] == "unknown"
+        assert auto["status"] in {"granted", "not_granted", "unknown"}
+
+    def test_full_disk_access_has_valid_status(self, ctrl):
+        """Full Disk Access probes a TCC-protected file — should return a valid status."""
+        perms = ctrl._collect_permission_status()
+        fda = next(p for p in perms if p["id"] == "full_disk_access")
+        assert fda["status"] in {"granted", "not_granted", "unknown"}
 
     def test_permissions_in_collect_state(self, ctrl):
         """_collect_state should include a 'permissions' key."""
         state = ctrl._collect_state()
         assert "permissions" in state
         assert isinstance(state["permissions"], list)
-        assert len(state["permissions"]) == 5
+        assert len(state["permissions"]) == 6
 
     @patch("subprocess.Popen")
     def test_open_permission_settings_accessibility(self, mock_popen, ctrl):
@@ -701,6 +708,14 @@ class TestPermissionStatus:
         args = mock_popen.call_args[0][0]
         assert args[0] == "open"
         assert "Privacy_Accessibility" in args[1]
+
+    @patch("subprocess.Popen")
+    def test_open_permission_settings_full_disk_access(self, mock_popen, ctrl):
+        ctrl.open_permission_settings("full_disk_access")
+        mock_popen.assert_called_once()
+        args = mock_popen.call_args[0][0]
+        assert args[0] == "open"
+        assert "Privacy_AllFiles" in args[1]
 
     @patch("subprocess.Popen")
     def test_open_permission_settings_unknown_id(self, mock_popen, ctrl):
@@ -719,3 +734,102 @@ class TestPermissionStatus:
             assert call_args[1]["permissions"] == [
                 {"id": "accessibility", "status": "granted"}
             ]
+
+
+class TestCheckAutomationPermission:
+    """Tests for _check_automation_permission()."""
+
+    def test_returns_valid_status(self):
+        status = SettingsController._check_automation_permission()
+        assert status in {"granted", "not_granted", "unknown"}
+
+    @patch("ctypes.util.find_library", return_value=None)
+    def test_returns_unknown_when_no_library(self, _mock):
+        assert SettingsController._check_automation_permission() == "unknown"
+
+
+class TestCheckFullDiskAccess:
+    """Tests for _check_full_disk_access()."""
+
+    def test_returns_valid_status(self):
+        status = SettingsController._check_full_disk_access()
+        assert status in {"granted", "not_granted", "unknown"}
+
+    def test_granted_when_readable(self, tmp_path):
+        probe = tmp_path / "Bookmarks.plist"
+        probe.write_bytes(b"\x00")
+        with patch("os.path.expanduser", return_value=str(probe)):
+            assert SettingsController._check_full_disk_access() == "granted"
+
+    def test_not_granted_on_permission_error(self, tmp_path):
+        with patch("builtins.open", side_effect=PermissionError):
+            assert SettingsController._check_full_disk_access() == "not_granted"
+
+    def test_unknown_on_file_not_found(self):
+        with patch("os.path.expanduser", return_value="/nonexistent/path"):
+            assert SettingsController._check_full_disk_access() == "unknown"
+
+
+class TestRequestPermission:
+    """Tests for _request_permission()."""
+
+    def test_unknown_permission_is_noop(self):
+        # Should not raise
+        SettingsController._request_permission("nonexistent")
+
+    def test_microphone_request(self):
+        mock_av = MagicMock()
+        with patch.dict("sys.modules", {"AVFoundation": mock_av}):
+            SettingsController._request_permission("microphone")
+            mock_av.AVCaptureDevice.requestAccessForMediaType_completionHandler_.assert_called_once()
+
+    def test_speech_recognition_request(self):
+        mock_speech = MagicMock()
+        with patch.dict("sys.modules", {"Speech": mock_speech}):
+            SettingsController._request_permission("speech_recognition")
+            mock_speech.SFSpeechRecognizer.requestAuthorization_.assert_called_once()
+
+
+class TestRevokeAllPermissions:
+    """Tests for revoke_all_permissions()."""
+
+    @patch("wenzi.controllers.settings_controller.SettingsController.refresh_permissions")
+    @patch("wenzi.controllers.settings_controller.send_notification")
+    @patch("subprocess.run")
+    def test_successful_revoke(self, mock_run, mock_notify, mock_refresh, ctrl):
+        mock_run.return_value = MagicMock(returncode=0)
+        ctrl.revoke_all_permissions()
+        mock_run.assert_called_once_with(
+            ["tccutil", "reset", "All", "io.github.airead.wenzi"],
+            capture_output=True, text=True, timeout=10,
+        )
+        mock_notify.assert_called_once()
+        mock_refresh.assert_called_once()
+
+    @patch("wenzi.controllers.settings_controller.SettingsController.refresh_permissions")
+    @patch("wenzi.controllers.settings_controller.restore_accessory")
+    @patch("wenzi.controllers.settings_controller.topmost_alert")
+    @patch("subprocess.run")
+    def test_failed_revoke_shows_alert(self, mock_run, mock_alert, mock_restore, mock_refresh, ctrl):
+        mock_run.return_value = MagicMock(returncode=1, stderr="error msg")
+        ctrl.revoke_all_permissions()
+        mock_alert.assert_called_once()
+        mock_refresh.assert_called_once()
+
+    @patch("wenzi.controllers.settings_controller.SettingsController.refresh_permissions")
+    @patch("subprocess.run")
+    def test_exception_does_not_crash(self, mock_run, mock_refresh, ctrl):
+        mock_run.side_effect = OSError("tccutil not found")
+        ctrl.revoke_all_permissions()  # Should not raise
+        mock_refresh.assert_called_once()
+
+
+class TestRevokeCallbackRegistered:
+    """Ensure revoke_all_permissions callback is registered in on_open_settings."""
+
+    def test_callback_registered(self, ctrl, mock_app):
+        with patch("wenzi.controllers.settings_controller.PRESETS", []):
+            with patch("wenzi.controllers.settings_controller.build_remote_asr_models", return_value=[]):
+                ctrl.on_open_settings(None)
+        _, callbacks = mock_app._settings_panel.show.call_args[0]
+        assert "on_revoke_all_permissions" in callbacks

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ctypes
+import ctypes.util
 import logging
 import os
 import subprocess
@@ -59,6 +61,122 @@ class SettingsController:
         self._verify_request_id = 0
         self._stt_verify_in_progress = False
         self._stt_verify_request_id = 0
+
+    @staticmethod
+    def _ae_check_target(cs, bundle_id_bytes: bytes) -> int:
+        """Call AEDeterminePermissionToAutomateTarget for a given target.
+
+        Returns the raw OSStatus code.
+        """
+
+        class AEDesc(ctypes.Structure):
+            _fields_ = [
+                ("descriptorType", ctypes.c_uint32),
+                ("dataHandle", ctypes.c_void_p),
+            ]
+
+        cs.AECreateDesc.argtypes = [
+            ctypes.c_uint32, ctypes.c_void_p, ctypes.c_long,
+            ctypes.POINTER(AEDesc),
+        ]
+        cs.AECreateDesc.restype = ctypes.c_int32
+        cs.AEDeterminePermissionToAutomateTarget.argtypes = [
+            ctypes.POINTER(AEDesc), ctypes.c_uint32,
+            ctypes.c_uint32, ctypes.c_ubyte,
+        ]
+        cs.AEDeterminePermissionToAutomateTarget.restype = ctypes.c_int32
+        cs.AEDisposeDesc.argtypes = [ctypes.POINTER(AEDesc)]
+        cs.AEDisposeDesc.restype = ctypes.c_int32
+
+        type_bundle_id = int.from_bytes(b"bund", "big")
+        type_wildcard = int.from_bytes(b"****", "big")
+
+        target = AEDesc()
+        err = cs.AECreateDesc(
+            type_bundle_id, bundle_id_bytes,
+            len(bundle_id_bytes), ctypes.byref(target),
+        )
+        if err != 0:
+            return err
+        try:
+            return cs.AEDeterminePermissionToAutomateTarget(
+                ctypes.byref(target), type_wildcard,
+                type_wildcard, ctypes.c_ubyte(0),
+            )
+        finally:
+            cs.AEDisposeDesc(ctypes.byref(target))
+
+    @staticmethod
+    def _check_automation_permission() -> str:
+        """Check Automation permission for System Events via AE API.
+
+        Uses AEDeterminePermissionToAutomateTarget with askUserIfNeeded=False
+        so it never shows a prompt — just queries the current state.
+        System Events is launched silently if not already running, because
+        the AE API requires the target process to be alive.
+
+        Returns 'granted', 'not_granted', or 'unknown'.
+        """
+        try:
+            lib_path = ctypes.util.find_library("CoreServices")
+            if not lib_path:
+                return "unknown"
+            cs = ctypes.cdll.LoadLibrary(lib_path)
+
+            bundle_id = b"com.apple.systemevents"
+            result = SettingsController._ae_check_target(cs, bundle_id)
+
+            if result == -600:
+                # Target not running — launch silently and retry
+                subprocess.run(
+                    ["open", "-g", "-b", "com.apple.systemevents"],
+                    capture_output=True, timeout=5,
+                )
+                import time
+
+                for _ in range(5):
+                    time.sleep(0.1)
+                    result = SettingsController._ae_check_target(
+                        cs, bundle_id,
+                    )
+                    if result != -600:
+                        break
+
+            # 0 = noErr (granted)
+            # -1743 = errAEEventNotPermitted (denied)
+            # -1744 = errAEEventWouldRequireUserConsent (not yet asked)
+            # -600  = procNotFound (System Events still not running)
+            if result == 0:
+                return "granted"
+            elif result == -1743:
+                return "not_granted"
+            else:
+                return "unknown"
+        except Exception:
+            logger.debug(
+                "AEDeterminePermissionToAutomateTarget failed", exc_info=True,
+            )
+            return "unknown"
+
+    @staticmethod
+    def _check_full_disk_access() -> str:
+        """Check Full Disk Access by probing a TCC-protected path.
+
+        ~/Library/Safari/Bookmarks.plist is readable only with FDA.
+        Returns 'granted', 'not_granted', or 'unknown'.
+        """
+        probe = os.path.expanduser("~/Library/Safari/Bookmarks.plist")
+        try:
+            with open(probe, "rb") as f:
+                f.read(1)
+            return "granted"
+        except PermissionError:
+            return "not_granted"
+        except FileNotFoundError:
+            # Safari not installed — can't determine
+            return "unknown"
+        except Exception:
+            return "unknown"
 
     @staticmethod
     def _collect_permission_status() -> list:
@@ -123,8 +241,13 @@ class SettingsController:
             status = "unknown"
         results.append({"id": "screen_recording", "status": status})
 
-        # Automation — no runtime check API
-        results.append({"id": "automation", "status": "unknown"})
+        # Automation (System Events)
+        status = SettingsController._check_automation_permission()
+        results.append({"id": "automation", "status": status})
+
+        # Full Disk Access
+        status = SettingsController._check_full_disk_access()
+        results.append({"id": "full_disk_access", "status": status})
 
         return results
 
@@ -273,6 +396,7 @@ class SettingsController:
             "on_master_key_import": self.master_key_import,
             "on_open_permission_settings": self.open_permission_settings,
             "on_refresh_permissions": self.refresh_permissions,
+            "on_revoke_all_permissions": self.revoke_all_permissions,
             "on_scripting_toggle": self.scripting_toggle,
             "on_sound_toggle": self.sound_toggle,
             "on_visual_toggle": self.visual_toggle,
@@ -530,17 +654,85 @@ class SettingsController:
         "speech_recognition": "Privacy_SpeechRecognition",
         "screen_recording": "Privacy_ScreenCapture",
         "automation": "Privacy_Automation",
+        "full_disk_access": "Privacy_AllFiles",
     }
 
+    @staticmethod
+    def _request_permission(perm_id: str) -> None:
+        """Trigger the native permission request dialog where possible.
+
+        For permissions without a request API, this is a no-op —
+        the caller should still open System Settings.
+        """
+        if perm_id == "microphone":
+            try:
+                import AVFoundation
+
+                AVFoundation.AVCaptureDevice.requestAccessForMediaType_completionHandler_(
+                    AVFoundation.AVMediaTypeAudio, lambda _granted: None
+                )
+            except Exception:
+                logger.debug("Microphone request failed", exc_info=True)
+        elif perm_id == "speech_recognition":
+            try:
+                import Speech
+
+                Speech.SFSpeechRecognizer.requestAuthorization_(lambda _status: None)
+            except Exception:
+                logger.debug("Speech recognition request failed", exc_info=True)
+        elif perm_id == "screen_recording":
+            try:
+                from Quartz import CGRequestScreenCaptureAccess
+
+                CGRequestScreenCaptureAccess()
+                # CGRequestScreenCaptureAccess opens System Settings automatically,
+                # so caller can skip the subprocess.Popen("open") for this one.
+            except Exception:
+                logger.debug("Screen recording request failed", exc_info=True)
+
     def open_permission_settings(self, perm_id: str) -> None:
-        """Open the relevant macOS System Settings privacy pane."""
+        """Request permission (if API exists) and open System Settings."""
         anchor = self._PERM_PANE_MAP.get(perm_id)
         if not anchor:
             logger.warning("Unknown permission id: %s", perm_id)
             return
+
+        # Trigger the native request dialog for supported permissions
+        self._request_permission(perm_id)
+
+        # Screen Recording: CGRequestScreenCaptureAccess already opens Settings
+        if perm_id == "screen_recording":
+            return
+
         pane = "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension"
         url = f"{pane}?{anchor}"
         subprocess.Popen(["open", url])
+
+    def revoke_all_permissions(self) -> None:
+        """Reset all TCC permission records for this app via tccutil."""
+        bundle_id = "io.github.airead.wenzi"
+        try:
+            result = subprocess.run(
+                ["tccutil", "reset", "All", bundle_id],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode == 0:
+                logger.info("All TCC permissions revoked for %s", bundle_id)
+                send_notification(
+                    t("security_tab.revoke_all_success"),
+                    "",
+                )
+            else:
+                logger.warning("tccutil reset failed: %s", result.stderr)
+                topmost_alert(
+                    title=t("security_tab.revoke_all_failed_title"),
+                    message=result.stderr.strip() or "tccutil returned non-zero",
+                )
+                restore_accessory()
+        except Exception:
+            logger.exception("Failed to revoke permissions")
+        # Refresh displayed statuses
+        self.refresh_permissions()
 
     def refresh_permissions(self) -> None:
         """Re-check permission statuses and push to the settings panel."""
