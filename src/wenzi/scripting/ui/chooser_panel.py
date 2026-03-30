@@ -235,6 +235,7 @@ class ChooserPanel:
         self._pending_async_count: int = 0
         self._loading_visible: bool = False
         self._debounce_state: Dict[str, _DebounceEntry] = {}  # source_name -> pending debounce
+        self._last_screen = None  # last screen the panel was positioned on
 
     # ------------------------------------------------------------------
     # Panel resize (driven by JS)
@@ -255,6 +256,42 @@ class ChooserPanel:
         new_x = old.origin.x + (old.size.width - width) / 2
         new_frame = NSMakeRect(new_x, new_y, width, height)
         self._panel.setFrame_display_(new_frame, True)
+
+    def _position_on_mouse_screen(self) -> None:
+        """Position panel centered-top on the screen containing the mouse.
+
+        Skips repositioning if the mouse is still on the same screen as
+        the last call, avoiding unnecessary frame changes.
+        """
+        if self._panel is None:
+            return
+        from AppKit import NSEvent, NSScreen
+
+        mouse = NSEvent.mouseLocation()
+        target = None
+        for screen in NSScreen.screens():
+            sf = screen.frame()
+            if (sf.origin.x <= mouse.x < sf.origin.x + sf.size.width
+                    and sf.origin.y <= mouse.y < sf.origin.y + sf.size.height):
+                target = screen
+                break
+        if target is None:
+            target = NSScreen.mainScreen()
+        if target is None:
+            self._panel.center()
+            self._last_screen = None
+            return
+
+        if target == self._last_screen:
+            return
+
+        self._last_screen = target
+        sf = target.frame()
+        pw = self._panel.frame().size.width
+        ph = self._panel.frame().size.height
+        x = sf.origin.x + (sf.size.width - pw) / 2
+        y = sf.origin.y + sf.size.height - ph - 200
+        self._panel.setFrameOrigin_((x, y))
 
     # ------------------------------------------------------------------
     # Panel reuse helpers
@@ -540,6 +577,7 @@ class ChooserPanel:
                 self._eval_js(f"setInputValue({json.dumps(initial_query)})")
             else:
                 self._eval_js("focusInput()")
+            self._position_on_mouse_screen()
             self._panel.makeKeyAndOrderFront_(None)
             from AppKit import NSApp
 
@@ -554,6 +592,7 @@ class ChooserPanel:
             # _reset_panel_ui reveals it (alpha=1) once the measured
             # collapsed height is applied so no stale frame flashes.
             self._reconnect_panel_refs()
+            self._position_on_mouse_screen()
             self._panel.setAlphaValue_(0.0)
             self._reset_panel_ui(initial_query, placeholder)
         else:
@@ -718,6 +757,7 @@ class ChooserPanel:
         self._panel_delegate = None
         self._page_loaded = False
         self._pending_js = []
+        self._last_screen = None
 
     def toggle(self, on_close: Optional[Callable] = None) -> None:
         """Toggle the chooser panel visibility."""
@@ -1567,7 +1607,6 @@ class ChooserPanel:
         """Create NSPanel + WKWebView."""
         from AppKit import (
             NSBackingStoreBuffered,
-            NSScreen,
             NSStatusWindowLevel,
         )
         from Foundation import NSMakeRect, NSURL
@@ -1614,16 +1653,9 @@ class ChooserPanel:
         panel.contentView().layer().setCornerRadius_(12.0)
         panel.contentView().layer().setMasksToBounds_(True)
 
-        # Position: center-top of main screen (like Spotlight)
-        # Top edge is always 200px below the screen top, regardless of height
-        screen = NSScreen.mainScreen()
-        if screen:
-            sf = screen.frame()
-            x = sf.origin.x + (sf.size.width - initial_width) / 2
-            y = sf.origin.y + sf.size.height - initial_height - 200
-            panel.setFrameOrigin_((x, y))
-        else:
-            panel.center()
+        # Position: center-top of mouse screen (like Spotlight)
+        self._panel = panel
+        self._position_on_mouse_screen()
 
         # WKWebView with message handler
         wk_config = WKWebViewConfiguration.alloc().init()
@@ -1649,7 +1681,6 @@ class ChooserPanel:
         nav_delegate._panel_ref = self
         webview.setNavigationDelegate_(nav_delegate)
 
-        self._panel = panel
         self._webview = webview
         self._message_handler = handler
         self._navigation_delegate = nav_delegate
