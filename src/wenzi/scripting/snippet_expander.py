@@ -17,6 +17,8 @@ import threading
 import time
 from typing import TYPE_CHECKING, Optional
 
+import objc
+
 if TYPE_CHECKING:
     from wenzi.scripting.sources.snippet_source import SnippetStore
 
@@ -120,28 +122,29 @@ class SnippetExpander:
         _CFRunLoopRun = Quartz.CFRunLoopRun
 
         def _run():
-            mask = _CGEventMaskBit(_kCGEventKeyDown)
-            self._tap = _CGEventTapCreate(
-                _kCGSessionEventTap,
-                _kCGHeadInsertEventTap,
-                _kCGEventTapOptionListenOnly,
-                mask,
-                self._callback,
-                None,
-            )
-            if self._tap is None:
-                logger.error(
-                    "SnippetExpander: failed to create event tap. "
-                    "Check accessibility permissions."
+            with objc.autorelease_pool():
+                mask = _CGEventMaskBit(_kCGEventKeyDown)
+                self._tap = _CGEventTapCreate(
+                    _kCGSessionEventTap,
+                    _kCGHeadInsertEventTap,
+                    _kCGEventTapOptionListenOnly,
+                    mask,
+                    self._callback,
+                    None,
                 )
-                return
+                if self._tap is None:
+                    logger.error(
+                        "SnippetExpander: failed to create event tap. "
+                        "Check accessibility permissions."
+                    )
+                    return
 
-            source = _CFMachPortCreateRunLoopSource(None, self._tap, 0)
-            self._loop = _CFRunLoopGetCurrent()
-            _CFRunLoopAddSource(self._loop, source, _kCFRunLoopDefaultMode)
-            _CGEventTapEnable(self._tap, True)
-            logger.info("SnippetExpander started")
-            _CFRunLoopRun()
+                source = _CFMachPortCreateRunLoopSource(None, self._tap, 0)
+                self._loop = _CFRunLoopGetCurrent()
+                _CFRunLoopAddSource(self._loop, source, _kCFRunLoopDefaultMode)
+                _CGEventTapEnable(self._tap, True)
+                logger.info("SnippetExpander started")
+                _CFRunLoopRun()
 
         self._thread = threading.Thread(target=_run, daemon=True)
         self._thread.start()
@@ -165,59 +168,60 @@ class SnippetExpander:
 
     def _callback(self, proxy, event_type, event, refcon):
         """CGEventTap callback — runs on the tap's background thread."""
-        try:
-            import Quartz
+        with objc.autorelease_pool():
+            try:
+                import Quartz
 
-            if event_type == Quartz.kCGEventTapDisabledByTimeout:
-                logger.warning("SnippetExpander tap disabled by timeout, re-enabling")
-                if self._tap is not None:
-                    Quartz.CGEventTapEnable(self._tap, True)
-                return event
+                if event_type == Quartz.kCGEventTapDisabledByTimeout:
+                    logger.warning("SnippetExpander tap disabled by timeout, re-enabling")
+                    if self._tap is not None:
+                        Quartz.CGEventTapEnable(self._tap, True)
+                    return event
 
-            if self._expanding or self._suppressed:
-                return event
+                if self._expanding or self._suppressed:
+                    return event
 
-            keycode = Quartz.CGEventGetIntegerValueField(
-                event, Quartz.kCGKeyboardEventKeycode,
-            )
-            flags = Quartz.CGEventGetFlags(event)
+                keycode = Quartz.CGEventGetIntegerValueField(
+                    event, Quartz.kCGKeyboardEventKeycode,
+                )
+                flags = Quartz.CGEventGetFlags(event)
 
-            # Ignore events with Cmd/Ctrl/Alt modifiers (shortcuts, not text)
-            mod_mask = (
-                Quartz.kCGEventFlagMaskCommand
-                | Quartz.kCGEventFlagMaskControl
-                | Quartz.kCGEventFlagMaskAlternate
-            )
-            if flags & mod_mask:
+                # Ignore events with Cmd/Ctrl/Alt modifiers (shortcuts, not text)
+                mod_mask = (
+                    Quartz.kCGEventFlagMaskCommand
+                    | Quartz.kCGEventFlagMaskControl
+                    | Quartz.kCGEventFlagMaskAlternate
+                )
+                if flags & mod_mask:
+                    with self._lock:
+                        self._buffer = ""
+                    return event
+
+                # Navigation / control keys clear the buffer
+                if keycode in _CLEAR_KEYCODES:
+                    with self._lock:
+                        self._buffer = ""
+                    return event
+
+                # Extract the actual character typed
+                char = _get_unicode_string(event)
+                if not char or not char.isprintable():
+                    return event
+
+                # Append to buffer
                 with self._lock:
-                    self._buffer = ""
-                return event
+                    self._buffer += char
+                    if len(self._buffer) > _MAX_BUFFER:
+                        self._buffer = self._buffer[-_MAX_BUFFER:]
+                    buf = self._buffer
 
-            # Navigation / control keys clear the buffer
-            if keycode in _CLEAR_KEYCODES:
-                with self._lock:
-                    self._buffer = ""
-                return event
+                # Check for keyword match at the end of buffer
+                self._check_expansion(buf)
 
-            # Extract the actual character typed
-            char = _get_unicode_string(event)
-            if not char or not char.isprintable():
-                return event
+            except Exception:
+                logger.warning("SnippetExpander callback exception", exc_info=True)
 
-            # Append to buffer
-            with self._lock:
-                self._buffer += char
-                if len(self._buffer) > _MAX_BUFFER:
-                    self._buffer = self._buffer[-_MAX_BUFFER:]
-                buf = self._buffer
-
-            # Check for keyword match at the end of buffer
-            self._check_expansion(buf)
-
-        except Exception:
-            logger.warning("SnippetExpander callback exception", exc_info=True)
-
-        return event
+            return event
 
     def _check_expansion(self, buf: str) -> None:
         """Check if the buffer ends with a snippet keyword and trigger expansion."""

@@ -133,13 +133,40 @@ All `chat.completions.create` calls **must** include `max_tokens` to prevent run
 
 When adding a new LLM call, always set `max_tokens` to a reasonable upper bound for the expected output.
 
+## CGEventTap Autorelease Pool
+
+CGEventTap callbacks run on background threads via `CFRunLoopRun()`. PyObjC creates autoreleased Objective-C wrapper objects (HIDEvent, CGEvent, CGSEventAppendix) for each event that passes through the callback. Without explicit pool management, these objects accumulate indefinitely on the thread.
+
+**Rule:** Always wrap CGEventTap `_callback` methods AND `_run` thread entry points with `objc.autorelease_pool()`:
+
+```python
+import objc
+
+def _callback(self, proxy, event_type, event, refcon):
+    with objc.autorelease_pool():
+        # ... process event ...
+        return event
+
+def _run():
+    with objc.autorelease_pool():
+        # ... create tap, run loop ...
+        CFRunLoopRun()
+```
+
+The per-callback pool is what prevents the leak. The `_run` pool is a defensive measure for the thread's top-level scope.
+
+See `hotkey.py` (`_QuartzAllKeysListener`, `TapHotkeyListener`, `KeyRemapListener`) and `snippet_expander.py` (`SnippetExpander`) for reference implementations.
+
 ## Launcher (Chooser) Panel Lifecycle
 
 The chooser panel (`ChooserPanel`) uses a **hide/reuse** strategy for performance. WKWebView creation + HTML loading is expensive (~200-500ms), so the panel is kept alive across open/close cycles:
 
-- **`close()`** — hides the panel (`orderOut_`) and breaks `_panel_ref` back-references to prevent retain cycles. The NSPanel, WKWebView, and delegates remain alive for reuse.
+- **`close()`** — hides the panel (`orderOut_`), breaks `_panel_ref` back-references to prevent retain cycles, then loads empty HTML to release IOSurface compositing layer buffers. Sets `_page_loaded = False`.
 - **`destroy()`** — fully tears down the panel and webview. Only called during `engine.reload()` when HTML/i18n may have changed.
-- **`show()`** — if a hidden panel exists (`self._panel is not None and self._page_loaded`), it reconnects refs and resets UI via JS instead of rebuilding from scratch.
+- **`show()`** has three paths:
+  1. **Hot path** (`_page_loaded` is True) — reconnects refs and resets UI via JS. Fastest, no HTML reload.
+  2. **Warm path** (panel + webview alive, `_page_loaded` is False) — reconnects refs and reloads the cached `_chooser.html` from disk. The panel is hidden (alpha=0) until `_on_page_loaded` reveals it (alpha=1).
+  3. **Cold path** (no panel) — builds everything from scratch.
 
 When modifying `close()`, do NOT set `self._panel = None` or `self._webview = None` — this would break the reuse path and force a cold start on every open. To prevent retain cycles while hidden, nil out `_panel_ref` on the message handler, navigation delegate, and panel delegate instead.
 

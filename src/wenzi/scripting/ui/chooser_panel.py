@@ -595,6 +595,16 @@ class ChooserPanel:
             self._position_on_mouse_screen()
             self._panel.setAlphaValue_(0.0)
             self._reset_panel_ui(initial_query, placeholder)
+        elif self._panel is not None and self._webview is not None:
+            # Warm path: panel + webview alive but page was unloaded
+            # (empty HTML) to reclaim IOSurface memory.  Reload the
+            # cached HTML — _on_page_loaded will handle pending query,
+            # placeholder, and context.  Hide the panel (alpha=0) until
+            # the page finishes loading to avoid a blank flash.
+            self._reconnect_panel_refs()
+            self._position_on_mouse_screen()
+            self._panel.setAlphaValue_(0.0)
+            self._reload_chooser_html()
         else:
             # First show — build from scratch
             self._build_panel()
@@ -700,6 +710,14 @@ class ChooserPanel:
         # Hide the panel (keep it alive)
         if self._panel is not None:
             self._panel.orderOut_(None)
+
+        # Load empty HTML to release IOSurface compositing layer buffers.
+        # The WKWebView stays alive for fast re-show; only the rendered
+        # content is discarded.  _page_loaded is set to False so the next
+        # show() will reload the HTML from the cached temp file.
+        if self._webview is not None:
+            self._webview.loadHTMLString_baseURL_("", None)
+            self._page_loaded = False
 
         self._current_items = []
         self._history_index = -1
@@ -1538,6 +1556,16 @@ class ChooserPanel:
 
     def _on_page_loaded(self) -> None:
         """Called when WKWebView finishes loading the HTML."""
+        # Guard against the blank-page navigation fired by close().
+        # If show() is called before the blank load completes,
+        # _reconnect_panel_refs restores the delegate ref and this
+        # callback would fire for the empty page.  Ignore it.
+        if self._webview is not None:
+            url = self._webview.URL()
+            url_str = str(url.absoluteString()) if url is not None else ""
+            if not url_str or url_str == "about:blank":
+                return
+
         # Inject i18n translations before flushing pending JS
         self._inject_i18n()
 
@@ -1564,6 +1592,11 @@ class ChooserPanel:
             escaped = json.dumps(self._context_text)
             label = json.dumps(t("chooser.ua.context_label"))
             self._eval_js(f"setContextText({escaped}, {label})")
+
+        # Reveal the panel if it was hidden (alpha=0) during the warm-start
+        # path.  This is a no-op on the cold path where alpha is already 1.
+        if self._panel is not None:
+            self._panel.setAlphaValue_(1.0)
 
     @staticmethod
     def _ensure_edit_menu() -> None:
@@ -1605,6 +1638,37 @@ class ChooserPanel:
         )
         edit_item.setSubmenu_(edit_menu)
         main_menu.addItem_(edit_item)
+
+    def _reload_chooser_html(self) -> None:
+        """Reload the chooser HTML into an existing (but blanked) WKWebView.
+
+        Used by the warm-start path in :meth:`show` after :meth:`close`
+        loaded ``about:blank`` to release IOSurface memory.  The cached
+        HTML file on disk is reused — no need to regenerate it.
+        """
+        from Foundation import NSURL
+
+        from wenzi.config import DEFAULT_CACHE_DIR
+
+        cache_dir = os.path.expanduser(DEFAULT_CACHE_DIR)
+        html_path = os.path.join(cache_dir, "_chooser.html")
+
+        if not os.path.isfile(html_path):
+            # HTML file missing (shouldn't happen) — regenerate it in-place.
+            # Do NOT call destroy() here: we are inside show(), and destroy()
+            # would fire the _on_close callback out of order.
+            logger.warning("Chooser HTML cache missing, regenerating")
+            from wenzi.ui.templates import load_template
+
+            os.makedirs(cache_dir, exist_ok=True)
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(load_template("chooser.html"))
+
+        home_dir = os.path.expanduser("~")
+        self._webview.loadFileURL_allowingReadAccessToURL_(
+            NSURL.fileURLWithPath_(html_path),
+            NSURL.fileURLWithPath_(home_dir),
+        )
 
     def _build_panel(self) -> None:
         """Create NSPanel + WKWebView."""
