@@ -217,3 +217,83 @@ class TestFuzzyMatchFields:
             "rsync aws", ("", "", "rsync -avz ops@aws-merger-00", ""),
         )
         assert matched is True
+
+
+class TestPinyinMatch:
+    """Pinyin search for Chinese text."""
+
+    def test_full_pinyin_prefix(self):
+        """Full pinyin prefix matches Chinese text."""
+        matched, score = fuzzy_match("xitong", "系统设置")
+        assert matched is True
+        assert score == 75
+
+    def test_full_pinyin_exact(self):
+        """Full pinyin matches entire Chinese text."""
+        matched, score = fuzzy_match("xitongshezhi", "系统设置")
+        assert matched is True
+        assert score == 75
+
+    def test_full_pinyin_substring(self):
+        """Pinyin substring matches Chinese text."""
+        matched, score = fuzzy_match("shezhi", "系统设置")
+        assert matched is True
+        assert score == 65
+
+    def test_pinyin_initials_prefix(self):
+        """Pinyin initials prefix matches Chinese text.
+
+        "系统设置" → initials "xtsz" (xi tong she zhi).
+        """
+        matched, score = fuzzy_match("xtsz", "系统设置")
+        assert matched is True
+        assert score == 70
+
+    def test_pinyin_initials_partial(self):
+        """Partial pinyin initials match via scattered chars in initials."""
+        matched, score = fuzzy_match("xsz", "系统设置")
+        assert matched is True
+        assert score == 50
+
+    def test_pinyin_scattered_full(self):
+        """Scattered chars in full pinyin match."""
+        matched, score = fuzzy_match("xtsh", "系统设置")
+        assert matched is True
+        assert score >= 40
+
+    def test_pinyin_case_insensitive(self):
+        """Pinyin matching is case-insensitive."""
+        matched, score = fuzzy_match("XTSZ", "系统设置")
+        assert matched is True
+        assert score == 70
+
+    def test_pinyin_no_match(self):
+        """Non-matching pinyin returns False."""
+        matched, _ = fuzzy_match("abc", "系统设置")
+        assert matched is False
+
+    def test_ascii_against_ascii_no_pinyin(self):
+        """ASCII query against ASCII text should not trigger pinyin path."""
+        matched, score = fuzzy_match("saf", "Safari")
+        assert matched is True
+        assert score == 100  # prefix match, not pinyin
+
+    def test_pinyin_mixed_text(self):
+        """Chinese text mixed with ASCII: '微信 WeChat'."""
+        matched, score = fuzzy_match("wx", "微信")
+        assert matched is True
+        assert score == 70  # pinyin initials
+
+    def test_pinyin_fields_match(self):
+        """fuzzy_match_fields works with pinyin across fields."""
+        matched, score = fuzzy_match_fields(
+            "xtsh", ("System Settings", "系统设置"),
+        )
+        assert matched is True
+        assert score > 0
+
+    def test_pinyin_score_ordering(self):
+        """Full pinyin prefix scores higher than initials."""
+        _, full_score = fuzzy_match("xitong", "系统设置")
+        _, init_score = fuzzy_match("xtsh", "系统设置")
+        assert full_score > init_score

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -113,6 +114,44 @@ class ChooserSource:
 
 
 # ---------------------------------------------------------------------------
+# Pinyin support (lazy-loaded)
+# ---------------------------------------------------------------------------
+
+_HAS_CJK = re.compile(r"[\u4e00-\u9fff]")
+_IS_ASCII = re.compile(r"^[a-zA-Z0-9]+$")
+
+# Cache: Chinese text → (full_pinyin, pinyin_initials)
+_pinyin_cache: Dict[str, Tuple[str, str]] = {}
+
+
+def _get_pinyin(text: str) -> Tuple[str, str]:
+    """Return (full_pinyin, pinyin_initials) for *text*.
+
+    full_pinyin:  "系统设置" → "xitongshezhi"
+    pinyin_initials: "系统设置" → "xtsh"
+
+    Non-CJK characters are kept as-is in both forms.
+    Results are cached for performance.
+    """
+    if text in _pinyin_cache:
+        return _pinyin_cache[text]
+
+    try:
+        from pypinyin import lazy_pinyin, Style
+
+        full_parts = lazy_pinyin(text, style=Style.NORMAL)
+        initial_parts = lazy_pinyin(text, style=Style.FIRST_LETTER)
+
+        full = "".join(full_parts).lower()
+        initials = "".join(initial_parts).lower()
+    except Exception:
+        full = initials = ""
+
+    _pinyin_cache[text] = (full, initials)
+    return full, initials
+
+
+# ---------------------------------------------------------------------------
 # Fuzzy matching
 # ---------------------------------------------------------------------------
 
@@ -125,7 +164,11 @@ def fuzzy_match(query: str, text: str) -> Tuple[bool, int]:
       - Exact prefix match (score 100)
       - Word-initials / CamelCase match (score 80)
       - Substring match (score 60)
+      - Pinyin full match (score 75) / initials match (score 70)
       - Scattered character match (score 40)
+
+    When *query* is ASCII and *text* contains Chinese characters, pinyin
+    matching is attempted automatically (e.g. "xtsh" matches "系统设置").
     """
     if not query:
         return False, 0
@@ -150,7 +193,28 @@ def fuzzy_match(query: str, text: str) -> Tuple[bool, int]:
     if sub_match:
         return True, 60
 
-    # 4. Scattered character match — query chars appear in order in text
+    # 4. Pinyin match — ASCII query against Chinese text
+    if _IS_ASCII.match(q) and _HAS_CJK.search(text):
+        full_py, init_py = _get_pinyin(text)
+        if full_py:
+            # Full pinyin prefix: "xitong" matches "系统设置"
+            if full_py.startswith(q):
+                return True, 75
+            # Full pinyin substring: "shezhi" matches "系统设置"
+            if q in full_py:
+                return True, 65
+        if init_py:
+            # Pinyin initials prefix: "xtsh" matches "系统设置"
+            if init_py.startswith(q):
+                return True, 70
+            # Pinyin initials scattered: "xsh" matches "系统设置" (xtsh)
+            if _chars_in_order(q, init_py):
+                return True, 50
+        # Scattered chars in full pinyin
+        if full_py and _chars_in_order(q, full_py):
+            return True, 40
+
+    # 5. Scattered character match — query chars appear in order in text
     if _chars_in_order(q, t):
         return True, 40
 
