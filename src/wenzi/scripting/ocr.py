@@ -34,36 +34,39 @@ def recognize_text(
         languages = ["zh-Hans", "zh-Hant", "en-US"]
 
     try:
-        from Foundation import NSURL
-        from Quartz import VNImageRequestHandler, VNRecognizeTextRequest
+        import objc
 
-        image_url = NSURL.fileURLWithPath_(image_path)
-        handler = VNImageRequestHandler.alloc().initWithURL_options_(
-            image_url, None,
-        )
+        with objc.autorelease_pool():
+            from Foundation import NSURL
+            from Quartz import VNImageRequestHandler, VNRecognizeTextRequest
 
-        request = VNRecognizeTextRequest.alloc().init()
-        request.setRecognitionLevel_(_RECOGNITION_LEVEL_FAST)
-        request.setRecognitionLanguages_(languages)
+            image_url = NSURL.fileURLWithPath_(image_path)
+            handler = VNImageRequestHandler.alloc().initWithURL_options_(
+                image_url, None,
+            )
 
-        success = handler.performRequests_error_([request], None)
-        if not success:
-            logger.debug("Vision request failed for %s", image_path)
-            return ""
+            request = VNRecognizeTextRequest.alloc().init()
+            request.setRecognitionLevel_(_RECOGNITION_LEVEL_FAST)
+            request.setRecognitionLanguages_(languages)
 
-        results = request.results()
-        if not results:
-            return ""
+            success = handler.performRequests_error_([request], None)
+            if not success:
+                logger.debug("Vision request failed for %s", image_path)
+                return ""
 
-        lines = []
-        for observation in results:
-            candidates = observation.topCandidates_(1)
-            if candidates:
-                text = str(candidates[0].string())
-                if text:
-                    lines.append(text)
+            results = request.results()
+            if not results:
+                return ""
 
-        return "\n".join(lines)
+            lines = []
+            for observation in results:
+                candidates = observation.topCandidates_(1)
+                if candidates:
+                    text = str(candidates[0].string())
+                    if text:
+                        lines.append(text)
+
+            return "\n".join(lines)
     except Exception:
         logger.debug("OCR failed for %s", image_path, exc_info=True)
         return ""

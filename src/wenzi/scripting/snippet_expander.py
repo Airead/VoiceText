@@ -17,8 +17,6 @@ import threading
 import time
 from typing import TYPE_CHECKING, Optional
 
-import objc
-
 if TYPE_CHECKING:
     from wenzi.scripting.sources.snippet_source import SnippetStore
 
@@ -52,13 +50,14 @@ _carbon = ctypes.cdll.LoadLibrary(ctypes.util.find_library("Carbon"))
 
 
 def _get_unicode_string(event) -> str:
-    """Extract the Unicode string from a Quartz CGEvent using ctypes."""
-    import objc
+    """Extract the Unicode string from a Quartz CGEvent using ctypes.
 
+    *event* is a raw pointer (integer) from the ctypes CGEventTap callback.
+    """
     length = ctypes.c_uint32(0)
     buf = (ctypes.c_uint16 * _KEYBOARD_BUF_SIZE)()
     _carbon.CGEventKeyboardGetUnicodeString(
-        ctypes.c_void_p(objc.pyobjc_id(event)),
+        ctypes.c_void_p(event),
         ctypes.c_uint32(_KEYBOARD_BUF_SIZE),
         ctypes.byref(length),
         buf,
@@ -84,6 +83,7 @@ class SnippetExpander:
         self._tap = None
         self._loop = None
         self._thread: Optional[threading.Thread] = None
+        self._ctypes_cb = None  # prevent GC of ctypes callback
         self._expanding = False  # Guard against re-entrance during expansion
         self._suppressed = False  # True while our own panels are key
 
@@ -103,60 +103,52 @@ class SnippetExpander:
 
     def start(self) -> None:
         """Start listening for keystrokes."""
-        import Quartz
-        from wenzi.hotkey import _pre_resolve_quartz
+        from wenzi import _cgeventtap as cg
 
-        _pre_resolve_quartz()
+        def _raw_cb(proxy, event_type, event, refcon):
+            self._callback(proxy, event_type, event, refcon)
+            return 0  # listen-only, return value ignored
+        self._ctypes_cb = cg.CGEventTapCallBack(_raw_cb)  # prevent GC!
 
-        _CGEventMaskBit = Quartz.CGEventMaskBit
-        _kCGEventKeyDown = Quartz.kCGEventKeyDown
-        _CGEventTapCreate = Quartz.CGEventTapCreate
-        _kCGSessionEventTap = Quartz.kCGSessionEventTap
-        _kCGHeadInsertEventTap = Quartz.kCGHeadInsertEventTap
-        _kCGEventTapOptionListenOnly = Quartz.kCGEventTapOptionListenOnly
-        _CFMachPortCreateRunLoopSource = Quartz.CFMachPortCreateRunLoopSource
-        _CFRunLoopGetCurrent = Quartz.CFRunLoopGetCurrent
-        _CFRunLoopAddSource = Quartz.CFRunLoopAddSource
-        _kCFRunLoopDefaultMode = Quartz.kCFRunLoopDefaultMode
-        _CGEventTapEnable = Quartz.CGEventTapEnable
-        _CFRunLoopRun = Quartz.CFRunLoopRun
+        mask = cg.CGEventMaskBit(cg.kCGEventKeyDown)
 
         def _run():
-            with objc.autorelease_pool():
-                mask = _CGEventMaskBit(_kCGEventKeyDown)
-                self._tap = _CGEventTapCreate(
-                    _kCGSessionEventTap,
-                    _kCGHeadInsertEventTap,
-                    _kCGEventTapOptionListenOnly,
-                    mask,
-                    self._callback,
-                    None,
+            self._tap = cg.CGEventTapCreate(
+                cg.kCGSessionEventTap,
+                cg.kCGHeadInsertEventTap,
+                cg.kCGEventTapOptionListenOnly,
+                mask,
+                self._ctypes_cb,
+                None,
+            )
+            if not self._tap:
+                logger.error(
+                    "SnippetExpander: failed to create event tap. "
+                    "Check accessibility permissions."
                 )
-                if self._tap is None:
-                    logger.error(
-                        "SnippetExpander: failed to create event tap. "
-                        "Check accessibility permissions."
-                    )
-                    return
+                return
 
-                source = _CFMachPortCreateRunLoopSource(None, self._tap, 0)
-                self._loop = _CFRunLoopGetCurrent()
-                _CFRunLoopAddSource(self._loop, source, _kCFRunLoopDefaultMode)
-                _CGEventTapEnable(self._tap, True)
-                logger.info("SnippetExpander started")
-                _CFRunLoopRun()
+            source = cg.CFMachPortCreateRunLoopSource(None, self._tap, 0)
+            self._loop = cg.CFRunLoopGetCurrent()
+            cg.CFRunLoopAddSource(self._loop, source, cg.kCFRunLoopDefaultMode.value)
+            cg.CGEventTapEnable(self._tap, True)
+            logger.info("SnippetExpander started")
+            cg.CFRunLoopRun()
 
         self._thread = threading.Thread(target=_run, daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
         """Stop listening."""
-        import Quartz
+        from wenzi import _cgeventtap as cg
 
+        if self._tap is not None:
+            cg.CGEventTapEnable(self._tap, False)
         if self._loop is not None:
-            Quartz.CFRunLoopStop(self._loop)
+            cg.CFRunLoopStop(self._loop)
             self._loop = None
         self._tap = None
+        self._ctypes_cb = None
         if self._thread is not None:
             self._thread.join(timeout=2.0)
             self._thread = None
@@ -168,63 +160,58 @@ class SnippetExpander:
 
     def _callback(self, proxy, event_type, event, refcon):
         """CGEventTap callback — runs on the tap's background thread."""
-        with objc.autorelease_pool():
-            try:
-                import Quartz
+        from wenzi import _cgeventtap as cg
 
-                if event_type == Quartz.kCGEventTapDisabledByTimeout:
-                    logger.warning("SnippetExpander tap disabled by timeout, re-enabling")
-                    if self._tap is not None:
-                        Quartz.CGEventTapEnable(self._tap, True)
-                    return event
+        try:
+            if event_type == cg.kCGEventTapDisabledByTimeout:
+                logger.warning("SnippetExpander tap disabled by timeout, re-enabling")
+                if self._tap is not None:
+                    cg.CGEventTapEnable(self._tap, True)
+                return None
 
-                if self._expanding or self._suppressed:
-                    return None
+            if self._expanding or self._suppressed:
+                return None
 
-                # Extract all data from event, then release the CF ref.
-                # CGEventRef is freed by CFRelease (not autorelease), so
-                # we must del the Python wrapper to trigger CFRelease.
-                keycode = Quartz.CGEventGetIntegerValueField(
-                    event, Quartz.kCGKeyboardEventKeycode,
-                )
-                flags = Quartz.CGEventGetFlags(event)
-                char = _get_unicode_string(event)
-                del event  # release CGEventRef immediately
+            keycode = cg.CGEventGetIntegerValueField(
+                event, cg.kCGKeyboardEventKeycode,
+            )
+            flags = cg.CGEventGetFlags(event)
+            char = _get_unicode_string(event)
 
-                # Ignore events with Cmd/Ctrl/Alt modifiers (shortcuts, not text)
-                mod_mask = (
-                    Quartz.kCGEventFlagMaskCommand
-                    | Quartz.kCGEventFlagMaskControl
-                    | Quartz.kCGEventFlagMaskAlternate
-                )
-                if flags & mod_mask:
-                    with self._lock:
-                        self._buffer = ""
-                    return None
-
-                # Navigation / control keys clear the buffer
-                if keycode in _CLEAR_KEYCODES:
-                    with self._lock:
-                        self._buffer = ""
-                    return None
-
-                if not char or not char.isprintable():
-                    return None
-
-                # Append to buffer
+            # Ignore events with Cmd/Ctrl/Alt modifiers (shortcuts, not text)
+            mod_mask = (
+                cg.kCGEventFlagMaskCommand
+                | cg.kCGEventFlagMaskControl
+                | cg.kCGEventFlagMaskAlternate
+            )
+            if flags & mod_mask:
                 with self._lock:
-                    self._buffer += char
-                    if len(self._buffer) > _MAX_BUFFER:
-                        self._buffer = self._buffer[-_MAX_BUFFER:]
-                    buf = self._buffer
+                    self._buffer = ""
+                return None
 
-                # Check for keyword match at the end of buffer
-                self._check_expansion(buf)
+            # Navigation / control keys clear the buffer
+            if keycode in _CLEAR_KEYCODES:
+                with self._lock:
+                    self._buffer = ""
+                return None
 
-            except Exception:
-                logger.warning("SnippetExpander callback exception", exc_info=True)
+            if not char or not char.isprintable():
+                return None
 
-            return None
+            # Append to buffer
+            with self._lock:
+                self._buffer += char
+                if len(self._buffer) > _MAX_BUFFER:
+                    self._buffer = self._buffer[-_MAX_BUFFER:]
+                buf = self._buffer
+
+            # Check for keyword match at the end of buffer
+            self._check_expansion(buf)
+
+        except Exception:
+            logger.warning("SnippetExpander callback exception", exc_info=True)
+
+        return None
 
     def _check_expansion(self, buf: str) -> None:
         """Check if the buffer ends with a snippet keyword and trigger expansion."""
@@ -311,12 +298,14 @@ class SnippetExpander:
 
     @staticmethod
     def _send_backspaces(count: int) -> None:
-        """Send *count* backspace keystrokes via Quartz CGEvent."""
-        import Quartz
+        """Send *count* backspace keystrokes via CGEvent."""
+        from wenzi import _cgeventtap as cg
 
         for _ in range(count):
-            down = Quartz.CGEventCreateKeyboardEvent(None, _VK_DELETE, True)
-            Quartz.CGEventPost(Quartz.kCGAnnotatedSessionEventTap, down)
-            up = Quartz.CGEventCreateKeyboardEvent(None, _VK_DELETE, False)
-            Quartz.CGEventPost(Quartz.kCGAnnotatedSessionEventTap, up)
+            down = cg.CGEventCreateKeyboardEvent(None, _VK_DELETE, True)
+            cg.CGEventPost(cg.kCGAnnotatedSessionEventTap, down)
+            cg.CFRelease(down)
+            up = cg.CGEventCreateKeyboardEvent(None, _VK_DELETE, False)
+            cg.CGEventPost(cg.kCGAnnotatedSessionEventTap, up)
+            cg.CFRelease(up)
             time.sleep(0.01)

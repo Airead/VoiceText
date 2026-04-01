@@ -12,9 +12,6 @@ import logging
 import threading
 from typing import Callable, Dict, List, Optional
 
-import objc
-
-
 logger = logging.getLogger(__name__)
 
 # --- Virtual keycode mappings ---
@@ -227,168 +224,147 @@ class _QuartzAllKeysListener:
         self._tap = None
         self._loop = None
         self._thread: Optional[threading.Thread] = None
+        self._ctypes_cb = None  # prevent GC of ctypes callback
         # Track modifier key states to detect press vs release.
         # Snapshot current flags so a modifier held across listener
         # restart is not misinterpreted as a new press.
         try:
-            import Quartz as _Q
-            self._mod_flags_prev = _Q.CGEventSourceFlagsState(
-                _Q.kCGEventSourceStateCombinedSessionState
+            from wenzi import _cgeventtap as _cg
+            self._mod_flags_prev = _cg.CGEventSourceFlagsState(
+                _cg.kCGEventSourceStateCombinedSessionState
             )
         except Exception:
             self._mod_flags_prev = 0
 
     def _callback(self, proxy, event_type, event, refcon):
-        with objc.autorelease_pool():
-            try:
-                import Quartz
+        from wenzi import _cgeventtap as cg
 
-                if event_type == Quartz.kCGEventTapDisabledByTimeout:
-                    logger.warning("CGEventTap disabled by timeout, re-enabling")
-                    if self._tap is not None:
-                        Quartz.CGEventTapEnable(self._tap, True)
-                    # Re-sync modifier flags: if a modifier key was released
-                    # while the tap was disabled, the release event is lost
-                    # forever.  Poll the current system flags and fire synthetic
-                    # releases for any modifiers that went away.
-                    try:
-                        new_flags = Quartz.CGEventSourceFlagsState(
-                            Quartz.kCGEventSourceStateCombinedSessionState
-                        )
-                        seen_masks: set = set()
-                        for _name, (_vk, _mask) in _MOD_VK.items():
-                            if _mask in seen_masks:
-                                continue
-                            seen_masks.add(_mask)
-                            if (self._mod_flags_prev & _mask) and not (new_flags & _mask):
-                                self._on_release(_name)
-                        if (self._mod_flags_prev & _FN_FLAG) and not (new_flags & _FN_FLAG):
-                            self._on_release("fn")
-                        self._mod_flags_prev = new_flags
-                    except Exception:
-                        logger.warning(
-                            "Failed to re-sync modifier flags", exc_info=True
-                        )
-                    return event
+        try:
+            if event_type == cg.kCGEventTapDisabledByTimeout:
+                logger.warning("CGEventTap disabled by timeout, re-enabling")
+                if self._tap is not None:
+                    cg.CGEventTapEnable(self._tap, True)
+                # Re-sync modifier flags: if a modifier key was released
+                # while the tap was disabled, the release event is lost
+                # forever.  Poll the current system flags and fire synthetic
+                # releases for any modifiers that went away.
+                try:
+                    new_flags = cg.CGEventSourceFlagsState(
+                        cg.kCGEventSourceStateCombinedSessionState
+                    )
+                    seen_masks: set = set()
+                    for _name, (_vk, _mask) in _MOD_VK.items():
+                        if _mask in seen_masks:
+                            continue
+                        seen_masks.add(_mask)
+                        if (self._mod_flags_prev & _mask) and not (new_flags & _mask):
+                            self._on_release(_name)
+                    if (self._mod_flags_prev & _FN_FLAG) and not (new_flags & _FN_FLAG):
+                        self._on_release("fn")
+                    self._mod_flags_prev = new_flags
+                except Exception:
+                    logger.warning(
+                        "Failed to re-sync modifier flags", exc_info=True
+                    )
+                return event
 
-                # Extract all data from the event up front so we can
-                # release the CGEventRef early.  CGEventRef is a CF type
-                # freed by CFRelease (not autorelease), so the Python
-                # wrapper must be deleted to trigger CFRelease.
-                keycode = Quartz.CGEventGetIntegerValueField(
-                    event, Quartz.kCGKeyboardEventKeycode
-                )
-                flags = Quartz.CGEventGetFlags(event) if event_type == Quartz.kCGEventFlagsChanged else 0
+            keycode = cg.CGEventGetIntegerValueField(
+                event, cg.kCGKeyboardEventKeycode
+            )
+            flags = cg.CGEventGetFlags(event) if event_type == cg.kCGEventFlagsChanged else 0
 
-                if self._listen_only:
-                    # Listen-only: return value is ignored by the system,
-                    # so delete the wrapper now and return None.
-                    del event
+            if event_type == cg.kCGEventKeyDown:
+                name = _VK_TO_NAME.get(keycode)
+                if name:
+                    swallow = self._on_press(name)
+                    if swallow and not self._listen_only:
+                        return None
 
-                if event_type == Quartz.kCGEventKeyDown:
-                    name = _VK_TO_NAME.get(keycode)
-                    if name:
-                        swallow = self._on_press(name)
-                        if swallow and not self._listen_only:
-                            return None
+            elif event_type == cg.kCGEventKeyUp:
+                name = _VK_TO_NAME.get(keycode)
+                if name:
+                    self._on_release(name)
 
-                elif event_type == Quartz.kCGEventKeyUp:
-                    name = _VK_TO_NAME.get(keycode)
-                    if name:
+            elif event_type == cg.kCGEventFlagsChanged:
+                name = _VK_TO_NAME.get(keycode)
+                if name and name in _MOD_VK:
+                    _vk, mask = _MOD_VK[name]
+                    was_down = bool(self._mod_flags_prev & mask)
+                    is_down = bool(flags & mask)
+                    self._mod_flags_prev = flags
+                    if is_down and not was_down:
+                        self._on_press(name)
+                    elif was_down and not is_down:
                         self._on_release(name)
+                elif keycode == _FN_KEYCODE:
+                    was_down = bool(self._mod_flags_prev & _FN_FLAG)
+                    is_down = bool(flags & _FN_FLAG)
+                    self._mod_flags_prev = flags
+                    if is_down and not was_down:
+                        self._on_press("fn")
+                    elif was_down and not is_down:
+                        self._on_release("fn")
+                else:
+                    # Unknown modifier key; just update tracked flags
+                    self._mod_flags_prev = flags
 
-                elif event_type == Quartz.kCGEventFlagsChanged:
-                    name = _VK_TO_NAME.get(keycode)
-                    if name and name in _MOD_VK:
-                        _vk, mask = _MOD_VK[name]
-                        was_down = bool(self._mod_flags_prev & mask)
-                        is_down = bool(flags & mask)
-                        self._mod_flags_prev = flags
-                        if is_down and not was_down:
-                            self._on_press(name)
-                        elif was_down and not is_down:
-                            self._on_release(name)
-                    elif keycode == _FN_KEYCODE:
-                        was_down = bool(self._mod_flags_prev & _FN_FLAG)
-                        is_down = bool(flags & _FN_FLAG)
-                        self._mod_flags_prev = flags
-                        if is_down and not was_down:
-                            self._on_press("fn")
-                        elif was_down and not is_down:
-                            self._on_release("fn")
-                    else:
-                        # Unknown modifier key; just update tracked flags
-                        self._mod_flags_prev = flags
+        except Exception:
+            logger.warning("_QuartzAllKeysListener callback exception", exc_info=True)
 
-            except Exception:
-                logger.warning("_QuartzAllKeysListener callback exception", exc_info=True)
-
-            # Listen-only: event was already del'd, return None (ignored
-            # by the system).  Active: return the original event to pass
-            # it through to the focused application.
-            return None if self._listen_only else event
+        # Listen-only: return None (ignored by the system).
+        # Active: return the original event to pass it through.
+        return None if self._listen_only else event
 
     def start(self) -> None:
-        import Quartz
-        _pre_resolve_quartz()
+        from wenzi import _cgeventtap as cg
 
-        _listen_only = self._listen_only
-        _CGEventMaskBit = Quartz.CGEventMaskBit
-        _kCGEventKeyDown = Quartz.kCGEventKeyDown
-        _kCGEventKeyUp = Quartz.kCGEventKeyUp
-        _kCGEventFlagsChanged = Quartz.kCGEventFlagsChanged
-        _CGEventTapCreate = Quartz.CGEventTapCreate
-        _kCGSessionEventTap = Quartz.kCGSessionEventTap
-        _kCGHeadInsertEventTap = Quartz.kCGHeadInsertEventTap
-        _kCGEventTapOptionListenOnly = Quartz.kCGEventTapOptionListenOnly
-        _CFMachPortCreateRunLoopSource = Quartz.CFMachPortCreateRunLoopSource
-        _CFRunLoopGetCurrent = Quartz.CFRunLoopGetCurrent
-        _CFRunLoopAddSource = Quartz.CFRunLoopAddSource
-        _kCFRunLoopDefaultMode = Quartz.kCFRunLoopDefaultMode
-        _CGEventTapEnable = Quartz.CGEventTapEnable
-        _CFRunLoopRun = Quartz.CFRunLoopRun
+        def _raw_cb(proxy, event_type, event, refcon):
+            return self._callback(proxy, event_type, event, refcon) or 0
+        self._ctypes_cb = cg.CGEventTapCallBack(_raw_cb)  # prevent GC!
+
+        mask = (
+            cg.CGEventMaskBit(cg.kCGEventKeyDown)
+            | cg.CGEventMaskBit(cg.kCGEventKeyUp)
+            | cg.CGEventMaskBit(cg.kCGEventFlagsChanged)
+        )
+        option = cg.kCGEventTapOptionListenOnly if self._listen_only else cg.kCGEventTapOptionDefault
 
         def _run():
-            with objc.autorelease_pool():
-                mask = (
-                    _CGEventMaskBit(_kCGEventKeyDown)
-                    | _CGEventMaskBit(_kCGEventKeyUp)
-                    | _CGEventMaskBit(_kCGEventFlagsChanged)
+            self._tap = cg.CGEventTapCreate(
+                cg.kCGSessionEventTap,
+                cg.kCGHeadInsertEventTap,
+                option,
+                mask,
+                self._ctypes_cb,
+                None,
+            )
+            if not self._tap:
+                logger.error(
+                    "Failed to create Quartz event tap. "
+                    "Check accessibility permissions in System Settings."
                 )
-                self._tap = _CGEventTapCreate(
-                    _kCGSessionEventTap,
-                    _kCGHeadInsertEventTap,
-                    _kCGEventTapOptionListenOnly if _listen_only else Quartz.kCGEventTapOptionDefault,
-                    mask,
-                    self._callback,
-                    None,
-                )
-                if self._tap is None:
-                    logger.error(
-                        "Failed to create Quartz event tap. "
-                        "Check accessibility permissions in System Settings."
-                    )
-                    return
+                return
 
-                source = _CFMachPortCreateRunLoopSource(None, self._tap, 0)
-                self._loop = _CFRunLoopGetCurrent()
-                _CFRunLoopAddSource(self._loop, source, _kCFRunLoopDefaultMode)
-                _CGEventTapEnable(self._tap, True)
-                logger.info("Quartz all-keys listener started (listen_only=%s)", _listen_only)
-                _CFRunLoopRun()
+            source = cg.CFMachPortCreateRunLoopSource(None, self._tap, 0)
+            self._loop = cg.CFRunLoopGetCurrent()
+            cg.CFRunLoopAddSource(self._loop, source, cg.kCFRunLoopDefaultMode.value)
+            cg.CGEventTapEnable(self._tap, True)
+            logger.info("Quartz all-keys listener started (listen_only=%s)", self._listen_only)
+            cg.CFRunLoopRun()
 
         self._thread = threading.Thread(target=_run, daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
-        import Quartz
+        from wenzi import _cgeventtap as cg
 
         if self._tap is not None:
-            Quartz.CGEventTapEnable(self._tap, False)
+            cg.CGEventTapEnable(self._tap, False)
         if self._loop is not None:
-            Quartz.CFRunLoopStop(self._loop)
+            cg.CFRunLoopStop(self._loop)
             self._loop = None
         self._tap = None
+        self._ctypes_cb = None
         logger.info("Quartz all-keys listener stopped")
 
 
@@ -410,6 +386,7 @@ class TapHotkeyListener:
         self._tap = None
         self._loop = None
         self._thread: Optional[threading.Thread] = None
+        self._ctypes_cb = None  # prevent GC of ctypes callback
 
     def _run_activate(self):
         try:
@@ -418,90 +395,80 @@ class TapHotkeyListener:
             logger.error("on_activate callback error: %s", e)
 
     def _callback(self, proxy, event_type, event, refcon):
-        with objc.autorelease_pool():
-            try:
-                import Quartz
+        from wenzi import _cgeventtap as cg
 
-                if event_type == Quartz.kCGEventTapDisabledByTimeout:
-                    logger.warning("CGEventTap disabled by timeout, re-enabling")
-                    if self._tap is not None:
-                        Quartz.CGEventTapEnable(self._tap, True)
-                    return event
-
-                if event_type != Quartz.kCGEventKeyDown:
-                    return event
-
-                keycode = Quartz.CGEventGetIntegerValueField(
-                    event, Quartz.kCGKeyboardEventKeycode
-                )
-                flags = Quartz.CGEventGetFlags(event) & _MOD_MASK
-
-                if keycode == self._keycode and flags == self._mod_flags:
-                    logger.debug("TapHotkeyListener matched: %s", self._hotkey_str)
-                    threading.Thread(
-                        target=self._run_activate, daemon=True,
-                    ).start()
-                    return None  # Swallow the event
-
+        try:
+            if event_type == cg.kCGEventTapDisabledByTimeout:
+                logger.warning("CGEventTap disabled by timeout, re-enabling")
+                if self._tap is not None:
+                    cg.CGEventTapEnable(self._tap, True)
                 return event
-            except Exception:
-                logger.warning("[TapHotkey] _callback exception", exc_info=True)
+
+            if event_type != cg.kCGEventKeyDown:
                 return event
+
+            keycode = cg.CGEventGetIntegerValueField(
+                event, cg.kCGKeyboardEventKeycode
+            )
+            flags = cg.CGEventGetFlags(event) & _MOD_MASK
+
+            if keycode == self._keycode and flags == self._mod_flags:
+                logger.debug("TapHotkeyListener matched: %s", self._hotkey_str)
+                threading.Thread(
+                    target=self._run_activate, daemon=True,
+                ).start()
+                return None  # Swallow the event
+
+            return event
+        except Exception:
+            logger.warning("[TapHotkey] _callback exception", exc_info=True)
+            return event
 
     def start(self) -> None:
-        import Quartz
-        _pre_resolve_quartz()
+        from wenzi import _cgeventtap as cg
 
-        _CGEventMaskBit = Quartz.CGEventMaskBit
-        _kCGEventKeyDown = Quartz.kCGEventKeyDown
-        _CGEventTapCreate = Quartz.CGEventTapCreate
-        _kCGSessionEventTap = Quartz.kCGSessionEventTap
-        _kCGHeadInsertEventTap = Quartz.kCGHeadInsertEventTap
-        _kCGEventTapOptionDefault = Quartz.kCGEventTapOptionDefault
-        _CFMachPortCreateRunLoopSource = Quartz.CFMachPortCreateRunLoopSource
-        _CFRunLoopGetCurrent = Quartz.CFRunLoopGetCurrent
-        _CFRunLoopAddSource = Quartz.CFRunLoopAddSource
-        _kCFRunLoopDefaultMode = Quartz.kCFRunLoopDefaultMode
-        _CGEventTapEnable = Quartz.CGEventTapEnable
-        _CFRunLoopRun = Quartz.CFRunLoopRun
+        def _raw_cb(proxy, event_type, event, refcon):
+            return self._callback(proxy, event_type, event, refcon) or 0
+        self._ctypes_cb = cg.CGEventTapCallBack(_raw_cb)  # prevent GC!
+
+        mask = cg.CGEventMaskBit(cg.kCGEventKeyDown)
 
         def _run():
-            with objc.autorelease_pool():
-                mask = _CGEventMaskBit(_kCGEventKeyDown)
-                self._tap = _CGEventTapCreate(
-                    _kCGSessionEventTap,
-                    _kCGHeadInsertEventTap,
-                    _kCGEventTapOptionDefault,
-                    mask,
-                    self._callback,
-                    None,
+            self._tap = cg.CGEventTapCreate(
+                cg.kCGSessionEventTap,
+                cg.kCGHeadInsertEventTap,
+                cg.kCGEventTapOptionDefault,
+                mask,
+                self._ctypes_cb,
+                None,
+            )
+            if not self._tap:
+                logger.error(
+                    "Failed to create Quartz event tap for hotkey. "
+                    "Check accessibility permissions in System Settings."
                 )
-                if self._tap is None:
-                    logger.error(
-                        "Failed to create Quartz event tap for hotkey. "
-                        "Check accessibility permissions in System Settings."
-                    )
-                    return
+                return
 
-                source = _CFMachPortCreateRunLoopSource(None, self._tap, 0)
-                self._loop = _CFRunLoopGetCurrent()
-                _CFRunLoopAddSource(self._loop, source, _kCFRunLoopDefaultMode)
-                _CGEventTapEnable(self._tap, True)
-                logger.info("TapHotkeyListener started: %s", self._hotkey_str)
-                _CFRunLoopRun()
+            source = cg.CFMachPortCreateRunLoopSource(None, self._tap, 0)
+            self._loop = cg.CFRunLoopGetCurrent()
+            cg.CFRunLoopAddSource(self._loop, source, cg.kCFRunLoopDefaultMode.value)
+            cg.CGEventTapEnable(self._tap, True)
+            logger.info("TapHotkeyListener started: %s", self._hotkey_str)
+            cg.CFRunLoopRun()
 
         self._thread = threading.Thread(target=_run, daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
-        import Quartz
+        from wenzi import _cgeventtap as cg
 
         if self._tap is not None:
-            Quartz.CGEventTapEnable(self._tap, False)
+            cg.CGEventTapEnable(self._tap, False)
         if self._loop is not None:
-            Quartz.CFRunLoopStop(self._loop)
+            cg.CFRunLoopStop(self._loop)
             self._loop = None
         self._tap = None
+        self._ctypes_cb = None
         logger.info("TapHotkeyListener stopped")
 
 
@@ -523,6 +490,7 @@ class KeyRemapListener:
         self._loop = None
         self._thread: Optional[threading.Thread] = None
         self._prev_flags: int = 0
+        self._ctypes_cb = None  # prevent GC of ctypes callback
 
     def add(self, source_vk: int, target_vk: int, is_modifier: bool, mod_flag: int) -> None:
         """Add a remap.  Can be called while running."""
@@ -537,97 +505,102 @@ class KeyRemapListener:
         return self._tap is not None
 
     def _callback(self, proxy, event_type, event, refcon):
-        with objc.autorelease_pool():
-            try:
-                import Quartz
+        from wenzi import _cgeventtap as cg
 
-                if event_type == Quartz.kCGEventTapDisabledByTimeout:
-                    logger.warning("KeyRemapListener tap disabled by timeout, re-enabling")
-                    if self._tap is not None:
-                        Quartz.CGEventTapEnable(self._tap, True)
-                    return event
-
-                if event_type == Quartz.kCGEventFlagsChanged:
-                    keycode = Quartz.CGEventGetIntegerValueField(
-                        event, Quartz.kCGKeyboardEventKeycode
-                    )
-                    remap = self._remaps.get(keycode)
-                    if remap and remap[1]:  # is_modifier source
-                        target_vk, _, mod_flag = remap
-                        flags = Quartz.CGEventGetFlags(event)
-                        was_down = bool(self._prev_flags & mod_flag)
-                        is_down = bool(flags & mod_flag)
-                        self._prev_flags = flags
-                        if is_down != was_down:
-                            evt = Quartz.CGEventCreateKeyboardEvent(None, target_vk, is_down)
-                            Quartz.CGEventPost(Quartz.kCGAnnotatedSessionEventTap, evt)
-                            return None  # Swallow the original modifier event
-                    return event
-
-                if event_type in (Quartz.kCGEventKeyDown, Quartz.kCGEventKeyUp):
-                    keycode = Quartz.CGEventGetIntegerValueField(
-                        event, Quartz.kCGKeyboardEventKeycode
-                    )
-                    remap = self._remaps.get(keycode)
-                    if remap and not remap[1]:  # non-modifier source
-                        target_vk = remap[0]
-                        is_down = event_type == Quartz.kCGEventKeyDown
-                        evt_flags = Quartz.CGEventGetFlags(event)
-                        evt = Quartz.CGEventCreateKeyboardEvent(None, target_vk, is_down)
-                        Quartz.CGEventSetFlags(evt, evt_flags)
-                        Quartz.CGEventPost(Quartz.kCGAnnotatedSessionEventTap, evt)
-                        return None  # Swallow the original key event
-                    return event
-
+        try:
+            if event_type == cg.kCGEventTapDisabledByTimeout:
+                logger.warning("KeyRemapListener tap disabled by timeout, re-enabling")
+                if self._tap is not None:
+                    cg.CGEventTapEnable(self._tap, True)
                 return event
-            except Exception:
-                logger.warning("[KeyRemap] _callback exception", exc_info=True)
+
+            if event_type == cg.kCGEventFlagsChanged:
+                keycode = cg.CGEventGetIntegerValueField(
+                    event, cg.kCGKeyboardEventKeycode
+                )
+                remap = self._remaps.get(keycode)
+                if remap and remap[1]:  # is_modifier source
+                    target_vk, _, mod_flag = remap
+                    flags = cg.CGEventGetFlags(event)
+                    was_down = bool(self._prev_flags & mod_flag)
+                    is_down = bool(flags & mod_flag)
+                    self._prev_flags = flags
+                    if is_down != was_down:
+                        evt = cg.CGEventCreateKeyboardEvent(None, target_vk, is_down)
+                        cg.CGEventPost(cg.kCGAnnotatedSessionEventTap, evt)
+                        cg.CFRelease(evt)
+                        return None  # Swallow the original modifier event
                 return event
+
+            if event_type in (cg.kCGEventKeyDown, cg.kCGEventKeyUp):
+                keycode = cg.CGEventGetIntegerValueField(
+                    event, cg.kCGKeyboardEventKeycode
+                )
+                remap = self._remaps.get(keycode)
+                if remap and not remap[1]:  # non-modifier source
+                    target_vk = remap[0]
+                    is_down = event_type == cg.kCGEventKeyDown
+                    evt_flags = cg.CGEventGetFlags(event)
+                    evt = cg.CGEventCreateKeyboardEvent(None, target_vk, is_down)
+                    cg.CGEventSetFlags(evt, evt_flags)
+                    cg.CGEventPost(cg.kCGAnnotatedSessionEventTap, evt)
+                    cg.CFRelease(evt)
+                    return None  # Swallow the original key event
+                return event
+
+            return event
+        except Exception:
+            logger.warning("[KeyRemap] _callback exception", exc_info=True)
+            return event
 
     def start(self) -> None:
-        import Quartz
-        _pre_resolve_quartz()
+        from wenzi import _cgeventtap as cg
+
+        def _raw_cb(proxy, event_type, event, refcon):
+            return self._callback(proxy, event_type, event, refcon) or 0
+        self._ctypes_cb = cg.CGEventTapCallBack(_raw_cb)  # prevent GC!
+
+        mask = (
+            cg.CGEventMaskBit(cg.kCGEventFlagsChanged)
+            | cg.CGEventMaskBit(cg.kCGEventKeyDown)
+            | cg.CGEventMaskBit(cg.kCGEventKeyUp)
+        )
 
         def _run():
-            with objc.autorelease_pool():
-                mask = (
-                    Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)
-                    | Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown)
-                    | Quartz.CGEventMaskBit(Quartz.kCGEventKeyUp)
+            self._tap = cg.CGEventTapCreate(
+                cg.kCGSessionEventTap,
+                cg.kCGHeadInsertEventTap,
+                cg.kCGEventTapOptionDefault,
+                mask,
+                self._ctypes_cb,
+                None,
+            )
+            if not self._tap:
+                logger.error(
+                    "Failed to create CGEventTap for key remap. "
+                    "Check accessibility permissions."
                 )
-                self._tap = Quartz.CGEventTapCreate(
-                    Quartz.kCGSessionEventTap,
-                    Quartz.kCGHeadInsertEventTap,
-                    Quartz.kCGEventTapOptionDefault,
-                    mask,
-                    self._callback,
-                    None,
-                )
-                if self._tap is None:
-                    logger.error(
-                        "Failed to create CGEventTap for key remap. "
-                        "Check accessibility permissions."
-                    )
-                    return
-                source = Quartz.CFMachPortCreateRunLoopSource(None, self._tap, 0)
-                self._loop = Quartz.CFRunLoopGetCurrent()
-                Quartz.CFRunLoopAddSource(self._loop, source, Quartz.kCFRunLoopDefaultMode)
-                Quartz.CGEventTapEnable(self._tap, True)
-                logger.info("KeyRemapListener started with %d remap(s)", len(self._remaps))
-                Quartz.CFRunLoopRun()
+                return
+            source = cg.CFMachPortCreateRunLoopSource(None, self._tap, 0)
+            self._loop = cg.CFRunLoopGetCurrent()
+            cg.CFRunLoopAddSource(self._loop, source, cg.kCFRunLoopDefaultMode.value)
+            cg.CGEventTapEnable(self._tap, True)
+            logger.info("KeyRemapListener started with %d remap(s)", len(self._remaps))
+            cg.CFRunLoopRun()
 
         self._thread = threading.Thread(target=_run, daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
-        import Quartz
+        from wenzi import _cgeventtap as cg
 
         if self._tap is not None:
-            Quartz.CGEventTapEnable(self._tap, False)
+            cg.CGEventTapEnable(self._tap, False)
         if self._loop is not None:
-            Quartz.CFRunLoopStop(self._loop)
+            cg.CFRunLoopStop(self._loop)
             self._loop = None
         self._tap = None
+        self._ctypes_cb = None
         logger.info("KeyRemapListener stopped")
 
 

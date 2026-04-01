@@ -289,12 +289,9 @@ class TestGetUnicodeString:
         """Ensure out-of-bounds read is prevented when length > buf_size."""
         from wenzi.scripting.snippet_expander import _get_unicode_string
 
-        mock_event = MagicMock()
-        mock_objc = MagicMock()
-        mock_objc.pyobjc_id.return_value = 0
+        # event is now a raw pointer (integer) — use 0 as a dummy
         with (
             patch("wenzi.scripting.snippet_expander._carbon") as mock_carbon,
-            patch.dict("sys.modules", {"objc": mock_objc}),
         ):
             def fake_get(event_ptr, max_len, length_ptr, buf):
                 # Simulate the API reporting a length larger than buffer
@@ -303,7 +300,7 @@ class TestGetUnicodeString:
                     buf[i] = ord("A") + (i % 26)
 
             mock_carbon.CGEventKeyboardGetUnicodeString.side_effect = fake_get
-            result = _get_unicode_string(mock_event)
+            result = _get_unicode_string(0)
 
         # Should return at most 16 chars (buf_size), not 32
         assert len(result) <= 16
@@ -311,18 +308,15 @@ class TestGetUnicodeString:
     def test_empty_event_returns_empty_string(self):
         from wenzi.scripting.snippet_expander import _get_unicode_string
 
-        mock_event = MagicMock()
-        mock_objc = MagicMock()
-        mock_objc.pyobjc_id.return_value = 0
+        # event is now a raw pointer (integer) — use 0 as a dummy
         with (
             patch("wenzi.scripting.snippet_expander._carbon") as mock_carbon,
-            patch.dict("sys.modules", {"objc": mock_objc}),
         ):
             def fake_get(event_ptr, max_len, length_ptr, buf):
                 length_ptr._obj.value = 0
 
             mock_carbon.CGEventKeyboardGetUnicodeString.side_effect = fake_get
-            result = _get_unicode_string(mock_event)
+            result = _get_unicode_string(0)
 
         assert result == ""
 

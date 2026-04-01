@@ -236,7 +236,7 @@ class TestQuartzAllKeysListener:
         """stop() must disable the CGEventTap so it stops intercepting events
         immediately, preventing queued/swallowed keystrokes."""
         from wenzi.hotkey import _QuartzAllKeysListener
-        import Quartz
+        import wenzi._cgeventtap as cg
 
         listener = _QuartzAllKeysListener(
             on_press=MagicMock(), on_release=MagicMock()
@@ -250,9 +250,9 @@ class TestQuartzAllKeysListener:
             pytest.MonkeyPatch.context() as mp,
         ):
             calls = []
-            mp.setattr(Quartz, "CGEventTapEnable",
+            mp.setattr(cg, "CGEventTapEnable",
                         lambda tap, en: calls.append(("disable", tap, en)))
-            mp.setattr(Quartz, "CFRunLoopStop",
+            mp.setattr(cg, "CFRunLoopStop",
                         lambda loop: calls.append(("stop", loop)))
             listener.stop()
 
@@ -265,7 +265,7 @@ class TestQuartzAllKeysListener:
         """When CGEventTap is disabled by timeout, missed modifier releases
         should be detected by polling CGEventSourceFlagsState."""
         from wenzi.hotkey import _QuartzAllKeysListener, _FN_FLAG
-        import Quartz
+        import wenzi._cgeventtap as cg
 
         on_release = MagicMock()
         listener = _QuartzAllKeysListener(
@@ -277,15 +277,12 @@ class TestQuartzAllKeysListener:
         listener._mod_flags_prev = _FN_FLAG
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(Quartz, "CGEventTapEnable", lambda tap, en: None)
+            mp.setattr(cg, "CGEventTapEnable", lambda tap, en: None)
             # Current flags show fn is no longer held
-            mp.setattr(Quartz, "CGEventSourceFlagsState", lambda src: 0)
-            mp.setattr(
-                Quartz, "kCGEventSourceStateCombinedSessionState", 0
-            )
+            mp.setattr(cg, "CGEventSourceFlagsState", lambda src: 0)
 
             listener._callback(
-                None, Quartz.kCGEventTapDisabledByTimeout, None, None
+                None, 0xFFFFFFFE, None, None
             )
 
         on_release.assert_called_once_with("fn")
@@ -294,7 +291,7 @@ class TestQuartzAllKeysListener:
     def test_tap_timeout_no_false_release(self):
         """When modifier is still held during tap timeout, no release fires."""
         from wenzi.hotkey import _QuartzAllKeysListener, _FN_FLAG
-        import Quartz
+        import wenzi._cgeventtap as cg
 
         on_release = MagicMock()
         listener = _QuartzAllKeysListener(
@@ -305,15 +302,12 @@ class TestQuartzAllKeysListener:
         listener._mod_flags_prev = _FN_FLAG
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(Quartz, "CGEventTapEnable", lambda tap, en: None)
+            mp.setattr(cg, "CGEventTapEnable", lambda tap, en: None)
             # fn is still held
-            mp.setattr(Quartz, "CGEventSourceFlagsState", lambda src: _FN_FLAG)
-            mp.setattr(
-                Quartz, "kCGEventSourceStateCombinedSessionState", 0
-            )
+            mp.setattr(cg, "CGEventSourceFlagsState", lambda src: _FN_FLAG)
 
             listener._callback(
-                None, Quartz.kCGEventTapDisabledByTimeout, None, None
+                None, 0xFFFFFFFE, None, None
             )
 
         on_release.assert_not_called()
@@ -334,7 +328,7 @@ class TestTapHotkeyListener:
 
     def test_stop_disables_tap_before_stopping_runloop(self):
         """stop() must disable the CGEventTap to avoid swallowing events."""
-        import Quartz
+        import wenzi._cgeventtap as cg
 
         listener = TapHotkeyListener("ctrl+v", MagicMock())
         fake_tap = MagicMock()
@@ -344,9 +338,9 @@ class TestTapHotkeyListener:
 
         with pytest.MonkeyPatch.context() as mp:
             calls = []
-            mp.setattr(Quartz, "CGEventTapEnable",
+            mp.setattr(cg, "CGEventTapEnable",
                         lambda tap, en: calls.append(("disable", tap, en)))
-            mp.setattr(Quartz, "CFRunLoopStop",
+            mp.setattr(cg, "CFRunLoopStop",
                         lambda loop: calls.append(("stop", loop)))
             listener.stop()
 
@@ -991,36 +985,47 @@ class TestKeyRemapListener:
 
     def test_modifier_remap_keydown(self):
         """FlagsChanged event for modifier press → synthesize target keydown."""
-        import Quartz
+        import wenzi._cgeventtap as cg
 
         listener = KeyRemapListener()
         listener.add(60, 80, True, 0x020000)  # shift_r → f19
         listener._prev_flags = 0
 
         posted_events = []
+        created_events = []
+
+        def mock_create(source, vk, key_down):
+            token = f"evt_{vk}_{key_down}"
+            created_events.append(token)
+            return token
 
         def mock_post(tap, evt):
-            vk = Quartz.CGEventGetIntegerValueField(evt, Quartz.kCGKeyboardEventKeycode)
-            is_down = Quartz.CGEventGetType(evt) == Quartz.kCGEventKeyDown
-            posted_events.append((vk, is_down))
+            posted_events.append(evt)
 
-        # Build a FlagsChanged event with shift flag set (key down)
-        event = Quartz.CGEventCreateKeyboardEvent(None, 60, True)
-        Quartz.CGEventSetType(event, Quartz.kCGEventFlagsChanged)
-        Quartz.CGEventSetFlags(event, 0x020000)
-        Quartz.CGEventSetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode, 60)
+        def mock_get_int(event, field):
+            # Return keycode 60 for the input event
+            if field == cg.kCGKeyboardEventKeycode:
+                return 60
+            return 0
 
-        import unittest.mock
-        with unittest.mock.patch.object(Quartz, "CGEventPost", side_effect=mock_post):
-            result = listener._callback(None, Quartz.kCGEventFlagsChanged, event, None)
+        def mock_get_flags(event):
+            return 0x020000  # shift flag set (key down)
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(cg, "CGEventGetIntegerValueField", mock_get_int)
+            mp.setattr(cg, "CGEventGetFlags", mock_get_flags)
+            mp.setattr(cg, "CGEventCreateKeyboardEvent", mock_create)
+            mp.setattr(cg, "CGEventPost", mock_post)
+            mp.setattr(cg, "CFRelease", lambda evt: None)
+            result = listener._callback(None, cg.kCGEventFlagsChanged, 0xDEAD, None)
 
         assert result is None  # Swallowed
         assert len(posted_events) == 1
-        assert posted_events[0] == (80, True)  # F19 keydown
+        assert posted_events[0] == "evt_80_True"  # F19 keydown
 
     def test_modifier_remap_keyup(self):
         """FlagsChanged event for modifier release → synthesize target keyup."""
-        import Quartz
+        import wenzi._cgeventtap as cg
 
         listener = KeyRemapListener()
         listener.add(60, 80, True, 0x020000)
@@ -1028,54 +1033,77 @@ class TestKeyRemapListener:
 
         posted_events = []
 
-        def mock_post(tap, evt):
-            vk = Quartz.CGEventGetIntegerValueField(evt, Quartz.kCGKeyboardEventKeycode)
-            is_down = Quartz.CGEventGetType(evt) == Quartz.kCGEventKeyDown
-            posted_events.append((vk, is_down))
+        def mock_create(source, vk, key_down):
+            return f"evt_{vk}_{key_down}"
 
-        # Flags cleared → key up
-        event = Quartz.CGEventCreateKeyboardEvent(None, 60, False)
-        Quartz.CGEventSetType(event, Quartz.kCGEventFlagsChanged)
-        Quartz.CGEventSetFlags(event, 0)
-        Quartz.CGEventSetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode, 60)
+        def mock_get_int(event, field):
+            if field == cg.kCGKeyboardEventKeycode:
+                return 60
+            return 0
 
-        import unittest.mock
-        with unittest.mock.patch.object(Quartz, "CGEventPost", side_effect=mock_post):
-            result = listener._callback(None, Quartz.kCGEventFlagsChanged, event, None)
+        def mock_get_flags(event):
+            return 0  # Flags cleared → key up
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(cg, "CGEventGetIntegerValueField", mock_get_int)
+            mp.setattr(cg, "CGEventGetFlags", mock_get_flags)
+            mp.setattr(cg, "CGEventCreateKeyboardEvent", mock_create)
+            mp.setattr(cg, "CGEventPost", lambda tap, evt: posted_events.append(evt))
+            mp.setattr(cg, "CFRelease", lambda evt: None)
+            result = listener._callback(None, cg.kCGEventFlagsChanged, 0xDEAD, None)
 
         assert result is None
         assert len(posted_events) == 1
-        assert posted_events[0] == (80, False)  # F19 keyup
+        assert posted_events[0] == "evt_80_False"  # F19 keyup
 
     def test_unremapped_key_passes_through(self):
         """Keys not in the remap table should pass through unchanged."""
-        import Quartz
+        import wenzi._cgeventtap as cg
 
         listener = KeyRemapListener()
         listener.add(60, 80, True, 0x020000)
 
-        event = Quartz.CGEventCreateKeyboardEvent(None, 0, True)  # 'a' key
-        result = listener._callback(None, Quartz.kCGEventKeyDown, event, None)
-        assert result is event  # Passed through
+        event = 0xBEEF  # raw pointer placeholder
+
+        def mock_get_int(ev, field):
+            if field == cg.kCGKeyboardEventKeycode:
+                return 0  # 'a' key
+            return 0
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(cg, "CGEventGetIntegerValueField", mock_get_int)
+            result = listener._callback(None, cg.kCGEventKeyDown, event, None)
+
+        assert result == event  # Passed through
 
     def test_regular_key_remap(self):
         """KeyDown for regular key remap → synthesize target."""
-        import Quartz
+        import wenzi._cgeventtap as cg
 
         listener = KeyRemapListener()
         listener.add(105, 53, False, 0)  # f13 → esc
 
         posted_events = []
 
-        def mock_post(tap, evt):
-            vk = Quartz.CGEventGetIntegerValueField(evt, Quartz.kCGKeyboardEventKeycode)
-            posted_events.append(vk)
+        def mock_create(source, vk, key_down):
+            return f"evt_{vk}_{key_down}"
 
-        event = Quartz.CGEventCreateKeyboardEvent(None, 105, True)
+        def mock_get_int(event, field):
+            if field == cg.kCGKeyboardEventKeycode:
+                return 105
+            return 0
 
-        import unittest.mock
-        with unittest.mock.patch.object(Quartz, "CGEventPost", side_effect=mock_post):
-            result = listener._callback(None, Quartz.kCGEventKeyDown, event, None)
+        def mock_get_flags(event):
+            return 0
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(cg, "CGEventGetIntegerValueField", mock_get_int)
+            mp.setattr(cg, "CGEventGetFlags", mock_get_flags)
+            mp.setattr(cg, "CGEventCreateKeyboardEvent", mock_create)
+            mp.setattr(cg, "CGEventSetFlags", lambda evt, flags: None)
+            mp.setattr(cg, "CGEventPost", lambda tap, evt: posted_events.append(evt))
+            mp.setattr(cg, "CFRelease", lambda evt: None)
+            result = listener._callback(None, cg.kCGEventKeyDown, 0xDEAD, None)
 
         assert result is None
-        assert posted_events == [53]
+        assert posted_events == ["evt_53_True"]
