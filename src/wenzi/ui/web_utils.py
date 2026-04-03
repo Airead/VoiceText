@@ -101,7 +101,9 @@ def _shared_nonpersistent_store():
     return _nonpersistent_store
 
 
-def lightweight_webview_config(*, network: bool = False):  # -> WKWebViewConfiguration
+def lightweight_webview_config(
+    *, network: bool = False, shared: bool = True
+):  # -> WKWebViewConfiguration
     """Return a WKWebViewConfiguration optimised for low memory usage.
 
     WebViews sharing the same ``WKWebsiteDataStore`` instance share a
@@ -111,15 +113,29 @@ def lightweight_webview_config(*, network: bool = False):  # -> WKWebViewConfigu
 
     *network* — keep the default persistent data store (needed when the
     WebView loads real URLs, e.g. Google Translate).  When ``False`` a
-    shared non-persistent ``WKWebsiteDataStore`` is used, which avoids
+    non-persistent ``WKWebsiteDataStore`` is used, which avoids
     persistent cookie/cache storage and reduces Networking process
     overhead.
+
+    *shared* — when ``True`` (default), all WebViews use a single shared
+    non-persistent data store and therefore share one Web Content process.
+    When ``False``, a dedicated non-persistent data store is created so
+    the WebView gets its own Web Content process that exits automatically
+    when the WebView is deallocated.  Use ``False`` for rarely-opened
+    panels to avoid long-lived memory retention in the shared process.
     """
     from WebKit import WKWebViewConfiguration
 
     config = WKWebViewConfiguration.alloc().init()
 
     if not network:
-        config.setWebsiteDataStore_(_shared_nonpersistent_store())
+        if shared:
+            config.setWebsiteDataStore_(_shared_nonpersistent_store())
+        else:
+            from WebKit import WKWebsiteDataStore
+
+            config.setWebsiteDataStore_(
+                WKWebsiteDataStore.nonPersistentDataStore()
+            )
 
     return config

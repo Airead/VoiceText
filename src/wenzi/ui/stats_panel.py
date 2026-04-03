@@ -207,7 +207,7 @@ class StatsChartPanel:
         # WKWebView fills content area
         from wenzi.ui.web_utils import lightweight_webview_config
 
-        config = lightweight_webview_config()
+        config = lightweight_webview_config(shared=False)
         webview = WKWebView.alloc().initWithFrame_configuration_(
             NSMakeRect(0, 0, self._WIDTH, self._HEIGHT),
             config,

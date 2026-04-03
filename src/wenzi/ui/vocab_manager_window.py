@@ -337,7 +337,7 @@ class VocabManagerPanel:
 
         from wenzi.ui.web_utils import lightweight_webview_config
 
-        config = lightweight_webview_config()
+        config = lightweight_webview_config(shared=False)
         content_controller = WKUserContentController.alloc().init()
 
         handler_cls = _get_message_handler_class()

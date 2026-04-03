@@ -692,7 +692,7 @@ class WebViewPanel:
 
         from wenzi.ui.web_utils import lightweight_webview_config
 
-        config = lightweight_webview_config()
+        config = lightweight_webview_config(shared=False)
         config.setUserContentController_(content_controller)
 
         # Register wz-file:// scheme handler for local file access from JS
