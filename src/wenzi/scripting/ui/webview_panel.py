@@ -439,6 +439,13 @@ class WebViewPanel:
             NSApp.setActivationPolicy_(1)  # Accessory (statusbar-only)
 
         self._webview = None
+        self._panel = None
+        self._file_handler = None
+        self._message_handler_obj = None
+        self._close_delegate = None
+        self._on_close_callbacks = []
+        self._event_handlers = {}
+        self._call_handlers = {}
 
     def set_html(self, html: str) -> None:
         """Update the HTML content."""
