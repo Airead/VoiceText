@@ -55,6 +55,7 @@ a = Analysis(
         'wenzi.input_context',
         'wenzi.keychain',
         'wenzi.vault',
+        'wenzi._cgeventtap',
         'wenzi.i18n',
         'wenzi.locales',
         # wenzi.audio
@@ -83,6 +84,7 @@ a = Analysis(
         'wenzi.enhance.text_diff',
         'wenzi.enhance.manual_vocabulary',
         'wenzi.enhance.pool_monitor',
+        'wenzi.enhance.vocab_db',
         # wenzi.ui
         'wenzi.ui',
         'wenzi.ui.result_window_web',
@@ -96,6 +98,8 @@ a = Analysis(
         'wenzi.ui.hud',
         'wenzi.ui.translate_webview',
         'wenzi.ui.vocab_build_window',
+        'wenzi.ui.vocab_manager_window',
+        'wenzi.ui.web_utils',
         # wenzi.controllers
         'wenzi.controllers',
         'wenzi.controllers.model_controller',
@@ -108,6 +112,7 @@ a = Analysis(
         'wenzi.controllers.menu_builder',
         'wenzi.controllers.recording_flow',
         'wenzi.controllers.universal_action_controller',
+        'wenzi.controllers.vocab_controller',
         'wenzi.updater',
         # wenzi.scripting
         'wenzi.scripting',
@@ -135,6 +140,9 @@ a = Analysis(
         'wenzi.scripting.api.timer',
         'wenzi.scripting.api.ui',
         'wenzi.scripting.api.keychain',
+        'wenzi.scripting.api.menu',
+        'wenzi.scripting.api.menubar',
+        'wenzi.scripting.api.window',
         # wenzi.scripting.sources
         'wenzi.scripting.sources',
         'wenzi.scripting.sources._mdquery',
@@ -156,6 +164,9 @@ a = Analysis(
         'wenzi.scripting.ui.quick_edit_panel',
         'wenzi.scripting.ui.snippet_editor_panel',
         'wenzi.scripting.ui.webview_panel',
+        # wenzi.screenshot
+        'wenzi.screenshot',
+        'wenzi.screenshot.annotation',
         # third-party
         'sounddevice',
         'soundfile',

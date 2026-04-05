@@ -12,8 +12,6 @@ from .model_registry import (
     is_model_cached,
     resolve_preset_from_config,
 )
-from .punctuation import PunctuationRestorer
-
 __all__ = [
     "BaseTranscriber",
     "create_transcriber",
@@ -28,3 +26,11 @@ __all__ = [
     "resolve_preset_from_config",
     "PunctuationRestorer",
 ]
+
+
+def __getattr__(name):
+    if name == "PunctuationRestorer":
+        from .punctuation import PunctuationRestorer
+
+        return PunctuationRestorer
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
