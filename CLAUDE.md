@@ -12,7 +12,9 @@ src/wenzi/
 ├── enhance/         # AI text enhancement, vocabulary, conversation history
 ├── ui/              # UI panels and windows (result, settings, log viewer, etc.)
 ├── controllers/     # Business logic controllers
-└── screenshot/      # Screenshot capture + annotation (picture editor)
+├── screenshot/      # Screenshot capture + annotation (picture editor)
+├── scripting/       # Plugin/scripting engine, APIs (wz namespace), launcher, sources
+└── locales/         # Internationalization locale data
 ```
 
 Tests mirror this structure under `tests/`.
@@ -98,7 +100,7 @@ def _get_meta(self, btn) -> Dict:
     return self._btn_meta.get(id(btn), {})
 ```
 
-See `ui/settings_window.py` for the reference implementation.
+This pattern was used in the former native AppKit settings panel. Now that UI has migrated to WKWebView (where state lives in JS/DOM), it is less common — but still applies to any code that attaches metadata to raw AppKit objects (e.g. NSObject delegates).
 
 ## Dark Mode Support
 
@@ -119,7 +121,7 @@ All UI must support macOS dark mode. Follow these rules when writing UI code:
       return NSColor.colorWithName_dynamicProvider_("custom", provider)
   ```
 - **Avoid deprecated `colorWithCalibratedRed_green_blue_alpha_`** — use `colorWithSRGBRed_green_blue_alpha_` or system semantic colors.
-- See `ui/result_window.py` for a good reference implementation of dark mode support.
+- See `ui/result_window_web.py` for a good reference implementation of dark mode support.
 
 ## LLM max_tokens Guard
 
@@ -129,7 +131,6 @@ All `chat.completions.create` calls **must** include `max_tokens` to prevent run
 |-----------|-------------|-----------|
 | `enhancer.verify_provider` | `1` | Connectivity check only |
 | `enhancer._build_request_kwargs` | config `max_output_tokens` (default 4096) | Text enhancement — output ≈ input length |
-| `vocabulary_builder._extract_batch` | config `vocabulary.max_output_tokens` (default 4096) | Vocab extraction — ≤60 pipe-delimited lines |
 
 When adding a new LLM call, always set `max_tokens` to a reasonable upper bound for the expected output.
 

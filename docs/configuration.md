@@ -201,8 +201,8 @@ The config file is always `config.json` inside the resolved directory.
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `scripting.enabled` | `false` | Enable the Lua scripting system |
-| `scripting.script_dir` | `null` | Custom directory for Lua scripts (null = `<config_dir>/scripts`) |
+| `scripting.enabled` | `false` | Enable the Python scripting system |
+| `scripting.script_dir` | `null` | Custom directory for Python scripts (null = `<config_dir>/scripts`) |
 
 ### Logging
 

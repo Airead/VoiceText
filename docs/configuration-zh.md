@@ -201,8 +201,8 @@
 
 | 键名 | 默认值 | 说明 |
 |-----|---------|-------------|
-| `scripting.enabled` | `false` | 启用 Lua 脚本系统 |
-| `scripting.script_dir` | `null` | Lua 脚本的自定义目录（null 表示使用 `<配置目录>/scripts`） |
+| `scripting.enabled` | `false` | 启用 Python 脚本系统 |
+| `scripting.script_dir` | `null` | Python 脚本的自定义目录（null 表示使用 `<配置目录>/scripts`） |
 
 ### 日志设置
 

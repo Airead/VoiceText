@@ -100,11 +100,11 @@ def _mock_apple_frameworks(monkeypatch):
 ```python
 # tests/enhance/conftest.py
 @pytest.fixture(autouse=True)
-def _fast_common_words(monkeypatch):
-    """Skip loading 8MB word list — not needed for enhance test logic."""
+def _no_heavy_init(monkeypatch):
+    """Skip expensive initialization not needed for enhance test logic."""
     monkeypatch.setattr(
-        "wenzi.enhance.vocabulary_builder._load_common_words",
-        lambda: set(),
+        "wenzi.enhance.enhancer.TextEnhancer._load_vocabulary",
+        lambda self: None,
     )
 ```
 

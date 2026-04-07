@@ -109,6 +109,7 @@ The Launcher supports two search modes:
 | **Clipboard** | `cb` | Browse clipboard history (text and images). |
 | **Snippets** | `sn` | Search text snippets with keyword expansion. |
 | **Bookmarks** | `bm` | Search browser bookmarks (Chrome, Safari, Arc, Edge, Brave, Firefox). |
+| **System Settings** | *(none)* | Search macOS System Settings panes and sub-items. Always active in global search. |
 
 Prefixes are configurable via `scripting.chooser.prefixes` in config. The `>` prefix is reserved for commands and cannot be changed.
 

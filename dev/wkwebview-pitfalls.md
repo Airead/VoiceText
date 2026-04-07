@@ -64,11 +64,11 @@ have no ordering guarantee.
 no menu bar and no Edit menu. WKWebView relies on the responder chain's Edit menu
 to handle ⌘C, ⌘V, ⌘A. Without it, these shortcuts are silently swallowed.
 
-**Solution:** Call `_ensure_edit_menu()` (defined in `result_window.py`) during
+**Solution:** Call `_ensure_edit_menu()` (defined in `result_window_web.py`) during
 `_build_panel()` to inject a minimal Edit menu with Cut/Copy/Paste/Select All items.
 
 ```python
-from wenzi.ui.result_window import _ensure_edit_menu
+from wenzi.ui.result_window_web import _ensure_edit_menu
 _ensure_edit_menu()
 ```
 

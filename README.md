@@ -66,6 +66,7 @@ On first launch the app will prompt for **Microphone**, **Accessibility**, and o
 | [Enhancement Mode Examples](docs/enhance-mode-examples.md) | Ready-to-use mode templates |
 | [Prompt Optimization](docs/prompt-optimization-workflow.md) | Systematic prompt improvement workflow |
 | [Conversation History](docs/conversation-history-enhancement.md) | How conversation history improves accuracy |
+| [Error Correction](docs/error-correction.md) | How the five-layer correction system works |
 | [Scripting API](docs/scripting.md) | Leader keys, hotkeys, and automation APIs |
 
 ## Testing
