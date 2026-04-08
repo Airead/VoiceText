@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import logging
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -122,24 +123,44 @@ _HAS_CJK = re.compile(r"[\u4e00-\u9fff]")
 _IS_ASCII = re.compile(r"^[a-zA-Z0-9]+$")
 
 
+def _strip_diacritics(text: str) -> str:
+    """Remove combining diacritical marks (tone marks) from *text*."""
+    nfkd = unicodedata.normalize("NFD", text)
+    return "".join(ch for ch in nfkd if unicodedata.category(ch) != "Mn")
+
+
+def _cf_to_pinyin(text: str) -> str:
+    """Convert Chinese text to tone-stripped pinyin via macOS ICU transform.
+
+    Returns a lowercase string with spaces between syllables, e.g.
+    "系统设置" → "xi tong she zhi".
+    """
+    from Foundation import NSString
+
+    result = NSString.stringWithString_(text).stringByApplyingTransform_reverse_(
+        "Latin", False,
+    )
+    if result is None:
+        return text.lower()
+    return _strip_diacritics(str(result)).lower()
+
+
 @functools.lru_cache(maxsize=4096)
 def _get_pinyin(text: str) -> Tuple[str, str]:
     """Return (full_pinyin, pinyin_initials) for *text*.
 
     full_pinyin:  "系统设置" → "xitongshezhi"
-    pinyin_initials: "系统设置" → "xtsh"
+    pinyin_initials: "系统设置" → "xtsz"
 
     Non-CJK characters are kept as-is in both forms.
     Results are LRU-cached (bounded to 4096 entries) for performance.
     """
     try:
-        from pypinyin import lazy_pinyin, Style
-
-        full_parts = lazy_pinyin(text, style=Style.NORMAL)
-        initial_parts = lazy_pinyin(text, style=Style.FIRST_LETTER)
-
-        full = "".join(full_parts).lower()
-        initials = "".join(initial_parts).lower()
+        raw = _cf_to_pinyin(text)
+        # raw is like "xi tong she zhi" — split into syllables
+        parts = raw.split()
+        full = "".join(parts)
+        initials = "".join(p[0] for p in parts if p)
     except Exception:
         full = initials = ""
 

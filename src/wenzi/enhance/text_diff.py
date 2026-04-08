@@ -8,7 +8,6 @@ import unicodedata
 from difflib import SequenceMatcher
 from typing import List
 
-from zhconv import convert as _zhconv_convert
 
 # ASCII words as whole units, each non-ASCII char individually,
 # whitespace runs, or any other single character.
@@ -45,6 +44,16 @@ def tokenize_for_diff(text: str) -> List[str]:
     return _TOKEN_RE.findall(text)
 
 
+def _hant_to_hans(text: str) -> str:
+    """Convert Traditional Chinese to Simplified Chinese via macOS ICU transform."""
+    from Foundation import NSString
+
+    result = NSString.stringWithString_(text).stringByApplyingTransform_reverse_(
+        "Hant-Hans", False,
+    )
+    return str(result) if result is not None else text
+
+
 def _to_simplified(tokens: List[str]) -> List[str]:
     """Convert tokens to Simplified Chinese so SequenceMatcher treats trad/simp
     variants as equal.  Returns a same-length list (1:1 mapping) so opcodes
@@ -53,7 +62,7 @@ def _to_simplified(tokens: List[str]) -> List[str]:
     joined = "".join(tokens)
     if joined.isascii():
         return tokens
-    converted = _zhconv_convert(joined, "zh-hans")
+    converted = _hant_to_hans(joined)
     if converted == joined:
         return tokens
     # Fast path: zh-hans conversions are almost always char-to-char (same length)
@@ -66,7 +75,7 @@ def _to_simplified(tokens: List[str]) -> List[str]:
             pos = end
         return result
     # Rare fallback: length changed, convert per-token to keep 1:1 mapping
-    return [_zhconv_convert(t, "zh-hans") for t in tokens]
+    return [_hant_to_hans(t) for t in tokens]
 
 
 def _is_punctuation_only(text: str) -> bool:

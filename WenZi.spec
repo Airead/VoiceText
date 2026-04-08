@@ -24,13 +24,11 @@ mlx_datas, mlx_binaries, mlx_hiddenimports = collect_all('mlx')
 mlx_whisper_datas, mlx_whisper_binaries, mlx_whisper_hiddenimports = collect_all('mlx_whisper')
 sherpa_datas, sherpa_binaries, sherpa_hiddenimports = collect_all('sherpa_onnx')
 librosa_datas, librosa_binaries, librosa_hiddenimports = collect_all('librosa')
-certifi_datas, certifi_binaries, certifi_hiddenimports = collect_all('certifi')
-
 a = Analysis(
     ['src/wenzi/__main__.py'],
     pathex=['src'],
-    binaries=mlx_binaries + mlx_whisper_binaries + sherpa_binaries + librosa_binaries + certifi_binaries,
-    datas=mlx_datas + mlx_whisper_datas + sherpa_datas + librosa_datas + certifi_datas + [
+    binaries=mlx_binaries + mlx_whisper_binaries + sherpa_binaries + librosa_binaries,
+    datas=mlx_datas + mlx_whisper_datas + sherpa_datas + librosa_datas + [
         (os.path.join(_spec_dir, 'src/wenzi/audio/sounds'), 'wenzi/audio/sounds'),
         (os.path.join(_spec_dir, 'src/wenzi/enhance/data'), 'wenzi/enhance/data'),
         (os.path.join(_spec_dir, 'src/wenzi/locales'), 'wenzi/locales'),
@@ -38,7 +36,7 @@ a = Analysis(
         (os.path.join(_spec_dir, 'src/wenzi/ui/templates'), 'wenzi/ui/templates'),
         (os.path.join(_spec_dir, 'src/wenzi/screenshot/templates'), 'wenzi/screenshot/templates'),
     ],
-    hiddenimports=mlx_hiddenimports + mlx_whisper_hiddenimports + sherpa_hiddenimports + librosa_hiddenimports + certifi_hiddenimports + [
+    hiddenimports=mlx_hiddenimports + mlx_whisper_hiddenimports + sherpa_hiddenimports + librosa_hiddenimports + [
         # wenzi core
         'wenzi',
         'wenzi._build_info',
