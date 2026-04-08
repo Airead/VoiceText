@@ -6,7 +6,8 @@ import sys
 import time
 from unittest.mock import MagicMock
 
-import numpy as np
+import struct
+
 import pytest
 
 
@@ -84,7 +85,7 @@ class TestAppleSpeechStreaming:
 
         t.start_streaming(on_partial)
 
-        samples = np.array([100, 200, 300], dtype=np.int16)
+        samples = struct.pack("<3h", 100, 200, 300)
         t.feed_audio(samples)
 
         assert t._stream_request.appendAudioPCMBuffer_.called
@@ -93,7 +94,7 @@ class TestAppleSpeechStreaming:
 
     def test_feed_audio_noop_when_no_session(self):
         t = _make_transcriber()
-        samples = np.array([100, 200], dtype=np.int16)
+        samples = struct.pack("<2h", 100, 200)
         # Should not raise
         t.feed_audio(samples)
 

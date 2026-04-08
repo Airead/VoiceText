@@ -158,9 +158,6 @@ a = Analysis(
         'wenzi.screenshot',
         'wenzi.screenshot.annotation',
         # third-party (Lite only — no local ASR packages)
-        'sounddevice',
-        'soundfile',
-        'numpy',
         'pynput',
         'pynput.keyboard',
         'pynput.keyboard._darwin',

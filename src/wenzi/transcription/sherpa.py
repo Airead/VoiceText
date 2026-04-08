@@ -238,11 +238,12 @@ class SherpaOnnxTranscriber(BaseTranscriber):
         self._decode_thread.start()
         logger.info("Sherpa streaming started")
 
-    def feed_audio(self, samples: np.ndarray) -> None:
+    def feed_audio(self, samples: bytes) -> None:
         stream = self._stream  # local snapshot to avoid TOCTOU with _cleanup_stream
         if stream is None:
             return
-        float_samples = samples.astype(np.float32) / 32768.0
+        arr = np.frombuffer(samples, dtype=np.int16)
+        float_samples = arr.astype(np.float32) / 32768.0
         stream.accept_waveform(16000, float_samples)
 
     def stop_streaming(self) -> str:

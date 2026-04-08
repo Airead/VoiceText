@@ -8,7 +8,7 @@ import threading
 import time
 from typing import Callable, List, Optional
 
-import numpy as np
+import array
 
 from wenzi.i18n import t
 
@@ -196,8 +196,8 @@ def prompt_siri_setup():
 _audio_fmt_cache = (None, None)  # (AVAudioFormat, sample_rate)
 
 
-def _int16_to_avaudiopcmbuffer(samples: np.ndarray, sample_rate: int = 16000):
-    """Convert int16 numpy array to AVAudioPCMBuffer for Speech framework."""
+def _int16_to_avaudiopcmbuffer(samples: bytes, sample_rate: int = 16000):
+    """Convert raw int16 PCM bytes to AVAudioPCMBuffer for Speech framework."""
     global _audio_fmt_cache
     from AVFoundation import AVAudioFormat, AVAudioPCMBuffer
 
@@ -208,14 +208,15 @@ def _int16_to_avaudiopcmbuffer(samples: np.ndarray, sample_rate: int = 16000):
         )
         _audio_fmt_cache = (fmt, sample_rate)
 
-    frame_count = len(samples)
+    frame_count = len(samples) // 2  # int16 = 2 bytes per sample
     buf = AVAudioPCMBuffer.alloc().initWithPCMFormat_frameCapacity_(fmt, frame_count)
     buf.setFrameLength_(frame_count)
 
-    float_samples = samples.astype(np.float32) / 32768.0
+    int_arr = array.array("h", samples)
+    float_arr = array.array("f", (s / 32768.0 for s in int_arr))
     channel0 = buf.floatChannelData()[0]
     raw_buf = channel0.as_buffer(frame_count)
-    raw_buf[:] = float_samples.tobytes()
+    raw_buf[:] = float_arr.tobytes()
 
     return buf
 
@@ -490,8 +491,8 @@ class AppleSpeechTranscriber(BaseTranscriber):
         self._stream_runloop_thread = t
         logger.info("Streaming recognition started")
 
-    def feed_audio(self, samples: np.ndarray) -> None:
-        """Feed an int16 audio chunk to the active streaming session."""
+    def feed_audio(self, samples: bytes) -> None:
+        """Feed raw int16 PCM bytes to the active streaming session."""
         request = self._stream_request
         if request is None:
             return

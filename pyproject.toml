@@ -5,9 +5,6 @@ description = "macOS menubar app: hold hotkey to record, release to transcribe a
 requires-python = ">=3.13"
 dependencies = [
     "pyobjc-framework-Cocoa==12.1",
-    "sounddevice==0.5.5",
-    "soundfile==0.13.1",
-    "numpy==1.26.4",
     "openai-agents==0.11.1",
     "pypinyin==0.55.0",
     "pyobjc-framework-Speech==12.1",
@@ -24,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 local-asr = [
+    "numpy==1.26.4",
     "librosa>=0.11.0",
     "funasr_onnx>=0.4.1",
     "jieba>=0.42.1",

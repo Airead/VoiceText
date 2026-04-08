@@ -6,8 +6,6 @@ import abc
 import logging
 from typing import Callable, List, Optional
 
-import numpy as np
-
 logger = logging.getLogger(__name__)
 
 
@@ -53,8 +51,8 @@ class BaseTranscriber(abc.ABC):
         """
         raise NotImplementedError(f"{type(self).__name__} does not support streaming")
 
-    def feed_audio(self, samples: np.ndarray) -> None:
-        """Feed a chunk of int16 audio samples to the streaming session."""
+    def feed_audio(self, samples: bytes) -> None:
+        """Feed a chunk of raw int16 PCM audio bytes (little-endian, mono, 16 kHz)."""
         raise NotImplementedError(f"{type(self).__name__} does not support streaming")
 
     def stop_streaming(self) -> str:

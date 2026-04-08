@@ -211,11 +211,9 @@ class TestStreamingInterface:
             t.start_streaming(lambda text, is_final: None)
 
     def test_feed_audio_raises(self):
-        import numpy as np
-
         t = FunASRTranscriber(use_vad=False, use_punc=False)
         with pytest.raises(NotImplementedError):
-            t.feed_audio(np.zeros(160, dtype=np.int16))
+            t.feed_audio(b"\x00" * 320)
 
     def test_stop_streaming_raises(self):
         t = FunASRTranscriber(use_vad=False, use_punc=False)

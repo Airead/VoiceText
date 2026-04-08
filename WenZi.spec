@@ -168,8 +168,6 @@ a = Analysis(
         'wenzi.screenshot',
         'wenzi.screenshot.annotation',
         # third-party
-        'sounddevice',
-        'soundfile',
         'numpy',
         'librosa',
         'funasr_onnx',

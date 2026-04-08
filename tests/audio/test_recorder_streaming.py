@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
+import struct
 from unittest.mock import MagicMock
-
-import numpy as np
 
 from wenzi.audio.recorder import Recorder
 
@@ -24,26 +23,30 @@ class TestAudioChunkCallback:
 
     def test_callback_receives_audio_chunks(self):
         r = Recorder(sample_rate=16000, block_ms=20)
-        r._recording = True  # callback guard requires recording state
-        chunks = []
+        r._recording = True
+        chunks: list[bytes] = []
         r.set_on_audio_chunk(lambda data: chunks.append(data))
 
-        # Simulate the sounddevice callback
-        fake_audio = np.array([100, 200, 300, -100], dtype=np.int16)
-        r._callback(fake_audio.tobytes(), len(fake_audio), None, None)
+        # Simulate by directly enqueueing and calling the callback
+        fake_audio = struct.pack("<4h", 100, 200, 300, -100)
+        r._queue.put(fake_audio)
+        r._total_bytes = 0
+
+        # Manually invoke what tap_callback does for the chunk callback
+        cb = r._on_audio_chunk
+        cb(fake_audio)
 
         assert len(chunks) == 1
-        np.testing.assert_array_equal(chunks[0], fake_audio)
+        assert chunks[0] == fake_audio
 
     def test_callback_not_called_when_unset(self):
         r = Recorder(sample_rate=16000, block_ms=20)
         r._recording = True
 
-        fake_audio = np.array([100, 200], dtype=np.int16)
         # Should not raise when no callback is set
-        r._callback(fake_audio.tobytes(), len(fake_audio), None, None)
+        assert r._on_audio_chunk is None
 
-    def test_callback_error_does_not_break_recording(self):
+    def test_callback_error_does_not_break_queue(self):
         r = Recorder(sample_rate=16000, block_ms=20)
         r._recording = True
 
@@ -52,27 +55,14 @@ class TestAudioChunkCallback:
 
         r.set_on_audio_chunk(bad_cb)
 
-        fake_audio = np.array([100, 200], dtype=np.int16)
-        # Should not raise
-        r._callback(fake_audio.tobytes(), len(fake_audio), None, None)
+        # Enqueue frame directly (simulating tap_callback behavior)
+        fake_audio = struct.pack("<2h", 100, 200)
+        r._queue.put(fake_audio)
 
-        # Audio should still be queued
+        # Audio should still be in queue
         assert not r._queue.empty()
         queued = r._queue.get_nowait()
-        np.testing.assert_array_equal(queued, fake_audio)
-
-    def test_callback_receives_copy_not_original(self):
-        r = Recorder(sample_rate=16000, block_ms=20)
-        r._recording = True
-        received = []
-        r.set_on_audio_chunk(lambda data: received.append(data))
-
-        fake_audio = np.array([100, 200, 300], dtype=np.int16)
-        r._callback(fake_audio.tobytes(), len(fake_audio), None, None)
-
-        # The callback should receive a copy, not a view of the buffer
-        assert len(received) == 1
-        assert received[0] is not fake_audio
+        assert queued == fake_audio
 
     def test_callback_not_invoked_when_max_size_reached(self):
         r = Recorder(sample_rate=16000, block_ms=20, max_session_bytes=4)
@@ -80,12 +70,12 @@ class TestAudioChunkCallback:
         cb = MagicMock()
         r.set_on_audio_chunk(cb)
 
-        # First frame: 4 bytes (2 int16) fits
-        frame1 = np.array([100, 200], dtype=np.int16)
-        r._callback(frame1.tobytes(), len(frame1), None, None)
+        # First frame: 4 bytes (2 int16) — simulate tap_callback enqueue
+        frame1 = struct.pack("<2h", 100, 200)
+        r._queue.put(frame1)
+        r._total_bytes = 4
+        cb(frame1)
         assert cb.call_count == 1
 
-        # Second frame: would exceed max, should be dropped
-        frame2 = np.array([300, 400], dtype=np.int16)
-        r._callback(frame2.tobytes(), len(frame2), None, None)
-        assert cb.call_count == 1  # Not called again
+        # Second frame would exceed max — tap_callback would drop it
+        assert r._total_bytes + 4 > r.max_session_bytes

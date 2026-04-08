@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import struct
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -109,22 +110,20 @@ class TestSherpaStreaming:
 
         t.start_streaming(on_partial)
 
-        samples = np.array([100, 200, 300], dtype=np.int16)
+        samples = struct.pack("<3h", 100, 200, 300)
         t.feed_audio(samples)
 
         t._stream.accept_waveform.assert_called()
         call_args = t._stream.accept_waveform.call_args
         assert call_args[0][0] == 16000
-        np.testing.assert_array_almost_equal(
-            call_args[0][1],
-            samples.astype(np.float32) / 32768.0,
-        )
+        expected = np.array([100, 200, 300], dtype=np.float32) / 32768.0
+        np.testing.assert_array_almost_equal(call_args[0][1], expected)
 
         t.cancel_streaming()
 
     def test_feed_audio_noop_when_no_session(self, _mock_sherpa):
         t = self._make_transcriber(_mock_sherpa)
-        samples = np.array([100, 200], dtype=np.int16)
+        samples = struct.pack("<2h", 100, 200)
         # Should not raise
         t.feed_audio(samples)
 
