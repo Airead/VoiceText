@@ -134,6 +134,14 @@ All `chat.completions.create` calls **must** include `max_tokens` to prevent run
 
 When adding a new LLM call, always set `max_tokens` to a reasonable upper bound for the expected output.
 
+## Audio in WebViews — Use `wz.playAudio()`, Not `new Audio()`
+
+Playing audio via HTML5 `new Audio(url).play()` in WKWebView triggers macOS Now Playing, showing an unwanted playback icon in the menu bar. Use the built-in `wz.playAudio(url)` JS bridge method instead — it routes audio through native `NSSound`, which does not register with `MPNowPlayingInfoCenter`.
+
+- **WebView panels** (`wz.ui.webview_panel`): use `wz.playAudio(url)` in JavaScript
+- **Chooser preview HTML** (no `wz` bridge): use `webkit.messageHandlers.chooser.postMessage({type: 'playAudio', url: url})`
+- The built-in handler is registered in `WebViewPanel._builtin_play_audio` and `ChooserPanel._play_audio_url`
+
 ## CGEventTap — Use ctypes, Not PyObjC
 
 CGEventTap callbacks **must** use the ctypes bindings in `wenzi/_cgeventtap.py`, NOT PyObjC's `Quartz.CGEventTapCreate`. PyObjC's callback bridge internally retains `CGEventRef` wrappers (CF types freed by `CFRelease`, not autorelease), accumulating ~42 MB over 7 hours. The ctypes path bypasses the bridge entirely — callbacks receive raw `c_void_p` pointers with no `CFRetain`.

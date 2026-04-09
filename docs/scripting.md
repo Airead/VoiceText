@@ -232,6 +232,45 @@ Send a macOS notification.
 wz.notify("Build complete", "All tests passed")
 ```
 
+### `wz.ui.webview_panel(title, html, ...)`
+
+Create a WebView panel for custom UI. Returns a `WebViewPanel` with `show()`, `close()`, `eval_js()`, `send()`, `on()`, and `handle()` methods.
+
+```python
+panel = wz.ui.webview_panel(
+    title="My Panel",
+    html="<h1>Hello</h1>",
+    width=400, height=300,
+    floating=True,
+)
+panel.show()
+```
+
+#### JavaScript Bridge
+
+Inside the WebView, a `wz` object is injected at document start, providing bidirectional communication with Python:
+
+| JS API | Description |
+|--------|-------------|
+| `wz.send(event, data)` | Fire-and-forget event to Python |
+| `wz.call(method, data)` | Call Python handler, returns Promise |
+| `wz.on(event, callback)` | Listen for events from Python |
+| `wz.playAudio(url)` | Play audio via native NSSound (see below) |
+
+#### `wz.playAudio(url)` — Audio without Now Playing
+
+Play an audio URL using macOS native `NSSound`. This avoids the "Now Playing" icon that appears in the menu bar when using HTML5 `new Audio(url).play()` inside WKWebView.
+
+```javascript
+// In WebView JS — no Now Playing icon
+wz.playAudio('https://example.com/sound.mp3');
+
+// Standard HTML5 Audio — shows Now Playing icon (use when needed)
+new Audio('https://example.com/sound.mp3').play();
+```
+
+`wz.playAudio()` is available in all `wz.ui.webview_panel()` panels automatically. For HTML rendered inside the Launcher preview, use `webkit.messageHandlers.chooser.postMessage({type: 'playAudio', url: '...'})` instead (the Launcher does not inject the `wz` JS bridge).
+
 ### `wz.pasteboard.get()`
 
 Return the current clipboard text, or `None`.

@@ -66,6 +66,10 @@ _BRIDGE_JS = r"""
             _handlers[event].push(callback);
         },
 
+        playAudio(url) {
+            return wz.call('playAudio', {url: url});
+        },
+
         _resolve(callId, result) {
             const p = _pending[callId];
             if (p) { delete _pending[callId]; p.resolve(result); }
@@ -343,7 +347,9 @@ class WebViewPanel:
 
         # Bridge state
         self._event_handlers: dict[str, list[Callable]] = defaultdict(list)
-        self._call_handlers: dict[str, Callable] = {}
+        self._call_handlers: dict[str, Callable] = {
+            "playAudio": self._builtin_play_audio,
+        }
 
         # Close callbacks
         self._on_close_callbacks: list = []
@@ -483,6 +489,27 @@ class WebViewPanel:
     def on_close(self, callback: Callable) -> None:
         """Register a callback to be called when the panel is closed."""
         self._on_close_callbacks.append(callback)
+
+    # ------------------------------------------------------------------
+    # Built-in call handlers
+    # ------------------------------------------------------------------
+
+    def _builtin_play_audio(self, data: Any) -> None:
+        """Play an audio URL via NSSound (avoids Now Playing icon)."""
+        url = (data or {}).get("url", "")
+        if not url:
+            return
+        try:
+            from AppKit import NSSound
+            from Foundation import NSURL
+
+            sound = NSSound.alloc().initWithContentsOfURL_byReference_(
+                NSURL.URLWithString_(url), False
+            )
+            if sound:
+                sound.play()
+        except Exception:
+            logger.debug("Failed to play audio: %s", url, exc_info=True)
 
     # ------------------------------------------------------------------
     # JS message routing

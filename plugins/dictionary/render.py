@@ -75,18 +75,27 @@ def render_definition(data: dict, word: str) -> str:
     usphone = phone_data.get("usphone", "")
     ukphone = phone_data.get("ukphone", "")
     audio_word = _urlquote(word)
+    _play_js = (
+        "(function(u){"
+        "if(window.wz&&wz.playAudio){wz.playAudio(u)}"
+        "else{try{window.webkit.messageHandlers.chooser"
+        ".postMessage({type:'playAudio',url:u})}"
+        "catch(e){new Audio(u).play()}}})"
+    )
     if usphone:
+        _us_url = f"https://dict.youdao.com/dictvoice?audio={audio_word}&type=2"
         parts.append(
             f'<span class="phonetic">US /{escape(usphone)}/</span>'
             f'<button class="audio-btn" onclick='
-            f""""new Audio('https://dict.youdao.com/dictvoice?audio={audio_word}&type=2').play()">"""
+            f""""{_play_js}('{_us_url}')">"""
             f"\U0001f50a</button>"
         )
     if ukphone:
+        _uk_url = f"https://dict.youdao.com/dictvoice?audio={audio_word}&type=1"
         parts.append(
             f'<span class="phonetic">UK /{escape(ukphone)}/</span>'
             f'<button class="audio-btn" onclick='
-            f""""new Audio('https://dict.youdao.com/dictvoice?audio={audio_word}&type=1').play()">"""
+            f""""{_play_js}('{_uk_url}')">"""
             f"\U0001f50a</button>"
         )
     parts.append("</div>")

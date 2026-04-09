@@ -232,6 +232,45 @@ wz.alert("你好！", duration=3.0)
 wz.notify("构建完成", "所有测试已通过")
 ```
 
+### `wz.ui.webview_panel(title, html, ...)`
+
+创建自定义 WebView 面板。返回 `WebViewPanel` 对象，支持 `show()`、`close()`、`eval_js()`、`send()`、`on()`、`handle()` 方法。
+
+```python
+panel = wz.ui.webview_panel(
+    title="我的面板",
+    html="<h1>你好</h1>",
+    width=400, height=300,
+    floating=True,
+)
+panel.show()
+```
+
+#### JavaScript 桥接
+
+WebView 内部会在文档加载前注入 `wz` 对象，提供 JS 与 Python 双向通信：
+
+| JS API | 说明 |
+|--------|------|
+| `wz.send(event, data)` | 向 Python 发送事件（无返回值） |
+| `wz.call(method, data)` | 调用 Python 处理器，返回 Promise |
+| `wz.on(event, callback)` | 监听 Python 发来的事件 |
+| `wz.playAudio(url)` | 通过原生 NSSound 播放音频（见下文） |
+
+#### `wz.playAudio(url)` — 无 Now Playing 图标的音频播放
+
+使用 macOS 原生 `NSSound` 播放音频 URL。避免在 WKWebView 中使用 HTML5 `new Audio(url).play()` 时菜单栏出现"正在播放"图标。
+
+```javascript
+// WebView JS 中 — 不会出现 Now Playing 图标
+wz.playAudio('https://example.com/sound.mp3');
+
+// 标准 HTML5 Audio — 会显示 Now Playing 图标（需要时仍可使用）
+new Audio('https://example.com/sound.mp3').play();
+```
+
+`wz.playAudio()` 在所有 `wz.ui.webview_panel()` 面板中自动可用。在启动器预览中渲染的 HTML 需使用 `webkit.messageHandlers.chooser.postMessage({type: 'playAudio', url: '...'})` 代替（启动器不注入 `wz` JS 桥接）。
+
 ### `wz.pasteboard.get()`
 
 获取当前剪贴板文本，没有内容则返回 `None`。

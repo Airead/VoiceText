@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+import threading
 from collections.abc import Callable
 from typing import NamedTuple
 
@@ -1395,6 +1396,27 @@ class ChooserPanel:
         elif msg_type == "qlNavigate":
             index = body.get("index", -1)
             self._update_quicklook(index)
+
+        elif msg_type == "playAudio":
+            url = body.get("url", "")
+            if url:
+                threading.Thread(
+                    target=self._play_audio_url, args=(url,), daemon=True
+                ).start()
+
+    def _play_audio_url(self, url: str) -> None:
+        """Download and play an audio URL via NSSound (no Now Playing icon)."""
+        try:
+            from AppKit import NSSound
+            from Foundation import NSURL
+
+            sound = NSSound.alloc().initWithContentsOfURL_byReference_(
+                NSURL.URLWithString_(url), False
+            )
+            if sound:
+                sound.play()
+        except Exception:
+            logger.debug("Failed to play audio: %s", url, exc_info=True)
 
     def _history_navigate(self, direction: int) -> None:
         """Navigate query history. direction=1 means older, -1 means newer."""
