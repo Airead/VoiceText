@@ -191,17 +191,10 @@ class SnippetEditorPanel:
         saved_path = self._store.snippet_path(name, category)
         self.close()
 
-        # Show HUD with saved path
-        from PyObjCTools import AppHelper
+        from wenzi.scripting.api.alert import alert
 
-        def _show_hud():
-            from wenzi.ui.hud import show_hud
-
-            # Use path relative to home for brevity
-            display_path = saved_path.replace(os.path.expanduser("~"), "~")
-            show_hud(t("snippet_editor.hud.saved", path=display_path))
-
-        AppHelper.callAfter(_show_hud)
+        display_path = saved_path.replace(os.path.expanduser("~"), "~")
+        alert(t("snippet_editor.hud.saved", path=display_path))
 
         if callback is not None:
             callback()

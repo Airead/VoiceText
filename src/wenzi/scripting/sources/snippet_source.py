@@ -288,18 +288,13 @@ def _delete_and_notify(store, name: str, category: str) -> None:
     ok = store.remove(name, category)
     if ok:
         try:
-            from PyObjCTools import AppHelper
+            from wenzi.scripting.api.alert import alert
 
             home = os.path.expanduser("~")
             display = path.replace(home, "~")
-
-            def _hud():
-                from wenzi.ui.hud import show_hud
-                show_hud(f"Trashed\n{display}")
-
-            AppHelper.callAfter(_hud)
+            alert(f"Trashed\n{display}")
         except Exception:
-            logger.debug("Failed to show delete HUD", exc_info=True)
+            logger.debug("Failed to show delete alert", exc_info=True)
 
 
 

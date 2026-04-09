@@ -156,17 +156,12 @@ class QuickEditPanel:
         copy_to_clipboard(text)
         self.close()
 
-        from PyObjCTools import AppHelper
+        from wenzi.scripting.api.alert import alert
 
-        def _hud():
-            from wenzi.ui.hud import show_hud
-
-            preview = text.replace("\n", " ").strip()
-            if len(preview) > 40:
-                preview = preview[:37] + "..."
-            show_hud(t("quick_edit.hud.copied", preview=preview))
-
-        AppHelper.callAfter(_hud)
+        preview = text.replace("\n", " ").strip()
+        if len(preview) > 40:
+            preview = preview[:37] + "..."
+        alert(t("quick_edit.hud.copied", preview=preview))
 
     def _copy_reveal_path(self) -> None:
         """Copy the snippet file path to the clipboard."""
@@ -181,15 +176,10 @@ class QuickEditPanel:
         copy_to_clipboard(path)
         self.close()
 
-        from PyObjCTools import AppHelper
+        from wenzi.scripting.api.alert import alert
 
-        def _hud():
-            from wenzi.ui.hud import show_hud
-
-            display = path.replace(os.path.expanduser("~"), "~")
-            show_hud(t("quick_edit.hud.path_copied", display=display))
-
-        AppHelper.callAfter(_hud)
+        display = path.replace(os.path.expanduser("~"), "~")
+        alert(t("quick_edit.hud.path_copied", display=display))
 
     # -- ObjC button targets --
 

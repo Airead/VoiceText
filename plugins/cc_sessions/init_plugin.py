@@ -162,13 +162,9 @@ def register(wz) -> None:
     def _clear_cache(_args: str) -> None:
         scanner.clear_cache()
         try:
-            from PyObjCTools import AppHelper
-            def _hud():
-                from wenzi.ui.hud import show_hud
-                show_hud("Session cache cleared")
-            AppHelper.callAfter(_hud)
+            wz.alert("Session cache cleared")
         except Exception:
-            logger.debug("HUD notification failed", exc_info=True)
+            logger.debug("Alert notification failed", exc_info=True)
 
     wz.chooser.register_command(
         name="cc-sessions:clear-cache",
@@ -328,18 +324,11 @@ def register(wz) -> None:
                 return
 
         try:
-            from PyObjCTools import AppHelper
-
             home = os.path.expanduser("~")
             display = file_path.replace(home, "~")
-
-            def _hud():
-                from wenzi.ui.hud import show_hud
-                show_hud(f"Trashed\n{display}")
-
-            AppHelper.callAfter(_hud)
+            wz.alert(f"Trashed\n{display}")
         except Exception:
-            logger.debug("HUD notification failed", exc_info=True)
+            logger.debug("Alert notification failed", exc_info=True)
 
     def _copy_full_path(session: dict[str, Any]) -> None:
         """Copy session JSONL file path to clipboard."""
