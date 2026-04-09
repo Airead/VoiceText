@@ -23,7 +23,6 @@ a = Analysis(
     binaries=[],
     datas=[
         (os.path.join(_spec_dir, 'src/wenzi/audio/sounds'), 'wenzi/audio/sounds'),
-        (os.path.join(_spec_dir, 'src/wenzi/enhance/data'), 'wenzi/enhance/data'),
         (os.path.join(_spec_dir, 'src/wenzi/locales'), 'wenzi/locales'),
         (os.path.join(_spec_dir, 'src/wenzi/ui/vendor'), 'wenzi/ui/vendor'),
         (os.path.join(_spec_dir, 'src/wenzi/ui/templates'), 'wenzi/ui/templates'),

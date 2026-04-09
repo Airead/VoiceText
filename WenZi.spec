@@ -30,7 +30,6 @@ a = Analysis(
     binaries=mlx_binaries + mlx_whisper_binaries + sherpa_binaries + librosa_binaries,
     datas=mlx_datas + mlx_whisper_datas + sherpa_datas + librosa_datas + [
         (os.path.join(_spec_dir, 'src/wenzi/audio/sounds'), 'wenzi/audio/sounds'),
-        (os.path.join(_spec_dir, 'src/wenzi/enhance/data'), 'wenzi/enhance/data'),
         (os.path.join(_spec_dir, 'src/wenzi/locales'), 'wenzi/locales'),
         (os.path.join(_spec_dir, 'src/wenzi/ui/vendor'), 'wenzi/ui/vendor'),
         (os.path.join(_spec_dir, 'src/wenzi/ui/templates'), 'wenzi/ui/templates'),
