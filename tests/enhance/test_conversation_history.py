@@ -1182,6 +1182,64 @@ class TestFullCache:
         results = history.get_all()
         assert len(results) == 2
 
+    def test_full_cache_bounded_by_max_records(self, history):
+        """_full_cache should not exceed _MAX_RECORDS."""
+        history._MAX_RECORDS = 5
+        history._ROTATE_SIZE_THRESHOLD = 999_999_999  # disable rotation
+
+        # Populate full cache
+        for i in range(3):
+            history.log(f"t{i}", None, f"t{i}", "off", False)
+        history.get_all()  # load full cache
+        assert len(history._full_cache) == 3
+
+        # Append enough to exceed _MAX_RECORDS via log
+        for i in range(5):
+            history.log(f"extra{i}", None, f"extra{i}", "off", False)
+
+        # Full cache should be trimmed to _MAX_RECORDS
+        assert len(history._full_cache) <= 5
+        # Most recent entry should be kept
+        assert history._full_cache[-1]["asr_text"] == "extra4"
+
+    def test_maybe_release_idle_cache_releases_after_timeout(self, history):
+        """Idle cache should be auto-released."""
+        import time
+
+        history.log("a", None, "a", "off", False)
+        history.get_all()  # populate full cache
+        assert history._full_cache is not None
+
+        # Simulate last access was long ago
+        history._full_cache_last_access = time.monotonic() - 600
+
+        history.maybe_release_idle_cache()
+        assert history._full_cache is None
+
+    def test_maybe_release_idle_cache_keeps_recent(self, history):
+        """Recently accessed cache should NOT be released."""
+        history.log("a", None, "a", "off", False)
+        history.get_all()  # populate full cache
+        assert history._full_cache is not None
+
+        history.maybe_release_idle_cache()
+        assert history._full_cache is not None  # still alive
+
+    def test_log_triggers_idle_cache_release(self, history):
+        """log() should call maybe_release_idle_cache()."""
+        import time
+
+        history.log("a", None, "a", "off", False)
+        history.get_all()  # populate full cache
+        assert history._full_cache is not None
+
+        # Simulate stale access
+        history._full_cache_last_access = time.monotonic() - 600
+
+        # log() should trigger idle release
+        history.log("b", None, "b", "off", False)
+        assert history._full_cache is None
+
 
 class TestInputContextStorage:
     def test_log_with_input_context(self, history, history_dir):
