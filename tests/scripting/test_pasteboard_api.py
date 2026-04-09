@@ -14,6 +14,7 @@ class _FakeEntry:
     timestamp: float = field(default_factory=time.time)
     source_app: str = ""
     image_path: str = ""
+    _db_id: int = 0
 
 
 class _FakeMonitor:
@@ -26,6 +27,12 @@ class _FakeMonitor:
     @property
     def entries(self) -> list:
         return list(self._entries)
+
+    def full_text_by_id(self, db_id: int) -> str:
+        for entry in self._entries:
+            if entry._db_id == db_id:
+                return entry.text
+        return ""
 
     def clear(self) -> None:
         self.cleared = True

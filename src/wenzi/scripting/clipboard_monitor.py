@@ -15,9 +15,9 @@ import json
 import logging
 import os
 import sqlite3
+import sys
 import threading
 import time
-from dataclasses import dataclass, field
 
 import objc
 
@@ -129,19 +129,56 @@ def _get_app_icon_png(bundle_id: str) -> bytes | None:
             return None
 
 
-@dataclass
-class ClipboardEntry:
-    """A single clipboard history entry."""
+_TEXT_MEM_LIMIT = 512  # chars kept in memory; full text lives in SQLite
 
-    text: str = ""
-    timestamp: float = field(default_factory=time.time)
-    source_app: str = ""
-    source_bundle_id: str = ""  # e.g. "com.apple.Safari"
-    image_path: str = ""  # filename in clipboard_images/ (empty = text entry)
-    image_width: int = 0
-    image_height: int = 0
-    image_size: int = 0  # file size in bytes
-    ocr_text: str = ""
+
+def _trunc(text: str) -> str:
+    """Truncate *text* to ``_TEXT_MEM_LIMIT`` characters."""
+    return text[:_TEXT_MEM_LIMIT] if len(text) > _TEXT_MEM_LIMIT else text
+
+
+class ClipboardEntry:
+    """A single clipboard history entry.
+
+    Uses ``__slots__`` to reduce per-instance memory (~280 bytes saved
+    vs a ``@dataclass`` ``__dict__``).  ``source_app`` and
+    ``source_bundle_id`` are interned to deduplicate repeated strings.
+
+    ``text`` and ``ocr_text`` are truncated to ``_TEXT_MEM_LIMIT`` in
+    memory.  Full text is retrieved from SQLite on demand via
+    ``ClipboardMonitor.full_text_by_id``.
+    """
+
+    __slots__ = (
+        "_db_id", "text", "timestamp", "source_app", "source_bundle_id",
+        "image_path", "image_width", "image_height", "image_size",
+        "ocr_text",
+    )
+
+    def __init__(
+        self,
+        text: str = "",
+        timestamp: float | None = None,
+        source_app: str = "",
+        source_bundle_id: str = "",
+        image_path: str = "",
+        image_width: int = 0,
+        image_height: int = 0,
+        image_size: int = 0,
+        ocr_text: str = "",
+        *,
+        _db_id: int = 0,
+    ) -> None:
+        self._db_id = _db_id
+        self.text = _trunc(text)
+        self.timestamp = timestamp if timestamp is not None else time.time()
+        self.source_app = sys.intern(source_app)
+        self.source_bundle_id = sys.intern(source_bundle_id)
+        self.image_path = image_path
+        self.image_width = image_width
+        self.image_height = image_height
+        self.image_size = image_size
+        self.ocr_text = _trunc(ocr_text)
 
 
 # ---------------------------------------------------------------------------
@@ -198,20 +235,29 @@ class _ClipboardDB:
 
     # -- writes --
 
-    def insert(self, entry: ClipboardEntry) -> None:
-        self._conn.execute(
+    def insert(
+        self, entry: ClipboardEntry, *, full_text: str | None = None,
+    ) -> int:
+        """Insert *entry* and return the new rowid.
+
+        *full_text*, if provided, is stored in the ``text`` column
+        instead of ``entry.text`` (which may be truncated in memory).
+        """
+        text_to_store = full_text if full_text is not None else entry.text
+        cur = self._conn.execute(
             "INSERT INTO entries"
             " (text, timestamp, source_app, source_bundle_id, image_path,"
             "  image_width, image_height, image_size, ocr_text)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                entry.text, entry.timestamp, entry.source_app,
+                text_to_store, entry.timestamp, entry.source_app,
                 entry.source_bundle_id, entry.image_path,
                 entry.image_width, entry.image_height, entry.image_size,
                 entry.ocr_text,
             ),
         )
         self._conn.commit()
+        return cur.lastrowid
 
     def update_timestamp(self, **match) -> bool:
         """Set timestamp=now for the first row matching *match* kwargs.
@@ -300,7 +346,7 @@ class _ClipboardDB:
         """Return all non-expired entries, newest first."""
         cutoff = time.time() - max_days * 86400
         cur = self._conn.execute(
-            "SELECT text, timestamp, source_app, source_bundle_id,"
+            "SELECT id, text, timestamp, source_app, source_bundle_id,"
             " image_path, image_width, image_height, image_size, ocr_text"
             " FROM entries WHERE timestamp >= ?"
             " ORDER BY timestamp DESC",
@@ -308,13 +354,50 @@ class _ClipboardDB:
         )
         return [
             ClipboardEntry(
-                text=row[0], timestamp=row[1], source_app=row[2],
-                source_bundle_id=row[3], image_path=row[4],
-                image_width=row[5], image_height=row[6],
-                image_size=row[7], ocr_text=row[8],
+                text=row[1], timestamp=row[2], source_app=row[3],
+                source_bundle_id=row[4], image_path=row[5],
+                image_width=row[6], image_height=row[7],
+                image_size=row[8], ocr_text=row[9],
+                _db_id=row[0],
             )
             for row in cur.fetchall()
         ]
+
+    def full_text(self, db_id: int) -> str:
+        """Return the full (untruncated) text for a single entry by rowid."""
+        cur = self._conn.execute(
+            "SELECT text FROM entries WHERE id=?", (db_id,),
+        )
+        row = cur.fetchone()
+        return row[0] if row else ""
+
+    def full_texts(self, db_ids: list[int]) -> dict[int, str]:
+        """Return full texts for multiple entries in a single query."""
+        if not db_ids:
+            return {}
+        placeholders = ",".join("?" * len(db_ids))
+        cur = self._conn.execute(
+            f"SELECT id, text FROM entries WHERE id IN ({placeholders})",  # noqa: S608
+            db_ids,
+        )
+        return dict(cur.fetchall())
+
+    def update_timestamp_by_id(self, db_id: int) -> bool:
+        """Set timestamp=now for the row with *db_id*."""
+        cur = self._conn.execute(
+            "UPDATE entries SET timestamp=? WHERE id=?",
+            (time.time(), db_id),
+        )
+        self._conn.commit()
+        return cur.rowcount > 0
+
+    def delete_by_id(self, db_id: int) -> bool:
+        """Delete the entry with *db_id*.  Returns True if deleted."""
+        cur = self._conn.execute(
+            "DELETE FROM entries WHERE id=?", (db_id,),
+        )
+        self._conn.commit()
+        return cur.rowcount > 0
 
     def update_ocr_text(self, image_path: str, ocr_text: str) -> bool:
         """Update ocr_text for an image entry. Returns True if updated."""
@@ -355,8 +438,9 @@ def _migrate_json_to_db(json_path: str, db: _ClipboardDB) -> int:
         for d in data:
             if not isinstance(d, dict):
                 continue
+            full = d.get("text", "")
             entry = ClipboardEntry(
-                text=d.get("text", ""),
+                text=full,
                 timestamp=d.get("timestamp", 0),
                 source_app=d.get("source_app", ""),
                 image_path=d.get("image_path", ""),
@@ -364,7 +448,7 @@ def _migrate_json_to_db(json_path: str, db: _ClipboardDB) -> int:
                 image_height=d.get("image_height", 0),
                 image_size=d.get("image_size", 0),
             )
-            db.insert(entry)
+            db.insert(entry, full_text=full)
             count += 1
         # Rename old file so we don't re-import
         os.rename(json_path, json_path + ".bak")
@@ -663,11 +747,32 @@ class ClipboardMonitor:
             pass
         return "", ""
 
-    def promote(self, text: str) -> None:
-        """Move an existing text entry to the top of the history list."""
+    # -- ID-based operations (preferred) ------------------------------------
+
+    def full_texts_by_ids(self, db_ids: list[int]) -> dict[int, str]:
+        """Return full texts for multiple *db_ids* in a single query."""
+        if self._db:
+            valid = [d for d in db_ids if d]
+            if valid:
+                return self._db.full_texts(valid)
+        return {}
+
+    def full_text_by_id(self, db_id: int) -> str:
+        """Return the full (untruncated) text for *db_id* from SQLite."""
+        if self._db and db_id:
+            return self._db.full_text(db_id)
+        # Fallback: return the (possibly truncated) in-memory text
+        with self._lock:
+            for entry in self._entries:
+                if entry._db_id == db_id:
+                    return entry.text
+        return ""
+
+    def promote_by_id(self, db_id: int) -> None:
+        """Move entry with *db_id* to the top of the history list."""
         with self._lock:
             for i, entry in enumerate(self._entries):
-                if entry.text == text:
+                if entry._db_id == db_id:
                     self._entries.pop(i)
                     entry.timestamp = time.time()
                     self._entries.insert(0, entry)
@@ -676,50 +781,90 @@ class ClipboardMonitor:
             else:
                 return
         if self._db:
-            self._db.update_timestamp(text=text)
+            self._db.update_timestamp_by_id(db_id)
 
-    def promote_image(self, image_path: str) -> None:
-        """Move an existing image entry to the top of the history list."""
+    def delete_by_id(self, db_id: int) -> bool:
+        """Delete entry with *db_id*.  Returns True if found."""
+        image_path = ""
         with self._lock:
             for i, entry in enumerate(self._entries):
-                if entry.image_path == image_path:
-                    self._entries.pop(i)
-                    entry.timestamp = time.time()
-                    self._entries.insert(0, entry)
-                    self._version += 1
-                    break
-            else:
-                return
-        if self._db:
-            self._db.update_timestamp(image_path=image_path)
-
-    def delete_text(self, text: str) -> bool:
-        """Delete a text entry from history. Returns True if found."""
-        with self._lock:
-            for i, entry in enumerate(self._entries):
-                if entry.text == text:
+                if entry._db_id == db_id:
+                    image_path = entry.image_path
                     self._entries.pop(i)
                     self._version += 1
                     break
             else:
                 return False
         if self._db:
-            self._db.delete_by_text(text)
+            self._db.delete_by_id(db_id)
+        if image_path:
+            self._cleanup_image_files([image_path])
+        return True
+
+    # -- Text/path-based operations (plugin API) ----------------------------
+
+    def _find_entry_index(self, predicate) -> int:
+        """Return index of the first entry matching *predicate*, or -1."""
+        for i, entry in enumerate(self._entries):
+            if predicate(entry):
+                return i
+        return -1
+
+    def _promote_at(self, idx: int) -> None:
+        """Move the entry at *idx* to the front.  Must hold ``_lock``."""
+        entry = self._entries.pop(idx)
+        entry.timestamp = time.time()
+        self._entries.insert(0, entry)
+        self._version += 1
+
+    def promote(self, text: str) -> None:
+        """Move an existing text entry to the top of the history list."""
+        trunc = _trunc(text)
+        with self._lock:
+            idx = self._find_entry_index(lambda e: e.text == trunc)
+            if idx < 0:
+                return
+            db_id = self._entries[idx]._db_id
+            self._promote_at(idx)
+        if self._db and db_id:
+            self._db.update_timestamp_by_id(db_id)
+
+    def promote_image(self, image_path: str) -> None:
+        """Move an existing image entry to the top of the history list."""
+        with self._lock:
+            idx = self._find_entry_index(lambda e: e.image_path == image_path)
+            if idx < 0:
+                return
+            db_id = self._entries[idx]._db_id
+            self._promote_at(idx)
+        if self._db and db_id:
+            self._db.update_timestamp_by_id(db_id)
+
+    def delete_text(self, text: str) -> bool:
+        """Delete a text entry from history. Returns True if found."""
+        trunc = _trunc(text)
+        with self._lock:
+            idx = self._find_entry_index(lambda e: e.text == trunc)
+            if idx < 0:
+                return False
+            entry = self._entries.pop(idx)
+            self._version += 1
+        if self._db and entry._db_id:
+            self._db.delete_by_id(entry._db_id)
         return True
 
     def delete_image(self, image_path: str) -> bool:
         """Delete an image entry and its file. Returns True if found."""
         with self._lock:
-            for i, entry in enumerate(self._entries):
-                if entry.image_path == image_path:
-                    self._entries.pop(i)
-                    self._version += 1
-                    break
-            else:
+            idx = self._find_entry_index(lambda e: e.image_path == image_path)
+            if idx < 0:
                 return False
-        if self._db:
-            self._db.delete_by_image_path(image_path)
-        self._cleanup_image_files([image_path])
+            entry = self._entries.pop(idx)
+            self._version += 1
+        if self._db and entry._db_id:
+            self._db.delete_by_id(entry._db_id)
+        if entry.image_path:
+            self._cleanup_image_files([entry.image_path])
         return True
 
     def _add_image_entry(
@@ -758,7 +903,8 @@ class ClipboardMonitor:
             removed = self._trim_expired_locked()
 
         if self._db:
-            self._db.insert(entry)
+            db_id = self._db.insert(entry)
+            entry._db_id = db_id
             if removed:
                 self._db.delete_expired(self._max_days)
 
@@ -793,10 +939,11 @@ class ClipboardMonitor:
             if self._stop_event.is_set():
                 return
 
+            trunc_ocr = _trunc(text)
             with self._lock:
                 for entry in self._entries:
                     if entry.image_path == image_path:
-                        entry.ocr_text = text
+                        entry.ocr_text = trunc_ocr
                         self._version += 1
                         break
 
@@ -889,6 +1036,9 @@ class ClipboardMonitor:
         self, text: str, source_app: str = "", source_bundle_id: str = "",
     ) -> None:
         """Add a new entry, deduplicating consecutive identical texts."""
+        # Compare truncated text for dedup (both sides truncated to same limit)
+        trunc = _trunc(text)
+
         entry = ClipboardEntry(
             text=text,
             timestamp=time.time(),
@@ -899,14 +1049,15 @@ class ClipboardMonitor:
         removed: list[str] = []
         with self._lock:
             # Skip if same as the most recent entry
-            if self._entries and self._entries[0].text == text:
+            if self._entries and self._entries[0].text == trunc:
                 return
             self._entries.insert(0, entry)
             self._version += 1
             removed = self._trim_expired_locked()
 
         if self._db:
-            self._db.insert(entry)
+            db_id = self._db.insert(entry, full_text=text)
+            entry._db_id = db_id
             if removed:
                 self._db.delete_expired(self._max_days)
 

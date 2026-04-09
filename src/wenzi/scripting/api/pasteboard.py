@@ -42,11 +42,16 @@ class PasteboardAPI:
         """
         if self._clipboard_monitor is None:
             return []
-        entries = self._clipboard_monitor.entries  # already newest-first
+        monitor = self._clipboard_monitor
+        entries = monitor.entries[:limit]  # already newest-first
+        # Batch-fetch full texts to avoid N+1 queries
+        db_ids = [e._db_id for e in entries if e._db_id]
+        full_texts = monitor.full_texts_by_ids(db_ids) if db_ids else {}
         result: list[dict[str, Any]] = []
-        for entry in entries[:limit]:
+        for entry in entries:
+            text = full_texts.get(entry._db_id, entry.text)
             d: dict[str, Any] = {
-                "text": entry.text,
+                "text": text,
                 "timestamp": time.strftime(
                     "%Y-%m-%dT%H:%M:%S", time.localtime(entry.timestamp),
                 ),

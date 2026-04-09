@@ -225,17 +225,18 @@ class ClipboardSource:
                 full_path = os.path.join(self._monitor.image_dir, entry.image_path)
                 monitor = self._monitor
                 ep = entry.image_path  # capture
+                did = entry._db_id
 
-                def _do_paste_img(p=full_path, ip=ep, m=monitor):
-                    m.promote_image(ip)
+                def _do_paste_img(p=full_path, d=did, m=monitor):
+                    m.promote_by_id(d)
                     _paste_image(p)
 
-                def _do_copy_img(p=full_path, ip=ep, m=monitor):
-                    m.promote_image(ip)
+                def _do_copy_img(p=full_path, d=did, m=monitor):
+                    m.promote_by_id(d)
                     _copy_image_to_clipboard(p)
 
-                def _do_delete_img(ip=ep, m=monitor):
-                    m.delete_image(ip)
+                def _do_delete_img(d=did, m=monitor):
+                    m.delete_by_id(d)
 
                 _entry = entry  # capture for lambda
 
@@ -268,27 +269,33 @@ class ClipboardSource:
                     display = display[:77] + "..."
 
                 time_ago = _format_time_ago(entry.timestamp)
-                text = entry.text  # capture
+                did = entry._db_id  # capture db_id for full-text retrieval
                 monitor = self._monitor
 
-                def _do_paste(t=text, m=monitor):
-                    m.promote(t)
-                    paste_text(t)
+                def _do_paste(d=did, m=monitor):
+                    full = m.full_text_by_id(d)
+                    m.promote_by_id(d)
+                    paste_text(full)
 
-                def _do_copy(t=text, m=monitor):
-                    m.promote(t)
-                    copy_to_clipboard(t)
+                def _do_copy(d=did, m=monitor):
+                    full = m.full_text_by_id(d)
+                    m.promote_by_id(d)
+                    copy_to_clipboard(full)
 
-                def _do_delete_text(t=text, m=monitor):
-                    m.delete_text(t)
+                def _do_delete_text(d=did, m=monitor):
+                    m.delete_by_id(d)
 
                 # Use first 64 chars of text as stable id
-                text_key = text[:64].replace("\n", " ")
-                def _do_edit(t=text):
+                text_key = entry.text[:64].replace("\n", " ")
+
+                def _do_edit(d=did, m=monitor):
                     from wenzi.scripting.ui.quick_edit_panel import (
                         open_quick_edit,
                     )
-                    open_quick_edit(t)
+                    open_quick_edit(m.full_text_by_id(d))
+
+                def _lazy_text_preview(d=did, m=monitor):
+                    return {"type": "text", "content": m.full_text_by_id(d)}
 
                 scored_results.append((
                     score,
@@ -298,7 +305,7 @@ class ClipboardSource:
                         subtitle=f"{subtitle}  {time_ago}".strip() if subtitle else time_ago,
                         icon=self._get_icon_uri(entry.source_bundle_id),
                         item_id=f"cb:txt:{text_key}",
-                        preview={"type": "text", "content": text},
+                        preview=_lazy_text_preview,
                         action=_do_paste,
                         secondary_action=_do_copy,
                         delete_action=_do_delete_text,
@@ -342,7 +349,8 @@ class ClipboardSource:
         """Build a preview dict for the given clipboard entry."""
         if entry.image_path:
             return self._make_image_preview(entry)
-        return {"type": "text", "content": entry.text}
+        full = self._monitor.full_text_by_id(entry._db_id)
+        return {"type": "text", "content": full}
 
     def _make_image_preview(self, entry) -> dict:
         """Build an image preview dict with a file:// URL."""

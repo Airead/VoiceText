@@ -233,11 +233,15 @@ class TestClipboardSource:
         monitor = self._make_monitor_with_entries([
             {"text": "hello world full text", "timestamp": now},
         ])
+        monitor.full_text_by_id = MagicMock(return_value="hello world full text")
         source = ClipboardSource(monitor)
         result = source.search("")
         assert result[0].preview is not None
-        assert result[0].preview["type"] == "text"
-        assert result[0].preview["content"] == "hello world full text"
+        # Preview is now a lazy callable
+        assert callable(result[0].preview)
+        preview = result[0].preview()
+        assert preview["type"] == "text"
+        assert preview["content"] == "hello world full text"
 
     def test_text_entry_has_delete_action(self):
         now = time.time()
@@ -249,7 +253,7 @@ class TestClipboardSource:
         assert result[0].delete_action is not None
         assert callable(result[0].delete_action)
 
-    def test_delete_action_calls_monitor_delete_text(self):
+    def test_delete_action_calls_monitor_delete_by_id(self):
         now = time.time()
         monitor = self._make_monitor_with_entries([
             {"text": "hello", "timestamp": now},
@@ -257,7 +261,7 @@ class TestClipboardSource:
         source = ClipboardSource(monitor)
         result = source.search("")
         result[0].delete_action()
-        monitor.delete_text.assert_called_once_with("hello")
+        monitor.delete_by_id.assert_called_once_with(0)
 
 
 class TestImageEntries:
@@ -463,7 +467,7 @@ class TestImageEntries:
         assert result[0].delete_action is not None
         assert callable(result[0].delete_action)
 
-    def test_delete_action_calls_monitor_delete_image(self):
+    def test_delete_action_calls_monitor_delete_by_id(self):
         now = time.time()
         monitor = self._make_monitor_with_entries([
             {
@@ -478,7 +482,7 @@ class TestImageEntries:
         with patch("os.path.isfile", return_value=False):
             result = source.search("")
         result[0].delete_action()
-        monitor.delete_image.assert_called_once_with("test.png")
+        monitor.delete_by_id.assert_called_once_with(0)
 
 
 class TestImageOCRSearch:
