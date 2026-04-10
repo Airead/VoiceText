@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Diagnostic script to debug microphone capture issues.
 
-Usage: uv run python dev/debug_mic.py [--device NAME_SUBSTRING] [--seconds 3]
+Usage: uv run python debug_scripts/debug_mic.py [--device NAME_SUBSTRING] [--seconds 3]
 
 Tests:
 1. Device enumeration — is the device visible?
