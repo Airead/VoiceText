@@ -123,6 +123,26 @@ All UI must support macOS dark mode. Follow these rules when writing UI code:
 - **Avoid deprecated `colorWithCalibratedRed_green_blue_alpha_`** — use `colorWithSRGBRed_green_blue_alpha_` or system semantic colors.
 - See `ui/result_window_web.py` for a good reference implementation of dark mode support.
 
+## NSVisualEffectView Memory Management
+
+`NSVisualEffectView` with `NSVisualEffectBlendingModeBehindWindow` causes macOS to allocate a **full-screen IOSurface** (~72 MB at retina) for desktop content capture used by the blur effect. This memory is **not released** by `orderOut_` alone.
+
+When hiding or closing any panel that contains an `NSVisualEffectView`, call the shared helper **before or after** `orderOut_`:
+
+```python
+from wenzi.ui_helpers import release_panel_surfaces
+
+release_panel_surfaces(self._panel)   # deactivate VFX + shrink to 1×1
+self._panel.orderOut_(None)
+self._panel = None
+```
+
+`release_panel_surfaces(panel)` handles both steps automatically:
+1. Walks the content view and its direct subviews, deactivates any `NSVisualEffectView` (`setState_(0)`)
+2. Shrinks the panel to 1×1 to force Core Animation to release the backing store
+
+When re-showing, re-activate the effect view (`setState_(1)`) **just before** `orderFront_`/`makeKeyAndOrderFront_`, so the IOSurface is only allocated while the panel is visible.
+
 ## LLM max_tokens Guard
 
 All `chat.completions.create` calls **must** include `max_tokens` to prevent runaway repetition (models sometimes loop the same tokens indefinitely). Current call sites and their limits:

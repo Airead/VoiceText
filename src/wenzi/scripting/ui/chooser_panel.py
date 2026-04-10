@@ -886,25 +886,13 @@ class ChooserPanel:
                 None,
             )
 
-        # Deactivate the blur backdrop to release the full-screen IOSurface
-        # that macOS allocates for behindWindow blending (~72 MB at retina).
-        if self._effect_view is not None:
-            self._effect_view.setState_(0)  # NSVisualEffectStateInactive
+        # Deactivate VFX + shrink to 1×1 to release the full-screen IOSurface
+        # (~72 MB at retina).  show() repositions and JS resizes back.
+        from wenzi.ui_helpers import release_panel_surfaces
 
         if self._panel is not None:
+            release_panel_surfaces(self._panel)
             self._panel.orderOut_(None)
-
-            # Shrink to 1×1 to release the CA Whippet Drawable backing
-            # store.  macOS retains the full-size RGBA half-float
-            # IOSurface (~63 MB at retina) even after orderOut_;
-            # resizing forces CoreAnimation to reallocate a trivial
-            # buffer.  show() repositions and JS resizes back.
-            from Foundation import NSMakeRect
-
-            f = self._panel.frame()
-            self._panel.setFrame_display_(
-                NSMakeRect(f.origin.x, f.origin.y, 1, 1), False,
-            )
         self._last_screen = None
 
         # Load empty HTML to release IOSurface compositing layer buffers.
@@ -2071,8 +2059,8 @@ class ChooserPanel:
             NSMakeRect(0, 0, initial_width, initial_height)
         )
         effect_view.setAutoresizingMask_(0x12)  # Width + Height sizable
-        effect_view.setBlendingMode_(1)  # NSVisualEffectBlendingModeBehindWindow
-        effect_view.setMaterial_(0)  # NSVisualEffectMaterialAppearanceBased — bright glass
+        effect_view.setBlendingMode_(0)  # NSVisualEffectBlendingModeBehindWindow
+        effect_view.setMaterial_(15)  # NSVisualEffectMaterialFullScreenUI
         effect_view.setState_(0)  # NSVisualEffectStateInactive until show()
         effect_view.setWantsLayer_(True)
         effect_view.layer().setCornerRadius_(16.0)

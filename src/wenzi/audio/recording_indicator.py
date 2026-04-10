@@ -27,12 +27,8 @@ _WAVE_MAX_AMP = 8.0     # max amplitude from centre line
 _WAVE_LINE_W = 2.0      # primary wave stroke width
 _WAVE_LINE_W2 = 1.5     # secondary wave stroke width
 
-# Pulse dot parameters
-_DOT_BASE_RADIUS = 3.5
-_DOT_PULSE_AMPLITUDE = 1.2
-_DOT_PULSE_SPEED = 5.0
-_DOT_ALPHA_MIN = 0.65
-_DOT_ALPHA_MAX = 1.0
+# Status dot parameters
+_DOT_RADIUS = 4.5
 
 # Font
 _FONT_WEIGHT_MEDIUM = 0.23  # NSFontWeightMedium
@@ -115,26 +111,20 @@ class RecordingIndicatorView:
         )
         from Foundation import NSMakeRect, NSString
 
-        width = rect.size.width
-
         # Subtitle sits at the bottom; animation area is above it.
         sub_height = _LABEL_HEIGHT if self._subtitle else 0
         anim_center_y = sub_height + _PANEL_HEIGHT / 2.0
 
         elapsed = time.monotonic() - self._start_time
 
-        # ── Pulsing dot (left) ──────────────────────────────────────────
+        # ── Status dot (left) — red when recording, grey when waiting ───
         dot_x = 15.0
         dot_y = anim_center_y
-        sin_pulse = math.sin(elapsed * _DOT_PULSE_SPEED)
-        dot_radius = _DOT_BASE_RADIUS + sin_pulse * _DOT_PULSE_AMPLITUDE
-        alpha_t = (sin_pulse + 1.0) / 2.0
-        alpha_pulse = _DOT_ALPHA_MIN + (_DOT_ALPHA_MAX - _DOT_ALPHA_MIN) * alpha_t
 
         if self._recording_active:
             if self._dot_color is None:
                 self._dot_color = NSColor.systemRedColor()
-            self._dot_color.colorWithAlphaComponent_(alpha_pulse).setFill()
+            self._dot_color.setFill()
         else:
             if self._dot_color_inactive is None:
                 self._dot_color_inactive = self._dynamic_color(
@@ -144,8 +134,8 @@ class RecordingIndicatorView:
             self._dot_color_inactive.setFill()
 
         dot_rect = NSMakeRect(
-            dot_x - dot_radius, dot_y - dot_radius,
-            dot_radius * 2, dot_radius * 2,
+            dot_x - _DOT_RADIUS, dot_y - _DOT_RADIUS,
+            _DOT_RADIUS * 2, _DOT_RADIUS * 2,
         )
         NSBezierPath.bezierPathWithOvalInRect_(dot_rect).fill()
 
@@ -404,6 +394,8 @@ class RecordingIndicatorPanel:
     def hide(self) -> None:
         """Hide and clean up the indicator panel."""
         try:
+            from wenzi.ui_helpers import release_panel_surfaces
+
             if self._timer is not None:
                 self._timer.invalidate()
                 self._timer = None
@@ -411,6 +403,7 @@ class RecordingIndicatorPanel:
             self._clear_view_backref()
 
             if self._panel is not None:
+                release_panel_surfaces(self._panel)
                 self._panel.orderOut_(None)
                 self._panel = None
 
@@ -552,6 +545,9 @@ class RecordingIndicatorPanel:
             panel = self._panel
 
             def _on_complete():
+                from wenzi.ui_helpers import release_panel_surfaces
+
+                release_panel_surfaces(panel)
                 panel.orderOut_(None)
                 self._clear_view_backref()
                 self._panel = None

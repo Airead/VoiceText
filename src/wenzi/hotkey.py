@@ -36,6 +36,7 @@ _SPECIAL_VK = {
     "fn": 63, "esc": 53, "space": 49,
     "return": 36, "delete": 51, "tab": 48,
     "up": 126, "down": 125, "left": 123, "right": 124,
+    "home": 115, "end": 119, "pageup": 116, "pagedown": 121,
     "printscreen": 105,  # PC keyboards map PrintScreen to F13
     # Keypad (kp = keypad, distinguishes from main keyboard keys)
     "kp0": 82, "kp1": 83, "kp2": 84, "kp3": 85,
@@ -755,13 +756,13 @@ class MultiHotkeyListener:
                 elif (
                     self._on_mode_prev
                     and self._held
-                    and name in ("left", "up")
+                    and name in ("left", "up", "home", "pageup")
                 ):
                     action = "mode_prev"
                 elif (
                     self._on_mode_next
                     and self._held
-                    and name in ("right", "down")
+                    and name in ("right", "down", "end", "pagedown")
                 ):
                     action = "mode_next"
                 else:

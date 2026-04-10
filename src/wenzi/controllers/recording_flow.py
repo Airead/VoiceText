@@ -801,9 +801,11 @@ class RecordingFlow:
         Must be called on the main thread (via AppHelper.callAfter).
         """
         app = self._app
+        indicator_frame = app._recording_indicator.current_frame
         app._recording_indicator.hide()
         app._streaming_overlay.show(
             asr_text=asr_text,
+            animate_from_frame=indicator_frame,
             stt_info=stt_info,
             llm_info=llm_info,
             on_cancel=lambda: self.send_action(Action.CANCEL),
