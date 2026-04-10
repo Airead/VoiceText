@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root {
-    --bg: rgba(255, 255, 255, 0.70);
+    --bg: rgba(255, 255, 255, 0.96);
     --text: #1d1d1f;
     --secondary: #86868b;
     --border: rgba(0, 0, 0, 0.08);
@@ -19,7 +19,7 @@
 }
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg: rgba(50, 50, 55, 0.70);
+        --bg: rgba(50, 50, 55, 0.96);
         --text: #e5e5e7;
         --secondary: #98989d;
         --border: rgba(255, 255, 255, 0.10);
@@ -52,19 +52,8 @@ body::before {
     position: fixed; inset: 0;
     border-radius: 18px;
     background: var(--bg);
-    -webkit-backdrop-filter: blur(40px) saturate(1.8);
-    backdrop-filter: blur(40px) saturate(1.8);
-    -webkit-backface-visibility: hidden;
     z-index: -1;
     pointer-events: none;
-    /* Micro-animation keeps the compositing layer alive so the
-       window server doesn't reclaim the backdrop-filter texture
-       during audio playback or other system events (WebKit #275919). */
-    animation: keepCompositing 1s linear infinite;
-}
-@keyframes keepCompositing {
-    from { opacity: 0.999; }
-    to   { opacity: 1; }
 }
 
 /* Main content: left panel + preview */
@@ -611,7 +600,6 @@ function _renderVisibleRows() {
 }
 
 // --- Event delegation on resultList (replaces per-row listeners) ---
-var _mouseHoverTimer = null;
 resultList.addEventListener('mousemove', function(e) {
     if (e.clientX === _lastMouseX && e.clientY === _lastMouseY) return;
     _lastMouseX = e.clientX;
@@ -620,16 +608,11 @@ resultList.addEventListener('mousemove', function(e) {
     if (!row) return;
     var idx = parseInt(row.getAttribute('data-idx'), 10);
     if (isNaN(idx) || idx === selectedIndex) return;
-    // Debounce: wait for mouse to settle before switching selection
-    if (_mouseHoverTimer) clearTimeout(_mouseHoverTimer);
-    _mouseHoverTimer = setTimeout(function() {
-        _mouseHoverTimer = null;
-        var prev = _spacer.querySelector('.result-item.selected');
-        if (prev) prev.className = 'result-item';
-        row.className = 'result-item selected';
-        selectedIndex = idx;
-        updatePreview();
-    }, 180);
+    var prev = _spacer.querySelector('.result-item.selected');
+    if (prev) prev.className = 'result-item';
+    row.className = 'result-item selected';
+    selectedIndex = idx;
+    updatePreview();
 }, false);
 
 resultList.addEventListener('click', function(e) {
