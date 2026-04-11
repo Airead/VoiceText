@@ -193,6 +193,8 @@ panel.orderOut_(None)
 
 The chooser panel (`ChooserPanel`) manages this via `_deactivate_glass()` / `_activate_glass()` — see `chooser_panel.py`.
 
+For the full Liquid Glass API reference, best practices, and visual enhancement techniques (outline, highlight, tintColor, event passthrough), see [`dev/liquid-glass.md`](dev/liquid-glass.md).
+
 ## LLM max_tokens Guard
 
 All `chat.completions.create` calls **must** include `max_tokens` to prevent runaway repetition (models sometimes loop the same tokens indefinitely). Current call sites and their limits:

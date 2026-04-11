@@ -42,6 +42,20 @@ _FADE_OUT_DURATION = 0.3
 _RECALC_DEBOUNCE = 0.05
 
 
+# Decoration-only view that passes through all mouse/scroll events
+try:
+    from AppKit import NSView as _NSViewBase
+
+    class _OverlayOutlineView(_NSViewBase):
+        """NSView that returns nil from hitTest_ so it never intercepts events."""
+
+        def hitTest_(self, point):
+            return None
+
+except Exception:
+    _OverlayOutlineView = None
+
+
 class StreamingOverlayPanel:
     """Non-interactive floating overlay that displays streaming AI enhancement.
 
@@ -245,6 +259,8 @@ class StreamingOverlayPanel:
 
             glass = NSGlassEffectView.alloc().initWithFrame_(NSMakeRect(0, 0, _PANEL_WIDTH, init_h))
             glass.setCornerRadius_(_CORNER_RADIUS)
+            glass.setWantsLayer_(True)
+            glass.layer().setMasksToBounds_(True)
             configure_glass_appearance(glass)
             panel.setContentView_(glass)
 
@@ -255,6 +271,25 @@ class StreamingOverlayPanel:
             box.setAutoresizingMask_(0x12)  # flex W+H
             glass.setContentView_(box)
             self._content_box = box
+
+            # Subtle outline for edge definition — restrained for content-heavy panel.
+            # Wrapped separately: decoration only, safe to skip on failure.
+            try:
+                if _OverlayOutlineView is not None:
+                    from wenzi.ui_helpers import dynamic_color
+
+                    ol_color = dynamic_color((1.0, 1.0, 1.0, 0.22), (1.0, 1.0, 1.0, 0.10))
+                    outline = _OverlayOutlineView.alloc().initWithFrame_(
+                        NSMakeRect(0, 0, _PANEL_WIDTH, init_h)
+                    )
+                    outline.setWantsLayer_(True)
+                    outline.layer().setCornerRadius_(_CORNER_RADIUS)
+                    outline.layer().setBorderWidth_(0.5)
+                    outline.layer().setBorderColor_(ol_color.CGColor())
+                    outline.setAutoresizingMask_(0x12)  # flex W+H — tracks panel resize
+                    glass.addSubview_(outline)
+            except Exception:
+                pass
 
             self._panel = panel
 
