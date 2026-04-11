@@ -71,13 +71,13 @@ container.contentView = holderView  // holderView 包含多个 NSGlassEffectView
 
 ## 锁定自适应外观（关键！）
 
-NSGlassEffectView 默认持续采样背后内容亮度来自动切换 light/dark 渲染，忽略系统主题和 `setAppearance_`。必须用私有属性 `_adaptiveAppearance` 锁定：
+NSGlassEffectView 默认持续采样背后内容亮度来自动切换 light/dark 渲染，忽略系统主题和 `setAppearance_`。在 macOS 26 上，需要用私有属性 `_adaptiveAppearance` **关闭**自适应，再用 `setAppearance_` 指定 light/dark：
 
 | 值 | 含义 |
 |----|------|
-| 0 | 强制 Light |
-| 1 | 强制 Dark |
-| 2 | Auto（默认，根据背后内容亮度自适应） |
+| 0 | automatic |
+| 1 | off |
+| 2 | on |
 
 项目中已封装为 `configure_glass_appearance(glass)`（见 `ui_helpers.py`），所有 NSGlassEffectView 实例必须调用：
 
@@ -89,7 +89,7 @@ glass.setCornerRadius_(12)
 configure_glass_appearance(glass)
 ```
 
-来源：[qt-liquid-glass](https://github.com/fsalinas26/qt-liquid-glass) 逆向发现，私有 API 需 `respondsToSelector_` 保护。
+说明：旧的逆向资料常把 `_adaptiveAppearance` 记成 `0=Light, 1=Dark, 2=Auto`，但这与 macOS 26 runtime inspection 不符。项目内验证结果是 `1=off`，这也是当前需要使用的值。私有 API 需 `respondsToSelector_` 保护。
 
 ### 其他私有属性
 

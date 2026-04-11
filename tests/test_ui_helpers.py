@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib
+import sys
 from unittest.mock import MagicMock, patch
 
 from wenzi.ui_helpers import reactivate_app
@@ -67,3 +69,44 @@ class TestReactivateApp:
         with patch("PyObjCTools.AppHelper") as mock_helper:
             reactivate_app(mock_running_app)
             mock_helper.callAfter.assert_called_once()
+
+
+class TestConfigureGlassAppearance:
+    """Tests for configure_glass_appearance()."""
+
+    def _run_case(self, appearance_name: str):
+        mock_sys_appearance = MagicMock()
+        mock_sys_appearance.bestMatchFromAppearancesWithNames_.return_value = appearance_name
+
+        mock_app = MagicMock()
+        mock_app.effectiveAppearance.return_value = mock_sys_appearance
+
+        mock_appkit = MagicMock(NSApp=mock_app)
+        glass = MagicMock()
+        glass.respondsToSelector_.return_value = True
+
+        original = sys.modules.get("AppKit")
+        with patch.dict(sys.modules, {"AppKit": mock_appkit}):
+            import wenzi.ui_helpers as mod
+
+            importlib.reload(mod)
+            mod.configure_glass_appearance(glass)
+
+        if original is not None:
+            sys.modules["AppKit"] = original
+        else:
+            sys.modules.pop("AppKit", None)
+
+        return glass, mock_sys_appearance
+
+    def test_disables_adaptive_sampling_for_light_mode(self):
+        glass, mock_sys_appearance = self._run_case("NSAppearanceNameAqua")
+
+        glass.setAppearance_.assert_called_once_with(mock_sys_appearance)
+        glass.set_adaptiveAppearance_.assert_called_once_with(1)
+
+    def test_disables_adaptive_sampling_for_dark_mode(self):
+        glass, mock_sys_appearance = self._run_case("NSAppearanceNameDarkAqua")
+
+        glass.setAppearance_.assert_called_once_with(mock_sys_appearance)
+        glass.set_adaptiveAppearance_.assert_called_once_with(1)

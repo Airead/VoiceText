@@ -80,7 +80,7 @@ def configure_glass_appearance(glass) -> None:
     brightness and auto-switches light/dark, ignoring the system setting.
     This helper forces it to follow the system appearance via
     ``setAppearance_`` (public) and ``set_adaptiveAppearance_`` (private;
-    0=Light, 1=Dark, 2=Auto).
+    0=automatic, 1=off, 2=on).
 
     See CLAUDE.md "NSGlassEffectView — Lock Adaptive Appearance" for details.
     """
@@ -88,14 +88,16 @@ def configure_glass_appearance(glass) -> None:
         from AppKit import NSApp
 
         sys_appearance = NSApp.effectiveAppearance()
-        name = sys_appearance.bestMatchFromAppearancesWithNames_(
-            ["NSAppearanceNameAqua", "NSAppearanceNameDarkAqua"]
-        )
-        is_dark = name is not None and "Dark" in str(name)
-
         glass.setAppearance_(sys_appearance)
         if glass.respondsToSelector_(b"set_adaptiveAppearance:"):
-            glass.set_adaptiveAppearance_(1 if is_dark else 0)
+            # On macOS 26, the private enum does not map to light/dark modes.
+            # Runtime inspection shows:
+            #   0 = automatic
+            #   1 = off
+            #   2 = on
+            # Disable adaptive backdrop sampling, then let NSAppearance choose
+            # whether the glass should render in light or dark mode.
+            glass.set_adaptiveAppearance_(1)
     except Exception:
         logger.debug("Failed to lock glass appearance", exc_info=True)
 

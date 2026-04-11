@@ -31,35 +31,33 @@ The minimum supported macOS version is **macOS 26 (Tahoe)**. Do not add backward
 
 NSGlassEffectView is **adaptive by default**: it continuously samples the brightness of content behind the window and auto-switches between light and dark rendering, **ignoring the system dark/light mode setting**. This means a dark-mode panel over a white background will render as light glass.
 
-The public `setAppearance_()` API does **not** fix this — the glass material's own rendering pipeline ignores it. You must use the private `_adaptiveAppearance` property:
+The public `setAppearance_()` API does **not** fix this by itself — you must
+also disable the glass view's private adaptive backdrop sampling.
 
-- **0** = Light (force light)
-- **1** = Dark (force dark)
-- **2** = Auto (default — adapts to behind-window brightness)
+On macOS 26, runtime inspection shows `_adaptiveAppearance` maps as:
+
+- **0** = automatic
+- **1** = off
+- **2** = on
 
 ```python
 from AppKit import NSApp, NSAppearance, NSGlassEffectView
 
 glass = NSGlassEffectView.alloc().initWithFrame_(frame)
 
-# Detect system theme
 sys_appearance = NSApp.effectiveAppearance()
-name = sys_appearance.bestMatchFromAppearancesWithNames_(
-    ["NSAppearanceNameAqua", "NSAppearanceNameDarkAqua"]
-)
-is_dark = name is not None and "Dark" in str(name)
 
 # Public API — cascade to subviews (labels, text fields, etc.)
 glass.setAppearance_(sys_appearance)
 
-# Private API — lock the glass material itself
+# Private API — disable adaptive backdrop sampling on the glass material itself
 if glass.respondsToSelector_(b"set_adaptiveAppearance:"):
-    glass.set_adaptiveAppearance_(1 if is_dark else 0)
+    glass.set_adaptiveAppearance_(1)
 ```
 
 **Every** `NSGlassEffectView` instance in the project must apply this pattern. Without it, small panels (like the recording indicator) over bright/dark backgrounds will visually contradict the system theme. See `recording_indicator.py:_make_glass_view()` for the reference implementation.
 
-**Note:** `_adaptiveAppearance` is a private API (discovered via [qt-liquid-glass](https://github.com/fsalinas26/qt-liquid-glass)). Always guard with `respondsToSelector_`.
+**Note:** `_adaptiveAppearance` is a private API. Older reverse-engineering notes often describe it as `0=light, 1=dark, 2=auto`, but that mapping does not match macOS 26 runtime behavior. Always guard with `respondsToSelector_`.
 
 ## Test Safety — Never Use Real User Data Paths
 
