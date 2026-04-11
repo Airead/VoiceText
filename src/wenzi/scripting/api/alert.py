@@ -1,11 +1,11 @@
-"""vt.alert — floating on-screen alert overlay (HUD-style)."""
+"""wz.alert — floating on-screen alert overlay with Liquid Glass styling."""
 
 from __future__ import annotations
 
 import logging
 
 from wenzi.async_loop import call_later
-from wenzi.ui_helpers import release_panel_surfaces
+from wenzi.ui_helpers import dynamic_color, release_panel_surfaces
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,10 @@ _V_PADDING = 12
 _MAX_WIDTH = 600
 _MIN_WIDTH = 160
 _FADE_DURATION = 0.35
+
+# Cached dynamic colors for highlight / outline decorations
+_HIGHLIGHT_COLOR = dynamic_color((1.0, 1.0, 1.0, 0.16), (1.0, 1.0, 1.0, 0.08))
+_OUTLINE_COLOR = dynamic_color((1.0, 1.0, 1.0, 0.26), (1.0, 1.0, 1.0, 0.14))
 
 
 def _measure_text(text: str, font):
@@ -61,15 +65,17 @@ def _show_alert(text: str, duration: float) -> None:
         NSColor,
         NSFont,
         NSFontWeightMedium,
+        NSGlassEffectView,
         NSMakeRect,
         NSPanel,
         NSScreen,
         NSStatusWindowLevel,
         NSTextAlignmentCenter,
         NSTextField,
-        NSVisualEffectMaterialHUDWindow,
-        NSVisualEffectView,
+        NSView,
     )
+
+    from wenzi.ui_helpers import configure_glass_appearance
 
     # Close existing alert immediately (no fade)
     if _current_panel is not None:
@@ -103,16 +109,31 @@ def _show_alert(text: str, duration: float) -> None:
     panel.setHidesOnDeactivate_(False)
     panel.setCollectionBehavior_((1 << 0) | (1 << 4) | (1 << 8))  # canJoinAllSpaces | stationary | fullScreenAuxiliary
 
-    # Vibrancy background (macOS frosted glass)
-    vibrancy = NSVisualEffectView.alloc().initWithFrame_(
+    # Liquid Glass background
+    glass = NSGlassEffectView.alloc().initWithFrame_(
         NSMakeRect(0, 0, panel_width, panel_height)
     )
-    vibrancy.setMaterial_(NSVisualEffectMaterialHUDWindow)
-    vibrancy.setState_(1)  # NSVisualEffectStateActive — always active
-    vibrancy.setWantsLayer_(True)
-    vibrancy.layer().setCornerRadius_(panel_height / 2)  # pill shape
-    vibrancy.layer().setMasksToBounds_(True)
-    panel.contentView().addSubview_(vibrancy)
+    glass.setCornerRadius_(panel_height / 2)  # pill shape
+    glass.setWantsLayer_(True)
+    glass.layer().setMasksToBounds_(True)
+    configure_glass_appearance(glass)
+    panel.setContentView_(glass)
+
+    # Add a subtle highlight band and crisp outline so the glass reads
+    # more clearly than the default material alone.
+    highlight = NSView.alloc().initWithFrame_(
+        NSMakeRect(1, panel_height * 0.50, panel_width - 2, panel_height * 0.38)
+    )
+    highlight.setWantsLayer_(True)
+    highlight.layer().setBackgroundColor_(_HIGHLIGHT_COLOR.CGColor())
+    highlight.layer().setCornerRadius_(panel_height * 0.19)
+    glass.addSubview_(highlight)
+
+    outline = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, panel_width, panel_height))
+    outline.setWantsLayer_(True)
+    outline.layer().setCornerRadius_(panel_height / 2)
+    outline.layer().setBorderWidth_(1.0)
+    outline.layer().setBorderColor_(_OUTLINE_COLOR.CGColor())
 
     # Text label
     label = NSTextField.labelWithString_(text)
@@ -126,12 +147,13 @@ def _show_alert(text: str, duration: float) -> None:
     label.setBezeled_(False)
     label.setEditable_(False)
     label.setSelectable_(False)
-    vibrancy.addSubview_(label)
+    glass.addSubview_(label)
+    glass.addSubview_(outline)
 
     # Position: center-top of main screen
     screen = NSScreen.mainScreen()
     if screen:
-        sf = screen.frame()
+        sf = screen.visibleFrame()
         x = sf.origin.x + (sf.size.width - panel_width) / 2
         y = sf.origin.y + sf.size.height - panel_height - 100
         panel.setFrameOrigin_((x, y))

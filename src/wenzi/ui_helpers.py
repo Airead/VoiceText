@@ -15,27 +15,34 @@ logger = logging.getLogger(__name__)
 
 
 def release_panel_surfaces(panel) -> None:
-    """Deactivate NSVisualEffectView(s) and shrink panel to release IOSurface memory.
+    """Deactivate glass surfaces and shrink panel to release IOSurface memory.
 
     Call before or after ``orderOut_`` when hiding any panel that uses
-    ``NSVisualEffectView`` with behind-window blending.  See CLAUDE.md
-    "NSVisualEffectView Memory Management" for why this is needed.
+    ``NSGlassEffectView`` with behind-window blending. See CLAUDE.md
+    "Blur Panels — Use NSGlassEffectView" for why this is needed.
 
-    Safe to call on any NSPanel/NSWindow — no-ops gracefully if no VFX view.
+    Safe to call on any NSPanel/NSWindow — no-ops gracefully if no glass view.
     """
     if panel is None:
         return
-    # Deactivate all NSVisualEffectViews (content view itself or direct subviews)
+    # Deactivate all glass views (content view itself or direct subviews).
     try:
-        from AppKit import NSVisualEffectView
+        from AppKit import NSGlassEffectView
 
         cv = panel.contentView()
-        if isinstance(cv, NSVisualEffectView):
-            cv.setState_(0)  # NSVisualEffectStateInactive
+
+        if isinstance(cv, NSGlassEffectView):
+            try:
+                cv.setState_(0)  # inactive
+            except Exception:
+                pass
         if cv is not None:
             for sv in cv.subviews():
-                if isinstance(sv, NSVisualEffectView):
-                    sv.setState_(0)
+                if isinstance(sv, NSGlassEffectView):
+                    try:
+                        sv.setState_(0)
+                    except Exception:
+                        pass
     except Exception:
         pass
     # Shrink to 1×1 to force Core Animation to release the CA Whippet
@@ -47,6 +54,23 @@ def release_panel_surfaces(panel) -> None:
         panel.setFrame_display_(NSMakeRect(f.origin.x, f.origin.y, 1, 1), False)
     except Exception:
         pass
+
+
+def dynamic_color(light_rgba, dark_rgba):
+    """Create a dynamic NSColor that adapts to the system light/dark theme.
+
+    Each argument is an (r, g, b, a) tuple in the sRGB colour space.
+    """
+    from AppKit import NSColor
+
+    def _provider(appearance):
+        name = appearance.bestMatchFromAppearancesWithNames_(
+            ["NSAppearanceNameAqua", "NSAppearanceNameDarkAqua"]
+        )
+        rgba = dark_rgba if name and "Dark" in str(name) else light_rgba
+        return NSColor.colorWithSRGBRed_green_blue_alpha_(*rgba)
+
+    return NSColor.colorWithName_dynamicProvider_("dynamicColor", _provider)
 
 
 def configure_glass_appearance(glass) -> None:

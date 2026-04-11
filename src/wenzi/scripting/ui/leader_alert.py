@@ -1,7 +1,7 @@
-"""Leader-key floating alert panel (HUD-style).
+"""Leader-key floating alert panel with Liquid Glass styling.
 
 Displays available sub-key mappings when a leader trigger key is held.
-Uses NSVisualEffectView for native macOS vibrancy with fade animations.
+Uses NSGlassEffectView for native macOS glass with fade animations.
 """
 
 from __future__ import annotations
@@ -17,14 +17,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Layout constants
-_PANEL_WIDTH = 360
-_PADDING = 20
-_TITLE_HEIGHT = 26
-_ROW_HEIGHT = 28
-_BADGE_SIZE = 22
-_BADGE_CORNER = 6
-_GAP_AFTER_TITLE = 10
-_GAP_AFTER_SEP = 8
+_PANEL_WIDTH = 320
+_PADDING = 16
+_TITLE_HEIGHT = 22
+_ROW_HEIGHT = 26
+_BADGE_SIZE = 19
+_BADGE_CORNER = 5
+_GAP_AFTER_TITLE = 6
 _CORNER_RADIUS = 14
 _FADE_IN = 0.15
 _FADE_OUT = 0.2
@@ -55,6 +54,7 @@ class LeaderAlertPanel:
             NSFont,
             NSFontWeightMedium,
             NSFontWeightSemibold,
+            NSGlassEffectView,
             NSMakeRect,
             NSPanel,
             NSScreen,
@@ -62,9 +62,9 @@ class LeaderAlertPanel:
             NSTextAlignmentCenter,
             NSTextField,
             NSView,
-            NSVisualEffectMaterialHUDWindow,
-            NSVisualEffectView,
         )
+
+        from wenzi.ui_helpers import configure_glass_appearance
 
         if self._panel is not None:
             self.close()
@@ -74,8 +74,6 @@ class LeaderAlertPanel:
             _PADDING
             + _TITLE_HEIGHT
             + _GAP_AFTER_TITLE
-            + 1  # separator
-            + _GAP_AFTER_SEP
             + num_rows * _ROW_HEIGHT
             + _PADDING
         )
@@ -96,16 +94,21 @@ class LeaderAlertPanel:
         panel.setHidesOnDeactivate_(False)
         panel.setCollectionBehavior_((1 << 0) | (1 << 4) | (1 << 8))  # canJoinAllSpaces | stationary | fullScreenAuxiliary
 
-        # --- Vibrancy background ---
-        vibrancy = NSVisualEffectView.alloc().initWithFrame_(
+        # --- Liquid Glass background ---
+        glass = NSGlassEffectView.alloc().initWithFrame_(
             NSMakeRect(0, 0, _PANEL_WIDTH, panel_height)
         )
-        vibrancy.setMaterial_(NSVisualEffectMaterialHUDWindow)
-        vibrancy.setState_(1)  # NSVisualEffectStateActive
-        vibrancy.setWantsLayer_(True)
-        vibrancy.layer().setCornerRadius_(_CORNER_RADIUS)
-        vibrancy.layer().setMasksToBounds_(True)
-        panel.contentView().addSubview_(vibrancy)
+        glass.setCornerRadius_(_CORNER_RADIUS)
+        glass.setWantsLayer_(True)
+        glass.layer().setMasksToBounds_(True)
+        configure_glass_appearance(glass)
+        panel.setContentView_(glass)
+
+        container = NSView.alloc().initWithFrame_(
+            NSMakeRect(0, 0, _PANEL_WIDTH, panel_height)
+        )
+        container.setAutoresizingMask_(0x12)  # Width + Height sizable
+        glass.setContentView_(container)
 
         # --- Title ---
         title_font = NSFont.systemFontOfSize_weight_(15.0, NSFontWeightSemibold)
@@ -115,22 +118,13 @@ class LeaderAlertPanel:
             NSMakeRect(_PADDING, y_cursor, _PANEL_WIDTH - _PADDING * 2, _TITLE_HEIGHT)
         )
         title.setFont_(title_font)
-        title.setTextColor_(NSColor.labelColor())
+        title.setTextColor_(NSColor.secondaryLabelColor())
         title.setBackgroundColor_(NSColor.clearColor())
         title.setBezeled_(False)
         title.setEditable_(False)
         title.setSelectable_(False)
-        vibrancy.addSubview_(title)
-
-        # --- Separator ---
+        container.addSubview_(title)
         y_cursor -= _GAP_AFTER_TITLE
-        sep = NSView.alloc().initWithFrame_(
-            NSMakeRect(_PADDING, y_cursor, _PANEL_WIDTH - _PADDING * 2, 1)
-        )
-        sep.setWantsLayer_(True)
-        sep.layer().setBackgroundColor_(NSColor.separatorColor().CGColor())
-        vibrancy.addSubview_(sep)
-        y_cursor -= 1 + _GAP_AFTER_SEP
 
         # --- Mapping rows ---
         key_font = NSFont.monospacedSystemFontOfSize_weight_(12.0, NSFontWeightMedium)
@@ -139,7 +133,7 @@ class LeaderAlertPanel:
             0.5, 0.5, 0.5, 0.15
         ).CGColor()
         badge_x = _PADDING
-        desc_x = _PADDING + _BADGE_SIZE + 12
+        desc_x = _PADDING + _BADGE_SIZE + 10
         desc_width = _PANEL_WIDTH - desc_x - _PADDING
 
         for m in mappings:
@@ -153,7 +147,7 @@ class LeaderAlertPanel:
             badge.setWantsLayer_(True)
             badge.layer().setBackgroundColor_(badge_bg_cg)
             badge.layer().setCornerRadius_(_BADGE_CORNER)
-            vibrancy.addSubview_(badge)
+            container.addSubview_(badge)
 
             # Badge key letter
             key_label = NSTextField.labelWithString_(m.key.upper())
@@ -177,14 +171,19 @@ class LeaderAlertPanel:
             desc_label.setBezeled_(False)
             desc_label.setEditable_(False)
             desc_label.setSelectable_(False)
-            vibrancy.addSubview_(desc_label)
+            try:
+                desc_label.setUsesSingleLineMode_(True)
+                desc_label.cell().setLineBreakMode_(4)  # NSLineBreakByTruncatingTail
+            except Exception:
+                pass
+            container.addSubview_(desc_label)
 
             y_cursor = row_y
 
         # --- Position ---
         screen = NSScreen.mainScreen()
         if screen:
-            sf = screen.frame()
+            sf = screen.visibleFrame()
             x, y = self._calculate_origin(
                 position, _PANEL_WIDTH, panel_height, sf, NSEvent,
             )

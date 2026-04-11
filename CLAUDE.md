@@ -90,6 +90,10 @@ self._restore_accessory()
 
 `send_notification()` (from `statusbar.py`) may fail with `Info.plist` / `CFBundleIdentifier` errors when running directly from the terminal (`uv run`) without app bundling. This is expected during development — the function catches exceptions internally and logs them. In a packaged app notifications work normally.
 
+## Notifications — Prefer `wz.alert` Over System Notifications
+
+When code needs to notify the user of a transient event (success, warning, status change), use `wz.alert(text)` — a lightweight floating overlay that auto-dismisses. Do **not** use `send_notification()` (macOS system notification) unless the user explicitly asks for it. System notifications are heavyweight: they persist in Notification Center, require `Info.plist` / bundle setup, and are disruptive for frequent or low-importance events.
+
 ## WKWebView Development Reference
 
 When developing or modifying WKWebView-based panels, read `dev/wkwebview-pitfalls.md` first. It documents critical pitfalls including event handling, page load races, and state management.
