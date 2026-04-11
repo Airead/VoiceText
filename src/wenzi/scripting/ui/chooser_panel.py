@@ -212,7 +212,7 @@ class ChooserPanel:
     def __init__(self, usage_tracker=None) -> None:
         self._panel = None
         self._webview = None
-        self._vfx_view = None
+        self._glass_view = None
         self._message_handler = None
         self._navigation_delegate = None
         self._panel_delegate = None
@@ -343,14 +343,16 @@ class ChooserPanel:
     # Panel reuse helpers
     # ------------------------------------------------------------------
 
-    _VFX_MATERIAL = 5  # NSVisualEffectMaterialMenu
+    def _activate_glass(self) -> None:
+        """Re-lock glass appearance to the current system theme.
 
-    def _activate_vfx(self) -> None:
-        """Re-activate the VFX view."""
-        if self._vfx_view is None:
-            return
-        self._vfx_view.setState_(1)  # NSVisualEffectStateActive
-        self._vfx_view.setMaterial_(self._VFX_MATERIAL)
+        The panel is reused across open/close cycles, so the system theme
+        may have changed since the panel was built.
+        """
+        if self._glass_view is not None:
+            from wenzi.ui_helpers import configure_glass_appearance
+
+            configure_glass_appearance(self._glass_view)
 
     def _reconnect_panel_refs(self) -> None:
         """Restore ``_panel_ref`` back-references broken by :meth:`close`."""
@@ -361,12 +363,23 @@ class ChooserPanel:
         if self._panel_delegate is not None:
             self._panel_delegate._panel_ref = self
 
-    def _deactivate_vfx(self) -> None:
-        """Deactivate VFX and shrink panel to release IOSurface memory."""
-        from wenzi.ui_helpers import release_panel_surfaces
+    def _deactivate_glass(self) -> None:
+        """Shrink the hidden panel to 1x1 to force Core Animation to release
+        the NSGlassEffectView IOSurface backing store (~72 MB+ at retina).
 
-        release_panel_surfaces(self._panel)
+        ``orderOut_`` alone does not release these surfaces.
+        """
         self._last_screen = None
+        if self._panel is not None:
+            try:
+                from Foundation import NSMakeRect
+
+                f = self._panel.frame()
+                self._panel.setFrame_display_(
+                    NSMakeRect(f.origin.x, f.origin.y, 1, 1), False
+                )
+            except Exception:
+                pass
 
     def _reset_panel_ui(
         self,
@@ -560,40 +573,27 @@ class ChooserPanel:
     def _maybe_close(self) -> None:
         """Close unless QL preview or calculator mode is active.
 
-        Called on a deferred schedule after either the chooser or the QL
-        panel loses key-window status.  Gives macOS time to assign the
-        new key window before we check.
-
-        Note: we intentionally do NOT check whether the chooser panel
-        regained key-window status.  Because the panel is a floating
-        window at NSStatusWindowLevel, macOS may route focus back to it
-        after another app activates (e.g. via a system shortcut).
-        Ignoring the regained-key case ensures the panel closes
-        reliably whenever focus is lost.
+        Called synchronously from ``windowDidResignKey_``.  We must NOT
+        defer this check — the floating panel at NSStatusWindowLevel can
+        re-acquire key-window status within milliseconds, causing the
+        chooser to "grab focus back" from the app the user switched to.
         """
-        if self._closing:
+        if self._closing or self._panel is None:
             return
 
-        def _check():
-            if self._closing or self._panel is None:
+        try:
+            # QL panel is now key — user is interacting with preview
+            if self._ql_panel is not None and self._ql_panel.is_key_window:
                 return
-            try:
-                # QL panel is now key — user is interacting with preview
-                if self._ql_panel is not None and self._ql_panel.is_key_window:
-                    return
-            except Exception:
-                pass
+        except Exception:
+            pass
 
-            # Calculator mode: keep panel visible, listen for ESC
-            if self._should_pin_for_calc():
-                self._enter_calc_mode()
-                return
+        # Calculator mode: keep panel visible, listen for ESC
+        if self._should_pin_for_calc():
+            self._enter_calc_mode()
+            return
 
-            self.close()
-
-        from PyObjCTools import AppHelper
-
-        AppHelper.callLater(0.1, _check)
+        self.close()
 
     # ------------------------------------------------------------------
     # Calculator pin mode
@@ -769,7 +769,7 @@ class ChooserPanel:
             # Hot path — reuse hidden panel.  Hide via alpha until
             # _reset_panel_ui JS completes so stale results never flash.
             self._reconnect_panel_refs()
-            self._activate_vfx()
+            self._activate_glass()
             self._position_on_mouse_screen()
             self._panel.setAlphaValue_(0.0)
             self._reset_panel_ui(initial_query, placeholder)
@@ -778,7 +778,7 @@ class ChooserPanel:
             # (recycled in prebuild mode).  Load HTML — _on_page_loaded
             # will handle pending query, placeholder, and context.
             self._reconnect_panel_refs()
-            self._activate_vfx()
+            self._activate_glass()
             self._position_on_mouse_screen()
             self._panel.setAlphaValue_(0.0)
             if not self._recycle_preloading:
@@ -891,7 +891,7 @@ class ChooserPanel:
             )
 
         if self._panel is not None:
-            self._deactivate_vfx()
+            self._deactivate_glass()
             self._panel.orderOut_(None)
 
         self._closing = False
@@ -945,14 +945,12 @@ class ChooserPanel:
         from wenzi.ui.web_utils import cleanup_webview
 
         cleanup_webview(self._webview, handler_name="chooser")
-        if self._vfx_view is not None:
-            self._vfx_view.setState_(0)
         if self._panel is not None:
             self._panel.setDelegate_(None)
             self._panel.orderOut_(None)
         self._panel = None
         self._webview = None
-        self._vfx_view = None
+        self._glass_view = None
         self._message_handler = None
         self._navigation_delegate = None
         self._panel_delegate = None
@@ -1914,12 +1912,11 @@ class ChooserPanel:
 
         # Reveal the panel if it was hidden (alpha=0) during the warm-start
         # path.  This is a no-op on the cold path where alpha is already 1.
-        # For recycle preloads (panel not on screen), shrink to 1×1 instead
-        # to release IOSurface compositing layer buffers while keeping
-        # DOM/JS state alive for a fast hot-path re-show.
+        # For recycle preloads (panel not on screen), deactivate glass to
+        # release IOSurface memory while keeping DOM/JS state alive.
         if self._panel is not None:
             if was_preloading and not self._panel.isVisible():
-                self._deactivate_vfx()
+                self._deactivate_glass()
             else:
                 self._panel.setAlphaValue_(1.0)
 
@@ -2023,8 +2020,8 @@ class ChooserPanel:
         panel.setMovableByWindowBackground_(False)
         panel.setCollectionBehavior_((1 << 0) | (1 << 4) | (1 << 8))  # canJoinAllSpaces | stationary | fullScreenAuxiliary
 
-        # Transparent background — NSVisualEffectView provides the frosted glass
-        from AppKit import NSColor, NSVisualEffectView
+        # Transparent background — NSGlassEffectView provides the Liquid Glass
+        from AppKit import NSColor, NSGlassEffectView
 
         panel.setBackgroundColor_(NSColor.clearColor())
 
@@ -2041,19 +2038,20 @@ class ChooserPanel:
         panel.setDelegate_(delegate)
         self._panel_delegate = delegate
 
-        # NSVisualEffectView for native frosted glass blur
-        vfx = NSVisualEffectView.alloc().initWithFrame_(
+        # NSGlassEffectView for Liquid Glass background (subview, not contentView,
+        # to preserve NSPanel's focus / responder-chain management)
+        from wenzi.ui_helpers import configure_glass_appearance
+
+        glass = NSGlassEffectView.alloc().initWithFrame_(
             NSMakeRect(0, 0, initial_width, initial_height),
         )
-        vfx.setBlendingMode_(0)  # NSVisualEffectBlendingModeBehindWindow
-        vfx.setState_(1)  # NSVisualEffectStateActive
-        vfx.setAutoresizingMask_(0x12)  # Width + Height sizable
-        vfx.setWantsLayer_(True)
-        vfx.layer().setCornerRadius_(18.0)
-        vfx.layer().setMasksToBounds_(True)
-        panel.contentView().addSubview_(vfx)
-        self._vfx_view = vfx
-        self._activate_vfx()
+        glass.setCornerRadius_(18.0)
+        glass.setWantsLayer_(True)
+        glass.layer().setMasksToBounds_(True)  # clip webview to rounded corners
+        glass.setAutoresizingMask_(0x12)  # Width + Height sizable
+        configure_glass_appearance(glass)
+        panel.contentView().addSubview_(glass)
+        self._glass_view = glass
 
         # Position: center-top of mouse screen (like Spotlight)
         self._panel = panel
@@ -2077,7 +2075,7 @@ class ChooserPanel:
         )
         webview.setAutoresizingMask_(0x12)  # Width + Height sizable
         webview.setValue_forKey_(False, "drawsBackground")
-        vfx.addSubview_(webview)
+        glass.addSubview_(webview)
 
         # Navigation delegate
         nav_cls = _get_navigation_delegate_class()
@@ -2094,7 +2092,7 @@ class ChooserPanel:
         self._recycle_preloading = False
 
         if not load_html:
-            self._deactivate_vfx()
+            self._deactivate_glass()
             return
 
         # Load HTML from a temp file so WKWebView grants file:// access.

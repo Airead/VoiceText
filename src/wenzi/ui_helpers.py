@@ -49,6 +49,33 @@ def release_panel_surfaces(panel) -> None:
         pass
 
 
+def configure_glass_appearance(glass) -> None:
+    """Lock an NSGlassEffectView to the current system light/dark theme.
+
+    By default NSGlassEffectView is *adaptive* — it samples behind-window
+    brightness and auto-switches light/dark, ignoring the system setting.
+    This helper forces it to follow the system appearance via
+    ``setAppearance_`` (public) and ``set_adaptiveAppearance_`` (private;
+    0=Light, 1=Dark, 2=Auto).
+
+    See CLAUDE.md "NSGlassEffectView — Lock Adaptive Appearance" for details.
+    """
+    try:
+        from AppKit import NSApp
+
+        sys_appearance = NSApp.effectiveAppearance()
+        name = sys_appearance.bestMatchFromAppearancesWithNames_(
+            ["NSAppearanceNameAqua", "NSAppearanceNameDarkAqua"]
+        )
+        is_dark = name is not None and "Dark" in str(name)
+
+        glass.setAppearance_(sys_appearance)
+        if glass.respondsToSelector_(b"set_adaptiveAppearance:"):
+            glass.set_adaptiveAppearance_(1 if is_dark else 0)
+    except Exception:
+        logger.debug("Failed to lock glass appearance", exc_info=True)
+
+
 def activate_for_dialog() -> None:
     """Set activation policy so modal dialogs can show from non-bundled process.
 

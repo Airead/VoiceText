@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root {
-    --bg: transparent;
     --text: #1d1d1f;
     --secondary: #86868b;
     --border: rgba(0, 0, 0, 0.08);
@@ -13,14 +12,11 @@
     --item-hover: rgba(0, 0, 0, 0.06);
     --item-selected: rgba(0, 122, 255, 0.16);
     --item-selected-text: #003d99;
-    --input-bg: transparent;
-    --shadow: rgba(0, 0, 0, 0.06);
     --glass-badge: rgba(0, 0, 0, 0.06);
     --mark-bg: rgba(255, 204, 0, 0.35);
 }
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg: transparent;
         --text: #e5e5e7;
         --secondary: #98989d;
         --border: rgba(255, 255, 255, 0.10);
@@ -28,8 +24,6 @@
         --item-hover: rgba(255, 255, 255, 0.08);
         --item-selected: rgba(10, 132, 255, 0.25);
         --item-selected-text: #64d2ff;
-        --input-bg: transparent;
-        --shadow: rgba(0, 0, 0, 0.3);
         --glass-badge: rgba(255, 255, 255, 0.10);
         --mark-bg: rgba(255, 214, 10, 0.30);
     }
@@ -41,13 +35,8 @@ html, body {
     color: var(--text);
     -webkit-user-select: none; user-select: none;
 }
-html { background: transparent; }
 body {
     display: flex; flex-direction: column;
-    position: relative;
-    background: transparent;
-    border-radius: 18px;
-    overflow: hidden;
 }
 
 /* Main content: left panel + preview */
@@ -70,7 +59,6 @@ body {
     border-left: 0.5px solid var(--border);
     padding: 16px; overflow: hidden;
     min-height: 0;
-    background: transparent;
 }
 .preview-panel.hidden { display: none; }
 .preview-panel.empty {
@@ -121,7 +109,6 @@ body {
 .search-bar {
     display: flex; align-items: center; gap: 8px;
     padding: 12px 16px;
-    background: var(--input-bg);
     border-bottom: 0.5px solid var(--border);
     flex-shrink: 0;
     position: relative;
@@ -154,7 +141,6 @@ body {
 .context-block {
     display: none; flex-shrink: 0;
     padding: 10px 14px;
-    background: transparent;
     border-bottom: 0.5px solid var(--border);
 }
 .context-block.visible { display: block; }
@@ -222,10 +208,8 @@ body {
     padding: 8px 12px; cursor: default;
     transition: background 0.2s ease;
     gap: 10px;
-    box-sizing: border-box;
     overflow: hidden;
     border-radius: 10px;
-    margin: 0 0;
 }
 .icon-wrap {
     position: relative; flex-shrink: 0;

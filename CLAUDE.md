@@ -23,6 +23,44 @@ When adding new modules, place them in the appropriate subpackage. Subpackage `_
 
 Cross-package imports from controllers/ui should use absolute paths (`from wenzi.config import ...`), not relative imports to parent package.
 
+## Minimum Deployment Target — macOS 26
+
+The minimum supported macOS version is **macOS 26 (Tahoe)**. Do not add backwards-compatibility code for older systems. APIs available only in macOS 26+ (e.g. `NSGlassEffectView`) can be used unconditionally without version checks or fallbacks.
+
+## NSGlassEffectView — Lock Adaptive Appearance to System Theme
+
+NSGlassEffectView is **adaptive by default**: it continuously samples the brightness of content behind the window and auto-switches between light and dark rendering, **ignoring the system dark/light mode setting**. This means a dark-mode panel over a white background will render as light glass.
+
+The public `setAppearance_()` API does **not** fix this — the glass material's own rendering pipeline ignores it. You must use the private `_adaptiveAppearance` property:
+
+- **0** = Light (force light)
+- **1** = Dark (force dark)
+- **2** = Auto (default — adapts to behind-window brightness)
+
+```python
+from AppKit import NSApp, NSAppearance, NSGlassEffectView
+
+glass = NSGlassEffectView.alloc().initWithFrame_(frame)
+
+# Detect system theme
+sys_appearance = NSApp.effectiveAppearance()
+name = sys_appearance.bestMatchFromAppearancesWithNames_(
+    ["NSAppearanceNameAqua", "NSAppearanceNameDarkAqua"]
+)
+is_dark = name is not None and "Dark" in str(name)
+
+# Public API — cascade to subviews (labels, text fields, etc.)
+glass.setAppearance_(sys_appearance)
+
+# Private API — lock the glass material itself
+if glass.respondsToSelector_(b"set_adaptiveAppearance:"):
+    glass.set_adaptiveAppearance_(1 if is_dark else 0)
+```
+
+**Every** `NSGlassEffectView` instance in the project must apply this pattern. Without it, small panels (like the recording indicator) over bright/dark backgrounds will visually contradict the system theme. See `recording_indicator.py:_make_glass_view()` for the reference implementation.
+
+**Note:** `_adaptiveAppearance` is a private API (discovered via [qt-liquid-glass](https://github.com/fsalinas26/qt-liquid-glass)). Always guard with `respondsToSelector_`.
+
 ## Test Safety — Never Use Real User Data Paths
 
 When writing tests that instantiate classes with default paths pointing to real user directories (e.g. `~/.config/WenZi/`), **always override those paths with `tmp_path`** to prevent tests from reading, modifying, or deleting real user data.
@@ -123,27 +161,35 @@ All UI must support macOS dark mode. Follow these rules when writing UI code:
 - **Avoid deprecated `colorWithCalibratedRed_green_blue_alpha_`** — use `colorWithSRGBRed_green_blue_alpha_` or system semantic colors.
 - See `ui/result_window_web.py` for a good reference implementation of dark mode support.
 
-## NSVisualEffectView Memory Management
+## Blur Panels — Use NSGlassEffectView (Liquid Glass), Never NSVisualEffectView
 
-`NSVisualEffectView` with `NSVisualEffectBlendingModeBehindWindow` causes macOS to allocate a **full-screen IOSurface** (~72 MB at retina) for desktop content capture used by the blur effect. This memory is **not released** by `orderOut_` alone.
+**Minimum deployment target is macOS 26.** Do not add compatibility shims for older systems.
 
-When hiding or closing any panel that contains an `NSVisualEffectView`, call the shared helper **before or after** `orderOut_`:
+When a panel needs a blur/frosted-glass background, use **NSGlassEffectView** (Liquid Glass). **Never use NSVisualEffectView** for new panels — it is deprecated in this project. If you encounter an existing `NSVisualEffectView`, migrate it to `NSGlassEffectView`. If a panel does not need blur, use a plain NSView/NSPanel with a normal background color.
+
+Every NSGlassEffectView must call the shared helper to lock its appearance to the system theme:
 
 ```python
-from wenzi.ui_helpers import release_panel_surfaces
+from wenzi.ui_helpers import configure_glass_appearance
 
-release_panel_surfaces(self._panel)   # deactivate VFX + shrink to 1×1
-self._panel.orderOut_(None)
-self._panel = None
+glass = NSGlassEffectView.alloc().initWithFrame_(frame)
+glass.setCornerRadius_(12)
+configure_glass_appearance(glass)
 ```
 
-`release_panel_surfaces(panel)` handles both steps automatically:
-1. Walks the content view and its direct subviews, deactivates any `NSVisualEffectView` (`setState_(0)`)
-2. Shrinks the panel to 1×1 to force Core Animation to release the backing store
+### IOSurface Memory Management
 
-When re-showing, re-activate the effect view (`setState_(1)`) **just before** `orderFront_`/`makeKeyAndOrderFront_`, so the IOSurface is only allocated while the panel is visible.
+NSGlassEffectView allocates a GPU-backed IOSurface (~72 MB+ at retina) for behind-window compositing. This memory is **not released** by `orderOut_` alone. When hiding a panel, shrink it to 1×1 to force Core Animation to release the backing store:
 
-The chooser panel (`ChooserPanel`) uses `NSVisualEffectView` (Material Menu) with a fully transparent WKWebView on top. The VFX lifecycle is managed via `_activate_vfx()` / `_deactivate_vfx()` — see `chooser_panel.py`.
+```python
+from Foundation import NSMakeRect
+
+f = panel.frame()
+panel.setFrame_display_(NSMakeRect(f.origin.x, f.origin.y, 1, 1), False)
+panel.orderOut_(None)
+```
+
+The chooser panel (`ChooserPanel`) manages this via `_deactivate_glass()` / `_activate_glass()` — see `chooser_panel.py`.
 
 ## LLM max_tokens Guard
 

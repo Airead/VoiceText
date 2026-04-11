@@ -71,7 +71,6 @@ class TestSourceRegistration:
         assert panel._usage_tracker is None
         assert panel._query_history is None
 
-
 class TestSearchLogic:
     def test_empty_query_returns_no_results(self):
         panel = _make_panel()
@@ -932,11 +931,7 @@ class TestQuickLookIntegration:
         panel._panel = MagicMock()
         panel.close = MagicMock()
 
-        with patch("PyObjCTools.AppHelper.callLater") as mock_later:
-            panel._maybe_close()
-            check_fn = mock_later.call_args[0][1]
-
-        check_fn()
+        panel._maybe_close()
         panel.close.assert_not_called()
 
     def test_maybe_close_closes_even_when_chooser_regained_key(self):
@@ -950,11 +945,7 @@ class TestQuickLookIntegration:
         panel._panel = MagicMock()
         panel.close = MagicMock()
 
-        with patch("PyObjCTools.AppHelper.callLater") as mock_later:
-            panel._maybe_close()
-            check_fn = mock_later.call_args[0][1]
-
-        check_fn()
+        panel._maybe_close()
         panel.close.assert_called_once()
 
     def test_maybe_close_closes_when_no_ql_panel(self):
@@ -963,11 +954,7 @@ class TestQuickLookIntegration:
         panel._panel = MagicMock()
         panel.close = MagicMock()
 
-        with patch("PyObjCTools.AppHelper.callLater") as mock_later:
-            panel._maybe_close()
-            check_fn = mock_later.call_args[0][1]
-
-        check_fn()
+        panel._maybe_close()
         panel.close.assert_called_once()
 
 
@@ -1244,15 +1231,12 @@ class TestCalcMode:
         panel._panel = MagicMock()
         panel._current_items = [_make_calc_item()]
         panel._start_esc_tap = MagicMock()
+        panel.close = MagicMock()
 
-        with patch("PyObjCTools.AppHelper.callLater") as mock_later:
-            panel._maybe_close()
-            # Extract and run the deferred _check callback
-            _check = mock_later.call_args[0][1]
-            _check()
+        panel._maybe_close()
 
         assert panel._calc_mode is True
-        panel.close = MagicMock()  # Should NOT have been called
+        panel.close.assert_not_called()
 
     def test_maybe_close_closes_without_calc_results(self):
         """_maybe_close should close normally without calc results."""
@@ -1261,10 +1245,7 @@ class TestCalcMode:
         panel._current_items = [ChooserItem(title="Safari")]
         panel.close = MagicMock()
 
-        with patch("PyObjCTools.AppHelper.callLater") as mock_later:
-            panel._maybe_close()
-            _check = mock_later.call_args[0][1]
-            _check()
+        panel._maybe_close()
 
         panel.close.assert_called_once()
 
@@ -1352,13 +1333,12 @@ class TestCalcMode:
         panel._current_items = []  # No calc results
         panel._calc_sticky = True  # But sticky from previous calc
         panel._start_esc_tap = MagicMock()
+        panel.close = MagicMock()
 
-        with patch("PyObjCTools.AppHelper.callLater") as mock_later:
-            panel._maybe_close()
-            _check = mock_later.call_args[0][1]
-            _check()
+        panel._maybe_close()
 
         assert panel._calc_mode is True
+        panel.close.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -1771,7 +1751,7 @@ class TestDeferredRecycle:
         panel = _make_panel()
         panel._panel = MagicMock()
         panel._webview = MagicMock()
-        with patch.object(panel, "_deactivate_vfx") as mock_release, \
+        with patch.object(panel, "_deactivate_glass") as mock_release, \
              patch("PyObjCTools.AppHelper.callLater"), \
              patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn, *a, **kw: fn(*a, **kw)), \
              patch("wenzi.scripting.ui.chooser_panel.reactivate_app"):
@@ -1832,11 +1812,11 @@ class TestDeferredRecycle:
         timer.cancel.assert_called_once()
         assert panel._recycle_timer is None
 
-    def test_destroy_deactivates_vfx_during_close(self):
+    def test_destroy_deactivates_glass_during_close(self):
         panel = _make_panel()
         panel._panel = MagicMock()
         panel._webview = MagicMock()
-        with patch.object(panel, "_deactivate_vfx") as mock_deactivate, \
+        with patch.object(panel, "_deactivate_glass") as mock_deactivate, \
              patch("wenzi.ui.web_utils.cleanup_webview"), \
              patch("PyObjCTools.AppHelper.callAfter", side_effect=lambda fn, *a, **kw: fn(*a, **kw)), \
              patch("wenzi.scripting.ui.chooser_panel.reactivate_app"):
@@ -1942,6 +1922,6 @@ class TestDeferredRecycle:
         panel._pending_js = []
         with patch.object(panel, "_inject_i18n"), \
              patch.object(panel, "_eval_js"), \
-             patch.object(panel, "_deactivate_vfx") as mock_release:
+             patch.object(panel, "_deactivate_glass") as mock_release:
             panel._on_page_loaded()
         mock_release.assert_called_once_with()

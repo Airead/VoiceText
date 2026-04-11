@@ -21,11 +21,11 @@ _LABEL_HEIGHT = 17  # height added for subtitle row
 _REFRESH_INTERVAL = 0.05
 
 # Waveform visual parameters
-_WAVE_POINTS = 50       # sample points for smooth curve
-_WAVE_WIDTH = 180.0     # horizontal extent
-_WAVE_MAX_AMP = 9.6     # max amplitude from centre line
-_WAVE_LINE_W = 2.4      # primary wave stroke width
-_WAVE_LINE_W2 = 1.8     # secondary wave stroke width
+_WAVE_POINTS = 50  # sample points for smooth curve
+_WAVE_WIDTH = 180.0  # horizontal extent
+_WAVE_MAX_AMP = 9.6  # max amplitude from centre line
+_WAVE_LINE_W = 2.4  # primary wave stroke width
+_WAVE_LINE_W2 = 1.8  # secondary wave stroke width
 
 # Status dot parameters
 _DOT_RADIUS = 5.4
@@ -81,9 +81,7 @@ class RecordingIndicatorView:
         from AppKit import NSColor
 
         def _provider(appearance):
-            name = appearance.bestMatchFromAppearancesWithNames_(
-                ["NSAppearanceNameAqua", "NSAppearanceNameDarkAqua"]
-            )
+            name = appearance.bestMatchFromAppearancesWithNames_(["NSAppearanceNameAqua", "NSAppearanceNameDarkAqua"])
             rgba = dark_rgba if name and "Dark" in str(name) else light_rgba
             return NSColor.colorWithSRGBRed_green_blue_alpha_(*rgba)
 
@@ -129,8 +127,10 @@ class RecordingIndicatorView:
             self._dot_color_inactive.setFill()
 
         dot_rect = NSMakeRect(
-            dot_x - _DOT_RADIUS, dot_y - _DOT_RADIUS,
-            _DOT_RADIUS * 2, _DOT_RADIUS * 2,
+            dot_x - _DOT_RADIUS,
+            dot_y - _DOT_RADIUS,
+            _DOT_RADIUS * 2,
+            _DOT_RADIUS * 2,
         )
         NSBezierPath.bezierPathWithOvalInRect_(dot_rect).fill()
 
@@ -155,7 +155,7 @@ class RecordingIndicatorView:
 
             path = NSBezierPath.alloc().init()
             path.setLineWidth_(_WAVE_LINE_W if wave_idx == 0 else _WAVE_LINE_W2)
-            path.setLineCapStyle_(1)   # NSLineCapStyleRound
+            path.setLineCapStyle_(1)  # NSLineCapStyleRound
             path.setLineJoinStyle_(1)  # NSLineJoinStyleRound
 
             for i in range(_WAVE_POINTS + 1):
@@ -207,7 +207,8 @@ class RecordingIndicatorView:
                 self._subtitle_ns_str = NSString.stringWithString_(self._subtitle)
             label_rect = NSMakeRect(33.6, 6, 180, _LABEL_HEIGHT)
             self._subtitle_ns_str.drawInRect_withAttributes_(
-                label_rect, self._subtitle_attrs,
+                label_rect,
+                self._subtitle_attrs,
             )
 
 
@@ -276,16 +277,14 @@ class RecordingIndicatorPanel:
     @staticmethod
     def _make_glass_view(width: int, height: int):
         """Create an NSGlassEffectView with Liquid Glass appearance."""
-        from AppKit import NSColor, NSGlassEffectView
+        from AppKit import NSGlassEffectView
         from Foundation import NSMakeRect
 
-        glass = NSGlassEffectView.alloc().initWithFrame_(
-            NSMakeRect(0, 0, width, height)
-        )
+        from wenzi.ui_helpers import configure_glass_appearance
+
+        glass = NSGlassEffectView.alloc().initWithFrame_(NSMakeRect(0, 0, width, height))
         glass.setCornerRadius_(_BG_CORNER_RADIUS)
-        glass.setTintColor_(
-            NSColor.colorWithSRGBRed_green_blue_alpha_(1.0, 1.0, 1.0, 0.15)
-        )
+        configure_glass_appearance(glass)
         return glass
 
     def _panel_height(self) -> int:
@@ -374,11 +373,7 @@ class RecordingIndicatorPanel:
 
     def _clear_view_backref(self) -> None:
         """Clear the _indicator back-reference on the NSView to break the cycle."""
-        if (
-            self._indicator_view
-            and hasattr(self._indicator_view, "_view")
-            and self._indicator_view._view
-        ):
+        if self._indicator_view and hasattr(self._indicator_view, "_view") and self._indicator_view._view:
             try:
                 self._indicator_view._view._indicator = None
             except Exception:
@@ -565,8 +560,6 @@ class RecordingIndicatorPanel:
         response without jitter.
         """
         alpha = _EMA_ATTACK if level > self._smoothed_level else _EMA_RELEASE
-        self._smoothed_level = (
-            alpha * level + (1 - alpha) * self._smoothed_level
-        )
+        self._smoothed_level = alpha * level + (1 - alpha) * self._smoothed_level
         if self._indicator_view is not None:
             self._indicator_view.set_level(self._smoothed_level)
