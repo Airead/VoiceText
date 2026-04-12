@@ -1894,6 +1894,50 @@ class TestDeferredRecycle:
         mock_build.assert_not_called()
         assert panel._webview is not None
 
+    def test_teardown_breaks_panel_refs(self):
+        """_teardown_webview must nil _panel_ref on all delegates."""
+        panel = _make_panel()
+        panel._webview = MagicMock()
+        panel._panel = MagicMock()
+        handler = MagicMock()
+        handler._panel_ref = panel
+        nav = MagicMock()
+        nav._panel_ref = panel
+        delegate = MagicMock()
+        delegate._panel_ref = panel
+        panel._message_handler = handler
+        panel._navigation_delegate = nav
+        panel._panel_delegate = delegate
+        panel._teardown_webview()
+        assert handler._panel_ref is None
+        assert nav._panel_ref is None
+        assert delegate._panel_ref is None
+
+    def test_teardown_removes_webview_from_superview(self):
+        """_teardown_webview must call removeFromSuperview on the webview."""
+        panel = _make_panel()
+        webview = MagicMock()
+        panel._webview = webview
+        panel._panel = MagicMock()
+        panel._message_handler = MagicMock()
+        panel._navigation_delegate = MagicMock()
+        panel._panel_delegate = MagicMock()
+        panel._teardown_webview()
+        webview.removeFromSuperview.assert_called_once()
+
+    def test_teardown_cancels_debounce_timers(self):
+        """_teardown_webview must cancel pending debounce timers."""
+        panel = _make_panel()
+        panel._webview = MagicMock()
+        panel._panel = MagicMock()
+        timer = MagicMock()
+        panel._debounce_state = {"src": MagicMock(timer=timer)}
+        gen_before = panel._search_generation
+        panel._teardown_webview()
+        timer.invalidate.assert_called_once()
+        assert panel._debounce_state == {}
+        assert panel._search_generation == gen_before + 1
+
     def test_show_reuses_hidden_preload_without_reloading_html(self):
         panel = _make_panel()
         panel._panel = MagicMock()

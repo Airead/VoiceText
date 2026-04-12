@@ -944,6 +944,26 @@ class ChooserPanel:
         """Release the webview, panel, and associated delegates."""
         from wenzi.ui.web_utils import cleanup_webview
 
+        # Cancel pending debounce timers and bump the search generation so
+        # any in-flight async callAfter results see a stale generation and
+        # become no-ops immediately.
+        self._cancel_all_debounce_timers()
+        self._search_generation += 1
+
+        # Break _panel_ref back-references to prevent retain cycles
+        # (handler/nav_delegate/panel_delegate → ChooserPanel → webview).
+        if self._message_handler is not None:
+            self._message_handler._panel_ref = None
+        if self._navigation_delegate is not None:
+            self._navigation_delegate._panel_ref = None
+        if self._panel_delegate is not None:
+            self._panel_delegate._panel_ref = None
+
+        # Remove webview from the glass view hierarchy so the ObjC
+        # superview no longer retains it (glass → webview strong ref).
+        if self._webview is not None:
+            self._webview.removeFromSuperview()
+
         cleanup_webview(self._webview, handler_name="chooser")
         if self._panel is not None:
             self._panel.setDelegate_(None)
