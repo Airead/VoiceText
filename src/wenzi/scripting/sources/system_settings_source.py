@@ -288,7 +288,7 @@ def _get_icon_png(appex_path: str) -> bytes | None:
                 NSPNGFileType,
                 NSWorkspace,
             )
-            from Foundation import NSMakeRect, NSZeroRect
+            from Foundation import NSMakeRect, NSMakeSize, NSZeroRect
 
             ws = NSWorkspace.sharedWorkspace()
             icon = ws.iconForFile_(appex_path)
@@ -297,6 +297,7 @@ def _get_icon_png(appex_path: str) -> bytes | None:
 
             # Render into a bitmap rep (thread-safe, no deprecated lockFocus)
             sz = _ICON_SIZE
+            pt = sz // 2  # point size = half pixel size → 2x scale context
             rep = NSBitmapImageRep.alloc() \
                 .initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(  # noqa: E501
                     None, sz, sz, 8, 4, True, False,
@@ -304,6 +305,8 @@ def _get_icon_png(appex_path: str) -> bytes | None:
                 )
             if rep is None:
                 return None
+            # Set point size so NSImage picks a high-res representation
+            rep.setSize_(NSMakeSize(pt, pt))
             ctx = NSGraphicsContext.graphicsContextWithBitmapImageRep_(rep)
             if ctx is None:
                 return None
@@ -311,7 +314,7 @@ def _get_icon_png(appex_path: str) -> bytes | None:
             NSGraphicsContext.setCurrentContext_(ctx)
             ctx.setImageInterpolation_(3)  # NSImageInterpolationHigh
             icon.drawInRect_fromRect_operation_fraction_(
-                NSMakeRect(0, 0, sz, sz), NSZeroRect,
+                NSMakeRect(0, 0, pt, pt), NSZeroRect,
                 NSCompositingOperationCopy, 1.0,
             )
             NSGraphicsContext.restoreGraphicsState()

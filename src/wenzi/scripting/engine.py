@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import logging
 import os
+import re
 import shutil
 import sys
 import traceback as _tb
@@ -74,6 +76,136 @@ class ScriptEngine:
             alert(message, duration=duration)
         except Exception:
             logger.debug("Alert failed", exc_info=True)
+
+    # ── App icon helper ────────────────────────────────────────────
+
+    _app_icon_url: str | None = None
+
+    @classmethod
+    def _get_app_icon_url(cls) -> str:
+        """Return a file:// URL for the WenZi app icon as cached PNG.
+
+        Uses the same NSBitmapImageRep rendering pipeline as app_source to
+        produce a crisp 128×128 px icon at 2× scale.
+        """
+        if cls._app_icon_url is not None:
+            return cls._app_icon_url
+
+        cache_dir = os.path.expanduser(_cfg.DEFAULT_ICON_CACHE_DIR)
+        png_path = os.path.join(cache_dir, "wenzi_app.png")
+        if os.path.isfile(png_path):
+            cls._app_icon_url = f"file://{png_path}"
+            return cls._app_icon_url
+
+        try:
+            png = cls._render_app_icon_png()
+            if png:
+                os.makedirs(cache_dir, exist_ok=True)
+                with open(png_path, "wb") as f:
+                    f.write(png)
+                cls._app_icon_url = f"file://{png_path}"
+                return cls._app_icon_url
+        except Exception:
+            logger.debug("Failed to render app icon", exc_info=True)
+
+        cls._app_icon_url = ""
+        return cls._app_icon_url
+
+    @staticmethod
+    def _render_app_icon_png() -> bytes | None:
+        """Render the WenZi app icon to 128×128 PNG bytes at 2× scale."""
+        import objc
+
+        with objc.autorelease_pool():
+            from AppKit import (
+                NSBitmapImageRep,
+                NSCompositingOperationCopy,
+                NSDeviceRGBColorSpace,
+                NSGraphicsContext,
+                NSImage,
+                NSPNGFileType,
+            )
+            from Foundation import NSMakeRect, NSMakeSize, NSZeroRect
+
+            # Try loading from resources/icon.png
+            wenzi_pkg = os.path.dirname(os.path.dirname(__file__))
+            src_png = os.path.normpath(os.path.join(
+                os.path.dirname(wenzi_pkg), os.pardir, "resources", "icon.png",
+            ))
+            if os.path.isfile(src_png):
+                icon = NSImage.alloc().initWithContentsOfFile_(src_png)
+            else:
+                # Fallback: generic app icon
+                icon = NSImage.imageNamed_("NSApplicationIcon")
+            if icon is None:
+                return None
+
+            sz = 128  # pixel size
+            pt = sz // 2  # point size → 2× scale context
+            rep = NSBitmapImageRep.alloc() \
+                .initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(  # noqa: E501
+                    None, sz, sz, 8, 4, True, False,
+                    NSDeviceRGBColorSpace, 0, 0,
+                )
+            if rep is None:
+                return None
+            rep.setSize_(NSMakeSize(pt, pt))
+            ctx = NSGraphicsContext.graphicsContextWithBitmapImageRep_(rep)
+            if ctx is None:
+                return None
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.setCurrentContext_(ctx)
+            ctx.setImageInterpolation_(3)  # NSImageInterpolationHigh
+            icon.drawInRect_fromRect_operation_fraction_(
+                NSMakeRect(0, 0, pt, pt), NSZeroRect,
+                NSCompositingOperationCopy, 1.0,
+            )
+            NSGraphicsContext.restoreGraphicsState()
+
+            png_data = rep.representationUsingType_properties_(
+                NSPNGFileType, None,
+            )
+            return bytes(png_data) if png_data else None
+
+    # ── Menu commands ─────────────────────────────────────────────
+
+    def _register_menu_commands(self) -> None:
+        """Register top-level menu items as promoted chooser commands."""
+        items = self._wz.menu.list()
+        if not items:
+            return
+
+        icon_url = self._get_app_icon_url()
+        count = 0
+
+        for item in items:
+            if not item.get("has_action") or item.get("children"):
+                continue
+            title = item["title"]
+
+            # Slugify title → command name
+            slug = re.sub(
+                r"[^a-zA-Z0-9]+", "-", title.rstrip(".").strip(),
+            ).strip("-").lower()
+            if not slug or not slug[0].isalnum():
+                slug = hashlib.md5(title.encode()).hexdigest()[:8]
+
+            # Create action closure that triggers the menu item
+            def _make_action(t: str = title) -> Callable:
+                def _action(args: str) -> None:
+                    self._wz.menu.trigger(t)
+                return _action
+
+            self._wz.chooser.register_command(
+                name=slug,
+                title=f"WenZi {title}",
+                action=_make_action(),
+                icon=icon_url,
+                promoted=True,
+            )
+            count += 1
+
+        logger.info("Registered %d menu items as chooser commands", count)
 
     def start(self) -> None:
         """Load scripts, register built-in sources, and start all listeners."""
@@ -502,6 +634,9 @@ class ScriptEngine:
 
         # Command source (always registered when chooser is enabled)
         self._wz.chooser._ensure_command_source()
+
+        # Register top-level menu items as chooser commands
+        self._register_menu_commands()
 
         # Re-apply openSettings handler on the (possibly new) ChooserAPI
         if self._open_settings_cb is not None:

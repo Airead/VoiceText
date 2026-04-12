@@ -284,8 +284,27 @@ class RecordingIndicatorPanel:
 
         glass = NSGlassEffectView.alloc().initWithFrame_(NSMakeRect(0, 0, width, height))
         glass.setCornerRadius_(_BG_CORNER_RADIUS)
+        glass.setWantsLayer_(True)
+        glass.layer().setMasksToBounds_(True)
         configure_glass_appearance(glass)
         return glass
+
+    @staticmethod
+    def _decorate_glass(glass, width, height):
+        """Add outline for Liquid Glass edge definition."""
+        from AppKit import NSView
+        from Foundation import NSMakeRect
+
+        from wenzi.ui_helpers import dynamic_color
+
+        # Crisp outline for edge definition
+        ol_color = dynamic_color((1.0, 1.0, 1.0, 0.30), (1.0, 1.0, 1.0, 0.16))
+        outline = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, width, height))
+        outline.setWantsLayer_(True)
+        outline.layer().setCornerRadius_(_BG_CORNER_RADIUS)
+        outline.layer().setBorderWidth_(1.0)
+        outline.layer().setBorderColor_(ol_color.CGColor())
+        glass.addSubview_(outline)
 
     def _panel_height(self) -> int:
         """Compute current panel height based on whether a subtitle is shown."""
@@ -346,6 +365,7 @@ class RecordingIndicatorPanel:
             glass = self._make_glass_view(_PANEL_WIDTH, panel_height)
             indicator = self._indicator_view.create_view(_PANEL_WIDTH, panel_height)
             glass.setContentView_(indicator)
+            self._decorate_glass(glass, _PANEL_WIDTH, panel_height)
             panel.setContentView_(glass)
 
             panel.orderFront_(None)
@@ -424,6 +444,7 @@ class RecordingIndicatorPanel:
         glass = self._make_glass_view(_PANEL_WIDTH, new_height)
         indicator = self._indicator_view.create_view(_PANEL_WIDTH, new_height)
         glass.setContentView_(indicator)
+        self._decorate_glass(glass, _PANEL_WIDTH, new_height)
 
         self._panel.setContentSize_((float(_PANEL_WIDTH), float(new_height)))
         self._panel.setContentView_(glass)

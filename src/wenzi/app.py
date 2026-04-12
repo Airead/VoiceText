@@ -473,7 +473,10 @@ class WenZiApp(StatusBarApp):
             t("menu.usage_stats"), callback=self._on_show_usage_stats
         )
 
-        # Restart / About / Help items
+        # Reload Scripts / Restart / About / Help items
+        self._reload_scripts_item = StatusMenuItem(
+            t("menu.reload_scripts"), callback=self._on_reload_scripts
+        )
         self._restart_item = StatusMenuItem(t("menu.restart"), callback=self._on_restart)
         self._about_item = StatusMenuItem(t("menu.about"), callback=self._on_about)
         self._help_item = StatusMenuItem(
@@ -513,6 +516,7 @@ class WenZiApp(StatusBarApp):
                 self._about_item,
                 self._help_item,
                 None,
+                self._reload_scripts_item,
                 self._restart_item,
             ]
         self.quit_button.set_callback(self._on_quit_click)
@@ -1051,6 +1055,10 @@ class WenZiApp(StatusBarApp):
     def _on_about(self, _) -> None:
         self._config_controller.on_about(_)
 
+    def _on_reload_scripts(self, _) -> None:
+        if self._script_engine is not None:
+            self._script_engine.reload()
+
     def _on_restart(self, _) -> None:
         from wenzi.statusbar import restart_application
         restart_application()
@@ -1519,11 +1527,11 @@ class WenZiApp(StatusBarApp):
                 plugins_dir=os.path.join(self._config_dir, "plugins"),
             )
             self._script_engine._ua_controller = self._ua_controller
-            self._script_engine.start()
             self._script_engine.wz.menu._set_root(self._menu)
             self._script_engine.wz.menu._set_wz_ns(
                 self._script_engine.wz
             )
+            self._script_engine.start()
             self._script_engine.set_open_settings_callback(
                 lambda: self._on_open_settings(None)
             )
