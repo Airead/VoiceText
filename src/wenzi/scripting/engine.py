@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import logging
 import os
+import re
 import shutil
 import sys
 import traceback as _tb
@@ -74,6 +76,84 @@ class ScriptEngine:
             alert(message, duration=duration)
         except Exception:
             logger.debug("Alert failed", exc_info=True)
+
+    # ── App icon helper ────────────────────────────────────────────
+
+    _app_icon_url: str | None = None
+
+    @classmethod
+    def _get_app_icon_url(cls) -> str:
+        """Return a file:// URL for the WenZi app icon as cached PNG."""
+        if cls._app_icon_url is not None:
+            return cls._app_icon_url
+
+        cache_dir = os.path.expanduser(_cfg.DEFAULT_ICON_CACHE_DIR)
+        png_path = os.path.join(cache_dir, "wenzi_app.png")
+        if os.path.isfile(png_path):
+            cls._app_icon_url = f"file://{png_path}"
+            return cls._app_icon_url
+
+        wenzi_pkg = os.path.dirname(os.path.dirname(__file__))
+        src_png = os.path.normpath(os.path.join(
+            os.path.dirname(wenzi_pkg), os.pardir, "resources", "icon.png",
+        ))
+        if os.path.isfile(src_png):
+            try:
+                import subprocess
+                os.makedirs(cache_dir, exist_ok=True)
+                subprocess.run(
+                    ["sips", "-z", "128", "128",
+                     src_png, "--out", png_path],
+                    capture_output=True, timeout=5,
+                )
+                if os.path.isfile(png_path):
+                    cls._app_icon_url = f"file://{png_path}"
+                    return cls._app_icon_url
+            except Exception:
+                logger.debug("Failed to convert app icon", exc_info=True)
+
+        cls._app_icon_url = ""
+        return cls._app_icon_url
+
+    # ── Menu commands ─────────────────────────────────────────────
+
+    def _register_menu_commands(self) -> None:
+        """Register top-level menu items as promoted chooser commands."""
+        items = self._wz.menu.list()
+        if not items:
+            return
+
+        icon_url = self._get_app_icon_url()
+        count = 0
+
+        for item in items:
+            if not item.get("has_action") or item.get("children"):
+                continue
+            title = item["title"]
+
+            # Slugify title → command name
+            slug = re.sub(
+                r"[^a-zA-Z0-9]+", "-", title.rstrip(".").strip(),
+            ).strip("-").lower()
+            if not slug or not slug[0].isalnum():
+                slug = hashlib.md5(title.encode()).hexdigest()[:8]
+
+            # Create action closure that triggers the menu item
+            def _make_action(t: str = title) -> Callable:
+                def _action(args: str) -> None:
+                    self._wz.menu.trigger(t)
+                return _action
+
+            self._wz.chooser.register_command(
+                name=slug,
+                title=f"WenZi {title}",
+                action=_make_action(),
+                icon=icon_url,
+                promoted=True,
+            )
+            count += 1
+
+        logger.info("Registered %d menu items as chooser commands", count)
 
     def start(self) -> None:
         """Load scripts, register built-in sources, and start all listeners."""
@@ -502,6 +582,9 @@ class ScriptEngine:
 
         # Command source (always registered when chooser is enabled)
         self._wz.chooser._ensure_command_source()
+
+        # Register top-level menu items as chooser commands
+        self._register_menu_commands()
 
         # Re-apply openSettings handler on the (possibly new) ChooserAPI
         if self._open_settings_cb is not None:

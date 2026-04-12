@@ -46,6 +46,7 @@
   "menu.reload_config": "重新加载配置",
   "menu.usage_stats": "使用统计",
   "menu.quit": "退出",
+  "menu.reload_scripts": "重新加载脚本",
   "menu.restart": "重启",
   "menu.about": "关于闻字",
   "menu.help": "帮助",

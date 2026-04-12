@@ -93,58 +93,10 @@ class ChooserAPI:
             self._panel.register_source(
                 self._command_source.as_promoted_chooser_source(),
             )
-        if "help" not in self._command_source._commands:
-            self._register_help_command()
         if "quit-all" not in self._command_source._commands:
             self._register_quit_all_command()
-        if "reload" not in self._command_source._commands:
-            self._register_reload_command()
         if "settings" not in self._command_source._commands:
             self._register_settings_command()
-
-    def _register_help_command(self) -> None:
-        """Register the built-in help command."""
-
-        def _help_action(args: str) -> None:
-            # Snapshot sources on the calling thread
-            sources = list(self._panel._sources.values())
-            items = []
-            for src in sorted(sources, key=lambda s: (s.prefix or "")):
-                if not src.prefix:
-                    continue
-                desc = src.description or src.name
-                # Filter by args if provided
-                if args.strip():
-                    from wenzi.scripting.sources import fuzzy_match
-
-                    m1, _ = fuzzy_match(args.strip(), desc)
-                    m2, _ = fuzzy_match(args.strip(), src.prefix)
-                    if not m1 and not m2:
-                        continue
-                items.append(
-                    {
-                        "title": desc,
-                        "subtitle": f"{src.prefix} <query>",
-                        "item_id": f"help:{src.name}",
-                        "action": lambda p=src.prefix: self.show_source(p),
-                    }
-                )
-            if items:
-                self.pick(
-                    items,
-                    callback=lambda _: None,
-                    placeholder="Available prefixes...",
-                )
-
-        self._command_source.register(
-            CommandEntry(
-                name="help",
-                title="Help",
-                subtitle="Show available prefixes",
-                action=_help_action,
-                promoted=True,
-            )
-        )
 
     def _register_quit_all_command(self) -> None:
         """Register the built-in quit-all command."""
@@ -170,26 +122,6 @@ class ChooserAPI:
                 title="Quit All Applications",
                 subtitle="Quit all running applications",
                 action=_quit_all_action,
-                promoted=True,
-            )
-        )
-
-    def _register_reload_command(self) -> None:
-        """Register the built-in reload command."""
-
-        def _reload_action(args: str) -> None:
-            import wenzi.scripting.api as _api
-
-            _wz = _api.wz
-            if _wz is not None:
-                _wz.reload()
-
-        self._command_source.register(
-            CommandEntry(
-                name="reload",
-                title="Reload Scripts",
-                subtitle="Reload all scripts and plugins",
-                action=_reload_action,
                 promoted=True,
             )
         )

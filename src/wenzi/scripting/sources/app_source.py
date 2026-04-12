@@ -26,7 +26,7 @@ from wenzi.scripting.sources import (
 
 logger = logging.getLogger(__name__)
 
-_ICON_SIZE = 72  # 72x72 px for Retina display (rendered at 36x36 CSS @2x)
+_ICON_SIZE = 128  # 128x128 px for Retina display (rendered at 32x32 CSS @2x)
 _DEFAULT_ICON_CACHE_DIR = os.path.expanduser(_CFG_ICON_CACHE_DIR)
 
 # Directories to scan for applications

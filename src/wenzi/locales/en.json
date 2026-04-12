@@ -46,6 +46,7 @@
   "menu.reload_config": "Reload Config",
   "menu.usage_stats": "Usage Stats",
   "menu.quit": "Quit",
+  "menu.reload_scripts": "Reload Scripts",
   "menu.restart": "Restart",
   "menu.about": "About WenZi",
   "menu.help": "Help",
