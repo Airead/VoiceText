@@ -83,7 +83,11 @@ class ScriptEngine:
 
     @classmethod
     def _get_app_icon_url(cls) -> str:
-        """Return a file:// URL for the WenZi app icon as cached PNG."""
+        """Return a file:// URL for the WenZi app icon as cached PNG.
+
+        Uses the same NSBitmapImageRep rendering pipeline as app_source to
+        produce a crisp 128×128 px icon at 2× scale.
+        """
         if cls._app_icon_url is not None:
             return cls._app_icon_url
 
@@ -93,27 +97,75 @@ class ScriptEngine:
             cls._app_icon_url = f"file://{png_path}"
             return cls._app_icon_url
 
-        wenzi_pkg = os.path.dirname(os.path.dirname(__file__))
-        src_png = os.path.normpath(os.path.join(
-            os.path.dirname(wenzi_pkg), os.pardir, "resources", "icon.png",
-        ))
-        if os.path.isfile(src_png):
-            try:
-                import subprocess
+        try:
+            png = cls._render_app_icon_png()
+            if png:
                 os.makedirs(cache_dir, exist_ok=True)
-                subprocess.run(
-                    ["sips", "-z", "128", "128",
-                     src_png, "--out", png_path],
-                    capture_output=True, timeout=5,
-                )
-                if os.path.isfile(png_path):
-                    cls._app_icon_url = f"file://{png_path}"
-                    return cls._app_icon_url
-            except Exception:
-                logger.debug("Failed to convert app icon", exc_info=True)
+                with open(png_path, "wb") as f:
+                    f.write(png)
+                cls._app_icon_url = f"file://{png_path}"
+                return cls._app_icon_url
+        except Exception:
+            logger.debug("Failed to render app icon", exc_info=True)
 
         cls._app_icon_url = ""
         return cls._app_icon_url
+
+    @staticmethod
+    def _render_app_icon_png() -> bytes | None:
+        """Render the WenZi app icon to 128×128 PNG bytes at 2× scale."""
+        import objc
+
+        with objc.autorelease_pool():
+            from AppKit import (
+                NSBitmapImageRep,
+                NSCompositingOperationCopy,
+                NSDeviceRGBColorSpace,
+                NSGraphicsContext,
+                NSImage,
+                NSPNGFileType,
+            )
+            from Foundation import NSMakeRect, NSMakeSize, NSZeroRect
+
+            # Try loading from resources/icon.png
+            wenzi_pkg = os.path.dirname(os.path.dirname(__file__))
+            src_png = os.path.normpath(os.path.join(
+                os.path.dirname(wenzi_pkg), os.pardir, "resources", "icon.png",
+            ))
+            if os.path.isfile(src_png):
+                icon = NSImage.alloc().initWithContentsOfFile_(src_png)
+            else:
+                # Fallback: generic app icon
+                icon = NSImage.imageNamed_("NSApplicationIcon")
+            if icon is None:
+                return None
+
+            sz = 128  # pixel size
+            pt = sz // 2  # point size → 2× scale context
+            rep = NSBitmapImageRep.alloc() \
+                .initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(  # noqa: E501
+                    None, sz, sz, 8, 4, True, False,
+                    NSDeviceRGBColorSpace, 0, 0,
+                )
+            if rep is None:
+                return None
+            rep.setSize_(NSMakeSize(pt, pt))
+            ctx = NSGraphicsContext.graphicsContextWithBitmapImageRep_(rep)
+            if ctx is None:
+                return None
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.setCurrentContext_(ctx)
+            ctx.setImageInterpolation_(3)  # NSImageInterpolationHigh
+            icon.drawInRect_fromRect_operation_fraction_(
+                NSMakeRect(0, 0, pt, pt), NSZeroRect,
+                NSCompositingOperationCopy, 1.0,
+            )
+            NSGraphicsContext.restoreGraphicsState()
+
+            png_data = rep.representationUsingType_properties_(
+                NSPNGFileType, None,
+            )
+            return bytes(png_data) if png_data else None
 
     # ── Menu commands ─────────────────────────────────────────────
 
