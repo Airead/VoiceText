@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -231,6 +232,89 @@ def _get_session_parts(
     return parts_by_msg
 
 
+_SUBAGENT_TITLE_RE = re.compile(r"^(.*?)\s+\(@(\w+)\s+subagent\)$")
+
+
+def _parse_subagent_title(title: str) -> tuple[str, str]:
+    """Extract description and agent_type from an OpenCode subagent title."""
+    m = _SUBAGENT_TITLE_RE.match(title)
+    if m:
+        return m.group(1), m.group(2)
+    return title, ""
+
+
+def _get_first_assistant_model(conn: sqlite3.Connection, session_id: str) -> str:
+    """Return modelID from the first assistant message in a session."""
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT json_extract(data, '$.modelID')
+        FROM message
+        WHERE session_id = ? AND json_extract(data, '$.role') = 'assistant'
+        LIMIT 1
+        """,
+        (session_id,),
+    )
+    row = cur.fetchone()
+    return row[0] if row and row[0] else ""
+
+
+def list_opencode_subagents(parent_session_id: str) -> list[dict[str, Any]]:
+    """Return subagents for a given OpenCode parent session."""
+    db = _db_path()
+    if not db.exists():
+        return []
+
+    results: list[dict[str, Any]] = []
+    with sqlite3.connect(str(db)) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, title, version FROM session WHERE parent_id = ?",
+            (parent_session_id,),
+        )
+        for sid, title, version in cur:
+            description, agent_type = _parse_subagent_title(title or "")
+            model = _get_first_assistant_model(conn, sid)
+            results.append(
+                {
+                    "agent_id": sid,
+                    "description": description,
+                    "agent_type": agent_type,
+                    "model": model,
+                    "version": version or "",
+                }
+            )
+    return results
+
+
+def check_opencode_subagent_exists(parent_session_id: str, agent_ids: list[str]) -> dict[str, dict[str, Any]]:
+    """Check which OpenCode subagent sessions exist and extract their model."""
+    result: dict[str, dict[str, Any]] = {}
+    if not agent_ids:
+        return result
+
+    db = _db_path()
+    if not db.exists():
+        for aid in agent_ids:
+            result[aid] = {"exists": False, "model": ""}
+        return result
+
+    placeholders = ",".join("?" * len(agent_ids))
+    with sqlite3.connect(str(db)) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT id FROM session WHERE parent_id = ? AND id IN ({placeholders})",
+            [parent_session_id] + agent_ids,
+        )
+        existing = {row[0] for row in cur.fetchall()}
+        for aid in agent_ids:
+            model = ""
+            if aid in existing:
+                model = _get_first_assistant_model(conn, aid)
+            result[aid] = {"exists": aid in existing, "model": model}
+    return result
+
+
 def export_opencode_session(session_id: str, out_path: Path) -> None:
     """Export an OpenCode session to a CC-compatible JSONL file."""
     db = _db_path()
@@ -260,6 +344,46 @@ def export_opencode_session(session_id: str, out_path: Path) -> None:
     logger.info("Exported OpenCode session %s to %s", session_id, out_path)
 
 
+def _make_call_id() -> str:
+    """Return a deterministic pseudo-unique call id."""
+    import uuid
+
+    return "oc_" + uuid.uuid4().hex[:16]
+
+
+_TOOL_NAME_MAP: dict[str, str] = {
+    "bash": "Bash",
+    "read": "Read",
+    "glob": "Glob",
+    "grep": "Grep",
+    "edit": "Edit",
+    "write": "Write",
+    "webfetch": "WebFetch",
+    "websearch": "WebSearch",
+    "question": "Question",
+    "todowrite": "TodoWrite",
+    "codesearch": "CodeSearch",
+    "skill": "Skill",
+    "task": "Agent",
+}
+
+
+def _map_tool_name(raw: str) -> str:
+    """Map OpenCode tool name to CC-compatible tool name."""
+    return _TOOL_NAME_MAP.get(raw, raw.capitalize())
+
+
+def _build_tool_input(tool_name: str, raw_input: dict[str, Any], title: str) -> dict[str, Any]:
+    """Build tool_use input dict compatible with the viewer."""
+    inp = dict(raw_input) if isinstance(raw_input, dict) else {}
+    if tool_name == "Agent" and "subagent_type" not in inp:
+        # task tool uses 'subagent_type' key; promote it if missing
+        inp.setdefault("subagent_type", inp.get("subagent_type", "general-purpose"))
+    if title and "description" not in inp:
+        inp["description"] = title
+    return inp
+
+
 def _convert_message(
     msg_data: dict[str, Any],
     ts_ms: int,
@@ -274,36 +398,56 @@ def _convert_message(
     path_info = msg_data.get("path", {})
     cwd = path_info.get("cwd", "")
 
-    content_parts: list[dict[str, str]] = []
-    for p in parts:
+    content_parts: list[dict[str, Any]] = []
+    i = 0
+    while i < len(parts):
+        p = parts[i]
         pt = p.get("type")
         if pt == "text":
             text = p.get("text", "")
-            if text:
+            # Skip synthetic placeholder text injected by OpenCode after tool execution
+            if text and not p.get("synthetic"):
                 content_parts.append({"type": "text", "text": text})
         elif pt == "reasoning":
             text = p.get("text", "")
             if text:
-                content_parts.append({"type": "text", "text": f"[Thinking] {text}"})
+                content_parts.append({"type": "thinking", "thinking": text})
         elif pt == "tool":
-            tool_name = p.get("tool", "tool")
+            tool_name = _map_tool_name(p.get("tool", "tool"))
+            call_id = p.get("callID") or _make_call_id()
             state = p.get("state", {})
-            inp = state.get("input", {})
+            inp = _build_tool_input(tool_name, state.get("input", {}), state.get("title", ""))
             out = state.get("output", "")
-            title = state.get("title", "")
-            desc = title or inp.get("description", "")
-            text = f"**Tool: {tool_name}**"
-            if desc:
-                text += f" ({desc})"
-            text += f"\n```json\n{json.dumps(inp, ensure_ascii=False, indent=2)}\n```\n"
-            if out:
-                text += f"**Output:**\n```\n{out}\n```"
-            content_parts.append({"type": "text", "text": text})
-        elif pt in ("step-start", "step-finish"):
-            continue
+            content_parts.append(
+                {
+                    "type": "tool_use",
+                    "id": call_id,
+                    "name": tool_name,
+                    "input": inp,
+                }
+            )
+            content_parts.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": call_id,
+                    "content": out,
+                }
+            )
+        elif pt == "file":
+            filename = p.get("filename", "")
+            if filename:
+                content_parts.append({"type": "text", "text": f"@{filename}"})
+        elif pt == "patch":
+            files = p.get("files", [])
+            if files:
+                content_parts.append({"type": "text", "text": f"[Patch] {', '.join(files)}"})
+        elif pt in ("step-start", "step-finish", "subtask", "compaction"):
+            pass
         else:
-            if "text" in p:
-                content_parts.append({"type": "text", "text": p["text"]})
+            text = p.get("text")
+            if text:
+                content_parts.append({"type": "text", "text": text})
+        i += 1
 
     if role == "user":
         user_text = " ".join(p["text"] for p in content_parts if p.get("text"))

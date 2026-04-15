@@ -273,6 +273,32 @@ def register(wz) -> None:
                 data.get("parent_file_path", ""),
                 data.get("agent_id", ""),
                 data.get("description", ""),
+                parent_panel=panel,
+            )
+
+    def _register_opencode_subagent_handlers(panel, session_id: str) -> None:
+        """Register OpenCode subagent bridge handlers on a viewer panel."""
+        from .opencode_store import (
+            check_opencode_subagent_exists,
+            list_opencode_subagents,
+        )
+
+        @panel.handle("check_subagent_exists")
+        def check_subagent_exists(data):
+            agent_ids = data.get("agent_ids", [])
+            return check_opencode_subagent_exists(session_id, agent_ids)
+
+        @panel.handle("list_subagents")
+        def list_subagents(data):
+            return list_opencode_subagents(session_id)
+
+        @panel.handle("open_subagent")
+        def open_subagent(data):
+            _open_opencode_subagent_viewer(
+                session_id,
+                data.get("agent_id", ""),
+                data.get("description", ""),
+                parent_panel=panel,
             )
 
     def _open_viewer(session: dict[str, Any]) -> None:
@@ -322,6 +348,70 @@ def register(wz) -> None:
         if source == SOURCE_CC:
             _register_subagent_handlers(panel)
             _start_auto_reload(panel, display_session["file_path"])
+        elif source == SOURCE_OPENCODE:
+            _register_opencode_subagent_handlers(panel, display_session["session_id"])
+            _start_auto_reload(panel, display_session["file_path"])
+        panel.show()
+
+    def _open_opencode_subagent_viewer(
+        parent_session_id: str,
+        agent_id: str,
+        description: str,
+        parent_panel=None,
+    ) -> None:
+        """Open a viewer panel for an OpenCode subagent session."""
+        from wenzi.config import resolve_cache_dir
+
+        from .opencode_store import SOURCE_OPENCODE, export_opencode_session
+
+        cache_dir = Path(resolve_cache_dir()) / "cc_sessions_opencode" / "subagents"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        subagent_path = cache_dir / f"{agent_id}.jsonl"
+        export_opencode_session(agent_id, subagent_path)
+        meta = _parse_subagent_meta(str(subagent_path))
+
+        panel = wz.ui.webview_panel(
+            title=f"Subagent: {description}",
+            html_file=viewer_html_path,
+            width=900,
+            height=700,
+            resizable=True,
+            titlebar_hidden=True,
+            floating=False,
+            allowed_read_paths=[
+                str(subagent_path.parent),
+                os.path.expanduser("~/.claude/"),
+            ],
+        )
+
+        @panel.handle("get_session_info")
+        def get_session_info(_data):
+            return {
+                "file": str(subagent_path),
+                "project": meta.get("project", ""),
+                "cwd": meta.get("cwd", ""),
+                "session_id": agent_id,
+                "title": f"Subagent: {description}",
+                "git_branch": meta.get("git_branch", ""),
+                "version": meta.get("version", ""),
+                "root_session_path": parent_session_id,
+                "parent_file_path": str(subagent_path),
+                "is_subagent": True,
+                "source": SOURCE_OPENCODE,
+            }
+
+        @panel.handle("open_parent_session")
+        def open_parent(_data):
+            panel.close()
+
+        def _bring_parent_to_front():
+            if parent_panel is not None:
+                parent_panel.show()
+
+        panel.on("copy_resume", lambda data: _copy_text(data.get("text", "")))
+        panel.on_close(lambda: _bring_parent_to_front())
+        _register_opencode_subagent_handlers(panel, agent_id)
+        _start_auto_reload(panel, str(subagent_path))
         panel.show()
 
     def _open_subagent_viewer(
@@ -329,6 +419,7 @@ def register(wz) -> None:
         parent_file_path: str,
         agent_id: str,
         description: str,
+        parent_panel=None,
     ) -> None:
         """Open a viewer panel for a subagent session."""
         subagent_path = _resolve_subagent_path(root_session_path, agent_id)
@@ -371,8 +462,12 @@ def register(wz) -> None:
         def open_parent(_data):
             panel.close()
 
-        panel.on("copy_resume", lambda data: _copy_text(data.get("text", "")))
+        def _bring_parent_to_front():
+            if parent_panel is not None:
+                parent_panel.show()
 
+        panel.on("copy_resume", lambda data: _copy_text(data.get("text", "")))
+        panel.on_close(lambda: _bring_parent_to_front())
         _register_subagent_handlers(panel)
         _start_auto_reload(panel, subagent_path)
         panel.show()
