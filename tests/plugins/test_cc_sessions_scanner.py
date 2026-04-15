@@ -7,6 +7,8 @@ import os
 import subprocess
 from pathlib import Path
 
+# Disable OpenCode session loading so unit tests run in isolation
+from cc_sessions import opencode_store as _test_oc_store
 from cc_sessions.git_utils import (
     _find_git_root,
     _git_remote_name,
@@ -21,9 +23,6 @@ from cc_sessions.scanner import (
     _scan_session_jsonl,
     is_noise_message,
 )
-
-# Disable OpenCode session loading so unit tests run in isolation
-from cc_sessions import opencode_store as _test_oc_store
 
 _test_oc_store.list_opencode_sessions = lambda: []
 
