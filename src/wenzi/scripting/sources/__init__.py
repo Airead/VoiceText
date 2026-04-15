@@ -109,6 +109,10 @@ class ChooserSource:
         default=None,
         repr=False,
     )  # Optional "create new" action; receives stripped query
+    load: Callable[[], list[ChooserItem]] | None = field(
+        default=None,
+        repr=False,
+    )  # Static mode: returns all items; engine handles fuzzy filtering
     is_async: bool = False
     search_timeout: float | None = None  # Async sources only; None = use global default
     debounce_delay: float | None = None  # Async sources only; None = use global default, 0 = no debounce
@@ -198,6 +202,17 @@ def fuzzy_match(query: str, text: str) -> tuple[bool, int]:
     """
     if not query:
         return False, 0
+
+    # Multi-term: split on whitespace, each term must match independently
+    terms = query.split()
+    if len(terms) > 1:
+        total = 0
+        for term in terms:
+            matched, score = fuzzy_match(term, text)
+            if not matched:
+                return False, 0
+            total += score
+        return True, total // len(terms)
 
     q = query.lower()
     t = text.lower()

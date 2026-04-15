@@ -61,6 +61,25 @@ class TestChooserSource:
         assert len(result) == 0
 
 
+class TestChooserSourceStatic:
+    def test_load_field(self):
+        items = [ChooserItem(title="server-01")]
+        src = ChooserSource(name="ssh", prefix="ss", load=lambda: items)
+        assert src.load is not None
+        assert src.search is None
+        assert src.load() == items
+
+    def test_load_and_search_mutually_exclusive_by_convention(self):
+        """Static sources use load, dynamic sources use search."""
+        static = ChooserSource(name="s", load=lambda: [])
+        assert static.load is not None
+        assert static.search is None
+
+        dynamic = ChooserSource(name="d", search=lambda q: [])
+        assert dynamic.search is not None
+        assert dynamic.load is None
+
+
 class TestWordInitials:
     def test_space_separated(self):
         assert _word_initials("System Configuration") == "sc"
@@ -172,6 +191,20 @@ class TestFuzzyMatch:
         _, initials_score = fuzzy_match("dd", "DragonDrop")
         _, scattered_score = fuzzy_match("dp", "DragonDrop")
         assert initials_score > scattered_score
+
+    def test_multi_term_all_match(self):
+        matched, score = fuzzy_match("btc euc", "aws-euc1a-btc-fw-12")
+        assert matched is True
+        assert score == 60  # both are substring matches
+
+    def test_multi_term_partial_miss(self):
+        matched, score = fuzzy_match("btc xyz", "aws-euc1a-btc-fw-12")
+        assert matched is False
+
+    def test_multi_term_order_irrelevant(self):
+        _, score1 = fuzzy_match("btc euc", "aws-euc1a-btc-fw-12")
+        _, score2 = fuzzy_match("euc btc", "aws-euc1a-btc-fw-12")
+        assert score1 == score2
 
 
 class TestFuzzyMatchFields:
