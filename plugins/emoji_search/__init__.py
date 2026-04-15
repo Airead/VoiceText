@@ -269,9 +269,9 @@ def _group_preview_html(g: dict[str, Any]) -> str:
     return _wrap_preview_html(inner)
 
 
-def _emoji_item(wz, rec: dict[str, str]) -> dict[str, Any]:
+def _build_preview_html(rec: dict[str, str]) -> dict[str, Any]:
+    """Build preview HTML dict for an emoji record."""
     char = rec["char"]
-    subtitle = f"{rec['name_zh']} | {rec['name_en']} · {rec['group_zh']}"
     inner_html = (
         "<div style='display:flex;flex-direction:column;align-items:center;"
         "justify-content:center;min-height:100%;padding:16px 0;"
@@ -288,14 +288,19 @@ def _emoji_item(wz, rec: dict[str, str]) -> dict[str, Any]:
         "</div>"
         "</div>"
     )
-    preview_html = _wrap_preview_html(inner_html)
+    return {"type": "html", "content": _wrap_preview_html(inner_html)}
+
+
+def _emoji_item(wz, rec: dict[str, str]) -> dict[str, Any]:
+    char = rec["char"]
+    subtitle = f"{rec['name_zh']} | {rec['name_en']} · {rec['group_zh']}"
     return {
         "title": char,
         "subtitle": subtitle,
         "item_id": f"emoji:{char}",
         "action": lambda c=char: wz.type_text(c, method="paste"),
         "secondary_action": lambda c=char: _copy_and_alert(wz, c),
-        "preview": {"type": "html", "content": preview_html},
+        "preview": _build_preview_html(rec),
     }
 
 
@@ -330,7 +335,7 @@ def setup(wz) -> None:
                 item_id=f"emoji:{rec['char']}",
                 action=lambda c=rec["char"]: wz.type_text(c, method="paste"),
                 secondary_action=lambda c=rec["char"]: _copy_and_alert(wz, c),
-                preview=_emoji_item(wz, rec)["preview"],
+                preview=_build_preview_html(rec),
             )
             for rec in results
         ]
