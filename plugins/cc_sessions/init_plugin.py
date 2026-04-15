@@ -6,6 +6,7 @@ import json
 import logging
 import os
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -50,13 +51,12 @@ def _resolve_subagent_path(root_session_path: str, agent_id: str) -> str:
     """Resolve subagent JSONL path from root session path and agent ID."""
     root_dir = os.path.dirname(root_session_path)
     session_id = os.path.splitext(os.path.basename(root_session_path))[0]
-    return os.path.join(
-        root_dir, session_id, "subagents", f"agent-{agent_id}.jsonl"
-    )
+    return os.path.join(root_dir, session_id, "subagents", f"agent-{agent_id}.jsonl")
 
 
 def _check_subagent_exists(
-    root_session_path: str, agent_ids: list,
+    root_session_path: str,
+    agent_ids: list,
 ) -> dict:
     """Check which subagent JSONL files exist and extract their model.
 
@@ -76,7 +76,11 @@ def _check_subagent_exists(
 def _parse_subagent_meta(jsonl_path: str) -> dict:
     """Extract basic metadata from the first few lines of a subagent JSONL."""
     meta: dict = {
-        "cwd": "", "version": "", "git_branch": "", "project": "", "model": "",
+        "cwd": "",
+        "version": "",
+        "git_branch": "",
+        "project": "",
+        "model": "",
     }
     try:
         with open(jsonl_path) as f:
@@ -125,10 +129,7 @@ def _filter_sessions(
     if query.strip():
         scored = []
         for s in result:
-            search_text = (
-                f"{s['title']} {s['project']} {s.get('git_branch', '')}"
-                f" {s.get('summary', '')} {s.get('first_prompt', '')[:200]}"
-            )
+            search_text = f"{s['title']} {s['project']} {s.get('git_branch', '')} {s.get('summary', '')} {s.get('first_prompt', '')[:200]}"
             matched, score = fuzzy_match(query, search_text)
             if matched:
                 scored.append((score, s))
@@ -180,7 +181,19 @@ def register(wz) -> None:
 
     def _copy_text(text: str) -> None:
         from wenzi.scripting.sources import copy_to_clipboard
+
         copy_to_clipboard(text)
+
+    def _ensure_opencode_jsonl(session: dict[str, Any], *, force: bool = False) -> Path:
+        """Return a temp JSONL path for an OpenCode session, exporting if needed."""
+        from wenzi.config import resolve_cache_dir
+        from .opencode_store import export_opencode_session
+
+        cache_dir = Path(resolve_cache_dir()) / "cc_sessions_opencode"
+        temp_path = cache_dir / f"{session['session_id']}.jsonl"
+        if force or not temp_path.exists():
+            export_opencode_session(session["session_id"], temp_path)
+        return temp_path
 
     def _start_auto_reload(panel, file_path: str) -> None:
         """Start auto-reload watcher that pushes file changes to the panel."""
@@ -189,7 +202,8 @@ def register(wz) -> None:
         watcher = AutoReloadWatcher(
             file_path,
             on_new_lines=lambda lines: panel.send(
-                "reload_update", {"lines": lines},
+                "reload_update",
+                {"lines": lines},
             ),
         )
         watcher.start()
@@ -215,39 +229,51 @@ def register(wz) -> None:
 
     def _open_viewer(session: dict[str, Any]) -> None:
         """Open the session viewer panel using pull model."""
-        logger.info("Opening viewer for session: %s, file: %s",
-                     session["session_id"], session["file_path"])
+        from .opencode_store import SOURCE_OPENCODE, SOURCE_CC
+
+        source = session.get("source", SOURCE_CC)
+        if source == SOURCE_OPENCODE:
+            temp_path = _ensure_opencode_jsonl(session, force=True)
+            display_session = dict(session)
+            display_session["file_path"] = str(temp_path)
+            read_paths = [str(temp_path.parent), os.path.expanduser("~/.claude/")]
+        else:
+            display_session = session
+            temp_path = None
+            read_paths = [os.path.expanduser("~/.claude/")]
+
+        logger.info("Opening viewer for session: %s, file: %s", display_session["session_id"], display_session["file_path"])
         panel = wz.ui.webview_panel(
-            title=session["title"],
+            title=display_session["title"],
             html_file=viewer_html_path,
             width=900,
             height=700,
             resizable=True,
             titlebar_hidden=True,
             floating=False,
-            allowed_read_paths=[
-                os.path.expanduser("~/.claude/"),
-            ],
+            allowed_read_paths=read_paths,
         )
 
         @panel.handle("get_session_info")
         def get_session_info(_data):
             return {
-                "file": session["file_path"],
-                "project": session["project"],
-                "cwd": session["cwd"],
-                "session_id": session["session_id"],
-                "title": session["title"],
-                "git_branch": session.get("git_branch", ""),
-                "version": session.get("version", ""),
-                "root_session_path": session["file_path"],
+                "file": display_session["file_path"],
+                "project": display_session["project"],
+                "cwd": display_session["cwd"],
+                "session_id": display_session["session_id"],
+                "title": display_session["title"],
+                "git_branch": display_session.get("git_branch", ""),
+                "version": display_session.get("version", ""),
+                "root_session_path": display_session["file_path"],
                 "is_subagent": False,
+                "source": display_session.get("source", SOURCE_CC),
             }
 
         panel.on("copy_resume", lambda data: _copy_text(data.get("text", "")))
 
-        _register_subagent_handlers(panel)
-        _start_auto_reload(panel, session["file_path"])
+        if source == SOURCE_CC:
+            _register_subagent_handlers(panel)
+            _start_auto_reload(panel, display_session["file_path"])
         panel.show()
 
     def _open_subagent_viewer(
@@ -305,6 +331,14 @@ def register(wz) -> None:
 
     def _delete_session(session: dict[str, Any]) -> None:
         """Move the session JSONL file to macOS Trash."""
+        from .opencode_store import SOURCE_OPENCODE
+
+        if session.get("source") == SOURCE_OPENCODE:
+            try:
+                wz.alert("OpenCode sessions cannot be deleted from this plugin.")
+            except Exception:
+                pass
+            return
         file_path = session.get("file_path", "")
         if not file_path:
             return
@@ -338,18 +372,31 @@ def register(wz) -> None:
 
     def _make_preview(session: dict[str, Any]):
         """Return a lazy callable that builds HTML preview on demand."""
+
         def _load():
             from pathlib import Path
 
+            from .opencode_store import SOURCE_OPENCODE
             from .preview import build_preview_html
             from .reader import read_session_detail
 
             file_path = session.get("file_path", "")
-            detail = read_session_detail(Path(file_path)) if file_path else {
-                "turns": [], "total_input_tokens": 0, "total_output_tokens": 0,
-            }
+            if session.get("source") == SOURCE_OPENCODE and file_path:
+                temp_path = _ensure_opencode_jsonl(session)
+                file_path = str(temp_path)
+
+            detail = (
+                read_session_detail(Path(file_path))
+                if file_path
+                else {
+                    "turns": [],
+                    "total_input_tokens": 0,
+                    "total_output_tokens": 0,
+                }
+            )
             html = build_preview_html(session, detail)
             return {"type": "html", "content": html}
+
         return _load
 
     @wz.chooser.source(
@@ -378,16 +425,19 @@ def register(wz) -> None:
                 subtitle_parts.append(s["git_branch"])
 
             msg_count = s.get("message_count", 0)
-            items.append({
-                "title": s["title"],
-                "subtitle": " \u00b7 ".join(subtitle_parts),
-                "icon": generate_identicon(s["project"]),
-                "icon_badge": str(msg_count) if msg_count else "",
-                "item_id": f"cc-{s['session_id']}",
-                "action": lambda sess=s: _open_viewer(sess),
-                "secondary_action": lambda sess=s: _copy_full_path(sess),
-                "preview": _make_preview(s),
-                "delete_action": lambda sess=s: _delete_session(sess),
-                "confirm_delete": True,
-            })
+            prefix = "oc" if s.get("source") == "opencode" else "cc"
+            items.append(
+                {
+                    "title": s["title"],
+                    "subtitle": " · ".join(subtitle_parts),
+                    "icon": generate_identicon(s["project"]),
+                    "icon_badge": str(msg_count) if msg_count else "",
+                    "item_id": f"{prefix}-{s['session_id']}",
+                    "action": lambda sess=s: _open_viewer(sess),
+                    "secondary_action": lambda sess=s: _copy_full_path(sess),
+                    "preview": _make_preview(s),
+                    "delete_action": lambda sess=s: _delete_session(sess),
+                    "confirm_delete": True,
+                }
+            )
         return items

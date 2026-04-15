@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
+from time import time
 from typing import Any
+
+from .git_utils import clear_project_name_cache, resolve_project_name
 
 # XML-like tags injected by Claude Code for system messages and commands
 _NOISE_PATTERN = re.compile(
@@ -105,88 +107,6 @@ def _project_name_from_dir(dirname: str) -> str:
         return dirname
     parts = stripped.split("-")
     return parts[-1] if parts else dirname
-
-
-def _find_git_root(cwd: str) -> str:
-    """Walk up from *cwd* to filesystem root looking for ``.git``.
-
-    Returns the path containing ``.git`` (directory or file), or ``""``
-    if none is found.
-    """
-    try:
-        current = Path(cwd).resolve()
-    except (OSError, ValueError):
-        return ""
-    if not current.exists():
-        return ""
-    while True:
-        if (current / ".git").exists():
-            return str(current)
-        parent = current.parent
-        if parent == current:  # reached filesystem root
-            return ""
-        current = parent
-
-
-# Cache: cwd path -> resolved project name
-_project_name_cache: dict[str, str] = {}
-
-
-def _resolve_project_name(cwd: str, fallback: str) -> str:
-    """Resolve the project name from *cwd*, with caching.
-
-    Priority: git remote origin repo name > git root / cwd basename
-    (before ``"."``) > *fallback* (directory-name derived).
-
-    When *cwd* is a subdirectory of a git repo, the repo root is used
-    for name resolution so that all sessions in the same repo share
-    one project name.
-    """
-    if not cwd:
-        return fallback
-    cached = _project_name_cache.get(cwd)
-    if cached is not None:
-        return cached
-
-    git_root = _find_git_root(cwd)
-    effective = git_root or cwd
-    name = _git_remote_name(effective) or _name_from_cwd(effective) or fallback
-    _project_name_cache[cwd] = name
-    return name
-
-
-def _git_remote_name(cwd: str) -> str:
-    """Extract the repository name from git remote origin URL."""
-    try:
-        result = subprocess.run(
-            ["git", "config", "--get", "remote.origin.url"],
-            capture_output=True,
-            text=True,
-            cwd=cwd,
-        )
-        url = result.stdout.strip()
-        if not url:
-            return ""
-        # git@github.com:User/Repo.git -> Repo
-        # https://github.com/User/Repo.git -> Repo
-        base = url.rstrip("/").rsplit("/", 1)[-1].rsplit(":", 1)[-1]
-        if base.endswith(".git"):
-            base = base[:-4]
-        return base
-    except OSError:
-        return ""
-
-
-def _name_from_cwd(cwd: str) -> str:
-    """Extract project name from cwd basename, handling worktree naming.
-
-    ``/path/to/VoiceText.feat-branch`` -> ``VoiceText``
-    ``/path/to/VoiceText`` -> ``VoiceText``
-    """
-    basename = Path(cwd).name
-    if "." in basename:
-        return basename.split(".", 1)[0]
-    return basename
 
 
 def _choose_title(
@@ -313,7 +233,7 @@ def _scan_session_jsonl(
     if custom_title:
         custom_title = _clean_custom_title(custom_title)
 
-    project = _resolve_project_name(cwd, project_name)
+    project = resolve_project_name(cwd, project_name)
     title = _choose_title(custom_title or None, summary or None, first_user_message)
 
     return _make_session(
@@ -364,15 +284,29 @@ class SessionScanner:
         # In-memory cache for index supplements: {index_path: (mtime, {sid: {summary, customTitle}})}
         self._index_supplements: dict[str, tuple[float, dict[str, dict[str, str]]]] = {}
 
+        # In-memory TTL cache for scan_all results
+        self._scan_all_ttl = 5.0
+        self._scan_all_cached_at: float = 0.0
+        self._scan_all_cached_result: list[dict[str, Any]] = []
+
     def clear_cache(self) -> None:
         """Clear all caches (disk, in-memory) so sessions are rescanned fresh."""
         if self._cache:
             self._cache.clear()
         self._index_supplements.clear()
-        _project_name_cache.clear()
+        clear_project_name_cache()
+        self._scan_all_cached_at = 0.0
+        self._scan_all_cached_result = []
+        from .opencode_store import clear_cache as _clear_opencode_cache
+
+        _clear_opencode_cache()
 
     def scan_all(self) -> list[dict[str, Any]]:
-        """Return all sessions sorted by modified descending."""
+        """Return all sessions sorted by modified descending (cached in-memory with TTL)."""
+        now = time()
+        if now - self._scan_all_cached_at < self._scan_all_ttl:
+            return self._scan_all_cached_result
+
         if not self._base_dir.is_dir():
             return []
 
@@ -431,6 +365,29 @@ class SessionScanner:
                     seen_ids.add(session["session_id"])
                     sessions.append(session)
 
+        # Merge OpenCode sessions
+        from .opencode_store import list_opencode_sessions
+
+        for oc_session in list_opencode_sessions():
+            cache_key = oc_session["file_path"]
+            live_paths.add(cache_key)
+            try:
+                mtime = datetime.fromisoformat(oc_session["modified"].replace("Z", "+00:00")).timestamp()
+            except (ValueError, TypeError):
+                mtime = 0.0
+
+            cached = self._cache.get(cache_key) if self._cache else None
+            if cached and cached[0] == mtime:
+                session = cached[1]
+            else:
+                session = oc_session
+                if self._cache:
+                    self._cache.put(cache_key, mtime, session)
+
+            if session["session_id"] not in seen_ids:
+                seen_ids.add(session["session_id"])
+                sessions.append(session)
+
         # Prune deleted entries and save
         if self._cache:
             self._cache.prune(live_paths)
@@ -438,6 +395,8 @@ class SessionScanner:
 
         # Sort by modified descending
         sessions.sort(key=lambda s: s.get("modified", ""), reverse=True)
+        self._scan_all_cached_at = now
+        self._scan_all_cached_result = sessions
         return sessions
 
     def _load_index_supplements(
